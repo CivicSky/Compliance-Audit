@@ -1,10 +1,10 @@
-const mysql = require('mysql2');
+const mysql = require('mysql2/promise');
 
 const pool = mysql.createPool({
   host: 'localhost',
   user: 'root',
   password: '',
-  database: 'db_shop',
+  database: 'db_compliance_audit',
   port: 3306
 });
 
