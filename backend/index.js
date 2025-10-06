@@ -4,7 +4,7 @@ const port = 3000;
 
 app.use(express.json());
 
-const userRoutes = require('./routes/user');
+const userRoutes = require('./routes/users');
 
 app.get('/', (req, res) => {
   res.send('Hello, Express!');
