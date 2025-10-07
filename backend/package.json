@@ -11,7 +11,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "devStart": "nodemon index.js",
+    "devstart": "nodemon index.js",
     "start": "node index.js"
   },
   "keywords": [],
