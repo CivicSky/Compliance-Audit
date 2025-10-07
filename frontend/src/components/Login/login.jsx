@@ -28,6 +28,7 @@ const Login = () => {
 
              <form className="bg-white p-8 rounded shadow-md w-96">
                 <h1 className="text-center text-2xl font-bold mb-6">Login</h1>
+
                 <div className="mb-4">
                     <input 
                         type="email" 
