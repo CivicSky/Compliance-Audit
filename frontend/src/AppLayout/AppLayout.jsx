@@ -1,15 +1,14 @@
 import { Outlet } from "react-router-dom";
-import  Navbar  from "../components/Navigation/navbar";
+import Navbar from "../components/Navigation/navbar";
 
-const AppLayout = () => {
+export default function AppLayout() {
     return (
         <>
-        <Navbar/>
-        <main className="pt-20">
-            <Outlet/>
-        </main>
+            <Navbar />
+            <main className="pt-20">
+                <Outlet />
+            </main>
         </>
     );
 };
 
-export default AppLayout;

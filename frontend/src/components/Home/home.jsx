@@ -1,18 +1,17 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
 import Header from "../Header/header"
 
-const Home = ()=>{
-    return(
-         <div className="ml-72 px-6 pb-6 pt-0">
+export default function Home() {
+    return (
+        <div className="ml-72 px-6 pb-6 pt-0">
             <Header />
-            
+
             <div className="relative z-10">
-                
+
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-10">
                     <div className="relative bg-white shadow-md rounded-2xl p-6 text-center hover:scale-105 transition-transform border-2 border-slate-400">
-                        <img 
+                        <img
                             src="/images/organization.svg"
                             alt="background"
                             className="absolute top-3 right-3 w-10 h-10 opacity-20"
@@ -21,7 +20,7 @@ const Home = ()=>{
                         <p className="text-3xl font-bold text-blue-600 mt-2">17</p>
                     </div>
                     <div className="relative bg-white shadow-md rounded-2xl p-6 text-center hover:scale-105 transition-transform border-2 border-slate-400">
-                        <img 
+                        <img
                             src="/images/user.svg"
                             alt="background"
                             className="absolute top-3 right-3 w-10 h-10 opacity-20"
@@ -30,7 +29,7 @@ const Home = ()=>{
                         <p className="text-3xl font-bold text-blue-600 mt-2">245</p>
                     </div>
                     <div className="relative bg-white shadow-md rounded-2xl p-6 text-center hover:scale-105 transition-transform border-2 border-slate-400">
-                        <img 
+                        <img
                             src="/images/audit.svg"
                             alt="background"
                             className="absolute top-3 right-3 w-10 h-10 opacity-20"
@@ -39,7 +38,7 @@ const Home = ()=>{
                         <p className="text-3xl font-bold text-blue-600 mt-2">58</p>
                     </div>
                     <div className="relative bg-white shadow-md rounded-2xl p-6 text-center hover:scale-105 transition-transform border-2 border-slate-400">
-                        <img 
+                        <img
                             src="/images/pending.svg"
                             alt="background"
                             className="absolute top-3 right-3 w-10 h-10 opacity-20"
@@ -55,4 +54,3 @@ const Home = ()=>{
 
 
 
-export default Home;
