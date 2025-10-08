@@ -12,21 +12,19 @@ const Login = () => {
           
           <div className="absolute inset-0 bg-black/50"></div>
 
-          <div className="relative z-10 w-96">
-            <div className="bg-white rounded-xl shadow-md px-6 py-6 flex items-center justify-center gap-3 mb-6">
-                <img
-                  src="/images/lccb_logo.png"
-                  alt="App Logo"
-                  className="w-12 h-12 mb-2"
-                />
-                <h1 className="text-lg font-bold text-gray-800">
+          <div className="relative z-10 w-auto">
+                <div className="bg-white rounded-xl shadow-lg px-8 py-8 flex items-center justify-center gap-4 mb-6 border-2 border-slate-400">
+                    <img
+                    src="/images/lccb_logo.png"
+                    alt="App Logo"
+                    className="w-16 h-16"   
+                    />
+                    <h1 className="text-2xl font-bold text-gray-900">
                     Compliance and Audit
-                </h1>
-            </div>
+                    </h1>
+                </div>
         
-       
-
-             <form className="bg-white p-8 rounded shadow-md w-96">
+             <form className="bg-white p-8 rounded shadow-md w-96 border-2 border-slate-400">
                 <h1 className="text-center text-2xl font-bold mb-6">Login</h1>
 
                 <div className="mb-4">
@@ -34,7 +32,7 @@ const Login = () => {
                         type="email" 
                         placeholder="Email" 
                         required 
-                        className="w-full p-2 border border-gray-300 rounded" 
+                        className="w-full p-2 border-2 border-slate-300 rounded" 
                         />
                 </div>
                 <div className="mb-6">
@@ -42,7 +40,7 @@ const Login = () => {
                         type="password" 
                         placeholder="Password" 
                         required 
-                        className="w-full p-2 border border-gray-300 rounded" 
+                        className="w-full p-2 border-2 border-slate-300 rounded" 
                     />
                 </div>
 

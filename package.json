@@ -9,9 +9,17 @@
     "them": "concurrently \"npm run frontend\" \"npm run backend\"",
     "start": "node index.js"
   },
+<<<<<<< HEAD
+  "dependencies": {
+    "lucide-react": "^0.545.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "react-router-dom": "^7.9.3"
+=======
   "repository": {
     "type": "git",
     "url": "git+https://github.com/CivicSky/Compliance-Audit.git"
+>>>>>>> 7670d9a37e3f01a329e525195749264c32a3d153
   },
   "keywords": [],
   "author": "",
