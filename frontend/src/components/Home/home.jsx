@@ -46,6 +46,15 @@ export default function Home() {
                         <h2 className="text-lg font-semibold text-gray-700">Pending Audits</h2>
                         <p className="text-3xl font-bold text-blue-600 mt-2">7</p>
                     </div>
+
+                    <div className="bg-white shadow-xl rounded-2xl p-6 flex items-center justify-center gap-4 border-2 border-slate-400 w-[760px]">
+                        <h1 className="text-lg font-semibold text-gray-700">
+                            Recent Logs
+                        </h1>
+                        <h2 className="text-base font-semibold text-gray-700">
+                            
+                        </h2>
+                    </div>
                 </div>
             </div>
         </div>
