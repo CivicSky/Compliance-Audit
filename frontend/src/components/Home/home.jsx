@@ -47,13 +47,48 @@ export default function Home() {
                         <p className="text-3xl font-bold text-blue-600 mt-2">7</p>
                     </div>
 
-                    <div className="bg-white shadow-xl rounded-2xl p-6 flex items-center justify-center gap-4 border-2 border-slate-400 w-[760px]">
-                        <h1 className="text-lg font-semibold text-gray-700">
-                            Recent Logs
-                        </h1>
-                        <h2 className="text-base font-semibold text-gray-700">
-                            
-                        </h2>
+                    <div className="mt-8 bg-white shadow-lg rounded-2xl p-6 border-2 border-slate-400 w-[760px]">
+
+                        <div className="flex items-center justify-between mb-4">
+                            <h1 className="text-xl font-semibold text-slate-800">Recent Logs</h1>
+                            <button className="text-sm text-blue-600 hover:underline">
+                                View All
+                            </button>
+                        </div>
+
+
+                        <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
+
+                            <div className="flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 transition">
+                                <div className="w-2 h-2 mt-2 rounded-full bg-green-500"></div>
+                                <div>
+                                    <p className="text-sm text-gray-700">
+                                        <span className="font-medium">ABC Corp</span> completed Fire Safety Compliance.
+                                    </p>
+                                    <p className="text-xs text-gray-400">2 hours ago</p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 transition">
+                                <div className="w-2 h-2 mt-2 rounded-full bg-red-500"></div>
+                                <div>
+                                    <p className="text-sm text-gray-700">
+                                        <span className="font-medium">XYZ Industries</span> failed Data Protection Policy.
+                                    </p>
+                                    <p className="text-xs text-gray-400">5 hours ago</p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 transition">
+                                <div className="w-2 h-2 mt-2 rounded-full bg-yellow-400"></div>
+                                <div>
+                                    <p className="text-sm text-gray-700">
+                                        <span className="font-medium">LMN Group</span> pending Environmental Standards review.
+                                    </p>
+                                    <p className="text-xs text-gray-400">Yesterday</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

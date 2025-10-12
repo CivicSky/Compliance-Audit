@@ -10,7 +10,7 @@ export default function Header() {
                     className="h-20 w-30 object-contain mr-10"
                 />
                 <h1 className="text-4xl font-bold text-gray-800">
-                    Compliance Audity
+                    Compliance Audit
                 </h1>
             </div>
 

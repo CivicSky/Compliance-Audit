@@ -6,6 +6,7 @@ import Register from './components/Register/register.jsx'
 import Home from './components/Home/home.jsx'
 import NotFoundPage from './components/NotFoundPage/notfoundpage.jsx'
 import AppLayout from './AppLayout/AppLayout.jsx'
+import Organization from './pages/Organization/organization.jsx'
 
 export default function App() {
   const router = createBrowserRouter([
@@ -16,7 +17,7 @@ export default function App() {
       element: <AppLayout />,
       children: [
         { index: true, element: <Home /> },
-        { path: 'organizations', element: <div>Organizations Page</div> },
+        { path: 'organizations', element: <Organization/>},
       ],
     },
     { path: '*', element: <NotFoundPage /> },
