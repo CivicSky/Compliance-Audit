@@ -1,67 +1,23 @@
 const db = require('../db');
 
-exports.getUserHome = (req, res) => {
-  res.send('User Home Route');
-};
-
-exports.getUserProfile = (req, res) => {
-  res.send('User Profile Page');
-};
-
-exports.getUserSettings = (req, res) => {
-  res.send('User Settings Page');
-};
-
-exports.addUser = async (req, res) => {
+exports.getUsers = async (req, res) => {
   try {
-    const { username, firstname } = req.body;
+    // Join users with roles to get role name
+    const [rows] = await db.query(`
+      SELECT u.UserID, u.FullName, u.Email, r.RoleName 
+      FROM users u 
+      LEFT JOIN roles r ON u.RoleID = r.RoleID
+    `);
 
-    if (!username || !firstname) {
-      return res.status(400).json({ message: "Username and firstname are required" });
-    }
-
-    const [result] = await db.execute(
-      'INSERT INTO tbl_users (username, firstname) VALUES (?, ?)',
-      [username, firstname]
-    );
-
-    res.json({
-      id: result.insertId,
-      username,
-      firstname,
-      message: "User added successfully"
-    });
+    // Format users into a clean text output
+    const userList = rows.map(user => 
+      `ID: ${user.UserID} | Name: ${user.FullName} | Email: ${user.Email} | Role: ${user.RoleName || 'N/A'}`
+    ).join('\n');
+    
+    res.send(userList || 'No users found');
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Database error" });
+    console.error('Error fetching users:', error);
+    res.status(500).send('Error: Could not fetch users');
   }
 };
 
-exports.listUsers = async (req, res) => {
-  try {
-    const [rows] = await db.execute('SELECT id, username, firstname FROM tbl_users');
-    res.json(rows);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Database error" });
-  }
-};
-
-exports.getUserById = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const [rows] = await db.execute(
-      'SELECT id, username, firstname FROM tbl_users WHERE id = ?',
-      [id]
-    );
-
-    if (rows.length === 0) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    res.json(rows[0]);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Database error" });
-  }
-};

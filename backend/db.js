@@ -4,8 +4,9 @@ const pool = mysql.createPool({
   host: 'localhost',
   user: 'root',
   password: '',
-  database: 'db_compliance_audit',
+  database: 'db_complinceaudit',
   port: 3306
 });
+
 
 module.exports = pool.promise();
