@@ -1,0 +1,25 @@
+{
+  "name": "compliance-audit",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "frontend": "cd frontend && npm run dev",
+    "backend": "cd backend && npm start",
+    "dev": "concurrently \"npm run backend\" \"npm run frontend\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CivicSky/Compliance-Audit.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/CivicSky/Compliance-Audit/issues"
+  },
+  "homepage": "https://github.com/CivicSky/Compliance-Audit#readme",
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
