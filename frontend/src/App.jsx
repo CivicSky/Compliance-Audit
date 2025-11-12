@@ -6,7 +6,7 @@ import Register from './components/Register/register.jsx'
 import Home from './components/Home/home.jsx'
 import NotFoundPage from './components/NotFoundPage/notfoundpage.jsx'
 import AppLayout from './AppLayout/AppLayout.jsx'
-import Organization from './pages/Organization/organization.jsx'
+import Organization from './components/Organization/organization.jsx'
 
 export default function App() {
   const router = createBrowserRouter([
