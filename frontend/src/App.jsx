@@ -7,6 +7,7 @@ import Home from './components/Home/home.jsx'
 import NotFoundPage from './components/NotFoundPage/notfoundpage.jsx'
 import AppLayout from './AppLayout/AppLayout.jsx'
 import Organization from './components/Organization/organization.jsx'
+import Audit from './components/Audit/audit.jsx'
 
 export default function App() {
   const router = createBrowserRouter([
@@ -18,6 +19,7 @@ export default function App() {
       children: [
         { index: true, element: <Home /> },
         { path: 'organizations', element: <Organization/>},
+        { path: 'audit', element: <Audit/>},
       ],
     },
     { path: '*', element: <NotFoundPage /> },

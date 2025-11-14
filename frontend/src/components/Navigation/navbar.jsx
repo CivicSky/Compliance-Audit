@@ -18,7 +18,7 @@ export default function Navbar() {
                 </Link>
 
                 <Link
-                    to="/audits"
+                    to="/home/audit"
                     className="py-1 px-3 text-lg font-light text-white hover:text-sky-300 rounded-lg hover:bg-slate-700 transition duration-300"
                 >
                     Audits
