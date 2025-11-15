@@ -9,6 +9,8 @@ import AppLayout from './AppLayout/AppLayout.jsx'
 import Organization from './components/Organization/organization.jsx'
 import Audit from './components/Audit/audit.jsx'
 import OfficeHead from './components/OfficeHead/OfficeHead.jsx'
+import Requirements from './components/requirements/requirements.jsx'
+import Profile from './components/Profile/Profile.jsx'
 
 export default function App() {
   const router = createBrowserRouter([
@@ -21,7 +23,9 @@ export default function App() {
         { index: true, element: <Home /> },
         { path: 'organizations', element: <Organization/>},
         { path: 'audit', element: <Audit/>},
+        { path: 'requirements', element: <Requirements/>},
         { path: 'officehead', element: <OfficeHead/>},
+        { path: 'profile', element: <Profile/>},
       ],
     },
     { path: '*', element: <NotFoundPage /> },

@@ -1,14 +1,18 @@
-import Header from "../../components/Header/header.jsx";
-import user from "../../assets/images/user.svg"
-import OfficeP from "../OfficeP/OfficeP.jsx";
+import React from "react";
+import Header from "../Header/header"
+import OfficeP from "../OfficeP/OfficeP";
 
-export default function OfficeHead() {
-
-
+export default function Home() {
     return (
         <div className="px-6 pb-6 pt-6 w-full">
-            <Header pageTitle="Office Head" />
-          <OfficeP/>
+            <Header pageTitle="Office Heads" />
+
+            <div className="relative z-10">
+                <OfficeP/>
+            </div>
         </div>
     );
-}
+};
+
+
+
