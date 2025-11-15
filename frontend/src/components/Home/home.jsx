@@ -7,14 +7,14 @@ import pending from "../../assets/images/pending.svg"
 
 export default function Home() {
     return (
-        <div className="ml-72 px-6 pb-6 pt-0">
+        <div className="px-6 pb-6 pt-6 w-full">
             <Header />
 
             <div className="relative z-10">
 
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-10">
-                    <div className="relative bg-white shadow-md rounded-2xl p-6 text-center hover:scale-105 transition-transform border-2 border-slate-400">
+                    <div className="relative bg-white rounded-2xl p-6 text-center border border-slate-200 shadow-sm hover:shadow-lg transform transition-transform hover:-translate-y-1">
                         <img
                             src={org}
                             alt="background"
@@ -23,7 +23,7 @@ export default function Home() {
                         <h2 className="text-lg font-semibold text-gray-700">Organizations</h2>
                         <p className="text-3xl font-bold text-blue-600 mt-2">17</p>
                     </div>
-                    <div className="relative bg-white shadow-md rounded-2xl p-6 text-center hover:scale-105 transition-transform border-2 border-slate-400">
+                        <div className="relative bg-white rounded-2xl p-6 text-center border border-slate-200 shadow-sm hover:shadow-lg transform transition-transform hover:-translate-y-1">
                         <img
                             src={user}
                             alt="background"
@@ -32,7 +32,7 @@ export default function Home() {
                         <h2 className="text-lg font-semibold text-gray-700">User</h2>
                         <p className="text-3xl font-bold text-blue-600 mt-2">245</p>
                     </div>
-                    <div className="relative bg-white shadow-md rounded-2xl p-6 text-center hover:scale-105 transition-transform border-2 border-slate-400">
+                        <div className="relative bg-white rounded-2xl p-6 text-center border border-slate-200 shadow-sm hover:shadow-lg transform transition-transform hover:-translate-y-1">
                         <img
                             src={audit}
                             alt="background"
@@ -41,7 +41,7 @@ export default function Home() {
                         <h2 className="text-lg font-semibold text-gray-700">Total Audits</h2>
                         <p className="text-3xl font-bold text-blue-600 mt-2">58</p>
                     </div>
-                    <div className="relative bg-white shadow-md rounded-2xl p-6 text-center hover:scale-105 transition-transform border-2 border-slate-400">
+                        <div className="relative bg-white rounded-2xl p-6 text-center border border-slate-200 shadow-sm hover:shadow-lg transform transition-transform hover:-translate-y-1">
                         <img
                             src={pending}
                             alt="background"
@@ -51,7 +51,7 @@ export default function Home() {
                         <p className="text-3xl font-bold text-blue-600 mt-2">7</p>
                     </div>
 
-                    <div className="mt-8 bg-white shadow-lg rounded-2xl p-6 border-2 border-slate-400 w-[760px]">
+                    <div className="mt-8 bg-white shadow-lg rounded-2xl p-6 border-2 border-slate-400 w-full max-w-4xl">
 
                         <div className="flex items-center justify-between mb-4">
                             <h1 className="text-xl font-semibold text-slate-800">Recent Logs</h1>

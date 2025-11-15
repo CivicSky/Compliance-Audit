@@ -5,7 +5,7 @@ export default function AppLayout() {
     return (
         <>
             <Navbar />
-            <main className="pt-20">
+            <main className="pt-20 ml-64">
                 <Outlet />
             </main>
         </>

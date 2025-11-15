@@ -8,6 +8,7 @@ import NotFoundPage from './components/NotFoundPage/notfoundpage.jsx'
 import AppLayout from './AppLayout/AppLayout.jsx'
 import Organization from './components/Organization/organization.jsx'
 import Audit from './components/Audit/audit.jsx'
+import OfficeHead from './components/OfficeHead/OfficeHead.jsx'
 
 export default function App() {
   const router = createBrowserRouter([
@@ -20,6 +21,7 @@ export default function App() {
         { index: true, element: <Home /> },
         { path: 'organizations', element: <Organization/>},
         { path: 'audit', element: <Audit/>},
+        { path: 'officehead', element: <OfficeHead/>},
       ],
     },
     { path: '*', element: <NotFoundPage /> },
