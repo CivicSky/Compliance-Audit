@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import logo from "../../assets/images/lccb_logo.png"
+import bg from "../../assets/images/login_bg.jpg"
 import axios from "axios";
 
 export default function Login() {
@@ -49,14 +51,14 @@ export default function Login() {
     return (
         <div
             className="relative flex justify-center items-center h-screen bg-cover bg-center"
-            style={{ backgroundImage: "url('/images/login_bg.jpg')" }}
+            style={{ backgroundImage: `url(${bg})`}}
         >
             <div className="absolute inset-0 bg-black/50"></div>
 
             <div className="relative z-10 w-auto">
                 <div className="bg-white rounded-xl shadow-lg px-8 py-8 flex items-center justify-center gap-4 mb-6 border-2 border-slate-400">
                     <img
-                        src="/images/lccb_logo.png"
+                        src={logo}
                         alt="App Logo"
                         className="w-16 h-16"
                     />
@@ -122,5 +124,4 @@ export default function Login() {
         </div>
     );
 };
-
 

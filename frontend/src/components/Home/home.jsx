@@ -1,5 +1,9 @@
 import React from "react";
 import Header from "../Header/header"
+import org from "../../assets/images/organization.svg"
+import user from "../../assets/images/user.svg"
+import audit from "../../assets/images/audit.svg"
+import pending from "../../assets/images/pending.svg"
 
 export default function Home() {
     return (
@@ -12,7 +16,7 @@ export default function Home() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-10">
                     <div className="relative bg-white shadow-md rounded-2xl p-6 text-center hover:scale-105 transition-transform border-2 border-slate-400">
                         <img
-                            src="/images/organization.svg"
+                            src={org}
                             alt="background"
                             className="absolute top-3 right-3 w-10 h-10 opacity-20"
                         />
@@ -21,7 +25,7 @@ export default function Home() {
                     </div>
                     <div className="relative bg-white shadow-md rounded-2xl p-6 text-center hover:scale-105 transition-transform border-2 border-slate-400">
                         <img
-                            src="/images/user.svg"
+                            src={user}
                             alt="background"
                             className="absolute top-3 right-3 w-10 h-10 opacity-20"
                         />
@@ -30,7 +34,7 @@ export default function Home() {
                     </div>
                     <div className="relative bg-white shadow-md rounded-2xl p-6 text-center hover:scale-105 transition-transform border-2 border-slate-400">
                         <img
-                            src="/images/audit.svg"
+                            src={audit}
                             alt="background"
                             className="absolute top-3 right-3 w-10 h-10 opacity-20"
                         />
@@ -39,7 +43,7 @@ export default function Home() {
                     </div>
                     <div className="relative bg-white shadow-md rounded-2xl p-6 text-center hover:scale-105 transition-transform border-2 border-slate-400">
                         <img
-                            src="/images/pending.svg"
+                            src={pending}
                             alt="background"
                             className="absolute top-3 right-3 w-10 h-10 opacity-20"
                         />
@@ -59,35 +63,7 @@ export default function Home() {
 
                         <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
 
-                            <div className="flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 transition">
-                                <div className="w-2 h-2 mt-2 rounded-full bg-green-500"></div>
-                                <div>
-                                    <p className="text-sm text-gray-700">
-                                        <span className="font-medium">ABC Corp</span> completed Fire Safety Compliance.
-                                    </p>
-                                    <p className="text-xs text-gray-400">2 hours ago</p>
-                                </div>
-                            </div>
 
-                            <div className="flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 transition">
-                                <div className="w-2 h-2 mt-2 rounded-full bg-red-500"></div>
-                                <div>
-                                    <p className="text-sm text-gray-700">
-                                        <span className="font-medium">XYZ Industries</span> failed Data Protection Policy.
-                                    </p>
-                                    <p className="text-xs text-gray-400">5 hours ago</p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 transition">
-                                <div className="w-2 h-2 mt-2 rounded-full bg-yellow-400"></div>
-                                <div>
-                                    <p className="text-sm text-gray-700">
-                                        <span className="font-medium">LMN Group</span> pending Environmental Standards review.
-                                    </p>
-                                    <p className="text-xs text-gray-400">Yesterday</p>
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </div>
