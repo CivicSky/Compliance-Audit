@@ -1,13 +1,15 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import bg from "../../assets/images/login_bg.jpg"
+import { useNavigate, Link } from "react-router-dom";
+import bg from "../../assets/images/homebg.jpg"
 import logo from "../../assets/images/lccb_logo.png"
+import audittrackLogo from "../../assets/images/logo.png"
 import axios from "axios";
 
 export default function Register() {
     const navigate = useNavigate();
     const [formData, setFormData] = useState({
         firstName: "",
+        middleInitial: "",
         lastName: "",
         email: "",
         password: "",
@@ -29,138 +31,218 @@ export default function Register() {
         setError("");
 
         try {
-            // Combine first and last name for fullName as required by the database
-            const fullName = `${formData.firstName} ${formData.lastName}`;
-            
+            console.log('Submitting registration with data:', {
+                firstName: formData.firstName,
+                middleInitial: formData.middleInitial,
+                lastName: formData.lastName,
+                email: formData.email,
+                roleId: parseInt(formData.roleId)
+            });
+
             // Send registration data to backend API (backend mounts user routes at /user)
             const response = await axios.post("http://localhost:3000/user/register", {
-                fullName,
+                firstName: formData.firstName,
+                middleInitial: formData.middleInitial,
+                lastName: formData.lastName,
                 email: formData.email,
                 password: formData.password,
                 roleId: parseInt(formData.roleId)
             });
 
+            console.log('Registration response:', response.data);
+
             if (response.data.success) {
+                alert('Registration successful! Redirecting to login...');
                 // Redirect to login page on success (login component is mounted at '/')
                 navigate("/");
             } else {
                 setError(response.data.message || "Registration failed");
             }
         } catch (err) {
+            console.error('Registration error full:', err);
+            console.error('Error response:', err.response);
             setError(err.response?.data?.message || "An error occurred during registration");
-            console.error("Registration error:", err);
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div
-            className="relative flex justify-center items-center h-screen bg-cover bg-center"
-            style={{ backgroundImage:  `url(${bg})` }}
-        >
-            <div className="absolute inset-0 bg-black/50"></div>
+        <div className="flex h-screen overflow-hidden">
+            {/* Left side - Background Image */}
+            <div 
+                className="w-1/2 flex items-center justify-center relative overflow-hidden transition-all duration-700 ease-in-out bg-cover bg-center bg-no-repeat"
+                style={{
+                    backgroundImage: `url(${bg})`,
+                    backgroundPosition: 'center',
+                    backgroundSize: 'cover'
+                }}
+            >
+                {/* Subtle blue overlay */}
+                <div className="absolute inset-0 bg-blue-600 bg-opacity-20"></div>
 
-            <div className="relative z-10 w-auto">
-                <div className="bg-white rounded-xl shadow-lg px-8 py-8 flex items-center justify-center gap-4 mb-6 border-2 border-slate-400">
-                    <img
-                        src={logo}
-                        alt="App Logo"
-                        className="w-16 h-16"
-                    />
-                    <h1 className="text-2xl font-bold text-gray-900">
-                        Compliance and Audit
-                    </h1>
-                </div>
-
-                <form 
-                    className="bg-white p-8 rounded shadow-md w-96 border-2 border-slate-400"
-                    onSubmit={handleSubmit}
-                >
-                    <h1 className="text-center text-2xl font-bold mb-6">Register</h1>
-                    
-                    {error && (
-                        <div className="mb-4 p-2 bg-red-100 border border-red-400 text-red-700 rounded">
-                            {error}
+                {/* Main illustration content */}
+                <div className="relative z-10 text-center text-white max-w-md">
+                    <div className="mb-0">
+                        {/* Audittrack Logo */}
+                        <div className="relative mx-auto w-65 h-65 flex items-center justify-center mb-0">
+                            <img
+                                src={audittrackLogo}
+                                alt="Audittrack Logo"
+                                className="w-65 h-65 object-contain transition-all duration-500 hover:scale-105 drop-shadow-2xl"
+                            />
                         </div>
-                    )}
+                    </div>
+                    
+                    <h2 className="text-4xl font-bold mb-2 animate-slide-up drop-shadow-lg -mt-20">Audittrack</h2>
+                    <p className="text-white text-lg animate-fade-in-delayed drop-shadow-md px-4">
+                        Create your account and start managing compliance processes efficiently.
+                    </p>
+                </div>
+            </div>
 
-                    <div className="mb-4">
-                        <input
-                            type="text"
-                            name="firstName"
-                            placeholder="First Name"
-                            required
-                            value={formData.firstName}
-                            onChange={handleChange}
-                            className="w-full p-2 border-2 border-gray-300 rounded"
+            {/* Right side - Registration form */}
+            <div className="w-1/2 flex items-center justify-center bg-white transition-all duration-700 ease-in-out transform">
+                <div className="w-full max-w-md px-8 animate-fade-in-right">
+                    {/* Logo and title */}
+                    <div className="text-center mb-8 animate-slide-down">
+                        <img
+                            src={logo}
+                            alt="App Logo"
+                            className="w-16 h-16 mx-auto mb-4 transition-transform duration-500 hover:scale-110"
                         />
+                        <h1 className="text-2xl font-bold text-gray-900 mb-2 transition-all duration-300">
+                            Create Account
+                        </h1>
+                        <p className="text-gray-600 transition-opacity duration-500">Please enter your details to register</p>
                     </div>
-                    <div className="mb-4">
-                        <input
-                            type="text"
-                            name="lastName"
-                            placeholder="Last Name"
-                            required
-                            value={formData.lastName}
-                            onChange={handleChange}
-                            className="w-full p-2 border-2 border-gray-300 rounded"
-                        />
-                    </div>
-                    <div className="mb-4">
-                        <input
-                            type="email"
-                            name="email"
-                            placeholder="Email"
-                            required
-                            value={formData.email}
-                            onChange={handleChange}
-                            className="w-full p-2 border-2 border-gray-300 rounded"
-                        />
-                    </div>
-                    <div className="mb-4">
-                        <input
-                            type="password"
-                            name="password"
-                            placeholder="Password"
-                            required
-                            value={formData.password}
-                            onChange={handleChange}
-                            className="w-full p-2 border-2 border-gray-300 rounded"
-                        />
-                    </div>
-                    <div className="mb-6">
-                        <label className="block text-gray-700 text-sm font-bold mb-2">
-                            Select Role
-                        </label>
-                        <select
-                            name="roleId"
-                            value={formData.roleId}
-                            onChange={handleChange}
-                            className="w-full p-2 border-2 border-gray-300 rounded"
-                            required
+
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        {error && (
+                            <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
+                                {error}
+                            </div>
+                        )}
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1">
+                                    First Name *
+                                </label>
+                                <input
+                                    type="text"
+                                    id="firstName"
+                                    name="firstName"
+                                    required
+                                    value={formData.firstName}
+                                    onChange={handleChange}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                                    placeholder="First name"
+                                />
+                            </div>
+
+                            <div>
+                                <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1">
+                                    Last Name *
+                                </label>
+                                <input
+                                    type="text"
+                                    id="lastName"
+                                    name="lastName"
+                                    required
+                                    value={formData.lastName}
+                                    onChange={handleChange}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                                    placeholder="Last name"
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label htmlFor="middleInitial" className="block text-sm font-medium text-gray-700 mb-1">
+                                Middle Initial
+                            </label>
+                            <input
+                                type="text"
+                                id="middleInitial"
+                                name="middleInitial"
+                                maxLength="1"
+                                value={formData.middleInitial}
+                                onChange={handleChange}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                                placeholder="M"
+                            />
+                        </div>
+
+                        <div>
+                            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                                Email address *
+                            </label>
+                            <input
+                                type="email"
+                                id="email"
+                                name="email"
+                                required
+                                value={formData.email}
+                                onChange={handleChange}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                                placeholder="Enter your email"
+                            />
+                        </div>
+
+                        <div>
+                            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                                Password *
+                            </label>
+                            <input
+                                type="password"
+                                id="password"
+                                name="password"
+                                required
+                                value={formData.password}
+                                onChange={handleChange}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                                placeholder="Create a password"
+                            />
+                        </div>
+
+                        <div>
+                            <label htmlFor="roleId" className="block text-sm font-medium text-gray-700 mb-1">
+                                Account Type *
+                            </label>
+                            <select
+                                id="roleId"
+                                name="roleId"
+                                value={formData.roleId}
+                                onChange={handleChange}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                                required
+                            >
+                                <option value="2">User</option>
+                                <option value="1">Admin</option>
+                            </select>
+                        </div>
+
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className={`w-full py-2 px-4 rounded-md font-medium transition-colors text-sm ${
+                                loading 
+                                    ? "bg-blue-300 cursor-not-allowed text-white" 
+                                    : "bg-blue-600 hover:bg-blue-700 text-white"
+                            }`}
                         >
-                            <option value="2">User</option>
-                            <option value="1">Admin</option>
-                        </select>
-                    </div>
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className={`w-full py-2 rounded transition-colors ${
-                            loading 
-                                ? "bg-blue-300 cursor-not-allowed" 
-                                : "bg-blue-500 hover:bg-blue-600 text-white"
-                        }`}
-                    >
-                        {loading ? "Processing..." : "Register"}
-                    </button>
-                    <div className="mt-4 text-center">
-                        <p className="text-sm">
-                            Already have an account? <a href="/login" className="text-blue-500 hover:underline">Login</a>
+                            {loading ? "Creating Account..." : "Create Account"}
+                        </button>
+
+                        <p className="text-center text-sm text-gray-600">
+                            Already have an account?{" "}
+                            <Link to="/" className="text-blue-600 hover:text-blue-500 font-medium">
+                                Sign in
+                            </Link>
                         </p>
-                    </div>
-                </form>
+                    </form>
+                </div>
             </div>
         </div>
     );

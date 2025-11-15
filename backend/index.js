@@ -1,11 +1,16 @@
 const express = require('express');
 const app = express();
-const port = 3000;
+const port = 5000;
 const cors = require('cors');
 const userRoutes = require('./routes/users');
+const officeHeadsRoutes = require('./routes/officeheads');
 
-app.use(cors());
+app.use(cors({
+  origin: ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'], // Add common dev server ports
+  credentials: true
+}));
 app.use(express.json());
+app.use('/uploads', express.static('uploads')); // Serve uploaded files
 /*const rolesRoutes = require('./routes/roles');
 const requirementsRoutes = require('./routes/requirements');
 const officetypesRoutes = require('./routes/officetypes');
@@ -24,6 +29,7 @@ app.get('/health', (req, res) => {
 }); 
 
 app.use('/user', userRoutes);
+app.use('/api/officeheads', officeHeadsRoutes);
 /*app.use('/roles', rolesRoutes);
 app.use('/requirements', requirementsRoutes);
 app.use('/officetypes', officetypesRoutes);

@@ -1,12 +1,18 @@
 import { NavLink } from "react-router-dom";
+import audittrackLogo from "../../assets/images/logo.png";
 
 export default function Navbar() {
     return (
-        <nav className="fixed top-0 left-0 h-screen w-64 bg-blue-900 shadow-xl z-50 flex flex-col justify-between p-6">
+        <nav className="fixed top-0 left-0 h-screen w-64 bg-blue-600 shadow-xl z-50 flex flex-col justify-between p-6">
             <div className="flex flex-col space-y-5">
-                <div className="mb-6 block">
-                    <span className="font-semibold text-white text-sm">
-                        Compliance and Audit
+                <div className="mb-6 flex items-center gap-3">
+                    <img
+                        src={audittrackLogo}
+                        alt="Audittrack Logo"
+                        className="w-10 h-10 object-contain"
+                    />
+                    <span className="font-semibold text-white text-lg">
+                        Audittrack
                     </span>
                 </div>
 
@@ -14,6 +20,13 @@ export default function Navbar() {
                 <NavLink
                     to="/home"
                     end
+                    onClick={(e) => {
+                        // Force navigation if React Router seems blocked
+                        if (window.location.pathname === '/home/officehead') {
+                            e.preventDefault();
+                            window.location.href = '/home';
+                        }
+                    }}
                     className={({ isActive }) =>
                         `flex items-center gap-3 py-2 px-3 rounded-md transition-colors duration-200 text-white ${
                             isActive ? 'bg-blue-800 shadow-inner' : 'hover:bg-blue-800/60'
@@ -30,6 +43,13 @@ export default function Navbar() {
 
                 <NavLink
                     to="/home/organizations"
+                    onClick={(e) => {
+                        // Force navigation if React Router seems blocked
+                        if (window.location.pathname === '/home/officehead') {
+                            e.preventDefault();
+                            window.location.href = '/home/organizations';
+                        }
+                    }}
                     className={({ isActive }) =>
                         `flex items-center gap-3 py-2 px-3 rounded-md transition-colors duration-200 text-white ${
                             isActive ? 'bg-blue-800 shadow-inner' : 'hover:bg-blue-800/60'
@@ -47,6 +67,13 @@ export default function Navbar() {
 
                 <NavLink
                     to="/home/audit"
+                    onClick={(e) => {
+                        // Force navigation if React Router seems blocked
+                        if (window.location.pathname === '/home/officehead') {
+                            e.preventDefault();
+                            window.location.href = '/home/audit';
+                        }
+                    }}
                     className={({ isActive }) =>
                         `flex items-center gap-3 py-2 px-3 rounded-md transition-colors duration-200 text-white ${
                             isActive ? 'bg-blue-800 shadow-inner' : 'hover:bg-blue-800/60'
@@ -64,6 +91,13 @@ export default function Navbar() {
 
                 <NavLink
                     to="/home/requirements"
+                    onClick={(e) => {
+                        // Force navigation if React Router seems blocked
+                        if (window.location.pathname === '/home/officehead') {
+                            e.preventDefault();
+                            window.location.href = '/home/requirements';
+                        }
+                    }}
                     className={({ isActive }) =>
                         `flex items-center gap-3 py-2 px-3 rounded-md transition-colors duration-200 text-white ${
                             isActive ? 'bg-blue-800 shadow-inner' : 'hover:bg-blue-800/60'
@@ -97,6 +131,13 @@ export default function Navbar() {
 
                 <NavLink
                     to="/home/Profile"
+                    onClick={(e) => {
+                        // Force navigation if React Router seems blocked
+                        if (window.location.pathname === '/home/officehead') {
+                            e.preventDefault();
+                            window.location.href = '/home/Profile';
+                        }
+                    }}
                     className={({ isActive }) =>
                         `flex items-center gap-3 py-2 px-3 rounded-md transition-colors duration-200 text-white ${
                             isActive ? 'bg-blue-800 shadow-inner' : 'hover:bg-blue-800/60'

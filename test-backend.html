@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backend Image Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        img {
+            max-width: 200px;
+            max-height: 200px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            margin: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Backend Server & Image Serving Test</h1>
+
+    <div class="test-section">
+        <h2>1. Backend Health Check</h2>
+        <div id="health-status" class="status info">Testing backend connection...</div>
+    </div>
+
+    <div class="test-section">
+        <h2>2. Static File Serving Test</h2>
+        <div id="static-status" class="status info">Testing static file serving...</div>
+        <div id="image-container"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>3. API Test</h2>
+        <div id="api-status" class="status info">Testing office heads API...</div>
+        <div id="api-data"></div>
+    </div>
+
+    <script>
+        async function testBackend() {
+            // Test 1: Health check
+            try {
+                const healthResponse = await fetch('http://localhost:5000/health');
+                const healthData = await healthResponse.json();
+                document.getElementById('health-status').innerHTML = 
+                    `✅ Backend is running! Response: ${JSON.stringify(healthData)}`;
+                document.getElementById('health-status').className = 'status success';
+            } catch (error) {
+                document.getElementById('health-status').innerHTML = 
+                    `❌ Backend connection failed: ${error.message}`;
+                document.getElementById('health-status').className = 'status error';
+                return; // Stop if backend is not running
+            }
+
+            // Test 2: Static file serving (you can add a test image here)
+            try {
+                const testImageResponse = await fetch('http://localhost:5000/uploads/profile-pics/test.jpg');
+                if (testImageResponse.ok) {
+                    document.getElementById('static-status').innerHTML = 
+                        `✅ Static file serving is working!`;
+                    document.getElementById('static-status').className = 'status success';
+                } else {
+                    document.getElementById('static-status').innerHTML = 
+                        `⚠️ Static file serving test failed (this is normal if no test image exists)`;
+                    document.getElementById('static-status').className = 'status info';
+                }
+            } catch (error) {
+                document.getElementById('static-status').innerHTML = 
+                    `❌ Static file serving error: ${error.message}`;
+                document.getElementById('static-status').className = 'status error';
+            }
+
+            // Test 3: API test
+            try {
+                const apiResponse = await fetch('http://localhost:5000/api/officeheads/all');
+                const apiData = await apiResponse.json();
+                
+                if (apiData.success) {
+                    document.getElementById('api-status').innerHTML = 
+                        `✅ API is working! Found ${apiData.data.length} office heads`;
+                    document.getElementById('api-status').className = 'status success';
+                    
+                    // Display data
+                    let dataHtml = '<h4>Office Heads Data:</h4>';
+                    apiData.data.forEach(head => {
+                        dataHtml += `
+                            <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                                <strong>${head.FirstName} ${head.LastName}</strong><br>
+                                Position: ${head.Position}<br>
+                                Contact: ${head.ContactInfo}<br>
+                                Profile Pic: ${head.ProfilePic || 'None'}
+                                ${head.ProfilePic ? 
+                                    `<br><img src="http://localhost:5000/uploads/profile-pics/${head.ProfilePic}" 
+                                           alt="Profile" onerror="this.style.display='none'" />` 
+                                    : ''}
+                            </div>
+                        `;
+                    });
+                    document.getElementById('api-data').innerHTML = dataHtml;
+                } else {
+                    document.getElementById('api-status').innerHTML = 
+                        `❌ API returned error: ${apiData.message}`;
+                    document.getElementById('api-status').className = 'status error';
+                }
+            } catch (error) {
+                document.getElementById('api-status').innerHTML = 
+                    `❌ API test failed: ${error.message}`;
+                document.getElementById('api-status').className = 'status error';
+            }
+        }
+
+        // Run tests when page loads
+        window.addEventListener('load', testBackend);
+    </script>
+</body>
+</html>

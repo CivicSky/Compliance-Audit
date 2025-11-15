@@ -1,0 +1,129 @@
+import axios from 'axios';
+
+const API_BASE_URL = 'http://localhost:5000/api';
+
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Add request interceptor to include auth token if available
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Add response interceptor for error handling
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Handle unauthorized access
+      localStorage.removeItem('token');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
+// Office Heads API functions
+export const officeHeadsAPI = {
+  // Add new office head
+  addHead: async (formData) => {
+    const response = await api.post('/officeheads/add', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  // Get all office heads
+  getAllHeads: async () => {
+    const response = await api.get('/officeheads/all');
+    return response.data;
+  },
+
+  // Get office head by ID
+  getHeadById: async (id) => {
+    const response = await api.get(`/officeheads/${id}`);
+    return response.data;
+  },
+
+  // Test backend connection
+  testConnection: async () => {
+    try {
+      // Use the root health endpoint, not /api/health
+      const response = await axios.get('http://localhost:5000/health');
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // Delete multiple office heads
+  deleteHeads: async (headIds) => {
+    try {
+      console.log('Sending DELETE request to:', `${API_BASE_URL}/officeheads/delete`);
+      console.log('With data:', { headIds });
+      
+      // Try different request format - some servers prefer POST for complex data
+      const response = await api.delete('/officeheads/delete', {
+        data: { headIds },
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      console.log('Delete response received:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Delete API error:', error);
+      
+      // If DELETE with body fails, try as query parameters
+      if (error.response?.status === 404 || error.response?.status === 405) {
+        try {
+          console.log('Trying alternative DELETE method...');
+          const queryString = headIds.map(id => `ids=${id}`).join('&');
+          const fallbackResponse = await api.delete(`/officeheads/delete?${queryString}`);
+          return fallbackResponse.data;
+        } catch (fallbackError) {
+          console.error('Fallback delete method also failed:', fallbackError);
+          throw fallbackError;
+        }
+      }
+      
+      throw error;
+    }
+  },
+};
+
+// Authentication API functions
+export const authAPI = {
+  login: async (credentials) => {
+    const response = await api.post('/auth/login', credentials);
+    return response.data;
+  },
+
+  register: async (userData) => {
+    const response = await api.post('/auth/register', userData);
+    return response.data;
+  },
+
+  logout: async () => {
+    const response = await api.post('/auth/logout');
+    return response.data;
+  },
+};
+
+export default api;
