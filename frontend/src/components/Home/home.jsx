@@ -11,10 +11,8 @@ export default function Home() {
             <Header pageTitle="Dashboard"/>
 
             <div className="relative z-10">
-
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-10">
-                    <div className="relative bg-white rounded-2xl p-6 text-center shadow-lg hover:shadow-none hover:bg-gray-100 transform transition-all duration-300">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-6">
+                    <div className="relative bg-white rounded-md p-6 text-center shadow-lg hover:shadow-none hover:bg-gray-100 transform transition-all duration-300 border-2 border-gray-200 stroke-2">
                         <img
                             src={org}
                             alt="background"
@@ -23,7 +21,7 @@ export default function Home() {
                         <h2 className="text-lg font-semibold text-gray-700">Organizations</h2>
                         <p className="text-3xl font-bold text-blue-600 mt-2">17</p>
                     </div>
-                        <div className="relative bg-white rounded-2xl p-6 text-center shadow-lg hover:shadow-none hover:bg-gray-100 transform transition-all duration-300">
+                        <div className="relative bg-white rounded-md p-6 text-center shadow-lg hover:shadow-none hover:bg-gray-100 transform transition-all duration-300 border-2 border-gray-200 stroke-2">
                         <img
                             src={user}
                             alt="background"
@@ -32,7 +30,7 @@ export default function Home() {
                         <h2 className="text-lg font-semibold text-gray-700">User</h2>
                         <p className="text-3xl font-bold text-blue-600 mt-2">245</p>
                     </div>
-                        <div className="relative bg-white rounded-2xl p-6 text-center shadow-lg hover:shadow-none hover:bg-gray-100 transform transition-all duration-300">
+                        <div className="relative bg-white rounded-md p-6 text-center shadow-lg hover:shadow-none hover:bg-gray-100 transform transition-all duration-300 border-2 border-gray-200 stroke-2">
                         <img
                             src={audit}
                             alt="background"
@@ -41,7 +39,7 @@ export default function Home() {
                         <h2 className="text-lg font-semibold text-gray-700">Total Audits</h2>
                         <p className="text-3xl font-bold text-blue-600 mt-2">58</p>
                     </div>
-                        <div className="relative bg-white rounded-2xl p-6 text-center shadow-lg hover:shadow-none hover:bg-gray-100 transform transition-all duration-300">
+                        <div className="relative bg-white rounded-md p-6 text-center shadow-lg hover:shadow-none hover:bg-gray-100 transform transition-all duration-300 border-2 border-gray-200 stroke-2">
                         <img
                             src={pending}
                             alt="background"
@@ -51,7 +49,7 @@ export default function Home() {
                         <p className="text-3xl font-bold text-blue-600 mt-2">7</p>
                     </div>
 
-                    <div className="mt-8 bg-white shadow-lg rounded-2xl p-6 border-2 border-slate-400 w-full max-w-4xl">
+                    <div className="mt-6 bg-white shadow-lg rounded-md p-6 border-2 border-gray-200 stroke-2 w-full max-w-4xl">
 
                         <div className="flex items-center justify-between mb-4">
                             <h1 className="text-xl font-semibold text-slate-800">Recent Logs</h1>

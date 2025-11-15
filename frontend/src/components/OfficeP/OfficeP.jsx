@@ -13,8 +13,8 @@ export default function OfficeP() {
     };
 
     return (
-        <div className="pb-3 pt-3 w-full">
-            <div className="bg-white rounded-lg p-4 shadow-lg hover:shadow-none hover:bg-gray-100 transition-all duration-300">
+        <div className="mt-6 w-full">
+            <div className="bg-white rounded-md p-4 shadow-lg hover:shadow-none hover:bg-gray-100 transition-all duration-300 border-2 border-gray-200 stroke-2">
                 <div className="flex items-center justify-between">
                     {/* Left section - Profile pic, name and position */}
                     <div className="flex items-center gap-4">

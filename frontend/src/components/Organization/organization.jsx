@@ -7,8 +7,9 @@ export default function Organization() {
     return (
         <div className="px-6 pb-6 pt-6 w-full">
             <Header pageTitle="Offices"/>
+            
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
-                <div className="bg-white rounded-2xl p-5 w-full shadow-lg hover:shadow-none hover:bg-gray-100 transform transition-all duration-300">
+                <div className="bg-white rounded-md p-5 w-full shadow-lg hover:shadow-none hover:bg-gray-100 transform transition-all duration-300 border-2 border-gray-200 stroke-2">
                     <div className="flex justify-between items-start">
                         <h3 className="text-lg font-semibold" style={{color: '#121212'}}>SBIT DEPARTMENT</h3>
                         <span className="px-3 py-1 text-xs font-semibold text-white bg-green-500 rounded-full">
@@ -27,7 +28,7 @@ export default function Organization() {
                         </div>
                     </div>
                 </div>
-                <div className="bg-white rounded-2xl p-5 w-full shadow-lg hover:shadow-none hover:bg-gray-100 transform transition-all duration-300">
+                <div className="bg-white rounded-md p-5 w-full shadow-lg hover:shadow-none hover:bg-gray-100 transform transition-all duration-300 border-2 border-gray-200 stroke-2">
                     <div className="flex justify-between items-start">
                         <h3 className="text-lg font-semibold" style={{color: '#121212'}}>SSLATE</h3>
                         <span className="px-3 py-1 text-xs font-semibold text-white bg-red-500 rounded-full">
@@ -47,7 +48,7 @@ export default function Organization() {
                     </div>
                 </div>
 
-                <div className="bg-white rounded-2xl p-5 w-full shadow-lg hover:shadow-none hover:bg-gray-100 transform transition-all duration-300">
+                <div className="bg-white rounded-md p-5 w-full shadow-lg hover:shadow-none hover:bg-gray-100 transform transition-all duration-300 border-2 border-gray-200 stroke-2">
                     <div className="flex justify-between items-start">
                         <h3 className="text-lg font-semibold" style={{color: '#121212'}}>MIS Office</h3>
                         <span className="px-3 py-1 text-xs font-semibold text-white bg-orange-500 rounded-full">
