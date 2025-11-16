@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import Header from "../Header/header"
 import OfficeP from "../OfficeP/OfficeP";
 import AddOfficeHeadModal from "../AddHead/AddOfficeHeadModal";
@@ -56,18 +56,11 @@ export default function Home() {
         }
     };
 
-    // Force reset function for debugging
-    const forceReset = () => {
-        setDeleteMode(false);
-        setSelectedCount(0);
-        setSelectedIds([]);
-        console.log('Forced reset of all states');
-    };
-
-    const handleSelectionChange = (count, ids) => {
+    // Memoize handleSelectionChange to prevent infinite loops
+    const handleSelectionChange = useCallback((count, ids) => {
         setSelectedCount(count);
         setSelectedIds(ids);
-    };
+    }, []);
 
     const handleDeleteSelected = async () => {
         if (selectedIds.length === 0 || !officePRef.current) return;

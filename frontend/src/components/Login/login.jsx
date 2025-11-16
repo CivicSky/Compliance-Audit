@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import logo from "../../assets/images/lccb_logo.png"
-import audittrackLogo from "../../assets/images/logo.png"
+import auditrackLogo from "../../assets/images/logo.png"
 import bg from "../../assets/images/homebg.jpg"
 import axios from "axios";
 
@@ -80,7 +80,7 @@ export default function Login() {
                             </div>
                         )}
 
-                        <div className="transform transition-all duration-300 hover:translate-y-[-2px]">
+                        <div>
                             <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
                                 Email address
                             </label>
@@ -91,12 +91,12 @@ export default function Login() {
                                 required
                                 value={formData.email}
                                 onChange={handleChange}
-                                className="w-full px-3 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 focus:scale-105"
+                                className="w-full px-3 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 placeholder="Enter your email"
                             />
                         </div>
 
-                        <div className="transform transition-all duration-300 hover:translate-y-[-2px]">
+                        <div>
                             <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
                                 Password
                             </label>
@@ -107,7 +107,7 @@ export default function Login() {
                                 required
                                 value={formData.password}
                                 onChange={handleChange}
-                                className="w-full px-3 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 focus:scale-105"
+                                className="w-full px-3 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 placeholder="Enter your password"
                             />
                         </div>
@@ -131,10 +131,10 @@ export default function Login() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className={`w-full py-3 px-4 rounded-md font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg ${
+                            className={`w-full py-3 px-4 rounded-md font-medium transition-colors ${
                                 loading 
                                     ? "bg-blue-300 cursor-not-allowed text-white" 
-                                    : "bg-blue-600 hover:bg-blue-700 text-white hover:shadow-blue-200"
+                                    : "bg-blue-600 hover:bg-blue-700 text-white"
                             }`}
                         >
                             <span className={loading ? "animate-pulse" : ""}>
@@ -142,11 +142,11 @@ export default function Login() {
                             </span>
                         </button>
 
-                        <p className="text-center text-sm text-gray-600 transition-all duration-300">
+                        <p className="text-center text-sm text-gray-600">
                             Don't have an account?{" "}
                             <Link 
                                 to="/register" 
-                                className="text-blue-600 hover:text-blue-500 font-medium transition-all duration-200 hover:underline transform hover:scale-105 inline-block"
+                                className="text-blue-600 hover:text-blue-500 font-medium"
                             >
                                 Sign up
                             </Link>
@@ -169,18 +169,18 @@ export default function Login() {
 
                 {/* Main content overlay */}
                 <div className="relative z-10 text-center text-white max-w-md animate-fade-in-right">
-                    <div className="mb-0">
-                        {/* Audittrack Logo */}
-                        <div className="relative mx-auto w-65 h-65 flex items-center justify-center mb-0">
+                    <div className="mb-6">
+                        {/* Auditrack Logo */}
+                        <div className="relative mx-auto w-40 h-40 flex items-center justify-center mb-4">
                             <img
-                                src={audittrackLogo}
-                                alt="Audittrack Logo"
-                                className="w-65 h-65 object-contain transition-all duration-500 hover:scale-105 drop-shadow-2xl"
+                                src={auditrackLogo}
+                                alt="Auditrack Logo"
+                                className="w-32 h-32 object-contain transition-all duration-500 hover:scale-105 drop-shadow-2xl"
                             />
                         </div>
                     </div>
                     
-                    <h2 className="text-4xl font-bold mb-2 animate-slide-up drop-shadow-lg -mt-20">Audittrack</h2>
+                    <h2 className="text-4xl font-bold mb-4 animate-slide-up drop-shadow-lg">Auditrack</h2>
                     <p className="text-white text-lg animate-fade-in-delayed drop-shadow-md px-4">
                         Streamline Your Compliance processes with our comprehensive audit management systems
                     </p>

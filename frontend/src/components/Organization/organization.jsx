@@ -8,19 +8,19 @@ export default function Organization() {
         <div className="px-6 pb-6 pt-6 w-full">
             <Header pageTitle="Offices"/>
             
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
-                <div className="bg-white rounded-md p-5 w-full shadow-lg hover:shadow-none hover:bg-gray-100 transform transition-all duration-300 border-2 border-gray-200 stroke-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+                <div className="bg-white rounded-md p-4 w-full shadow-md hover:shadow-lg hover:bg-gray-50 transform transition-all duration-300 border border-gray-200">
                     <div className="flex justify-between items-start">
-                        <h3 className="text-lg font-semibold" style={{color: '#121212'}}>SBIT DEPARTMENT</h3>
-                        <span className="px-3 py-1 text-xs font-semibold text-white bg-green-500 rounded-full">
+                        <h3 className="text-base font-semibold" style={{color: '#121212'}}>SBIT DEPARTMENT</h3>
+                        <span className="px-2 py-1 text-xs font-semibold text-white bg-green-500 rounded-full">
                             Complied
                         </span>
                     </div>
-                    <div className="flex items-center border-t border-gray-200 mt-4 pt-3">
+                    <div className="flex items-center border-t border-gray-200 mt-3 pt-2">
                         <img
                             src={user}
                             alt="Sarah Johnson"
-                            className="w-10 h-10 rounded-full mr-3 object-cover"
+                            className="w-8 h-8 rounded-full mr-3 object-cover"
                         />
                         <div>
                             <p className="text-sm font-semibold" style={{color: '#121212'}}>Lenuelito Betita</p>
@@ -28,18 +28,18 @@ export default function Organization() {
                         </div>
                     </div>
                 </div>
-                <div className="bg-white rounded-md p-5 w-full shadow-lg hover:shadow-none hover:bg-gray-100 transform transition-all duration-300 border-2 border-gray-200 stroke-2">
+                <div className="bg-white rounded-md p-4 w-full shadow-md hover:shadow-lg hover:bg-gray-50 transform transition-all duration-300 border border-gray-200">
                     <div className="flex justify-between items-start">
-                        <h3 className="text-lg font-semibold" style={{color: '#121212'}}>SSLATE</h3>
-                        <span className="px-3 py-1 text-xs font-semibold text-white bg-red-500 rounded-full">
+                        <h3 className="text-base font-semibold" style={{color: '#121212'}}>SSLATE</h3>
+                        <span className="px-2 py-1 text-xs font-semibold text-white bg-red-500 rounded-full">
                             Not Complied
                         </span>
                     </div>
-                    <div className="flex items-center border-t border-gray-200 mt-4 pt-3">
+                    <div className="flex items-center border-t border-gray-200 mt-3 pt-2">
                         <img
                             src={user}
                             alt="Sarah Johnson"
-                            className="w-10 h-10 rounded-full mr-3 object-cover"
+                            className="w-8 h-8 rounded-full mr-3 object-cover"
                         />
                         <div>
                             <p className="text-sm font-semibold" style={{color: '#121212'}}>Lenuelito Betita</p>
@@ -48,18 +48,18 @@ export default function Organization() {
                     </div>
                 </div>
 
-                <div className="bg-white rounded-md p-5 w-full shadow-lg hover:shadow-none hover:bg-gray-100 transform transition-all duration-300 border-2 border-gray-200 stroke-2">
+                <div className="bg-white rounded-md p-4 w-full shadow-md hover:shadow-lg hover:bg-gray-50 transform transition-all duration-300 border border-gray-200">
                     <div className="flex justify-between items-start">
-                        <h3 className="text-lg font-semibold" style={{color: '#121212'}}>MIS Office</h3>
-                        <span className="px-3 py-1 text-xs font-semibold text-white bg-orange-500 rounded-full">
+                        <h3 className="text-base font-semibold" style={{color: '#121212'}}>MIS Office</h3>
+                        <span className="px-2 py-1 text-xs font-semibold text-white bg-orange-500 rounded-full">
                             Partially Complied
                         </span>
                     </div>
-                    <div className="flex items-center border-t border-gray-200 mt-4 pt-3">
+                    <div className="flex items-center border-t border-gray-200 mt-3 pt-2">
                         <img
                             src={user}
                             alt="Sarah Johnson"
-                            className="w-10 h-10 rounded-full mr-3 object-cover"
+                            className="w-8 h-8 rounded-full mr-3 object-cover"
                         />
                         <div>
                             <p className="text-sm font-semibold" style={{color: '#121212'}}>Lenuelito Betita</p>

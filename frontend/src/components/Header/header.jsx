@@ -53,55 +53,42 @@ export default function Header({ pageTitle = "Compliance Audit", showSearch = tr
             }
         };
 
-        const handleWindowClick = (event) => {
-            // Close all dropdowns on any navigation link click, but don't prevent default
-            const navLink = event.target.closest('a[href^="/home"]');
-            if (navLink) {
-                setShowSortDropdown(false);
-                setShowDeleteDropdown(false);
-                // Don't prevent default - let navigation happen
-            }
-        };
-
         document.addEventListener('mousedown', handleClickOutside);
         document.addEventListener('keydown', handleEscapeKey);
-        // Use capture: false to ensure we don't interfere with navigation
-        window.addEventListener('click', handleWindowClick, false);
         
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
             document.removeEventListener('keydown', handleEscapeKey);
-            window.removeEventListener('click', handleWindowClick, false);
         };
     }, []);
     return (
-        <div className="fixed top-0 left-64 right-0 z-40 bg-white shadow-lg px-6 py-4">
+        <div className="header-container fixed top-0 lg:left-64 left-0 right-0 lg:top-0 top-16 z-40 bg-white shadow-lg lg:px-6 lg:py-4 px-4 py-2">
             <div className="flex items-center justify-between w-full">
-                <div className="flex items-center gap-4">
+                <div className="flex items-center lg:gap-4 gap-2">
                     <img
                         src={logo}
                         alt="Logo"
-                        className="h-16 w-16 object-contain"
+                        className="lg:h-16 lg:w-16 h-8 w-8 object-contain"
                     />
-                    <h1 className="text-3xl font-bold text-gray-800">
+                    <h1 className="lg:text-3xl text-lg font-bold text-gray-800">
                         {pageTitle}
                     </h1>
                 </div>
 
                 {showSearch && (
-                    <div className="flex items-center gap-4">
-                        <div className="relative w-80">
+                    <div className="flex items-center lg:gap-4 gap-2">
+                        <div className="relative lg:w-80 w-48">
                             <input
                                 type="text"
-                                placeholder="Search office heads..."
+                                placeholder="Search..."
                                 value={searchValue}
                                 onChange={(e) => onSearchChange && onSearchChange(e.target.value)}
-                                className="w-full px-4 py-2 pr-10 rounded-md bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 border-0 shadow-inner"
+                                className="w-full lg:px-4 lg:py-2 px-2 py-1 lg:pr-10 pr-8 rounded-md bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 border-0 shadow-inner lg:text-base text-sm"
                             />
                             <img
                                 src={search}
                                 alt="Search"
-                                className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500 pointer-events-none"
+                                className="absolute lg:right-3 right-2 top-1/2 -translate-y-1/2 lg:h-5 lg:w-5 h-4 w-4 text-gray-500 pointer-events-none"
                             />
                         </div>
                         
@@ -111,10 +98,10 @@ export default function Header({ pageTitle = "Compliance Audit", showSearch = tr
                                 <button
                                     type="button"
                                     onClick={() => setShowSortDropdown(!showSortDropdown)}
-                                    className="flex items-center justify-center w-10 h-10 bg-white hover:bg-gray-50 rounded-md text-gray-700 shadow-md border border-gray-200"
+                                    className="flex items-center justify-center lg:w-10 lg:h-10 w-8 h-8 bg-white hover:bg-gray-50 rounded-md text-gray-700 shadow-md border border-gray-200"
                                     title="Sort"
                                 >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg className="lg:w-5 lg:h-5 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
                                     </svg>
                                 </button>
@@ -148,10 +135,10 @@ export default function Header({ pageTitle = "Compliance Audit", showSearch = tr
                             <button
                                 type="button"
                                 onClick={onAddClick}
-                                className="flex items-center justify-center w-10 h-10 bg-white hover:bg-gray-50 rounded-md text-green-600 shadow-md border border-gray-200"
+                                className="flex items-center justify-center lg:w-10 lg:h-10 w-8 h-8 bg-white hover:bg-gray-50 rounded-md text-green-600 shadow-md border border-gray-200"
                                 title="Add Office Head"
                             >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="lg:w-5 lg:h-5 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                                 </svg>
                             </button>
@@ -160,12 +147,12 @@ export default function Header({ pageTitle = "Compliance Audit", showSearch = tr
                                 <button
                                     type="button"
                                     onClick={() => setShowDeleteDropdown(!showDeleteDropdown)}
-                                    className={`flex items-center justify-center w-10 h-10 hover:bg-gray-50 rounded-md shadow-md border border-gray-200 ${
+                                    className={`flex items-center justify-center lg:w-10 lg:h-10 w-8 h-8 hover:bg-gray-50 rounded-md shadow-md border border-gray-200 ${
                                         deleteMode ? 'bg-red-50 text-red-600' : 'bg-white text-red-600'
                                     }`}
                                     title="Delete Mode"
                                 >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg className="lg:w-5 lg:h-5 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                     </svg>
                                 </button>

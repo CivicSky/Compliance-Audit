@@ -10,5 +10,6 @@ router.post('/login', userController.loginUser);
 
 // User data routes
 router.get('/', userController.getUsers);
+router.get('/current/:email', userController.getCurrentUser);
 
 module.exports = router;

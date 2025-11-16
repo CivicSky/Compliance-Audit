@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import bg from "../../assets/images/homebg.jpg"
 import logo from "../../assets/images/lccb_logo.png"
-import audittrackLogo from "../../assets/images/logo.png"
+import auditrackLogo from "../../assets/images/logo.png"
 import axios from "axios";
 
 export default function Register() {
@@ -82,19 +82,19 @@ export default function Register() {
                 <div className="absolute inset-0 bg-blue-600 bg-opacity-20"></div>
 
                 {/* Main illustration content */}
-                <div className="relative z-10 text-center text-white max-w-md">
-                    <div className="mb-0">
-                        {/* Audittrack Logo */}
-                        <div className="relative mx-auto w-65 h-65 flex items-center justify-center mb-0">
+                <div className="relative z-10 text-center text-white max-w-md animate-fade-in-left">
+                    <div className="mb-6">
+                        {/* Auditrack Logo */}
+                        <div className="relative mx-auto w-40 h-40 flex items-center justify-center mb-4">
                             <img
-                                src={audittrackLogo}
-                                alt="Audittrack Logo"
-                                className="w-65 h-65 object-contain transition-all duration-500 hover:scale-105 drop-shadow-2xl"
+                                src={auditrackLogo}
+                                alt="Auditrack Logo"
+                                className="w-32 h-32 object-contain transition-all duration-500 hover:scale-105 drop-shadow-2xl"
                             />
                         </div>
                     </div>
                     
-                    <h2 className="text-4xl font-bold mb-2 animate-slide-up drop-shadow-lg -mt-20">Audittrack</h2>
+                    <h2 className="text-4xl font-bold mb-4 animate-slide-up drop-shadow-lg">Auditrack</h2>
                     <p className="text-white text-lg animate-fade-in-delayed drop-shadow-md px-4">
                         Create your account and start managing compliance processes efficiently.
                     </p>
@@ -117,9 +117,9 @@ export default function Register() {
                         <p className="text-gray-600 transition-opacity duration-500">Please enter your details to register</p>
                     </div>
 
-                    <form onSubmit={handleSubmit} className="space-y-4">
+                    <form onSubmit={handleSubmit} className="space-y-4 animate-fade-in-up">
                         {error && (
-                            <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
+                            <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm animate-shake">
                                 {error}
                             </div>
                         )}

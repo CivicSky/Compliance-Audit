@@ -181,3 +181,51 @@ exports.getUsers = async (req, res) => {
   }
 };
 
+// Get current user by email controller
+exports.getCurrentUser = async (req, res) => {
+  try {
+    const { email } = req.params;
+    
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required'
+      });
+    }
+    
+    console.log('Getting current user for email:', email);
+    
+    const [users] = await db.query(
+      'SELECT u.UserID, u.FirstName, u.MiddleInitial, u.LastName, u.Email, u.RoleID, u.ProfilePic, r.RoleName FROM users u LEFT JOIN roles r ON u.RoleID = r.RoleID WHERE u.Email = ?',
+      [email]
+    );
+    
+    if (users.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
+    const user = users[0];
+    const userWithFullName = {
+      ...user,
+      FullName: `${user.FirstName}${user.MiddleInitial ? ' ' + user.MiddleInitial + '.' : ''} ${user.LastName}`
+    };
+    
+    console.log('Current user found:', userWithFullName.FullName);
+    
+    res.json({
+      success: true,
+      user: userWithFullName
+    });
+    
+  } catch (error) {
+    console.error('Get current user error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'An error occurred while fetching current user'
+    });
+  }
+};
+

@@ -11,55 +11,55 @@ export default function Home() {
             <Header pageTitle="Dashboard"/>
 
             <div className="relative z-10">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-6">
-                    <div className="relative bg-white rounded-md p-6 text-center shadow-lg hover:shadow-none hover:bg-gray-100 transform transition-all duration-300 border-2 border-gray-200 stroke-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+                    <div className="relative bg-white rounded-md p-4 text-center shadow-md hover:shadow-lg hover:bg-gray-50 transform transition-all duration-300 border border-gray-200">
                         <img
                             src={org}
                             alt="background"
-                            className="absolute top-3 right-3 w-10 h-10 opacity-20"
+                            className="absolute top-2 right-2 w-6 h-6 opacity-20"
                         />
-                        <h2 className="text-lg font-semibold text-gray-700">Organizations</h2>
-                        <p className="text-3xl font-bold text-blue-600 mt-2">17</p>
+                        <h2 className="text-sm font-semibold text-gray-700">Organizations</h2>
+                        <p className="text-2xl font-bold text-blue-600 mt-1">17</p>
                     </div>
-                        <div className="relative bg-white rounded-md p-6 text-center shadow-lg hover:shadow-none hover:bg-gray-100 transform transition-all duration-300 border-2 border-gray-200 stroke-2">
+                        <div className="relative bg-white rounded-md p-4 text-center shadow-md hover:shadow-lg hover:bg-gray-50 transform transition-all duration-300 border border-gray-200">
                         <img
                             src={user}
                             alt="background"
-                            className="absolute top-3 right-3 w-10 h-10 opacity-20"
+                            className="absolute top-2 right-2 w-6 h-6 opacity-20"
                         />
-                        <h2 className="text-lg font-semibold text-gray-700">User</h2>
-                        <p className="text-3xl font-bold text-blue-600 mt-2">245</p>
+                        <h2 className="text-sm font-semibold text-gray-700">User</h2>
+                        <p className="text-2xl font-bold text-blue-600 mt-1">245</p>
                     </div>
-                        <div className="relative bg-white rounded-md p-6 text-center shadow-lg hover:shadow-none hover:bg-gray-100 transform transition-all duration-300 border-2 border-gray-200 stroke-2">
+                        <div className="relative bg-white rounded-md p-4 text-center shadow-md hover:shadow-lg hover:bg-gray-50 transform transition-all duration-300 border border-gray-200">
                         <img
                             src={audit}
                             alt="background"
-                            className="absolute top-3 right-3 w-10 h-10 opacity-20"
+                            className="absolute top-2 right-2 w-6 h-6 opacity-20"
                         />
-                        <h2 className="text-lg font-semibold text-gray-700">Total Audits</h2>
-                        <p className="text-3xl font-bold text-blue-600 mt-2">58</p>
+                        <h2 className="text-sm font-semibold text-gray-700">Total Audits</h2>
+                        <p className="text-2xl font-bold text-blue-600 mt-1">58</p>
                     </div>
-                        <div className="relative bg-white rounded-md p-6 text-center shadow-lg hover:shadow-none hover:bg-gray-100 transform transition-all duration-300 border-2 border-gray-200 stroke-2">
+                        <div className="relative bg-white rounded-md p-4 text-center shadow-md hover:shadow-lg hover:bg-gray-50 transform transition-all duration-300 border border-gray-200">
                         <img
                             src={pending}
                             alt="background"
-                            className="absolute top-3 right-3 w-10 h-10 opacity-20"
+                            className="absolute top-2 right-2 w-6 h-6 opacity-20"
                         />
-                        <h2 className="text-lg font-semibold text-gray-700">Pending Audits</h2>
-                        <p className="text-3xl font-bold text-blue-600 mt-2">7</p>
+                        <h2 className="text-sm font-semibold text-gray-700">Pending Audits</h2>
+                        <p className="text-2xl font-bold text-blue-600 mt-1">7</p>
                     </div>
 
-                    <div className="mt-6 bg-white shadow-lg rounded-md p-6 border-2 border-gray-200 stroke-2 w-full max-w-4xl">
+                    <div className="mt-4 bg-white shadow-md rounded-md p-4 border border-gray-200 w-full max-w-4xl">
 
-                        <div className="flex items-center justify-between mb-4">
-                            <h1 className="text-xl font-semibold text-slate-800">Recent Logs</h1>
-                            <button className="text-sm text-blue-600 hover:underline">
+                        <div className="flex items-center justify-between mb-3">
+                            <h1 className="text-lg font-semibold text-slate-800">Recent Logs</h1>
+                            <button className="text-xs text-blue-600 hover:underline">
                                 View All
                             </button>
                         </div>
 
 
-                        <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
+                        <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
 
 
                         </div>

@@ -126,4 +126,17 @@ export const authAPI = {
   },
 };
 
+// Users API functions
+export const usersAPI = {
+  getCurrentUser: async (email) => {
+    const response = await api.get(`/user/current/${email}`);
+    return response.data;
+  },
+  
+  getAllUsers: async () => {
+    const response = await api.get('/user');
+    return response.data;
+  },
+};
+
 export default api;
