@@ -29,7 +29,7 @@ export default function Login() {
         try {
             console.log('Attempting login with:', { email: formData.email });
             
-            const response = await axios.post("http://localhost:3000/user/login", {
+            const response = await axios.post("http://localhost:5000/user/login", {
                 email: formData.email,
                 password: formData.password
             });
