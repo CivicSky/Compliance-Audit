@@ -36,7 +36,7 @@ export default function Requirement() {
     const compliedPercentage = Math.round((compliedCount / totalRequirements) * 100);
 
     return (
-        <div className="ml-72 px-6 pb-6 pt-0">
+        <div className="ml-5 px-6 pb-6 pt-0">
             <Header />
 
             <div className="mt-6 bg-white p-6 shadow rounded">
