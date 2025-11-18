@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import Header from "../Header/header"
-import OfficeP from "../OfficeP/OfficeP";
+import OfficeHeadP from "../OfficeHeadP/OfficeHeadP";
 import AddOfficeHeadModal from "../AddHead/AddOfficeHeadModal";
 
 export default function Home() {
@@ -109,7 +109,7 @@ export default function Home() {
             />
 
             <div className="relative z-10">
-                <OfficeP 
+                <OfficeHeadP 
                     ref={officePRef} 
                     searchTerm={searchTerm} 
                     sortType={sortType}

@@ -4,7 +4,7 @@ import user from "../../assets/images/user.svg";
 import { officeHeadsAPI } from "../../utils/api";
 import EditOfficeHeadModal from '../EditHead/EditOfficeHeadModal.jsx';
 
-const OfficeP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode = false, onSelectionChange }, ref) => {
+const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode = false, onSelectionChange }, ref) => {
     const [officeHeads, setOfficeHeads] = useState([]);
     const [filteredOfficeHeads, setFilteredOfficeHeads] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -353,4 +353,4 @@ const OfficeP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode = f
     );
 });
 
-export default OfficeP;
+export default OfficeHeadP;

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import logo from "../../assets/images/lccb_logo.png"
 import search from "../../assets/images/search.svg"
 
-export default function Header({ pageTitle = "Compliance Audit", showSearch = true, onAddClick, onSearchChange, searchValue = '', onSortChange, sortValue = 'name', onDeleteModeToggle, deleteMode = false, selectedCount = 0, onDeleteSelected }) {
+export default function Header({ pageTitle = "Compliance Audit", showSearch = true, onAddClick, onSearchChange, searchValue = '', onSortChange, sortValue = 'name', onDeleteModeToggle, deleteMode = false, selectedCount = 0, onDeleteSelected, hideSortButton = false }) {
     const [showSortDropdown, setShowSortDropdown] = useState(false);
     const [showDeleteDropdown, setShowDeleteDropdown] = useState(false);
     const sortDropdownRef = useRef(null);
@@ -94,44 +94,48 @@ export default function Header({ pageTitle = "Compliance Audit", showSearch = tr
                         
                         {/* Toolbar buttons */}
                         <div className="flex items-center gap-2">
-                            <div className="relative" ref={sortDropdownRef}>
-                                <button
-                                    type="button"
-                                    onClick={() => setShowSortDropdown(!showSortDropdown)}
-                                    className="flex items-center justify-center lg:w-10 lg:h-10 w-8 h-8 bg-white hover:bg-gray-50 rounded-md text-gray-700 shadow-md border border-gray-200"
-                                    title="Sort"
-                                >
-                                    <svg className="lg:w-5 lg:h-5 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
-                                    </svg>
-                                </button>
-                                
-                                {/* Sort Dropdown */}
-                                {showSortDropdown && (
-                                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-50">
-                                        <div className="py-1">
-                                            {sortOptions.map((option) => (
-                                                <button
-                                                    key={option.value}
-                                                    onClick={() => handleSortSelect(option.value)}
-                                                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 transition-colors ${
-                                                        sortValue === option.value 
-                                                            ? 'bg-blue-50 text-blue-600 font-medium' 
-                                                            : 'text-gray-700'
-                                                    }`}
-                                                >
-                                                    {option.label}
-                                                    {sortValue === option.value && (
-                                                        <svg className="w-4 h-4 inline-block ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                                        </svg>
-                                                    )}
-                                                </button>
-                                            ))}
+                            {!hideSortButton ? (
+                                <div className="relative" ref={sortDropdownRef}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowSortDropdown(!showSortDropdown)}
+                                        className="flex items-center justify-center lg:w-10 lg:h-10 w-8 h-8 bg-white hover:bg-gray-50 rounded-md text-gray-700 shadow-md border border-gray-200"
+                                        title="Sort"
+                                    >
+                                        <svg className="lg:w-5 lg:h-5 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
+                                        </svg>
+                                    </button>
+                                    
+                                    {/* Sort Dropdown */}
+                                    {showSortDropdown && (
+                                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-50">
+                                            <div className="py-1">
+                                                {sortOptions.map((option) => (
+                                                    <button
+                                                        key={option.value}
+                                                        onClick={() => handleSortSelect(option.value)}
+                                                        className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 transition-colors ${
+                                                            sortValue === option.value 
+                                                                ? 'bg-blue-50 text-blue-600 font-medium' 
+                                                                : 'text-gray-700'
+                                                        }`}
+                                                    >
+                                                        {option.label}
+                                                        {sortValue === option.value && (
+                                                            <svg className="w-4 h-4 inline-block ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                            </svg>
+                                                        )}
+                                                    </button>
+                                                ))}
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
-                            </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="lg:w-10 lg:h-10 w-8 h-8"></div>
+                            )}
                             <button
                                 type="button"
                                 onClick={onAddClick}

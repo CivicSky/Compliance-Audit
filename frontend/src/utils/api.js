@@ -139,4 +139,32 @@ export const usersAPI = {
   },
 };
 
+// Events API functions
+export const eventsAPI = {
+  getAllEvents: async () => {
+    const response = await api.get('/events');
+    return response.data;
+  },
+
+  addEvent: async (eventData) => {
+    const response = await api.post('/events/add', eventData);
+    return response.data;
+  },
+
+  updateEvent: async (eventId, eventData) => {
+    const response = await api.put(`/events/update/${eventId}`, eventData);
+    return response.data;
+  },
+
+  deleteEvents: async (eventIds) => {
+    const response = await api.post('/events/delete', { eventIds });
+    return response.data;
+  },
+
+  testConnection: async () => {
+    const response = await api.get('/officeheads');
+    return response.data;
+  },
+};
+
 export default api;
