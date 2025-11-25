@@ -1,71 +1,102 @@
-import Header from "../Header/header.jsx";
 import { useState } from "react";
+import requirement from "../../assets/images/requirement.svg";
+import Header from "../../components/Header/header";
 
-export default function Requirement() {
+export default function RequirementBars() {
 
-    const [requirements, setRequirements] = useState([
-        { id: 1, name: "Board Resolution", complied: false },
-        { id: 2, name: "Constitution and By-laws", complied: false },
-        { id: 3, name: "List of Officers & Advisers", complied: false },
-        { id: 4, name: "Profile of Officers", complied: false },
-        { id: 5, name: "List of Members", complied: false },
-        { id: 6, name: "Financial Report", complied: false },
-        { id: 7, name: "Calendar of Activities", complied: false },
-        { id: 8, name: "Activity Report", complied: false },
-        { id: 9, name: "Accreditation Form", complied: false },
-        { id: 10, name: "Organizational Chart", complied: false },
-        { id: 11, name: "Copy of Constitution / By-Laws (Updated)", complied: false },
-        { id: 12, name: "Minutes of Meetings", complied: false },
-        { id: 13, name: "Plan of Action", complied: false },
-        { id: 14, name: "Official Email Address", complied: false },
-        { id: 15, name: "Seminar Workshop Reports", complied: false },
-        { id: 16, name: "General Assembly Documents", complied: false }
+    const [categories, setCategories] = useState([
+        {
+            id: 1,
+            title: "PAASCU Accreditation",
+            subtitle: "PAASCU",
+            description: "Requirements for PAASCU Validation",
+            logo: "/logos/paascu.png",
+            open: false,
+            pdf: "/mnt/data/PAASCU.pdf" // Add correct PAASCU file here
+        },
+        {
+            id: 2,
+            title: "PACUCOA Accreditation",
+            subtitle: "PACUCOA",
+            description: "Requirements for PACUCOA Validation",
+            logo: "/logos/pacucoa.png",
+            open: false,
+            pdf: null // No file uploaded for PACUCOA yet
+        },
+        {
+            id: 3,
+            title: "ISO Certification",
+            subtitle: "ISO",
+            description: "Requirements for ISO Validation",
+            logo: "/logos/iso.png",
+            open: false,
+            pdf: "/mnt/data/ISO 9001_2015 Quality Management Systems - Requirements.pdf"
+        },
     ]);
 
-    const toggleComplied = (id) => {
-        setRequirements(prev =>
-            prev.map(req =>
-                req.id === id ? { ...req, complied: !req.complied } : req
+    const toggleOpen = (id) => {
+        setCategories((prev) =>
+            prev.map((cat) =>
+                cat.id === id ? { ...cat, open: !cat.open } : cat
             )
         );
     };
 
-
-    const totalRequirements = requirements.length;
-    const compliedCount = requirements.filter(req => req.complied).length;
-    const compliedPercentage = Math.round((compliedCount / totalRequirements) * 100);
-
     return (
-        <div className="ml-5 px-6 pb-6 pt-0">
-            <Header />
+        <div className="p-6 flex flex-col gap-4">
 
-            <div className="mt-6 bg-white p-6 shadow rounded">
-                <h2 className="text-xl font-bold mb-4">
-                    Requirements Checklist
-                </h2>
+            {/* Header */}
+            <Header pageTitle="Requirements" />
 
-                <div className="space-y-2">
-                    {requirements.map(req => (
-                        <label
-                            key={req.id}
-                            className="flex items-center gap-3 p-2 border-b"
+            <div className="mt-6 space-y-4">
+                {categories.map((cat) => (
+                    <div
+                        key={cat.id}
+                        className="bg-white border rounded-xl shadow-sm hover:shadow-md transition p-4"
+                    >
+                        {/* Title Bar */}
+                        <button
+                            onClick={() => toggleOpen(cat.id)}
+                            className="w-full px-3 py-2 flex items-center justify-between"
                         >
-                            <input
-                                type="checkbox"
-                                checked={req.complied}
-                                onChange={() => toggleComplied(req.id)}
-                            />
-                            <span>{req.id}. {req.name}</span>
-                        </label>
-                    ))}
-                </div>
+                            <div className="flex items-center gap-4">
+                                <img
+                                    src={requirement}
+                                    className="w-10 h-10 object-contain opacity-80"
+                                />
+                                <div>
+                                    <h2 className="font-semibold text-lg">{cat.title}</h2>
+                                    <p className="text-gray-600 text-sm">{cat.subtitle}</p>
+                                    <p className="text-gray-500 text-xs -mt-1">{cat.description}</p>
+                                </div>
+                            </div>
 
-                <div className="mt-4">
-                    <h3 className="text-lg font-semibold">
-                        Compliance Percentage:
-                    </h3>
-                    <p className="text-xl font-bold text-green-600">{compliedPercentage}%</p>
-                </div>
+                            <span className="px-3 py-1 text-sm bg-blue-100 text-blue-600 rounded-md">
+                                {cat.open ? "Hide" : "View"}
+                            </span>
+                        </button>
+
+                        {/* Collapsible PDF Viewer */}
+                        {cat.open && (
+                            <div className="px-8 py-4 bg-gray-50 border-t mt-2 rounded-b-lg">
+                                
+                              
+                                {cat.pdf ? (
+                                    <iframe
+                                        src={cat.pdf}
+                                        className="w-full h-[600px] border rounded-lg"
+                                    />
+                                ) : (
+                                    <p className="text-gray-500 italic">
+                                        No PDF file uploaded for this category.
+                                    </p>
+                                )}
+
+                            </div>
+                        )}
+
+                    </div>
+                ))}
             </div>
         </div>
     );
