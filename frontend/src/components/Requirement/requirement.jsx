@@ -1,6 +1,8 @@
 import { useState } from "react";
 import requirement from "../../assets/images/requirement.svg";
 import Header from "../../components/Header/header";
+import paascu from "../../assets/paascu.pdf"
+import iso from "../../assets/iso.pdf"
 
 export default function RequirementBars() {
 
@@ -12,7 +14,7 @@ export default function RequirementBars() {
             description: "Requirements for PAASCU Validation",
             logo: "/logos/paascu.png",
             open: false,
-            pdf: "/mnt/data/PAASCU.pdf" // Add correct PAASCU file here
+            pdf: paascu, 
         },
         {
             id: 2,
@@ -30,7 +32,7 @@ export default function RequirementBars() {
             description: "Requirements for ISO Validation",
             logo: "/logos/iso.png",
             open: false,
-            pdf: "/mnt/data/ISO 9001_2015 Quality Management Systems - Requirements.pdf"
+            pdf: iso,
         },
     ]);
 
