@@ -1,105 +1,174 @@
-import { useState } from "react";
-import requirement from "../../assets/images/requirement.svg";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Header from "../../components/Header/header";
-import paascu from "../../assets/paascu.pdf"
-import iso from "../../assets/iso.pdf"
+import AddRequirementModal from "../AddRequirement/AddRequirementModal";
+import EditRequirementsModal from "../EditRequirements/EditRequirementsModal";
+import RequirementsP from "../RequirementsProfile/RequirementsProfile";
 
 export default function RequirementBars() {
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [selectedRequirement, setSelectedRequirement] = useState(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [deleteMode, setDeleteMode] = useState(false);
+    const [selectedCount, setSelectedCount] = useState(0);
+    const [selectedIds, setSelectedIds] = useState([]);
+    const [filterOptions, setFilterOptions] = useState({
+        events: [],
+        types: []
+    });
+    const requirementsPRef = useRef();
 
-    const [categories, setCategories] = useState([
-        {
-            id: 1,
-            title: "PAASCU Accreditation",
-            subtitle: "PAASCU",
-            description: "Requirements for PAASCU Validation",
-            logo: "/logos/paascu.png",
-            open: false,
-            pdf: paascu, 
-        },
-        {
-            id: 2,
-            title: "PACUCOA Accreditation",
-            subtitle: "PACUCOA",
-            description: "Requirements for PACUCOA Validation",
-            logo: "/logos/pacucoa.png",
-            open: false,
-            pdf: null // No file uploaded for PACUCOA yet
-        },
-        {
-            id: 3,
-            title: "ISO Certification",
-            subtitle: "ISO",
-            description: "Requirements for ISO Validation",
-            logo: "/logos/iso.png",
-            open: false,
-            pdf: iso,
-        },
-    ]);
+    // Reset all states when component unmounts or navigation happens
+    useEffect(() => {
+        setDeleteMode(false);
+        setSelectedCount(0);
+        setSelectedIds([]);
+        
+        return () => {
+            setDeleteMode(false);
+            setSelectedCount(0);
+            setSelectedIds([]);
+            setIsModalOpen(false);
+        };
+    }, []);
 
-    const toggleOpen = (id) => {
-        setCategories((prev) =>
-            prev.map((cat) =>
-                cat.id === id ? { ...cat, open: !cat.open } : cat
-            )
+    const handleAddSuccess = (newRequirement) => {
+        console.log('New requirement added:', newRequirement);
+        
+        // Refresh the RequirementsP component to show the new data
+        if (requirementsPRef.current && requirementsPRef.current.refresh) {
+            requirementsPRef.current.refresh();
+        }
+    };
+
+    const handleRequirementClick = (requirement) => {
+        setSelectedRequirement(requirement);
+        setIsEditModalOpen(true);
+    };
+
+    const handleEditSave = async (updatedRequirement) => {
+        try {
+            const { requirementsAPI } = await import('../../utils/api');
+            const response = await requirementsAPI.updateRequirement(
+                updatedRequirement.RequirementID,
+                updatedRequirement
+            );
+
+            if (response.success) {
+                console.log('Requirement updated successfully');
+                
+                // Refresh the list
+                if (requirementsPRef.current && requirementsPRef.current.refresh) {
+                    requirementsPRef.current.refresh();
+                }
+                
+                alert('Requirement updated successfully!');
+            } else {
+                alert(response.message || 'Failed to update requirement');
+            }
+        } catch (error) {
+            console.error('Error updating requirement:', error);
+            alert('An error occurred while updating the requirement');
+        }
+    };
+
+    const handleSearchChange = (term) => {
+        setSearchTerm(term);
+    };
+
+    const handleFilterChange = (filters) => {
+        setFilterOptions(filters);
+    };
+
+    const handleDeleteModeToggle = (mode) => {
+        setDeleteMode(mode);
+        if (!mode) {
+            setSelectedCount(0);
+            setSelectedIds([]);
+        }
+    };
+
+    // Memoize handleSelectionChange to prevent infinite loops
+    const handleSelectionChange = useCallback((count, ids) => {
+        setSelectedCount(count);
+        setSelectedIds(ids);
+    }, []);
+
+    const handleDeleteSelected = async () => {
+        if (selectedIds.length === 0 || !requirementsPRef.current) return;
+        
+        // Confirm deletion
+        const confirmed = window.confirm(
+            `Are you sure you want to delete ${selectedIds.length} requirement(s)? This action cannot be undone.`
         );
+        
+        if (!confirmed) return;
+        
+        try {
+            const result = await requirementsPRef.current.deleteSelected(selectedIds);
+            if (result.success) {
+                // Reset selection state
+                setSelectedCount(0);
+                setSelectedIds([]);
+                setDeleteMode(false);
+                // Show success message
+                console.log('Successfully deleted selected requirements');
+                alert(`Successfully deleted ${selectedIds.length} requirement(s)`);
+            } else {
+                // Show error message
+                console.error('Failed to delete requirements:', result.message);
+                alert(result.message || 'Failed to delete requirements');
+            }
+        } catch (error) {
+            console.error('Error deleting requirements:', error);
+            alert('An error occurred while deleting requirements');
+        }
     };
 
     return (
         <div className="p-6 flex flex-col gap-4">
-
             {/* Header */}
-            <Header pageTitle="Requirements" />
+            <Header 
+                pageTitle="Requirements" 
+                onAddClick={() => setIsModalOpen(true)}
+                onSearchChange={handleSearchChange}
+                searchValue={searchTerm}
+                onFilterChange={handleFilterChange}
+                filterOptions={filterOptions}
+                onDeleteModeToggle={handleDeleteModeToggle}
+                deleteMode={deleteMode}
+                selectedCount={selectedCount}
+                onDeleteSelected={handleDeleteSelected}
+                showRequirementsFilter={true}
+            />
 
-            <div className="mt-6 space-y-4">
-                {categories.map((cat) => (
-                    <div
-                        key={cat.id}
-                        className="bg-white border rounded-xl shadow-sm hover:shadow-md transition p-4"
-                    >
-                        {/* Title Bar */}
-                        <button
-                            onClick={() => toggleOpen(cat.id)}
-                            className="w-full px-3 py-2 flex items-center justify-between"
-                        >
-                            <div className="flex items-center gap-4">
-                                <img
-                                    src={requirement}
-                                    className="w-10 h-10 object-contain opacity-80"
-                                />
-                                <div>
-                                    <h2 className="font-semibold text-lg">{cat.title}</h2>
-                                    <p className="text-gray-600 text-sm">{cat.subtitle}</p>
-                                    <p className="text-gray-500 text-xs -mt-1">{cat.description}</p>
-                                </div>
-                            </div>
+            {/* Add Requirement Modal */}
+            <AddRequirementModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                onSuccess={handleAddSuccess}
+            />
 
-                            <span className="px-3 py-1 text-sm bg-blue-100 text-blue-600 rounded-md">
-                                {cat.open ? "Hide" : "View"}
-                            </span>
-                        </button>
+            {/* Edit Requirement Modal */}
+            <EditRequirementsModal
+                visible={isEditModalOpen}
+                onClose={() => {
+                    setIsEditModalOpen(false);
+                    setSelectedRequirement(null);
+                }}
+                requirement={selectedRequirement}
+                onSave={handleEditSave}
+            />
 
-                        {/* Collapsible PDF Viewer */}
-                        {cat.open && (
-                            <div className="px-8 py-4 bg-gray-50 border-t mt-2 rounded-b-lg">
-                                
-                              
-                                {cat.pdf ? (
-                                    <iframe
-                                        src={cat.pdf}
-                                        className="w-full h-[600px] border rounded-lg"
-                                    />
-                                ) : (
-                                    <p className="text-gray-500 italic">
-                                        No PDF file uploaded for this category.
-                                    </p>
-                                )}
-
-                            </div>
-                        )}
-
-                    </div>
-                ))}
-            </div>
+            {/* Requirements List */}
+            <RequirementsP
+                ref={requirementsPRef}
+                searchTerm={searchTerm}
+                filterOptions={filterOptions}
+                deleteMode={deleteMode}
+                onSelectionChange={handleSelectionChange}
+                onRequirementClick={handleRequirementClick}
+            />
         </div>
     );
 }

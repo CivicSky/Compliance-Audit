@@ -2,11 +2,13 @@ import { useState, useEffect, useRef } from "react";
 import logo from "../../assets/images/lccb_logo.png"
 import search from "../../assets/images/search.svg"
 
-export default function Header({ pageTitle = "Compliance Audit", showSearch = true, onAddClick, onSearchChange, searchValue = '', onSortChange, sortValue = 'name', onDeleteModeToggle, deleteMode = false, selectedCount = 0, onDeleteSelected, hideSortButton = false }) {
+export default function Header({ pageTitle = "Compliance Audit", showSearch = true, onAddClick, onSearchChange, searchValue = '', onSortChange, sortValue = 'name', onFilterChange, filterOptions = { events: [], types: [] }, onDeleteModeToggle, deleteMode = false, selectedCount = 0, onDeleteSelected, hideSortButton = false, showRequirementsFilter = false }) {
     const [showSortDropdown, setShowSortDropdown] = useState(false);
     const [showDeleteDropdown, setShowDeleteDropdown] = useState(false);
+    const [showFilterDropdown, setShowFilterDropdown] = useState(false);
     const sortDropdownRef = useRef(null);
     const deleteDropdownRef = useRef(null);
+    const filterDropdownRef = useRef(null);
 
     const sortOptions = [
         { value: 'name', label: 'By Name' },
@@ -35,6 +37,34 @@ export default function Header({ pageTitle = "Compliance Audit", showSearch = tr
         setShowDeleteDropdown(false);
     };
 
+    const handleFilterToggle = (filterType, value) => {
+        if (!onFilterChange) return;
+
+        const newFilters = { ...filterOptions };
+        
+        if (filterType === 'event') {
+            if (newFilters.events.includes(value)) {
+                newFilters.events = newFilters.events.filter(e => e !== value);
+            } else {
+                newFilters.events.push(value);
+            }
+        } else if (filterType === 'type') {
+            if (newFilters.types.includes(value)) {
+                newFilters.types = newFilters.types.filter(t => t !== value);
+            } else {
+                newFilters.types.push(value);
+            }
+        }
+        
+        onFilterChange(newFilters);
+    };
+
+    const clearAllFilters = () => {
+        if (onFilterChange) {
+            onFilterChange({ events: [], types: [] });
+        }
+    };
+
     // Close dropdowns when clicking outside
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -44,12 +74,16 @@ export default function Header({ pageTitle = "Compliance Audit", showSearch = tr
             if (deleteDropdownRef.current && !deleteDropdownRef.current.contains(event.target)) {
                 setShowDeleteDropdown(false);
             }
+            if (filterDropdownRef.current && !filterDropdownRef.current.contains(event.target)) {
+                setShowFilterDropdown(false);
+            }
         };
 
         const handleEscapeKey = (event) => {
             if (event.key === 'Escape') {
                 setShowSortDropdown(false);
                 setShowDeleteDropdown(false);
+                setShowFilterDropdown(false);
             }
         };
 
@@ -94,48 +128,88 @@ export default function Header({ pageTitle = "Compliance Audit", showSearch = tr
                         
                         {/* Toolbar buttons */}
                         <div className="flex items-center gap-2">
-                            {!hideSortButton ? (
-                                <div className="relative" ref={sortDropdownRef}>
+                            {/* Filter Button for Requirements */}
+                            {showRequirementsFilter && (
+                                <div className="relative" ref={filterDropdownRef}>
                                     <button
                                         type="button"
-                                        onClick={() => setShowSortDropdown(!showSortDropdown)}
-                                        className="flex items-center justify-center lg:w-10 lg:h-10 w-8 h-8 bg-white hover:bg-gray-50 rounded-md text-gray-700 shadow-md border border-gray-200"
-                                        title="Sort"
+                                        onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                                        className={`flex items-center justify-center lg:w-10 lg:h-10 w-8 h-8 rounded-md shadow-md border border-gray-200 ${
+                                            filterOptions.events.length > 0 || filterOptions.types.length > 0
+                                                ? 'bg-blue-500 text-white hover:bg-blue-600'
+                                                : 'bg-white text-gray-700 hover:bg-gray-50'
+                                        }`}
+                                        title="Filter"
                                     >
                                         <svg className="lg:w-5 lg:h-5 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                                         </svg>
+                                        {(filterOptions.events.length > 0 || filterOptions.types.length > 0) && (
+                                            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                                                {filterOptions.events.length + filterOptions.types.length}
+                                            </span>
+                                        )}
                                     </button>
                                     
-                                    {/* Sort Dropdown */}
-                                    {showSortDropdown && (
-                                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-50">
-                                            <div className="py-1">
-                                                {sortOptions.map((option) => (
+                                    {/* Filter Dropdown */}
+                                    {showFilterDropdown && (
+                                        <div className="absolute right-0 mt-2 w-72 bg-white rounded-md shadow-lg border border-gray-200 z-50 max-h-96 overflow-y-auto">
+                                            <div className="p-3 border-b border-gray-200 flex items-center justify-between">
+                                                <h3 className="font-semibold text-gray-800">Filter Requirements</h3>
+                                                {(filterOptions.events.length > 0 || filterOptions.types.length > 0) && (
                                                     <button
-                                                        key={option.value}
-                                                        onClick={() => handleSortSelect(option.value)}
-                                                        className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 transition-colors ${
-                                                            sortValue === option.value 
-                                                                ? 'bg-blue-50 text-blue-600 font-medium' 
-                                                                : 'text-gray-700'
-                                                        }`}
+                                                        onClick={clearAllFilters}
+                                                        className="text-xs text-blue-600 hover:text-blue-700"
                                                     >
-                                                        {option.label}
-                                                        {sortValue === option.value && (
-                                                            <svg className="w-4 h-4 inline-block ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                                            </svg>
-                                                        )}
+                                                        Clear All
                                                     </button>
-                                                ))}
+                                                )}
+                                            </div>
+                                            
+                                            {/* By Events */}
+                                            <div className="p-3 border-b border-gray-200">
+                                                <h4 className="text-sm font-medium text-gray-700 mb-2">By Event</h4>
+                                                <div className="space-y-2">
+                                                    {['PAASCU', 'PACUCOA', 'ISO'].map((event) => (
+                                                        <label key={event} className="flex items-center cursor-pointer hover:bg-gray-50 p-1 rounded">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={filterOptions.events.includes(event)}
+                                                                onChange={() => handleFilterToggle('event', event)}
+                                                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                                            />
+                                                            <span className="ml-2 text-sm text-gray-700">{event}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            
+                                            {/* By Type */}
+                                            <div className="p-3">
+                                                <h4 className="text-sm font-medium text-gray-700 mb-2">By Type</h4>
+                                                <div className="space-y-2">
+                                                    {[
+                                                        { value: 'main', label: 'Main Requirements' },
+                                                        { value: 'sub', label: 'Sub Requirements' },
+                                                        { value: 'nested', label: 'Nested (3+ levels)' }
+                                                    ].map((type) => (
+                                                        <label key={type.value} className="flex items-center cursor-pointer hover:bg-gray-50 p-1 rounded">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={filterOptions.types.includes(type.value)}
+                                                                onChange={() => handleFilterToggle('type', type.value)}
+                                                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                                            />
+                                                            <span className="ml-2 text-sm text-gray-700">{type.label}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
                                             </div>
                                         </div>
                                     )}
                                 </div>
-                            ) : (
-                                <div className="lg:w-10 lg:h-10 w-8 h-8"></div>
                             )}
+                            
                             <button
                                 type="button"
                                 onClick={onAddClick}

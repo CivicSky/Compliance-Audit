@@ -167,4 +167,42 @@ export const eventsAPI = {
   },
 };
 
+// Requirements API functions
+export const requirementsAPI = {
+  getAllCriteria: async () => {
+    const response = await api.get('/requirements/criteria');
+    return response.data;
+  },
+
+  getCriteriaByEvent: async (eventId) => {
+    const response = await api.get(`/requirements/criteria/event/${eventId}`);
+    return response.data;
+  },
+
+  getAllRequirements: async () => {
+    const response = await api.get('/requirements/all');
+    return response.data;
+  },
+
+  getRequirementsByEvent: async (eventId) => {
+    const response = await api.get(`/requirements/event/${eventId}`);
+    return response.data;
+  },
+
+  addRequirement: async (requirementData) => {
+    const response = await api.post('/requirements/add', requirementData);
+    return response.data;
+  },
+
+  updateRequirement: async (requirementId, requirementData) => {
+    const response = await api.put(`/requirements/update/${requirementId}`, requirementData);
+    return response.data;
+  },
+
+  deleteRequirements: async (requirementIds) => {
+    const response = await api.post('/requirements/delete', { requirementIds });
+    return response.data;
+  },
+};
+
 export default api;

@@ -1,5 +1,6 @@
 import React, { useEffect } from "react";
 import Header from "../Header/header"
+import UsersP from "../UsersProfile/UsersProfle";
 
 
 export default function Users() {
@@ -22,7 +23,7 @@ export default function Users() {
 
             <div className="relative z-10">
                 <div className="mt-6">
-                    <p className="text-gray-600">Users page content will go here.</p>
+                    <UsersP/>
                 </div>
             </div>
         </div>

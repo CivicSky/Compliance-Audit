@@ -3,8 +3,10 @@ const app = express();
 const port = 5000;
 const cors = require('cors');
 const userRoutes = require('./routes/users');
+const userListRoutes = require('./routes/userlist');
 const officeHeadsRoutes = require('./routes/officeheads');
 const eventsRoutes = require('./routes/events');
+const requirementsRoutes = require('./routes/requirements');
 
 app.use(cors({
   origin: ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'], // Add common dev server ports
@@ -30,8 +32,10 @@ app.get('/health', (req, res) => {
 }); 
 
 app.use('/user', userRoutes);
+app.use('/api/user', userListRoutes);
 app.use('/api/officeheads', officeHeadsRoutes);
 app.use('/api/events', eventsRoutes);
+app.use('/api/requirements', requirementsRoutes);
 /*app.use('/roles', rolesRoutes);
 app.use('/requirements', requirementsRoutes);
 app.use('/officetypes', officetypesRoutes);
