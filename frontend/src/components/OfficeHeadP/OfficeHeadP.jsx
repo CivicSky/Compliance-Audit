@@ -10,6 +10,7 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [selectedHeads, setSelectedHeads] = useState(new Set());
+    const [expandedCards, setExpandedCards] = useState(new Set());
 
     // Fetch office heads data from database
     useEffect(() => {
@@ -83,6 +84,18 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                 newSet.add(headId);
             } else {
                 newSet.delete(headId);
+            }
+            return newSet;
+        });
+    };
+
+    const toggleExpand = (headId) => {
+        setExpandedCards(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(headId)) {
+                newSet.delete(headId);
+            } else {
+                newSet.add(headId);
             }
             return newSet;
         });
@@ -288,10 +301,10 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                         : user;
 
                 return (
-                    <div key={person.HeadID} className={`bg-white rounded-md p-4 shadow-lg border-2 border-gray-200 stroke-2 transition-all duration-300 ${
-                        deleteMode ? 'hover:shadow-md' : 'hover:shadow-none hover:bg-gray-100 cursor-pointer'
+                    <div key={person.HeadID} className={`bg-white rounded-md shadow-lg border-2 border-gray-200 stroke-2 transition-all duration-300 ${
+                        deleteMode ? 'hover:shadow-md' : 'hover:shadow-none hover:bg-gray-100'
                     } ${selectedHeads.has(person.HeadID) ? 'ring-2 ring-blue-500 bg-blue-50' : ''}`}>
-                        <div className="flex items-center justify-between min-h-[4rem]">
+                        <div className="flex items-center justify-between min-h-[4rem] p-4">
                             {/* Checkbox for delete mode */}
                             {deleteMode && (
                                 <div className="flex items-center mr-4">
@@ -307,8 +320,8 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                             
                             {/* Left section - Profile pic, name and position */}
                             <div 
-                                className="flex items-center gap-4 flex-1"
-                                onClick={!deleteMode ? () => openEdit(person) : undefined}
+                                className="flex items-center gap-4 flex-1 cursor-pointer"
+                                onClick={() => toggleExpand(person.HeadID)}
                             >
                                 <img
                                     src={profilePicUrl}
@@ -324,7 +337,9 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                                         {fullName}
                                     </h3>
                                     <p className="text-gray-600 text-sm">{person.Position}</p>
-                                    <p className="text-gray-500 text-xs">{person.ContactInfo}</p>
+                                    {!expandedCards.has(person.HeadID) && (
+                                        <p className="text-gray-500 text-xs">{person.ContactInfo}</p>
+                                    )}
                                 </div>
                             </div>
 
@@ -337,7 +352,104 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                                     {person.OfficeID ? `Office ${person.OfficeID}` : 'Unassigned'}
                                 </span>
                             </div>
+
+                            {/* Expand/Collapse Button - Far Right */}
+                            <button
+                                onClick={() => toggleExpand(person.HeadID)}
+                                className="flex-shrink-0 ml-4 p-1 hover:bg-gray-200 rounded transition-colors"
+                                aria-label={expandedCards.has(person.HeadID) ? "Collapse details" : "Expand details"}
+                            >
+                                <svg 
+                                    className={`w-5 h-5 text-gray-600 transition-transform duration-200 ${expandedCards.has(person.HeadID) ? 'rotate-180' : ''}`}
+                                    fill="none" 
+                                    stroke="currentColor" 
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </button>
                         </div>
+
+                        {/* Expanded Details Section */}
+                        {expandedCards.has(person.HeadID) && (
+                            <div className="px-4 pb-4 pt-2 border-t border-gray-200 bg-gray-50 animate-fade-in">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+                                    {/* Contact Information */}
+                                    <div className="space-y-2">
+                                        <h4 className="font-semibold text-sm text-gray-700 mb-2">Contact Information</h4>
+                                        <div className="flex items-start gap-2">
+                                            <svg className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                            </svg>
+                                            <div>
+                                                <p className="text-xs text-gray-500">Email/Phone</p>
+                                                <p className="text-sm text-gray-800">{person.ContactInfo || 'Not provided'}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Office Assignment */}
+                                    <div className="space-y-2">
+                                        <h4 className="font-semibold text-sm text-gray-700 mb-2">Office Assignment</h4>
+                                        <div className="flex items-start gap-2">
+                                            <svg className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                            </svg>
+                                            <div>
+                                                <p className="text-xs text-gray-500">Current Office</p>
+                                                <p className="text-sm text-gray-800 font-medium">
+                                                    {person.OfficeID ? `Office #${person.OfficeID}` : 'Not assigned to any office'}
+                                                </p>
+                                                {person.OfficeName && (
+                                                    <p className="text-xs text-gray-600 mt-1">{person.OfficeName}</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Position Details */}
+                                    <div className="space-y-2">
+                                        <h4 className="font-semibold text-sm text-gray-700 mb-2">Position</h4>
+                                        <div className="flex items-start gap-2">
+                                            <svg className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                            </svg>
+                                            <div>
+                                                <p className="text-xs text-gray-500">Job Title</p>
+                                                <p className="text-sm text-gray-800">{person.Position}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Additional Info */}
+                                    <div className="space-y-2">
+                                        <h4 className="font-semibold text-sm text-gray-700 mb-2">Profile ID</h4>
+                                        <div className="flex items-start gap-2">
+                                            <svg className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" />
+                                            </svg>
+                                            <div>
+                                                <p className="text-xs text-gray-500">Head ID</p>
+                                                <p className="text-sm text-gray-800 font-mono">#{person.HeadID}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Action Button */}
+                                <div className="mt-4 pt-3 border-t border-gray-200">
+                                    <button
+                                        onClick={() => openEdit(person)}
+                                        className="w-full md:w-auto px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                        Edit Office Head
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 );
             })}
