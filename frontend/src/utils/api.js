@@ -36,6 +36,7 @@ api.interceptors.response.use(
   }
 );
 
+
 // Office Heads API functions
 export const officeHeadsAPI = {
   // Add new office head
@@ -76,7 +77,7 @@ export const officeHeadsAPI = {
     try {
       console.log('Sending DELETE request to:', `${API_BASE_URL}/officeheads/delete`);
       console.log('With data:', { headIds });
-      
+
       // Try different request format - some servers prefer POST for complex data
       const response = await api.delete('/officeheads/delete', {
         data: { headIds },
@@ -84,12 +85,12 @@ export const officeHeadsAPI = {
           'Content-Type': 'application/json'
         }
       });
-      
+
       console.log('Delete response received:', response.data);
       return response.data;
     } catch (error) {
       console.error('Delete API error:', error);
-      
+
       // If DELETE with body fails, try as query parameters
       if (error.response?.status === 404 || error.response?.status === 405) {
         try {
@@ -102,7 +103,7 @@ export const officeHeadsAPI = {
           throw fallbackError;
         }
       }
-      
+
       throw error;
     }
   },
@@ -132,7 +133,7 @@ export const usersAPI = {
     const response = await api.get(`/user/current/${email}`);
     return response.data;
   },
-  
+
   getAllUsers: async () => {
     const response = await api.get('/user');
     return response.data;
@@ -204,5 +205,62 @@ export const requirementsAPI = {
     return response.data;
   },
 };
+
+// Offices API functions
+export const officesAPI = {
+  // Get all offices
+  getAll: async () => {
+    const response = await api.get('/offices');
+    return response.data;
+  },
+
+  // Create a new office
+  createOffice: async (officeData) => {
+    const response = await api.post('/offices', officeData);
+    return response.data;
+  },
+
+  // Update an existing office
+  updateOffice: async (officeId, officeData) => {
+    const response = await api.put(`/offices/${officeId}`, officeData);
+    return response.data;
+  },
+
+  // Delete an office
+  deleteOffice: async (officeId) => {
+    const response = await api.delete(`/offices/${officeId}`);
+    return response.data;
+  },
+};
+
+// Offfices Types API functions
+export const officetypesAPI = {
+  getAll: async () => {
+    const response = await api.get('/officetypes');
+    return response.data;
+  },
+
+  getById: async (id) => {
+    const response = await api.get(`/officetypes/${id}`);
+    return response.data;
+  },
+
+  create: async (data) => {
+    const response = await api.post('/officetypes', data);
+    return response.data;
+  },
+
+  update: async (id, data) => {
+    const response = await api.put(`/officetypes/${id}`, data);
+    return response.data;
+  },
+
+  delete: async (id) => {
+    const response = await api.delete(`/officetypes/${id}`);
+    return response.data;
+  }
+};
+
+
 
 export default api;
