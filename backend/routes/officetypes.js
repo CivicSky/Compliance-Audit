@@ -1,11 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../controllers/OfficesTypesController.js');
-const OfficesController = require('../controllers/OfficesController');
+const OfficeTypesController = require('../controllers/OfficesTypesController.js');
 
 // GET all  office types
-router.get("/", OfficesTypesController.getAll);
-router.get("/:id", OfficesTypesController.getById);
+router.get("/", OfficeTypesController.getAll);
+router.get("/:id", OfficeTypesController.getById);
 router.post("/", OfficeTypesController.create);
 router.put("/:id", OfficeTypesController.update);
 router.delete("/:id", OfficeTypesController.delete);
