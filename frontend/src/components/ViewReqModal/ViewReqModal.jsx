@@ -51,20 +51,19 @@ export default function ViewReqModal({ isOpen, onClose, office, onEditOffice, on
     if (!isOpen || !office) return null;
 
     return (
-        <div className="fixed inset-0 z-50 bg-black/50 overflow-auto" onClick={onClose}>
-            <div className="min-h-screen flex items-center justify-center p-4">
-                <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl my-8 flex flex-col ml-64 h-[90vh]" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl ml-64 h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
                     {/* Header */}
-                    <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-4 flex items-center justify-between flex-shrink-0">
-                        <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-5 py-3 flex items-center justify-between flex-shrink-0">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                                 </svg>
                             </div>
                             <div>
-                                <h2 className="text-xl font-bold">{office.office_name}</h2>
-                                <p className="text-sm text-blue-100">{office.office_type_name}</p>
+                                <h2 className="text-lg font-bold">{office.office_name}</h2>
+                                <p className="text-xs text-blue-100">{office.office_type_name}</p>
                             </div>
                         </div>
 
@@ -73,9 +72,9 @@ export default function ViewReqModal({ isOpen, onClose, office, onEditOffice, on
                             <div className="relative">
                                 <button
                                     onClick={() => setShowMenu(!showMenu)}
-                                    className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                                    className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
                                 >
-                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
                                     </svg>
                                 </button>
@@ -113,9 +112,9 @@ export default function ViewReqModal({ isOpen, onClose, office, onEditOffice, on
 
                             <button
                                 onClick={onClose}
-                                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                                className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
                             >
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                             </button>
@@ -123,19 +122,17 @@ export default function ViewReqModal({ isOpen, onClose, office, onEditOffice, on
                     </div>
 
                     {/* Office Info */}
-                    <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 flex justify-center flex-shrink-0">
-                        <div className="flex items-center gap-3">
-                            <img
-                                src={office.head_profile_pic 
-                                    ? `http://localhost:5000/uploads/profile-pics/${office.head_profile_pic}`
-                                    : '/src/assets/images/user.svg'}
-                                alt={office.head_name}
-                                className="w-12 h-12 rounded-full object-cover border-2 border-blue-200"
-                            />
-                            <div>
-                                <p className="text-sm text-gray-500">Office Head</p>
-                                <p className="font-semibold text-gray-800">{office.head_name}</p>
-                            </div>
+                    <div className="px-6 py-3 bg-gray-50 border-b border-gray-200 flex items-center gap-3 flex-shrink-0">
+                        <img
+                            src={office.head_profile_pic 
+                                ? `http://localhost:5000/uploads/profile-pics/${office.head_profile_pic}`
+                                : '/src/assets/images/user.svg'}
+                            alt={office.head_name}
+                            className="w-10 h-10 rounded-full object-cover border-2 border-blue-200"
+                        />
+                        <div>
+                            <p className="text-xs text-gray-500">Office Head</p>
+                            <p className="font-semibold text-sm text-gray-800">{office.head_name}</p>
                         </div>
                     </div>
 
@@ -259,16 +256,15 @@ export default function ViewReqModal({ isOpen, onClose, office, onEditOffice, on
                     </div>
 
                     {/* Footer */}
-                    <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end flex-shrink-0">
+                    <div className="px-5 py-3 bg-gray-50 border-t border-gray-200 flex justify-end flex-shrink-0">
                         <button
                             onClick={onClose}
-                            className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium transition-colors"
+                            className="px-5 py-1.5 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium transition-colors text-sm"
                         >
                             Close
                         </button>
                     </div>
                 </div>
-            </div>
         </div>
     );
 }
