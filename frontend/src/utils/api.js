@@ -211,7 +211,7 @@ export const officesAPI = {
   // Get all offices
   getAll: async () => {
     const response = await api.get('/offices');
-    return response.data;
+    return { data: response.data };
   },
 
   // Create a new office

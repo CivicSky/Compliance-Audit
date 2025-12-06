@@ -4,6 +4,8 @@ import { officesAPI, officeHeadsAPI, officetypesAPI } from "../../utils/api";
 import OfficesP from "../../components/OfficesP/OfficesP";
 import AddOfficeModal from "../../components/AddOffice/AddOfficeModal";
 import EditOfficeModal from "../../components/EditOffice/EditOfficeModal";
+import OfficeDetailsModal from "../../components/OfficeDetailsModal/OfficeDetailsModal";
+import AddRequirementsModal from "../../components/ReqOfficeModal/ReqOfficeModal";
 
 export default function Organization() {
     const [officeTypes, setOfficeTypes] = useState([]);
@@ -11,6 +13,8 @@ export default function Organization() {
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+    const [isAddRequirementsModalOpen, setIsAddRequirementsModalOpen] = useState(false);
 
     const [selectedOffice, setSelectedOffice] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
@@ -66,7 +70,28 @@ export default function Organization() {
     const handleOfficeClick = (office) => {
         if (!deleteMode) {
             setSelectedOffice(office);
-            setIsEditModalOpen(true);
+            setIsDetailsModalOpen(true);
+        }
+    };
+
+    const handleEditOffice = (office) => {
+        setIsDetailsModalOpen(false);
+        setSelectedOffice(office);
+        setIsEditModalOpen(true);
+    };
+
+    const handleAddRequirements = (office) => {
+        setIsDetailsModalOpen(false);
+        setSelectedOffice(office);
+        setIsAddRequirementsModalOpen(true);
+    };
+
+    const handleRequirementsSaved = () => {
+        setIsAddRequirementsModalOpen(false);
+        setIsDetailsModalOpen(true);
+        // Refresh requirements in details modal
+        if (officesPRef.current?.refresh) {
+            officesPRef.current.refresh();
         }
     };
 
@@ -169,9 +194,21 @@ export default function Organization() {
                 <AddOfficeModal
                     isOpen={isModalOpen}
                     onClose={() => setIsModalOpen(false)}
-                    onSuccess={handleSuccess}  // Pass handleSuccess to the modal
+                    onSuccess={handleSuccess}
                     officeTypes={officeTypes}
                     heads={heads}
+                    selectedEventType={selectedEventType}
+                />
+            )}
+
+            {/* Office Details Modal */}
+            {isDetailsModalOpen && (
+                <OfficeDetailsModal
+                    isOpen={isDetailsModalOpen}
+                    onClose={() => setIsDetailsModalOpen(false)}
+                    office={selectedOffice}
+                    onEditOffice={handleEditOffice}
+                    onAddRequirements={handleAddRequirements}
                 />
             )}
 
@@ -179,11 +216,27 @@ export default function Organization() {
             {isEditModalOpen && (
                 <EditOfficeModal
                     visible={isEditModalOpen}
-                    onClose={() => setIsEditModalOpen(false)}
+                    onClose={() => {
+                        setIsEditModalOpen(false);
+                        setIsDetailsModalOpen(true);
+                    }}
                     office={selectedOffice}
                     onSave={handleEditSave}
                     officeTypes={officeTypes}
                     heads={heads}
+                />
+            )}
+
+            {/* Add Requirements Modal */}
+            {isAddRequirementsModalOpen && (
+                <AddRequirementsModal
+                    isOpen={isAddRequirementsModalOpen}
+                    onClose={() => {
+                        setIsAddRequirementsModalOpen(false);
+                        setIsDetailsModalOpen(true);
+                    }}
+                    office={selectedOffice}
+                    onSave={handleRequirementsSaved}
                 />
             )}
         </div>

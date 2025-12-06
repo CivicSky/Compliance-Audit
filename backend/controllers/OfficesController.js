@@ -12,31 +12,33 @@ const OfficesController = {
           o.OfficeName,
           o.OfficeTypeID,
           o.HeadID,
-          o.status,
-          o.progress,
-          t.TypeName,
+          o.EventID,
+          ot.TypeName,
           h.FirstName,
-          h.LastName
+          h.LastName,
+          h.ProfilePic
         FROM offices o
-        LEFT JOIN officetypes t ON o.OfficeTypeID = t.OfficeTypeID
-        LEFT JOIN officeheads h ON o.HeadID = h.HeadID
+        LEFT JOIN officetypes ot ON o.OfficeTypeID = ot.OfficeTypeID
+        LEFT JOIN headofoffice h ON o.HeadID = h.HeadID
       `);
 
       const formatted = rows.map(r => ({
-        OfficeID: r.OfficeID,
-        OfficeName: r.OfficeName,
-        OfficeTypeID: r.OfficeTypeID,
-        TypeName: r.TypeName || "Unknown Type",
-        HeadID: r.HeadID,
-        HeadName: r.FirstName ? `${r.FirstName} ${r.LastName}` : "Unknown Head",
-        status: r.status,
-        progress: r.progress
+        id: r.OfficeID,
+        office_name: r.OfficeName,
+        office_type_id: r.OfficeTypeID,
+        office_type_name: r.TypeName || "Unknown Type",
+        head_id: r.HeadID,
+        head_name: r.FirstName ? `${r.FirstName} ${r.LastName}` : "Unassigned",
+        head_profile_pic: r.ProfilePic,
+        event_id: r.EventID
       }));
 
+      console.log('Formatted offices with profile pics:', formatted);
       res.json(formatted);
     } catch (err) {
       console.error("Error fetching offices:", err);
-      res.status(500).json({ error: "Database error" });
+      console.error("Error details:", err.message);
+      res.status(500).json({ error: "Database error", details: err.message });
     }
   },
 
@@ -53,14 +55,13 @@ const OfficesController = {
           o.OfficeName,
           o.OfficeTypeID,
           o.HeadID,
-          o.status,
-          o.progress,
+          o.EventID,
           t.TypeName,
           h.FirstName,
           h.LastName
         FROM offices o
         LEFT JOIN officetypes t ON o.OfficeTypeID = t.OfficeTypeID
-        LEFT JOIN officeheads h ON o.HeadID = h.HeadID
+        LEFT JOIN headofoffice h ON o.HeadID = h.HeadID
         WHERE o.OfficeID = ?
       `, [id]);
 
@@ -77,8 +78,7 @@ const OfficesController = {
         TypeName: r.TypeName || "Unknown Type",
         HeadID: r.HeadID,
         HeadName: r.FirstName ? `${r.FirstName} ${r.LastName}` : "Unknown Head",
-        status: r.status,
-        progress: r.progress
+        EventID: r.EventID
       });
     } catch (err) {
       console.error("Error fetching office:", err);
@@ -90,32 +90,44 @@ const OfficesController = {
   // CREATE NEW OFFICE
   // ================================
   create: async (req, res) => {
-    const { OfficeName, OfficeTypeID, HeadID, status, progress } = req.body;
+    const { OfficeName, OfficeTypeID, HeadID, EventID } = req.body;
+
+    console.log('Received create office request:', { OfficeName, OfficeTypeID, HeadID, EventID });
 
     try {
       const [result] = await db.query(
-        `INSERT INTO offices (OfficeName, OfficeTypeID, HeadID, status, progress)
-         VALUES (?, ?, ?, ?, ?)`,
+        `INSERT INTO offices (OfficeName, OfficeTypeID, HeadID, EventID)
+         VALUES (?, ?, ?, ?)`,
         [
           OfficeName,
-          OfficeTypeID,
+          OfficeTypeID || null,
           HeadID || null,
-          status || "Active",
-          progress || 0
+          EventID || null
         ]
       );
 
+      console.log('Office created successfully:', result.insertId);
+
       res.json({
-        OfficeID: result.insertId,
-        OfficeName,
-        OfficeTypeID,
-        HeadID,
-        status: status || "Active",
-        progress: progress || 0
+        success: true,
+        message: 'Office created successfully',
+        data: {
+          OfficeID: result.insertId,
+          OfficeName,
+          OfficeTypeID,
+          HeadID,
+          EventID
+        }
       });
     } catch (err) {
       console.error("Error creating office:", err);
-      res.status(500).json({ error: "Database error" });
+      console.error("Error details:", err.message);
+      console.error("Error SQL:", err.sql);
+      res.status(500).json({ 
+        success: false, 
+        error: "Database error", 
+        details: err.message 
+      });
     }
   },
 
@@ -124,24 +136,24 @@ const OfficesController = {
   // ================================
   update: async (req, res) => {
     const id = req.params.id;
-    const { OfficeName, OfficeTypeID, HeadID, status, progress } = req.body;
+    const { OfficeName, OfficeTypeID, HeadID, EventID } = req.body;
 
     try {
       const [result] = await db.query(
         `UPDATE offices 
-         SET OfficeName = ?, OfficeTypeID = ?, HeadID = ?, status = ?, progress = ?
+         SET OfficeName = ?, OfficeTypeID = ?, HeadID = ?, EventID = ?
          WHERE OfficeID = ?`,
-        [OfficeName, OfficeTypeID, HeadID, status, progress, id]
+        [OfficeName, OfficeTypeID, HeadID, EventID, id]
       );
 
       if (result.affectedRows === 0) {
-        return res.status(404).json({ message: "Office not found" });
+        return res.status(404).json({ success: false, message: "Office not found" });
       }
 
-      res.json({ message: "Office updated successfully" });
+      res.json({ success: true, message: "Office updated successfully" });
     } catch (err) {
       console.error("Error updating office:", err);
-      res.status(500).json({ error: "Database error" });
+      res.status(500).json({ success: false, error: "Database error" });
     }
   },
 
@@ -162,6 +174,125 @@ const OfficesController = {
     } catch (err) {
       console.error("Error deleting office:", err);
       res.status(500).json({ error: "Database error" });
+    }
+  },
+
+  // ================================
+  // GET OFFICE REQUIREMENTS
+  // ================================
+  getOfficeRequirements: async (req, res) => {
+    const officeId = req.params.id;
+
+    try {
+      const [rows] = await db.query(`
+        SELECT 
+          r.RequirementID,
+          r.RequirementCode,
+          r.Description,
+          r.CriteriaID,
+          c.CriteriaName,
+          c.CriteriaCode,
+          or.ComplianceStatusID,
+          cst.StatusName as ComplianceStatus
+        FROM officerequirements or
+        INNER JOIN requirements r ON or.RequirementID = r.RequirementID
+        LEFT JOIN criteria c ON r.CriteriaID = c.CriteriaID
+        LEFT JOIN compliancestatustypes cst ON or.ComplianceStatusID = cst.StatusID
+        WHERE or.OfficeID = ?
+        ORDER BY r.RequirementCode ASC
+      `, [officeId]);
+
+      res.json({
+        success: true,
+        data: rows
+      });
+    } catch (err) {
+      console.error("Error fetching office requirements:", err);
+      res.status(500).json({ 
+        success: false, 
+        error: "Database error", 
+        details: err.message 
+      });
+    }
+  },
+
+  // ================================
+  // ADD REQUIREMENTS TO OFFICE
+  // ================================
+  addOfficeRequirements: async (req, res) => {
+    const officeId = req.params.id;
+    const { requirementIds } = req.body;
+
+    if (!Array.isArray(requirementIds) || requirementIds.length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "requirementIds must be a non-empty array" 
+      });
+    }
+
+    try {
+      // Check if office exists
+      const [office] = await db.query("SELECT OfficeID FROM offices WHERE OfficeID = ?", [officeId]);
+      if (office.length === 0) {
+        return res.status(404).json({ 
+          success: false, 
+          message: "Office not found" 
+        });
+      }
+
+      // Insert requirements (ignore duplicates)
+      const values = requirementIds.map(reqId => [officeId, reqId, 3]); // Default status: 3 = Not Complied
+      
+      await db.query(`
+        INSERT INTO officerequirements (OfficeID, RequirementID, ComplianceStatusID)
+        VALUES ?
+        ON DUPLICATE KEY UPDATE RequirementID = RequirementID
+      `, [values]);
+
+      res.json({ 
+        success: true, 
+        message: `${requirementIds.length} requirement(s) added successfully` 
+      });
+    } catch (err) {
+      console.error("Error adding office requirements:", err);
+      res.status(500).json({ 
+        success: false, 
+        error: "Database error", 
+        details: err.message 
+      });
+    }
+  },
+
+  // ================================
+  // REMOVE REQUIREMENT FROM OFFICE
+  // ================================
+  removeOfficeRequirement: async (req, res) => {
+    const { id: officeId, requirementId } = req.params;
+
+    try {
+      const [result] = await db.query(
+        "DELETE FROM officerequirements WHERE OfficeID = ? AND RequirementID = ?",
+        [officeId, requirementId]
+      );
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ 
+          success: false, 
+          message: "Requirement not found for this office" 
+        });
+      }
+
+      res.json({ 
+        success: true, 
+        message: "Requirement removed successfully" 
+      });
+    } catch (err) {
+      console.error("Error removing office requirement:", err);
+      res.status(500).json({ 
+        success: false, 
+        error: "Database error", 
+        details: err.message 
+      });
     }
   }
 };
