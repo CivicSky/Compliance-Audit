@@ -156,75 +156,104 @@ export default function ViewReqModal({ isOpen, onClose, office, onEditOffice, on
                                 <p className="text-sm text-gray-400 mt-1">Click "Add Requirements" to get started</p>
                             </div>
                         ) : (
-                            <div className="space-y-3">
-                                {requirements.map((req) => (
-                                    <div key={req.RequirementID} className="bg-white border border-gray-200 rounded-lg p-5 hover:shadow-md transition-shadow">
-                                        <div className="flex items-start gap-4">
-                                            {/* Status Checkboxes */}
-                                            <div className="flex flex-col gap-2 pt-1">
-                                                {/* Complied */}
-                                                <label className="flex items-center gap-2 cursor-pointer group">
-                                                    <input
-                                                        type="radio"
-                                                        name={`status-${req.RequirementID}`}
-                                                        checked={req.ComplianceStatusID === 5}
-                                                        onChange={() => handleStatusChange(req.RequirementID, 5)}
-                                                        className="w-5 h-5 text-green-600 border-2 border-gray-300 focus:ring-2 focus:ring-green-500 cursor-pointer accent-green-600"
-                                                    />
-                                                    <span className="text-xs font-medium text-green-700 group-hover:text-green-800">Complied</span>
-                                                </label>
-                                                
-                                                {/* Partially Complied */}
-                                                <label className="flex items-center gap-2 cursor-pointer group">
-                                                    <input
-                                                        type="radio"
-                                                        name={`status-${req.RequirementID}`}
-                                                        checked={req.ComplianceStatusID === 4}
-                                                        onChange={() => handleStatusChange(req.RequirementID, 4)}
-                                                        className="w-5 h-5 text-yellow-600 border-2 border-gray-300 focus:ring-2 focus:ring-yellow-500 cursor-pointer accent-yellow-600"
-                                                    />
-                                                    <span className="text-xs font-medium text-yellow-700 group-hover:text-yellow-800">Partially</span>
-                                                </label>
-                                                
-                                                {/* Not Complied */}
-                                                <label className="flex items-center gap-2 cursor-pointer group">
-                                                    <input
-                                                        type="radio"
-                                                        name={`status-${req.RequirementID}`}
-                                                        checked={req.ComplianceStatusID === 3 || !req.ComplianceStatusID}
-                                                        onChange={() => handleStatusChange(req.RequirementID, 3)}
-                                                        className="w-5 h-5 text-red-600 border-2 border-gray-300 focus:ring-2 focus:ring-red-500 cursor-pointer accent-red-600"
-                                                    />
-                                                    <span className="text-xs font-medium text-red-700 group-hover:text-red-800">Not Complied</span>
-                                                </label>
+                            <div className="space-y-4">
+                                {(() => {
+                                    // Group requirements by criteria
+                                    const groupedByCriteria = requirements.reduce((groups, req) => {
+                                        const criteriaKey = req.CriteriaCode || 'No Criteria';
+                                        if (!groups[criteriaKey]) {
+                                            groups[criteriaKey] = {
+                                                name: req.CriteriaName || 'Uncategorized',
+                                                code: req.CriteriaCode,
+                                                requirements: []
+                                            };
+                                        }
+                                        groups[criteriaKey].requirements.push(req);
+                                        return groups;
+                                    }, {});
+
+                                    return Object.entries(groupedByCriteria).map(([criteriaKey, group]) => (
+                                        <div key={criteriaKey} className="mb-6">
+                                            {/* Criteria Header */}
+                                            <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white px-4 py-3 rounded-t-lg shadow-md">
+                                                <h3 className="text-lg font-bold">{group.code}</h3>
+                                                <p className="text-sm text-indigo-100">{group.name}</p>
                                             </div>
 
-                                            {/* Requirement Details */}
-                                            <div className="flex-1 border-l-2 border-gray-200 pl-4">
-                                                <h4 className="font-bold text-lg text-gray-800">{req.RequirementCode}</h4>
-                                                <p className="text-sm text-gray-600 mt-1 leading-relaxed">{req.Description}</p>
-                                                {req.CriteriaCode && (
-                                                    <p className="text-xs text-blue-600 mt-2 font-medium">
-                                                        Criteria: {req.CriteriaCode} - {req.CriteriaName}
-                                                    </p>
-                                                )}
-                                            </div>
+                                            {/* Requirements under this criteria */}
+                                            <div className="border-l-4 border-r border-b border-indigo-200 rounded-b-lg bg-white shadow-sm">
+                                                {group.requirements.map((req, index) => (
+                                                    <div 
+                                                        key={req.RequirementID} 
+                                                        className={`p-5 hover:bg-gray-50 transition-all ${
+                                                            index !== group.requirements.length - 1 ? 'border-b border-gray-200' : ''
+                                                        }`}
+                                                    >
+                                                        <div className="flex items-start gap-4">
+                                                            {/* Status Checkboxes */}
+                                                            <div className="flex flex-col gap-2 pt-1">
+                                                                {/* Complied */}
+                                                                <label className="flex items-center gap-2 cursor-pointer group">
+                                                                    <input
+                                                                        type="radio"
+                                                                        name={`status-${req.RequirementID}`}
+                                                                        checked={req.ComplianceStatusID === 5}
+                                                                        onChange={() => handleStatusChange(req.RequirementID, 5)}
+                                                                        className="w-5 h-5 text-green-600 border-2 border-gray-300 focus:ring-2 focus:ring-green-500 cursor-pointer accent-green-600"
+                                                                    />
+                                                                    <span className="text-xs font-medium text-green-700 group-hover:text-green-800">Complied</span>
+                                                                </label>
+                                                                
+                                                                {/* Partially Complied */}
+                                                                <label className="flex items-center gap-2 cursor-pointer group">
+                                                                    <input
+                                                                        type="radio"
+                                                                        name={`status-${req.RequirementID}`}
+                                                                        checked={req.ComplianceStatusID === 4}
+                                                                        onChange={() => handleStatusChange(req.RequirementID, 4)}
+                                                                        className="w-5 h-5 text-yellow-600 border-2 border-gray-300 focus:ring-2 focus:ring-yellow-500 cursor-pointer accent-yellow-600"
+                                                                    />
+                                                                    <span className="text-xs font-medium text-yellow-700 group-hover:text-yellow-800">Partially</span>
+                                                                </label>
+                                                                
+                                                                {/* Not Complied */}
+                                                                <label className="flex items-center gap-2 cursor-pointer group">
+                                                                    <input
+                                                                        type="radio"
+                                                                        name={`status-${req.RequirementID}`}
+                                                                        checked={req.ComplianceStatusID === 3 || !req.ComplianceStatusID}
+                                                                        onChange={() => handleStatusChange(req.RequirementID, 3)}
+                                                                        className="w-5 h-5 text-red-600 border-2 border-gray-300 focus:ring-2 focus:ring-red-500 cursor-pointer accent-red-600"
+                                                                    />
+                                                                    <span className="text-xs font-medium text-red-700 group-hover:text-red-800">Not Complied</span>
+                                                                </label>
+                                                            </div>
 
-                                            {/* Status Badge */}
-                                            <div className="flex-shrink-0">
-                                                <span className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap ${
-                                                    req.ComplianceStatusID === 5 ? 'bg-green-100 text-green-800 border border-green-300' :
-                                                    req.ComplianceStatusID === 4 ? 'bg-yellow-100 text-yellow-800 border border-yellow-300' :
-                                                    'bg-red-100 text-red-800 border border-red-300'
-                                                }`}>
-                                                    {req.ComplianceStatusID === 5 ? 'Complied' :
-                                                     req.ComplianceStatusID === 4 ? 'Partially Complied' :
-                                                     'Not Complied'}
-                                                </span>
+                                                            {/* Requirement Details */}
+                                                            <div className="flex-1 border-l-2 border-gray-200 pl-4">
+                                                                <h4 className="font-bold text-lg text-gray-800">{req.RequirementCode}</h4>
+                                                                <p className="text-sm text-gray-600 mt-1 leading-relaxed">{req.Description}</p>
+                                                            </div>
+
+                                                            {/* Status Badge */}
+                                                            <div className="flex-shrink-0">
+                                                                <span className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap ${
+                                                                    req.ComplianceStatusID === 5 ? 'bg-green-100 text-green-800 border border-green-300' :
+                                                                    req.ComplianceStatusID === 4 ? 'bg-yellow-100 text-yellow-800 border border-yellow-300' :
+                                                                    'bg-red-100 text-red-800 border border-red-300'
+                                                                }`}>
+                                                                    {req.ComplianceStatusID === 5 ? 'Complied' :
+                                                                     req.ComplianceStatusID === 4 ? 'Partially Complied' :
+                                                                     'Not Complied'}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    ));
+                                })()}
                             </div>
                         )}
                     </div>
