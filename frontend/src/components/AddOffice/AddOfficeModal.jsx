@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from "react";
-import { officesAPI } from "../../utils/api";
+import { officesAPI, officeHeadsAPI } from "../../utils/api";
 
-export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes, heads }) {
+export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes }) {
     const [officeName, setOfficeName] = useState("");
     const [officeTypeID, setOfficeTypeID] = useState("");
     const [headID, setHeadID] = useState("");
     const [status, setStatus] = useState("Active");
     const [progress, setProgress] = useState(0);
+    const [heads, setHeads] = useState([]);
+    const [loading, setLoading] = useState(false); // Add loading state
 
-    // Reset form when modal opens
+    // Reset form & fetch heads when modal opens
     useEffect(() => {
         if (isOpen) {
             setOfficeName("");
@@ -16,27 +18,52 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
             setHeadID("");
             setStatus("Active");
             setProgress(0);
+
+            // Fetch available office heads
+            const fetchHeads = async () => {
+                try {
+                    const res = await officeHeadsAPI.getAllHeads();
+                    // Only show heads without an OfficeID assigned
+                    const availableHeads = res.data.filter((head) => !head.OfficeID);
+                    setHeads(availableHeads);
+                } catch (err) {
+                    console.error("Failed to fetch office heads:", err);
+                    setHeads([]);
+                }
+            };
+            fetchHeads();
         }
     }, [isOpen]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        if (!officeName || !officeTypeID || !headID) {
+            alert("Please fill out all required fields.");
+            return;
+        }
+
+        setLoading(true);
+
         try {
             const newOffice = {
-                office_name: officeName,
-                office_type: officeTypeID,
-                head_id: headID,
+                OfficeName: officeName,
+                OfficeTypeID: officeTypeID,
+                HeadID: headID || null,
                 status,
-                progress
+                progress,
             };
+
             const res = await officesAPI.createOffice(newOffice);
-            if (res.data) {
-                onSuccess(res.data);
-                onClose();
+            if (res?.data) {
+                onSuccess(res.data);  // Trigger the onSuccess function passed from parent
+                onClose();  // Close the modal
             }
         } catch (err) {
-            console.error(err);
-            alert("Failed to add office");
+            console.error("Error adding office:", err);
+            alert("Failed to add office. Please try again.");
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -68,8 +95,8 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
                         >
                             <option value="">Select Type</option>
                             {officeTypes.map((type) => (
-                                <option key={type.id} value={type.id}>
-                                    {type.name}
+                                <option key={type.OfficeTypeID} value={type.OfficeTypeID}>
+                                    {type.TypeName}
                                 </option>
                             ))}
                         </select>
@@ -85,8 +112,9 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
                         >
                             <option value="">Select Head</option>
                             {heads.map((head) => (
-                                <option key={head.id} value={head.id}>
-                                    {head.name}
+                                <option key={head.HeadID} value={head.HeadID}>
+                                    {head.FirstName} {head.MiddleInitial ? head.MiddleInitial + "." : ""}{" "}
+                                    {head.LastName} - {head.Position}
                                 </option>
                             ))}
                         </select>
@@ -128,8 +156,13 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
                         <button
                             type="submit"
                             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                            disabled={loading} // Disable button while loading
                         >
-                            Add
+                            {loading ? (
+                                <span className="spinner-border spinner-border-sm text-white" role="status" aria-hidden="true"></span>
+                            ) : (
+                                "Add"
+                            )}
                         </button>
                     </div>
                 </form>

@@ -1,87 +1,66 @@
-const db = require("../db"); // Your MySQL connection
+const db = require("../db"); // promise pool
 
 const OfficeTypesController = {
-  // Get all office types
-  getAll: (req, res) => {
-    const sql = "SELECT * FROM officetypes"; // Adjust table name as needed
-    db.query(sql, (err, results) => {
-      if (err) {
-        console.error("Error fetching office types:", err);
-        return res.status(500).json({ error: "Database error" });
-      }
+  getAll: async (req, res) => {
+    try {
+      const [results] = await db.query("SELECT * FROM officetypes");
       res.json(results);
-    });
+    } catch (err) {
+      console.error("Error fetching office types:", err);
+      res.status(500).json({ error: "Database error" });
+    }
   },
 
-  // Get one office type by ID
-  getById: (req, res) => {
+  getById: async (req, res) => {
     const id = req.params.id;
-    const sql = "SELECT * FROM officetypes WHERE OfficeTypeID = ?";
-    db.query(sql, [id], (err, results) => {
-      if (err) {
-        console.error("Error fetching office type:", err);
-        return res.status(500).json({ error: "Database error" });
-      }
-      if (results.length === 0) {
-        return res.status(404).json({ message: "Office type not found" });
-      }
+    try {
+      const [results] = await db.query("SELECT * FROM officetypes WHERE OfficeTypeID = ?", [id]);
+      if (results.length === 0) return res.status(404).json({ message: "Office type not found" });
       res.json(results[0]);
-    });
-  },
-
-  // Create a new office type
-  create: (req, res) => {
-    const { TypeName } = req.body;
-    if (!TypeName) {
-      return res.status(400).json({ error: "TypeName is required" });
+    } catch (err) {
+      console.error("Error fetching office type:", err);
+      res.status(500).json({ error: "Database error" });
     }
-    const sql = "INSERT INTO officetypes (TypeName) VALUES (?)";
-    db.query(sql, [TypeName], (err, result) => {
-      if (err) {
-        console.error("Error creating office type:", err);
-        return res.status(500).json({ error: "Database error" });
-      }
-      res.status(201).json({ 
-        OfficeTypeID: result.insertId, 
-        TypeName 
-      });
-    });
   },
 
-  // Update an existing office type
-  update: (req, res) => {
+  create: async (req, res) => {
+    const { TypeName } = req.body;
+    if (!TypeName) return res.status(400).json({ error: "TypeName is required" });
+
+    try {
+      const [result] = await db.query("INSERT INTO officetypes (TypeName) VALUES (?)", [TypeName]);
+      res.status(201).json({ OfficeTypeID: result.insertId, TypeName });
+    } catch (err) {
+      console.error("Error creating office type:", err);
+      res.status(500).json({ error: "Database error" });
+    }
+  },
+
+  update: async (req, res) => {
     const id = req.params.id;
     const { TypeName } = req.body;
-    if (!TypeName) {
-      return res.status(400).json({ error: "TypeName is required" });
-    }
-    const sql = "UPDATE officetypes SET TypeName = ? WHERE OfficeTypeID = ?";
-    db.query(sql, [TypeName, id], (err, result) => {
-      if (err) {
-        console.error("Error updating office type:", err);
-        return res.status(500).json({ error: "Database error" });
-      }
-      if (result.affectedRows === 0) {
-        return res.status(404).json({ message: "Office type not found" });
-      }
+    if (!TypeName) return res.status(400).json({ error: "TypeName is required" });
+
+    try {
+      const [result] = await db.query("UPDATE officetypes SET TypeName = ? WHERE OfficeTypeID = ?", [TypeName, id]);
+      if (result.affectedRows === 0) return res.status(404).json({ message: "Office type not found" });
       res.json({ message: "Office type updated successfully" });
-    });
+    } catch (err) {
+      console.error("Error updating office type:", err);
+      res.status(500).json({ error: "Database error" });
+    }
   },
 
-  // Delete an office type
-  delete: (req, res) => {
+  delete: async (req, res) => {
     const id = req.params.id;
-    const sql = "DELETE FROM officetypes WHERE OfficeTypeID = ?";
-    db.query(sql, [id], (err, result) => {
-      if (err) {
-        console.error("Error deleting office type:", err);
-        return res.status(500).json({ error: "Database error" });
-      }
-      if (result.affectedRows === 0) {
-        return res.status(404).json({ message: "Office type not found" });
-      }
+    try {
+      const [result] = await db.query("DELETE FROM officetypes WHERE OfficeTypeID = ?", [id]);
+      if (result.affectedRows === 0) return res.status(404).json({ message: "Office type not found" });
       res.json({ message: "Office type deleted successfully" });
-    });
+    } catch (err) {
+      console.error("Error deleting office type:", err);
+      res.status(500).json({ error: "Database error" });
+    }
   },
 };
 

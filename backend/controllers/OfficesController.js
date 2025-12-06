@@ -1,74 +1,169 @@
-const db = require('../db');
+const db = require("../db");
 
-module.exports = {
-  // GET all offices
-  getAll: (req, res) => {
-    db.query("SELECT * FROM offices", (err, rows) => {
-      if (err) return res.status(500).json({ error: err });
-      res.json(rows);
-    });
+const OfficesController = {
+  // ================================
+  // GET ALL OFFICES (WITH JOINED DATA)
+  // ================================
+  getAll: async (req, res) => {
+    try {
+      const [rows] = await db.query(`
+        SELECT 
+          o.OfficeID,
+          o.OfficeName,
+          o.OfficeTypeID,
+          o.HeadID,
+          o.status,
+          o.progress,
+          t.TypeName,
+          h.FirstName,
+          h.LastName
+        FROM offices o
+        LEFT JOIN officetypes t ON o.OfficeTypeID = t.OfficeTypeID
+        LEFT JOIN officeheads h ON o.HeadID = h.HeadID
+      `);
+
+      const formatted = rows.map(r => ({
+        OfficeID: r.OfficeID,
+        OfficeName: r.OfficeName,
+        OfficeTypeID: r.OfficeTypeID,
+        TypeName: r.TypeName || "Unknown Type",
+        HeadID: r.HeadID,
+        HeadName: r.FirstName ? `${r.FirstName} ${r.LastName}` : "Unknown Head",
+        status: r.status,
+        progress: r.progress
+      }));
+
+      res.json(formatted);
+    } catch (err) {
+      console.error("Error fetching offices:", err);
+      res.status(500).json({ error: "Database error" });
+    }
   },
 
-  // GET single office
-  getById: (req, res) => {
+  // ================================
+  // GET OFFICE BY ID
+  // ================================
+  getById: async (req, res) => {
     const id = req.params.id;
 
-    db.query("SELECT * FROM offices WHERE id = ?", [id], (err, rows) => {
-      if (err) return res.status(500).json({ error: err });
-      if (rows.length === 0) return res.status(404).json({ message: "Not found" });
+    try {
+      const [rows] = await db.query(`
+        SELECT 
+          o.OfficeID,
+          o.OfficeName,
+          o.OfficeTypeID,
+          o.HeadID,
+          o.status,
+          o.progress,
+          t.TypeName,
+          h.FirstName,
+          h.LastName
+        FROM offices o
+        LEFT JOIN officetypes t ON o.OfficeTypeID = t.OfficeTypeID
+        LEFT JOIN officeheads h ON o.HeadID = h.HeadID
+        WHERE o.OfficeID = ?
+      `, [id]);
 
-      res.json(rows[0]);
-    });
-  },
+      if (rows.length === 0) {
+        return res.status(404).json({ message: "Office not found" });
+      }
 
-  // CREATE office
-  create: (req, res) => {
-    const { office_name, office_type, status, progress } = req.body;
-
-    const sql = `
-      INSERT INTO offices (office_name, office_type, status, progress)
-      VALUES (?, ?, ?, ?)
-    `;
-
-    db.query(sql, [office_name, office_type, status || "Active", progress || 0], (err, result) => {
-      if (err) return res.status(500).json({ error: err });
+      const r = rows[0];
 
       res.json({
-        id: result.insertId,
-        office_name,
-        office_type,
-        status,
-        progress
+        OfficeID: r.OfficeID,
+        OfficeName: r.OfficeName,
+        OfficeTypeID: r.OfficeTypeID,
+        TypeName: r.TypeName || "Unknown Type",
+        HeadID: r.HeadID,
+        HeadName: r.FirstName ? `${r.FirstName} ${r.LastName}` : "Unknown Head",
+        status: r.status,
+        progress: r.progress
       });
-    });
+    } catch (err) {
+      console.error("Error fetching office:", err);
+      res.status(500).json({ error: "Database error" });
+    }
   },
 
-  // UPDATE office
-  update: (req, res) => {
+  // ================================
+  // CREATE NEW OFFICE
+  // ================================
+  create: async (req, res) => {
+    const { OfficeName, OfficeTypeID, HeadID, status, progress } = req.body;
+
+    try {
+      const [result] = await db.query(
+        `INSERT INTO offices (OfficeName, OfficeTypeID, HeadID, status, progress)
+         VALUES (?, ?, ?, ?, ?)`,
+        [
+          OfficeName,
+          OfficeTypeID,
+          HeadID || null,
+          status || "Active",
+          progress || 0
+        ]
+      );
+
+      res.json({
+        OfficeID: result.insertId,
+        OfficeName,
+        OfficeTypeID,
+        HeadID,
+        status: status || "Active",
+        progress: progress || 0
+      });
+    } catch (err) {
+      console.error("Error creating office:", err);
+      res.status(500).json({ error: "Database error" });
+    }
+  },
+
+  // ================================
+  // UPDATE OFFICE
+  // ================================
+  update: async (req, res) => {
     const id = req.params.id;
-    const { office_name, office_type, status, progress } = req.body;
+    const { OfficeName, OfficeTypeID, HeadID, status, progress } = req.body;
 
-    const sql = `
-      UPDATE offices
-      SET office_name = ?, office_type = ?, status = ?, progress = ?
-      WHERE id = ?
-    `;
+    try {
+      const [result] = await db.query(
+        `UPDATE offices 
+         SET OfficeName = ?, OfficeTypeID = ?, HeadID = ?, status = ?, progress = ?
+         WHERE OfficeID = ?`,
+        [OfficeName, OfficeTypeID, HeadID, status, progress, id]
+      );
 
-    db.query(sql, [office_name, office_type, status, progress, id], (err) => {
-      if (err) return res.status(500).json({ error: err });
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: "Office not found" });
+      }
 
-      res.json({ message: "Office updated" });
-    });
+      res.json({ message: "Office updated successfully" });
+    } catch (err) {
+      console.error("Error updating office:", err);
+      res.status(500).json({ error: "Database error" });
+    }
   },
 
-  // DELETE office
-  delete: (req, res) => {
+  // ================================
+  // DELETE OFFICE
+  // ================================
+  delete: async (req, res) => {
     const id = req.params.id;
 
-    db.query("DELETE FROM offices WHERE id = ?", [id], (err) => {
-      if (err) return res.status(500).json({ error: err });
+    try {
+      const [result] = await db.query("DELETE FROM offices WHERE OfficeID = ?", [id]);
 
-      res.json({ message: "Office deleted" });
-    });
-  },
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: "Office not found" });
+      }
+
+      res.json({ message: "Office deleted successfully" });
+    } catch (err) {
+      console.error("Error deleting office:", err);
+      res.status(500).json({ error: "Database error" });
+    }
+  }
 };
+
+module.exports = OfficesController;

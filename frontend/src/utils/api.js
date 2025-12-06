@@ -233,33 +233,35 @@ export const officesAPI = {
   },
 };
 
-// Offfices Types API functions
+// Offices Types API functions
 export const officetypesAPI = {
   getAll: async () => {
-    const response = await api.get('/officetypes');
+    const response = await api.get('/officestypes');
     return response.data;
   },
 
   getById: async (id) => {
-    const response = await api.get(`/officetypes/${id}`);
+    const response = await api.get(`/officestypes/${id}`);
     return response.data;
   },
 
   create: async (data) => {
-    const response = await api.post('/officetypes', data);
+    const response = await api.post('/officestypes', data);
     return response.data;
   },
 
   update: async (id, data) => {
-    const response = await api.put(`/officetypes/${id}`, data);
+    const response = await api.put(`/officestypes/${id}`, data);
     return response.data;
   },
 
   delete: async (id) => {
-    const response = await api.delete(`/officetypes/${id}`);
+    const response = await api.delete(`/officestypes/${id}`);
     return response.data;
   }
 };
+
+
 
 
 
