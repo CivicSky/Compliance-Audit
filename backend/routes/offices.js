@@ -12,6 +12,7 @@ router.delete("/:id", OfficesController.delete);
 // Office Requirements Routes
 router.get("/:id/requirements", OfficesController.getOfficeRequirements);
 router.post("/:id/requirements", OfficesController.addOfficeRequirements);
+router.put("/:id/requirements/:requirementId/status", OfficesController.updateRequirementStatus);
 router.delete("/:id/requirements/:requirementId", OfficesController.removeOfficeRequirement);
 
 module.exports = router;

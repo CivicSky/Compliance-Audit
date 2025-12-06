@@ -181,10 +181,10 @@ const OfficesController = {
   // GET OFFICE REQUIREMENTS
   // ================================
   getOfficeRequirements: async (req, res) => {
-    const officeId = req.params.id;
-
     try {
-      const [rows] = await db.query(`
+        const { id } = req.params;
+
+        const query = `
         SELECT 
           r.RequirementID,
           r.RequirementCode,
@@ -192,27 +192,30 @@ const OfficesController = {
           r.CriteriaID,
           c.CriteriaName,
           c.CriteriaCode,
-          or.ComplianceStatusID,
+          cso.Status as ComplianceStatusID,
           cst.StatusName as ComplianceStatus
-        FROM officerequirements or
-        INNER JOIN requirements r ON or.RequirementID = r.RequirementID
+        FROM compliancestatusoffices cso
+        INNER JOIN requirements r ON cso.RequirementID = r.RequirementID
         LEFT JOIN criteria c ON r.CriteriaID = c.CriteriaID
-        LEFT JOIN compliancestatustypes cst ON or.ComplianceStatusID = cst.StatusID
-        WHERE or.OfficeID = ?
+        LEFT JOIN compliancestatustypes cst ON cso.Status = cst.StatusID
+        WHERE cso.OfficeID = ?
         ORDER BY r.RequirementCode ASC
-      `, [officeId]);
+      `;
 
-      res.json({
-        success: true,
-        data: rows
-      });
+        const [results] = await db.query(query, [id]);
+
+        res.json({
+            success: true,
+            data: results
+        });
+
     } catch (err) {
-      console.error("Error fetching office requirements:", err);
-      res.status(500).json({ 
-        success: false, 
-        error: "Database error", 
-        details: err.message 
-      });
+        console.error('Error fetching office requirements:', err);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Failed to fetch office requirements',
+            details: err.message 
+        });
     }
   },
 
@@ -244,7 +247,7 @@ const OfficesController = {
       const values = requirementIds.map(reqId => [officeId, reqId, 3]); // Default status: 3 = Not Complied
       
       await db.query(`
-        INSERT INTO officerequirements (OfficeID, RequirementID, ComplianceStatusID)
+        INSERT INTO compliancestatusoffices (OfficeID, RequirementID, Status)
         VALUES ?
         ON DUPLICATE KEY UPDATE RequirementID = RequirementID
       `, [values]);
@@ -271,7 +274,7 @@ const OfficesController = {
 
     try {
       const [result] = await db.query(
-        "DELETE FROM officerequirements WHERE OfficeID = ? AND RequirementID = ?",
+        "DELETE FROM compliancestatusoffices WHERE OfficeID = ? AND RequirementID = ?",
         [officeId, requirementId]
       );
 
@@ -292,6 +295,43 @@ const OfficesController = {
         success: false, 
         error: "Database error", 
         details: err.message 
+      });
+    }
+  },
+
+  // ================================
+  // UPDATE REQUIREMENT STATUS
+  // ================================
+  updateRequirementStatus: async (req, res) => {
+    const { id: officeId, requirementId } = req.params;
+    const { statusId } = req.body;
+
+    if (!statusId || ![3, 4, 5].includes(Number(statusId))) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid status. Must be 3 (Not Complied), 4 (Partially Complied), or 5 (Complied)"
+      });
+    }
+
+    try {
+      // Use INSERT ... ON DUPLICATE KEY UPDATE to handle both insert and update
+      await db.query(
+        `INSERT INTO compliancestatusoffices (OfficeID, RequirementID, Status)
+         VALUES (?, ?, ?)
+         ON DUPLICATE KEY UPDATE Status = ?`,
+        [officeId, requirementId, statusId, statusId]
+      );
+
+      res.json({
+        success: true,
+        message: "Compliance status updated successfully"
+      });
+    } catch (err) {
+      console.error("Error updating requirement status:", err);
+      res.status(500).json({
+        success: false,
+        error: "Database error",
+        details: err.message
       });
     }
   }

@@ -49,7 +49,9 @@ const getCriteriaByEvent = async (req, res) => {
 // Get all requirements
 const getAllRequirements = async (req, res) => {
   try {
-    const [requirements] = await db.query(`
+    const { eventId } = req.query;
+    
+    let query = `
       SELECT 
         r.*, 
         c.CriteriaName, 
@@ -60,8 +62,19 @@ const getAllRequirements = async (req, res) => {
       FROM requirements r
       LEFT JOIN criteria c ON r.CriteriaID = c.CriteriaID
       LEFT JOIN Events e ON c.EventID = e.EventID
-      ORDER BY r.RequirementCode ASC
-    `);
+    `;
+    
+    const params = [];
+    
+    // Filter by event if eventId is provided
+    if (eventId) {
+      query += ` WHERE e.EventID = ?`;
+      params.push(eventId);
+    }
+    
+    query += ` ORDER BY r.RequirementCode ASC`;
+    
+    const [requirements] = await db.query(query, params);
     res.json({
       success: true,
       data: requirements
