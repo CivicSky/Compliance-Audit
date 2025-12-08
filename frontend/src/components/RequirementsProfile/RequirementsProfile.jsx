@@ -2,7 +2,7 @@ import React, { useState, useEffect, forwardRef, useImperativeHandle } from "rea
 import Header from "../Header/header.jsx";
 import { requirementsAPI } from "../../utils/api";
 
-const RequirementsP = forwardRef(({ searchTerm = '', filterOptions = { events: [], types: [] }, deleteMode = false, onSelectionChange, onRequirementClick }, ref) => {
+const RequirementsP = forwardRef(({ searchTerm = '', filterOptions = { events: [], types: [] }, deleteMode = false, onSelectionChange, onRequirementClick, eventType = 'PACUCOA' }, ref) => {
     const [requirements, setRequirements] = useState([]);
     const [filteredRequirements, setFilteredRequirements] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -17,10 +17,50 @@ const RequirementsP = forwardRef(({ searchTerm = '', filterOptions = { events: [
     // Filter and sort requirements based on search term and filters
     useEffect(() => {
         let filtered = requirements;
+
+        // Filter by selected event type FIRST
+        if (eventType) {
+            console.log('=== EVENT FILTERING DEBUG ===');
+            console.log('Selected eventType:', eventType);
+            console.log('Unique EventNames in database:', [...new Set(requirements.map(r => r.EventName))]);
+            
+            // Map the button types to actual EventNames in database
+            // Try both exact match and partial match for flexibility
+            filtered = requirements.filter(req => {
+                if (!req.EventName) return false;
+                
+                const eventNameUpper = req.EventName.toUpperCase();
+                const eventTypeUpper = eventType.toUpperCase();
+                
+                // Check for PASSCU - be very flexible
+                if (eventType === 'PASSCU') {
+                    const matches = eventNameUpper.includes('PASSCU') || 
+                                   eventNameUpper.includes('PAASCU') || 
+                                   eventNameUpper.includes('PASCU');
+                    console.log(`Checking ${req.RequirementCode}: EventName="${req.EventName}", matches PASSCU: ${matches}`);
+                    return matches;
+                }
+                // Check for ISO
+                if (eventType === 'ISO') {
+                    return eventNameUpper.includes('ISO');
+                }
+                // Check for PACUCOA
+                if (eventType === 'PACUCOA') {
+                    return eventNameUpper.includes('PACUCOA');
+                }
+                
+                return false;
+            });
+            
+            console.log(`Filtered ${eventType} requirements:`, filtered.length);
+            if (filtered.length > 0) {
+                console.log('Sample requirement:', filtered[0]);
+            }
+        }
         
         // Apply search filter
         if (searchTerm.trim()) {
-            filtered = requirements.filter(req => {
+            filtered = filtered.filter(req => {
                 const requirementCode = req.RequirementCode?.toLowerCase() || '';
                 const description = req.Description?.toLowerCase() || '';
                 const criteriaName = req.CriteriaName?.toLowerCase() || '';
@@ -63,7 +103,7 @@ const RequirementsP = forwardRef(({ searchTerm = '', filterOptions = { events: [
         });
 
         setFilteredRequirements(sortedFiltered);
-    }, [requirements, searchTerm, filterOptions]);
+    }, [requirements, searchTerm, filterOptions, eventType]);
 
     // Handle selection changes and notify parent component
     useEffect(() => {
@@ -228,97 +268,193 @@ const RequirementsP = forwardRef(({ searchTerm = '', filterOptions = { events: [
                 </div>
             )}
             
-            {filteredRequirements.map((requirement) => {
-                return (
-                    <div 
-                        key={requirement.RequirementID}
-                        onClick={() => !deleteMode && onRequirementClick && onRequirementClick(requirement)}
-                        className={`bg-white rounded-lg shadow-md border border-gray-200 transition-all duration-200 ${
-                            deleteMode ? 'hover:shadow-lg' : 'hover:shadow-lg cursor-pointer'
-                        } ${selectedRequirements.has(requirement.RequirementID) ? 'ring-2 ring-blue-500 bg-blue-50' : ''}`}>
-                        <div className="flex items-center justify-between p-4">
-                            {/* Left Section: Checkbox + Icon + Info */}
-                            <div className="flex items-center gap-4 flex-1">
-                                {/* Checkbox for delete mode */}
-                                {deleteMode && (
-                                    <input
-                                        type="checkbox"
-                                        checked={selectedRequirements.has(requirement.RequirementID)}
-                                        onChange={(e) => handleCheckboxChange(requirement.RequirementID, e.target.checked)}
-                                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                        onClick={(e) => e.stopPropagation()}
-                                    />
-                                )}
-                                
-                                {/* Icon */}
-                                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                    </svg>
+            {/* PASSCU - Hierarchical Area -> Criteria -> Requirements */}
+            {eventType === 'PASSCU' ? (
+                <div className="space-y-6">
+                    {(() => {
+                        // Group requirements by Area
+                        const areaGroups = filteredRequirements.reduce((acc, req) => {
+                            const areaCode = req.AreaCode || 'No Area';
+                            if (!acc[areaCode]) {
+                                acc[areaCode] = {
+                                    areaName: req.AreaName || 'Unknown Area',
+                                    requirements: []
+                                };
+                            }
+                            acc[areaCode].requirements.push(req);
+                            return acc;
+                        }, {});
+
+                        return Object.entries(areaGroups).map(([areaCode, areaData]) => (
+                            <div key={areaCode} className="space-y-4">
+                                {/* Area Header */}
+                                <div className="bg-gradient-to-r from-purple-600 to-purple-700 text-white px-4 py-3 rounded-lg shadow-md">
+                                    <h3 className="text-base font-bold">{areaCode}</h3>
+                                    <p className="text-xs text-purple-100 mt-1">{areaData.areaName}</p>
                                 </div>
-                                
-                                {/* Requirement Info */}
-                                <div className="flex flex-col flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <h3 className="font-semibold text-gray-900 text-base">
-                                            {requirement.RequirementCode}
-                                        </h3>
-                                        {requirement.ParentRequirementCode && (
-                                            <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
-                                                Child of {requirement.ParentRequirementCode}
-                                            </span>
-                                        )}
-                                        {/* Show nesting level */}
-                                        {requirement.RequirementCode && (
-                                            <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded">
-                                                Level {requirement.RequirementCode.split('.').length - 1}
-                                            </span>
-                                        )}
-                                    </div>
-                                    <p className="text-sm text-gray-600 line-clamp-2">
-                                        {requirement.Description}
-                                    </p>
-                                    <div className="flex items-center gap-3 mt-1.5">
-                                        {requirement.EventName && (
-                                            <span className="text-xs text-gray-500 flex items-center gap-1">
-                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                                </svg>
-                                                {requirement.EventName}
-                                            </span>
-                                        )}
-                                        {requirement.CriteriaName && (
-                                            <span className="text-xs text-gray-500 flex items-center gap-1">
-                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                                                </svg>
-                                                {requirement.CriteriaCode}: {requirement.CriteriaName}
-                                            </span>
-                                        )}
-                                    </div>
+
+                                {/* Group by Criteria within this Area */}
+                                {(() => {
+                                    const criteriaGroups = areaData.requirements.reduce((acc, req) => {
+                                        const criteriaCode = req.CriteriaCode || 'No Criteria';
+                                        if (!acc[criteriaCode]) {
+                                            acc[criteriaCode] = {
+                                                criteriaName: req.CriteriaName || 'Unknown Criteria',
+                                                requirements: []
+                                            };
+                                        }
+                                        acc[criteriaCode].requirements.push(req);
+                                        return acc;
+                                    }, {});
+
+                                    return Object.entries(criteriaGroups).map(([criteriaCode, criteriaData]) => (
+                                        <div key={criteriaCode} className="ml-4 space-y-2">
+                                            {/* Criteria Header */}
+                                            <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white px-4 py-3 rounded-lg shadow-md">
+                                                <h3 className="text-sm font-bold">{criteriaCode}</h3>
+                                                <p className="text-xs text-indigo-100 mt-1">{criteriaData.criteriaName}</p>
+                                            </div>
+
+                                            {/* Requirements under this Criteria */}
+                                            <div className="ml-4 space-y-2">
+                                                {criteriaData.requirements.map((requirement) => (
+                                                    <div 
+                                                        key={requirement.RequirementID}
+                                                        onClick={() => !deleteMode && onRequirementClick && onRequirementClick(requirement)}
+                                                        className={`bg-white rounded-lg shadow-md border-l-4 border-indigo-200 transition-all duration-200 ${
+                                                            deleteMode ? 'hover:shadow-lg' : 'hover:shadow-lg hover:border-indigo-400 cursor-pointer'
+                                                        } ${selectedRequirements.has(requirement.RequirementID) ? 'ring-2 ring-blue-500 bg-blue-50' : ''}`}>
+                                                        <div className="flex items-center justify-between p-4">
+                                                            {/* Left Section: Checkbox + Info */}
+                                                            <div className="flex items-center gap-4 flex-1">
+                                                                {/* Checkbox for delete mode */}
+                                                                {deleteMode && (
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={selectedRequirements.has(requirement.RequirementID)}
+                                                                        onChange={(e) => handleCheckboxChange(requirement.RequirementID, e.target.checked)}
+                                                                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                                                        onClick={(e) => e.stopPropagation()}
+                                                                    />
+                                                                )}
+                                                                
+                                                                {/* Requirement Info */}
+                                                                <div className="flex flex-col flex-1 min-w-0">
+                                                                    <h3 className="font-semibold text-gray-900 text-base">
+                                                                        {requirement.RequirementCode}
+                                                                    </h3>
+                                                                    <p className="text-sm text-gray-600 line-clamp-2 mt-1">
+                                                                        {requirement.Description}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ));
+                                })()}
+                            </div>
+                        ));
+                    })()}
+                </div>
+            ) : (
+                // PACUCOA & ISO - Group by Criteria only
+                <div className="space-y-6">
+                    {(() => {
+                        const criteriaGroups = filteredRequirements.reduce((acc, req) => {
+                            const criteriaCode = req.CriteriaCode || 'No Criteria';
+                            if (!acc[criteriaCode]) {
+                                acc[criteriaCode] = {
+                                    criteriaName: req.CriteriaName || 'Unknown Criteria',
+                                    requirements: []
+                                };
+                            }
+                            acc[criteriaCode].requirements.push(req);
+                            return acc;
+                        }, {});
+
+                        return Object.entries(criteriaGroups).map(([criteriaCode, criteriaData]) => (
+                            <div key={criteriaCode} className="space-y-2">
+                                {/* Criteria Header */}
+                                <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white px-4 py-3 rounded-lg shadow-md">
+                                    <h3 className="text-sm font-bold">{criteriaCode}</h3>
+                                    <p className="text-xs text-indigo-100 mt-1">{criteriaData.criteriaName}</p>
+                                </div>
+
+                                {/* Requirements under this Criteria */}
+                                <div className="space-y-2">
+                                    {criteriaData.requirements.map((requirement) => (
+                                        <div 
+                                            key={requirement.RequirementID}
+                                            onClick={() => !deleteMode && onRequirementClick && onRequirementClick(requirement)}
+                                            className={`bg-white rounded-lg shadow-md border-l-4 border-indigo-200 transition-all duration-200 ${
+                                                deleteMode ? 'hover:shadow-lg' : 'hover:shadow-lg hover:border-indigo-400 cursor-pointer'
+                                            } ${selectedRequirements.has(requirement.RequirementID) ? 'ring-2 ring-blue-500 bg-blue-50' : ''}`}>
+                                            <div className="flex items-center justify-between p-4">
+                                                {/* Left Section: Checkbox + Info */}
+                                                <div className="flex items-center gap-4 flex-1">
+                                                    {/* Checkbox for delete mode */}
+                                                    {deleteMode && (
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedRequirements.has(requirement.RequirementID)}
+                                                            onChange={(e) => handleCheckboxChange(requirement.RequirementID, e.target.checked)}
+                                                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        />
+                                                    )}
+                                                    
+                                                    {/* Requirement Info */}
+                                                    <div className="flex flex-col flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2">
+                                                            <h3 className="font-semibold text-gray-900 text-base">
+                                                                {requirement.RequirementCode}
+                                                            </h3>
+                                                            {requirement.ParentRequirementCode && (
+                                                                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
+                                                                    Child of {requirement.ParentRequirementCode}
+                                                                </span>
+                                                            )}
+                                                            {/* Show nesting level */}
+                                                            {requirement.RequirementCode && requirement.RequirementCode.split('.').length > 2 && (
+                                                                <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded">
+                                                                    Level {requirement.RequirementCode.split('.').length - 1}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-sm text-gray-600 line-clamp-2 mt-1">
+                                                            {requirement.Description}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                
+                                                {/* Right Section: Status Badge */}
+                                                <div className="flex-shrink-0">
+                                                    <span className={`px-3 py-1 rounded text-sm font-medium ${
+                                                        !requirement.ParentRequirementCode 
+                                                            ? 'bg-green-100 text-green-700' 
+                                                            : requirement.RequirementCode && requirement.RequirementCode.split('.').length > 3
+                                                            ? 'bg-orange-100 text-orange-700'
+                                                            : 'bg-purple-100 text-purple-700'
+                                                    }`}>
+                                                        {!requirement.ParentRequirementCode 
+                                                            ? 'Main' 
+                                                            : requirement.RequirementCode && requirement.RequirementCode.split('.').length > 3
+                                                            ? 'Nested'
+                                                            : 'Sub-requirement'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
-                            
-                            {/* Right Section: Status Badge */}
-                            <div className="flex-shrink-0">
-                                <span className={`px-3 py-1 rounded text-sm font-medium ${
-                                    !requirement.ParentRequirementCode 
-                                        ? 'bg-green-100 text-green-700' 
-                                        : requirement.RequirementCode && requirement.RequirementCode.split('.').length > 3
-                                        ? 'bg-orange-100 text-orange-700'
-                                        : 'bg-purple-100 text-purple-700'
-                                }`}>
-                                    {!requirement.ParentRequirementCode 
-                                        ? 'Main' 
-                                        : requirement.RequirementCode && requirement.RequirementCode.split('.').length > 3
-                                        ? 'Nested'
-                                        : 'Sub-requirement'}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                );
-            })}
+                        ));
+                    })()}
+                </div>
+            )}
         </div>
     );
 });

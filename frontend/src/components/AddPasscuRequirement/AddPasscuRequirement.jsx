@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
     const [formData, setFormData] = useState({
-        EventID: '',
+        EventID: '8', // Auto-set to PASSCU (EventID = 8)
         RequirementCode: '',
         Description: '',
         AreaID: '',
@@ -12,37 +12,45 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
 
     const [eventsList, setEventsList] = useState([]);
     const [areasList, setAreasList] = useState([]);
-    const [criteriaList, setCriteriaList] = useState([]);
+    const [allCriteria, setAllCriteria] = useState([]); // All criteria for the event
+    const [criteriaList, setCriteriaList] = useState([]); // Filtered criteria for selected area
     const [requirementsList, setRequirementsList] = useState([]);
     const [errors, setErrors] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
 
-    // Fetch events when modal opens
+    // Fetch events when modal opens and auto-load PASSCU areas and criteria
     useEffect(() => {
         if (isOpen) {
             fetchEvents();
+            // Automatically load PASSCU areas and criteria (EventID = 8)
+            fetchAreasByEvent('8');
+            fetchAllCriteriaForEvent('8');
         }
     }, [isOpen]);
 
-    // Fetch areas when event is selected
+    // Fetch areas and criteria when event is selected
     useEffect(() => {
         if (formData.EventID) {
             fetchAreasByEvent(formData.EventID);
+            fetchAllCriteriaForEvent(formData.EventID);
         } else {
             setAreasList([]);
+            setAllCriteria([]);
             setCriteriaList([]);
         }
     }, [formData.EventID]);
 
-    // Fetch criteria when area is selected
+    // Filter criteria when area is selected
     useEffect(() => {
-        if (formData.AreaID) {
-            fetchCriteriaByArea(formData.AreaID);
+        if (formData.AreaID && allCriteria.length > 0) {
+            const filtered = allCriteria.filter(c => c.AreaID == formData.AreaID);
+            console.log('Filtered criteria for AreaID', formData.AreaID, ':', filtered);
+            setCriteriaList(filtered);
         } else {
             setCriteriaList([]);
         }
-    }, [formData.AreaID]);
+    }, [formData.AreaID, allCriteria]);
 
     // Fetch requirements for selected criteria
     useEffect(() => {
@@ -87,22 +95,40 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
         }
     };
 
-    const fetchCriteriaByArea = async (areaId) => {
+    const fetchAllCriteriaForEvent = async (eventId) => {
         setIsLoading(true);
         try {
-            const response = await fetch(`http://localhost:5000/api/criteria/area/${areaId}`);
-            const data = await response.json();
-            console.log('Criteria response:', data);
+            console.log('Fetching all criteria for EventID:', eventId);
+            const { requirementsAPI } = await import('../../utils/api');
+            const response = await requirementsAPI.getAllRequirements();
             
-            if (data.success) {
-                setCriteriaList(data.data || []);
+            if (response.success) {
+                // Extract unique criteria from requirements
+                const criteriaMap = new Map();
+                response.data.forEach(req => {
+                    if (req.EventID == eventId && req.CriteriaID) {
+                        if (!criteriaMap.has(req.CriteriaID)) {
+                            criteriaMap.set(req.CriteriaID, {
+                                CriteriaID: req.CriteriaID,
+                                CriteriaCode: req.CriteriaCode,
+                                CriteriaName: req.CriteriaName,
+                                AreaID: req.AreaID,
+                                EventID: req.EventID
+                            });
+                        }
+                    }
+                });
+                
+                const criteriaArray = Array.from(criteriaMap.values());
+                console.log('All criteria for event:', criteriaArray);
+                setAllCriteria(criteriaArray);
             } else {
-                console.error('Failed to fetch criteria:', data.message);
-                setCriteriaList([]);
+                console.error('Failed to fetch criteria:', response.message);
+                setAllCriteria([]);
             }
         } catch (error) {
             console.error('Error fetching criteria:', error);
-            setCriteriaList([]);
+            setAllCriteria([]);
         } finally {
             setIsLoading(false);
         }
@@ -192,7 +218,7 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                 
                 // Reset form and close modal
                 setFormData({
-                    EventID: '',
+                    EventID: '8', // Keep PASSCU selected
                     RequirementCode: '',
                     Description: '',
                     AreaID: '',
@@ -223,7 +249,7 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
         if (!isSubmitting) {
             // Reset form when closing
             setFormData({
-                EventID: '',
+                EventID: '8', // Keep PASSCU selected
                 RequirementCode: '',
                 Description: '',
                 AreaID: '',
@@ -241,7 +267,7 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl mx-4 min-h-[70vh] max-h-[95vh] overflow-y-auto">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl mx-4 my-8 min-h-[70vh] max-h-[85vh] overflow-y-auto ml-64">
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b sticky top-0 bg-white z-10">
                     <h2 className="text-xl font-semibold text-gray-800">Add New PASSCU Requirement</h2>
@@ -260,7 +286,7 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                     {/* Left Side - Form */}
                     <div className="w-1/2 p-6 border-r">
                         <form onSubmit={handleSubmit} className="space-y-4">
-                            {/* Event Selection */}
+                            {/* Event Selection - Hidden/Disabled for PASSCU */}
                             <div>
                                 <label htmlFor="EventID" className="block text-sm font-medium text-gray-700 mb-1">
                                     Event *
@@ -270,10 +296,8 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                                     name="EventID"
                                     value={formData.EventID}
                                     onChange={handleInputChange}
-                                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 ${
-                                        errors.EventID ? 'border-red-500' : 'border-gray-300'
-                                    }`}
-                                    disabled={isSubmitting}
+                                    className="w-full px-3 py-2 border rounded-md bg-gray-100 border-gray-300 cursor-not-allowed"
+                                    disabled={true}
                                 >
                                     <option value="">Select an event</option>
                                     {eventsList.map((event) => (
@@ -282,9 +306,7 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                                         </option>
                                     ))}
                                 </select>
-                                {errors.EventID && (
-                                    <p className="text-red-500 text-xs mt-1">{errors.EventID}</p>
-                                )}
+                                <p className="text-green-600 text-xs mt-1">✓ PASSCU event pre-selected</p>
                             </div>
 
                             {/* Area Dropdown */}
@@ -302,9 +324,7 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                                     }`}
                                     disabled={isSubmitting || isLoading || !formData.EventID}
                                 >
-                                    <option value="">
-                                        {!formData.EventID ? 'Select an event first' : 'Select an area'}
-                                    </option>
+                                    <option value="">Select an area</option>
                                     {areasList.map((area) => (
                                         <option key={area.AreaID} value={area.AreaID}>
                                             {area.AreaCode} - {area.AreaName}

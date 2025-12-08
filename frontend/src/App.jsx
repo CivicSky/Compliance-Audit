@@ -12,6 +12,7 @@ import Requirements from './components/Requirement/requirement.jsx'
 import Profile from './components/Profile/Profile.jsx'
 import Users from './components/Users/Users.jsx'
 import Events from './components/Events/Events.jsx'
+import Criteria from './components/Criteria/Criteria.jsx'
 import AuditLogs from './components/AuditLogs/AuditLogs.jsx'
 
 export default function App() {
@@ -29,6 +30,7 @@ export default function App() {
         { path: 'officehead', element: <OfficeHead/>},
         { path: 'users', element: <Users/>},
         { path: 'events', element: <Events/>},
+        { path: 'criteria', element: <Criteria/>},
         { path: 'audit-logs', element: <AuditLogs/>},
         { path: 'profile', element: <Profile/>},
       ],

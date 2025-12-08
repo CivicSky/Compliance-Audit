@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import Header from "../../components/Header/header";
 import AddRequirementModal from "../AddRequirement/AddRequirementModal";
+import AddPasscuRequirement from "../AddPasscuRequirement/AddPasscuRequirement";
 import EditRequirementsModal from "../EditRequirements/EditRequirementsModal";
 import RequirementsP from "../RequirementsProfile/RequirementsProfile";
 
@@ -12,6 +13,7 @@ export default function RequirementBars() {
     const [deleteMode, setDeleteMode] = useState(false);
     const [selectedCount, setSelectedCount] = useState(0);
     const [selectedIds, setSelectedIds] = useState([]);
+    const [selectedEventType, setSelectedEventType] = useState('PACUCOA');
     const [filterOptions, setFilterOptions] = useState({
         events: [],
         types: []
@@ -140,14 +142,41 @@ export default function RequirementBars() {
                 selectedCount={selectedCount}
                 onDeleteSelected={handleDeleteSelected}
                 showRequirementsFilter={true}
+                hideSortButton={true}
             />
 
-            {/* Add Requirement Modal */}
-            <AddRequirementModal
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                onSuccess={handleAddSuccess}
-            />
+            {/* Event Type Buttons */}
+            <div className="flex gap-3 mb-4">
+                {['PACUCOA', 'ISO', 'PASSCU'].map((type) => (
+                    <button
+                        key={type}
+                        onClick={() => setSelectedEventType(type)}
+                        className={`flex-1 px-6 py-3 rounded-lg font-semibold text-sm transition-all duration-300 shadow-md ${selectedEventType === type
+                            ? 'bg-blue-600 text-white shadow-lg ring-2 ring-blue-400'
+                            : 'bg-white text-gray-700 hover:bg-blue-50 border-2 border-blue-200'
+                            }`}
+                    >
+                        <div className="flex items-center justify-center gap-2">
+                            <span>{type}</span>
+                        </div>
+                    </button>
+                ))}
+            </div>
+
+            {/* Add Requirement Modal - Use PASSCU modal for PASSCU, regular for others */}
+            {selectedEventType === 'PASSCU' ? (
+                <AddPasscuRequirement
+                    isOpen={isModalOpen}
+                    onClose={() => setIsModalOpen(false)}
+                    onSuccess={handleAddSuccess}
+                />
+            ) : (
+                <AddRequirementModal
+                    isOpen={isModalOpen}
+                    onClose={() => setIsModalOpen(false)}
+                    onSuccess={handleAddSuccess}
+                />
+            )}
 
             {/* Edit Requirement Modal */}
             <EditRequirementsModal
@@ -168,6 +197,7 @@ export default function RequirementBars() {
                 deleteMode={deleteMode}
                 onSelectionChange={handleSelectionChange}
                 onRequirementClick={handleRequirementClick}
+                eventType={selectedEventType}
             />
         </div>
     );

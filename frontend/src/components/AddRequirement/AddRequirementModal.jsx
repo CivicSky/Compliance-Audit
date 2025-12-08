@@ -201,7 +201,7 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 min-h-[70vh] max-h-[95vh] overflow-y-auto">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl mx-4 my-8 min-h-[70vh] max-h-[85vh] overflow-y-auto ml-64">
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b sticky top-0 bg-white z-10">
                     <h2 className="text-xl font-semibold text-gray-800">Add New Requirement</h2>
@@ -216,8 +216,10 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                     </button>
                 </div>
 
-                {/* Form */}
-                <form onSubmit={handleSubmit} className="p-6">
+                <div className="flex">
+                    {/* Left Side - Form */}
+                    <div className="w-1/2 p-6 border-r">
+                        <form onSubmit={handleSubmit} className="space-y-4">
                     {/* Event Selection */}
                     <div className="mb-4">
                         <label htmlFor="EventID" className="block text-sm font-medium text-gray-700 mb-1">
@@ -390,7 +392,60 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                             {isSubmitting ? 'Adding...' : 'Add Requirement'}
                         </button>
                     </div>
-                </form>
+                        </form>
+                    </div>
+
+                    {/* Right Side - Preview */}
+                    <div className="w-1/2 p-6 bg-gray-50">
+                        <h3 className="text-lg font-semibold text-gray-800 mb-4">Preview Structure</h3>
+                        
+                        {/* Preview of selected hierarchy */}
+                        {formData.CriteriaID || formData.RequirementCode ? (
+                            <div className="space-y-4">
+                                {/* Criteria Preview */}
+                                {formData.CriteriaID && (
+                                    <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-3 rounded-lg shadow-md">
+                                        <h3 className="text-sm font-bold">
+                                            {criteriaList.find(c => c.CriteriaID == formData.CriteriaID)?.CriteriaCode || 'Criteria'}
+                                        </h3>
+                                        <p className="text-xs text-blue-100 mt-1">
+                                            {criteriaList.find(c => c.CriteriaID == formData.CriteriaID)?.CriteriaName || 'Select a criteria'}
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* Requirement Preview */}
+                                {formData.RequirementCode && (
+                                    <div className="ml-4">
+                                        <div className="border-l-4 border-blue-200 bg-white p-4 rounded-r-lg shadow-sm">
+                                            <div className="flex items-start gap-3">
+                                                <div className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center mt-1">
+                                                    <svg className="w-3 h-3 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                                    </svg>
+                                                </div>
+                                                <div className="flex-1">
+                                                    <h4 className="font-bold text-sm text-gray-800">{formData.RequirementCode}</h4>
+                                                    <p className="text-xs text-gray-600 mt-1">
+                                                        {formData.Description || 'Enter a description...'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="text-center py-12">
+                                <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                <p className="text-gray-500 text-sm">Fill out the form to see preview</p>
+                                <p className="text-gray-400 text-xs mt-1">Criteria → Requirement</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
             </div>
         </div>
     );

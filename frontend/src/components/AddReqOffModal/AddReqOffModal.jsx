@@ -93,7 +93,7 @@ export default function AddReqOffModal({ isOpen, onClose, office, onSave }) {
     return (
         <div className="fixed inset-0 z-50 bg-black/50 overflow-auto" onClick={onClose}>
             <div className="min-h-screen flex items-center justify-center p-4">
-                <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl my-8 flex flex-col ml-64 h-[85vh]" onClick={(e) => e.stopPropagation()}>
+                <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl my-8 flex flex-col ml-64 h-[85vh]" onClick={(e) => e.stopPropagation()}>
                     {/* Header */}
                     <div className="bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-4 flex items-center justify-between flex-shrink-0">
                         <div className="flex items-center gap-4">
@@ -103,7 +103,7 @@ export default function AddReqOffModal({ isOpen, onClose, office, onSave }) {
                                 </svg>
                             </div>
                             <div>
-                                <h2 className="text-xl font-bold">Add Requirements</h2>
+                                <h2 className="text-xl font-bold">Add Requirements to Office</h2>
                                 <p className="text-sm text-green-100">{office.office_name}</p>
                             </div>
                         </div>
@@ -117,8 +117,11 @@ export default function AddReqOffModal({ isOpen, onClose, office, onSave }) {
                         </button>
                     </div>
 
-                    {/* Search and Select All */}
-                    <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 space-y-3 flex-shrink-0">
+                    <div className="flex flex-1 overflow-hidden">
+                        {/* Left Side - Requirements List */}
+                        <div className="w-1/2 flex flex-col border-r">
+                            {/* Search and Select All */}
+                            <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 space-y-3 flex-shrink-0">
                         <div className="relative">
                             <input
                                 type="text"
@@ -148,11 +151,11 @@ export default function AddReqOffModal({ isOpen, onClose, office, onSave }) {
                             <span className="text-sm text-gray-600">
                                 {selectedRequirements.length} selected
                             </span>
+                            </div>
                         </div>
-                    </div>
 
-                    {/* Requirements List */}
-                    <div className="flex-1 overflow-y-auto px-6 py-4">
+                        {/* Requirements List */}
+                        <div className="flex-1 overflow-y-auto px-6 py-4">
                         {loading ? (
                             <div className="flex items-center justify-center py-12">
                                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
@@ -299,9 +302,156 @@ export default function AddReqOffModal({ isOpen, onClose, office, onSave }) {
                                 ))}
                             </div>
                         )}
+                        </div>
                     </div>
 
-                    {/* Footer */}
+                    {/* Right Side - Preview */}
+                    <div className="w-1/2 flex flex-col bg-gray-50">
+                        <div className="p-6 border-b border-gray-200 flex-shrink-0">
+                            <h3 className="text-lg font-semibold text-gray-800">Preview Selected Requirements</h3>
+                            <p className="text-sm text-gray-600 mt-1">
+                                {selectedRequirements.length} requirement{selectedRequirements.length !== 1 ? 's' : ''} selected
+                            </p>
+                        </div>
+                        
+                        <div className="flex-1 overflow-y-auto p-6">
+                            {selectedRequirements.length === 0 ? (
+                                <div className="text-center py-12">
+                                    <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                    <p className="text-gray-500 text-sm">Select requirements to preview</p>
+                                    <p className="text-gray-400 text-xs mt-1">Selected items will appear here</p>
+                                </div>
+                            ) : office.event_id === 8 ? (
+                                // PASSCU - Preview with Area -> Criteria -> Requirements hierarchy
+                                <div className="space-y-6">
+                                    {(() => {
+                                        const selectedReqs = requirements.filter(req => selectedRequirements.includes(req.RequirementID));
+                                        
+                                        // Group by Area
+                                        const areaGroups = selectedReqs.reduce((acc, req) => {
+                                            const areaCode = req.AreaCode || 'No Area';
+                                            if (!acc[areaCode]) {
+                                                acc[areaCode] = {
+                                                    areaName: req.AreaName || 'Unknown Area',
+                                                    requirements: []
+                                                };
+                                            }
+                                            acc[areaCode].requirements.push(req);
+                                            return acc;
+                                        }, {});
+
+                                        return Object.entries(areaGroups).map(([areaCode, areaData]) => (
+                                            <div key={areaCode} className="space-y-4">
+                                                {/* Area Header */}
+                                                <div className="bg-gradient-to-r from-purple-600 to-purple-700 text-white px-4 py-3 rounded-lg shadow-md">
+                                                    <h3 className="text-base font-bold">{areaCode}</h3>
+                                                    <p className="text-xs text-purple-100 mt-1">{areaData.areaName}</p>
+                                                </div>
+
+                                                {/* Group by Criteria within this Area */}
+                                                {(() => {
+                                                    const criteriaGroups = areaData.requirements.reduce((acc, req) => {
+                                                        const criteriaCode = req.CriteriaCode || 'No Criteria';
+                                                        if (!acc[criteriaCode]) {
+                                                            acc[criteriaCode] = {
+                                                                criteriaName: req.CriteriaName || 'Unknown Criteria',
+                                                                requirements: []
+                                                            };
+                                                        }
+                                                        acc[criteriaCode].requirements.push(req);
+                                                        return acc;
+                                                    }, {});
+
+                                                    return Object.entries(criteriaGroups).map(([criteriaCode, criteriaData]) => (
+                                                        <div key={criteriaCode} className="ml-4 space-y-2">
+                                                            {/* Criteria Header */}
+                                                            <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white px-4 py-3 rounded-lg shadow-md">
+                                                                <h3 className="text-sm font-bold">{criteriaCode}</h3>
+                                                                <p className="text-xs text-indigo-100 mt-1">{criteriaData.criteriaName}</p>
+                                                            </div>
+
+                                                            {/* Requirements under this Criteria */}
+                                                            <div className="ml-4 space-y-2">
+                                                                {criteriaData.requirements.map((req) => (
+                                                                    <div key={req.RequirementID} className="border-l-4 border-indigo-200 bg-white p-4 rounded-r-lg shadow-sm">
+                                                                        <div className="flex items-start gap-3">
+                                                                            <div className="flex-shrink-0 w-5 h-5 rounded-full bg-green-100 flex items-center justify-center mt-1">
+                                                                                <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                                                                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                                                                </svg>
+                                                                            </div>
+                                                                            <div className="flex-1">
+                                                                                <h4 className="font-bold text-sm text-gray-800">{req.RequirementCode || 'No Code'}</h4>
+                                                                                <p className="text-xs text-gray-600 mt-1">{req.Description}</p>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    ));
+                                                })()}
+                                            </div>
+                                        ));
+                                    })()}
+                                </div>
+                            ) : (
+                                // Non-PASSCU - Preview with Criteria grouping
+                                <div className="space-y-4">
+                                    {(() => {
+                                        const selectedReqs = requirements.filter(req => selectedRequirements.includes(req.RequirementID));
+                                        
+                                        // Group by Criteria
+                                        const criteriaGroups = selectedReqs.reduce((acc, req) => {
+                                            const criteriaCode = req.CriteriaCode || 'No Criteria';
+                                            if (!acc[criteriaCode]) {
+                                                acc[criteriaCode] = {
+                                                    criteriaName: req.CriteriaName || 'Unknown Criteria',
+                                                    requirements: []
+                                                };
+                                            }
+                                            acc[criteriaCode].requirements.push(req);
+                                            return acc;
+                                        }, {});
+
+                                        return Object.entries(criteriaGroups).map(([criteriaCode, criteriaData]) => (
+                                            <div key={criteriaCode} className="space-y-2">
+                                                {/* Criteria Header */}
+                                                <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-3 rounded-lg shadow-md">
+                                                    <h3 className="text-sm font-bold">{criteriaCode}</h3>
+                                                    <p className="text-xs text-blue-100 mt-1">{criteriaData.criteriaName}</p>
+                                                </div>
+
+                                                {/* Requirements under this Criteria */}
+                                                <div className="ml-4 space-y-2">
+                                                    {criteriaData.requirements.map((req) => (
+                                                        <div key={req.RequirementID} className="border-l-4 border-blue-200 bg-white p-4 rounded-r-lg shadow-sm">
+                                                            <div className="flex items-start gap-3">
+                                                                <div className="flex-shrink-0 w-5 h-5 rounded-full bg-green-100 flex items-center justify-center mt-1">
+                                                                    <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                                                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                                                    </svg>
+                                                                </div>
+                                                                <div className="flex-1">
+                                                                    <h4 className="font-bold text-sm text-gray-800">{req.RequirementCode || 'No Code'}</h4>
+                                                                    <p className="text-xs text-gray-600 mt-1">{req.Description}</p>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ));
+                                    })()}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Footer */}
                     <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between flex-shrink-0">
                         <p className="text-sm text-gray-600">
                             {selectedRequirements.length} requirement{selectedRequirements.length !== 1 ? 's' : ''} selected
