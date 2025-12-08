@@ -74,6 +74,14 @@ export default function Organization() {
         }
     };
 
+    const handleCloseViewReqModal = () => {
+        setIsViewReqModalOpen(false);
+        // Refresh offices list to update compliance status
+        if (officesPRef.current?.refresh) {
+            officesPRef.current.refresh();
+        }
+    };
+
     const handleEditOffice = (office) => {
         setIsViewReqModalOpen(false);
         setSelectedOffice(office);
@@ -205,7 +213,7 @@ export default function Organization() {
             {isViewReqModalOpen && (
                 <ViewReqModal
                     isOpen={isViewReqModalOpen}
-                    onClose={() => setIsViewReqModalOpen(false)}
+                    onClose={handleCloseViewReqModal}
                     office={selectedOffice}
                     onEditOffice={handleEditOffice}
                     onAddRequirements={handleAddRequirements}

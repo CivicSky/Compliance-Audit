@@ -5,9 +5,11 @@ export default function ViewReqModal({ isOpen, onClose, office, onEditOffice, on
     const [showMenu, setShowMenu] = useState(false);
     const [requirements, setRequirements] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [officeData, setOfficeData] = useState(office);
 
     useEffect(() => {
         if (isOpen && office) {
+            setOfficeData(office);
             fetchOfficeRequirements();
         }
     }, [isOpen, office]);
@@ -17,6 +19,17 @@ export default function ViewReqModal({ isOpen, onClose, office, onEditOffice, on
         try {
             const response = await axios.get(`http://localhost:5000/api/offices/${office.id}/requirements`);
             setRequirements(response.data.data || []);
+            
+            // Also refresh the office data to get updated compliance stats
+            const officeResponse = await axios.get(`http://localhost:5000/api/offices/${office.id}`);
+            if (officeResponse.data) {
+                setOfficeData(prev => ({
+                    ...prev,
+                    overall_status: officeResponse.data.OverallStatus,
+                    compliance_percent: officeResponse.data.CompliancePercent,
+                    total_requirements: officeResponse.data.TotalRequirements
+                }));
+            }
         } catch (error) {
             console.error('Error fetching requirements:', error);
             setRequirements([]);
@@ -42,6 +55,17 @@ export default function ViewReqModal({ isOpen, onClose, office, onEditOffice, on
                       }
                     : req
             ));
+
+            // Refresh office data to update compliance percentage
+            const officeResponse = await axios.get(`http://localhost:5000/api/offices/${office.id}`);
+            if (officeResponse.data) {
+                setOfficeData(prev => ({
+                    ...prev,
+                    overall_status: officeResponse.data.OverallStatus,
+                    compliance_percent: officeResponse.data.CompliancePercent,
+                    total_requirements: officeResponse.data.TotalRequirements
+                }));
+            }
         } catch (error) {
             console.error('Error updating status:', error);
             alert('Failed to update compliance status');
@@ -62,8 +86,8 @@ export default function ViewReqModal({ isOpen, onClose, office, onEditOffice, on
                                 </svg>
                             </div>
                             <div>
-                                <h2 className="text-lg font-bold">{office.office_name}</h2>
-                                <p className="text-xs text-blue-100">{office.office_type_name}</p>
+                                <h2 className="text-lg font-bold">{officeData.office_name}</h2>
+                                <p className="text-xs text-blue-100">{officeData.office_type_name}</p>
                             </div>
                         </div>
 
@@ -122,17 +146,41 @@ export default function ViewReqModal({ isOpen, onClose, office, onEditOffice, on
                     </div>
 
                     {/* Office Info */}
-                    <div className="px-6 py-3 bg-gray-50 border-b border-gray-200 flex items-center gap-3 flex-shrink-0">
-                        <img
-                            src={office.head_profile_pic 
-                                ? `http://localhost:5000/uploads/profile-pics/${office.head_profile_pic}`
-                                : '/src/assets/images/user.svg'}
-                            alt={office.head_name}
-                            className="w-10 h-10 rounded-full object-cover border-2 border-blue-200"
-                        />
-                        <div>
-                            <p className="text-xs text-gray-500">Office Head</p>
-                            <p className="font-semibold text-sm text-gray-800">{office.head_name}</p>
+                    <div className="px-6 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
+                        <div className="flex items-center gap-3">
+                            <img
+                                src={officeData.head_profile_pic 
+                                    ? `http://localhost:5000/uploads/profile-pics/${officeData.head_profile_pic}`
+                                    : '/src/assets/images/user.svg'}
+                                alt={officeData.head_name}
+                                className="w-10 h-10 rounded-full object-cover border-2 border-blue-200"
+                            />
+                            <div>
+                                <p className="text-xs text-gray-500">Office Head</p>
+                                <p className="font-semibold text-sm text-gray-800">{officeData.head_name}</p>
+                            </div>
+                        </div>
+
+                        {/* Overall Status and Compliance Percentage */}
+                        <div className="flex items-center gap-3">
+                            <div className="text-right">
+                                <p className="text-xs text-gray-500">Compliance</p>
+                                <p className="font-bold text-lg text-gray-800">
+                                    {officeData.compliance_percent ? Number(officeData.compliance_percent).toFixed(1) : '0.0'}%
+                                </p>
+                            </div>
+                            <span className={`px-3 py-1.5 text-xs font-bold rounded-lg inline-flex items-center gap-1.5 ${
+                                officeData.overall_status === 'Complied' ? 'bg-green-100 text-green-800 border border-green-300' :
+                                officeData.overall_status === 'Partially Complied' ? 'bg-yellow-100 text-yellow-800 border border-yellow-300' :
+                                'bg-red-100 text-red-800 border border-red-300'
+                            }`}>
+                                <div className={`w-2 h-2 rounded-full ${
+                                    officeData.overall_status === 'Complied' ? 'bg-green-600' :
+                                    officeData.overall_status === 'Partially Complied' ? 'bg-yellow-600' :
+                                    'bg-red-600'
+                                }`}></div>
+                                {officeData.overall_status || 'Not Complied'}
+                            </span>
                         </div>
                     </div>
 

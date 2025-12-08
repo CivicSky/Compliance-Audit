@@ -94,6 +94,25 @@ const OfficesP = forwardRef(
                                 </span>
                             </div>
 
+                            {/* Overall Status Badge */}
+                            <div className="mb-3">
+                                <span className={`px-3 py-1.5 text-xs font-bold rounded-lg inline-flex items-center gap-1.5 ${
+                                    office.overall_status === 'Complied' ? 'bg-green-100 text-green-800 border border-green-300' :
+                                    office.overall_status === 'Partially Complied' ? 'bg-yellow-100 text-yellow-800 border border-yellow-300' :
+                                    'bg-red-100 text-red-800 border border-red-300'
+                                }`}>
+                                    <div className={`w-2 h-2 rounded-full ${
+                                        office.overall_status === 'Complied' ? 'bg-green-600' :
+                                        office.overall_status === 'Partially Complied' ? 'bg-yellow-600' :
+                                        'bg-red-600'
+                                    }`}></div>
+                                    {office.overall_status}
+                                </span>
+                                <div className="mt-1 text-xs text-gray-500">
+                                    {office.total_requirements || 0} requirement{(office.total_requirements || 0) !== 1 ? 's' : ''}
+                                </div>
+                            </div>
+
                             <div className="flex items-center gap-3 mt-3">
                                 <img
                                     src={profilePicUrl}

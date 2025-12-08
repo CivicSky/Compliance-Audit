@@ -16,10 +16,17 @@ const OfficesController = {
           ot.TypeName,
           h.FirstName,
           h.LastName,
-          h.ProfilePic
+          h.ProfilePic,
+          os.OverallStatus,
+          os.CompliancePercent,
+          os.TotalRequirements,
+          os.CompliedCount,
+          os.PartiallyCompliedCount,
+          os.NotCompliedCount
         FROM offices o
         LEFT JOIN officetypes ot ON o.OfficeTypeID = ot.OfficeTypeID
         LEFT JOIN headofoffice h ON o.HeadID = h.HeadID
+        LEFT JOIN OverallOfficeStatus os ON o.OfficeID = os.OfficeID
       `);
 
       const formatted = rows.map(r => ({
@@ -30,7 +37,13 @@ const OfficesController = {
         head_id: r.HeadID,
         head_name: r.FirstName ? `${r.FirstName} ${r.LastName}` : "Unassigned",
         head_profile_pic: r.ProfilePic,
-        event_id: r.EventID
+        event_id: r.EventID,
+        overall_status: r.OverallStatus || 'Not Complied',
+        compliance_percent: r.CompliancePercent || 0,
+        total_requirements: r.TotalRequirements || 0,
+        complied_count: r.CompliedCount || 0,
+        partially_complied_count: r.PartiallyCompliedCount || 0,
+        not_complied_count: r.NotCompliedCount || 0
       }));
 
       console.log('Formatted offices with profile pics:', formatted);
@@ -58,10 +71,14 @@ const OfficesController = {
           o.EventID,
           t.TypeName,
           h.FirstName,
-          h.LastName
+          h.LastName,
+          os.OverallStatus,
+          os.CompliancePercent,
+          os.TotalRequirements
         FROM offices o
         LEFT JOIN officetypes t ON o.OfficeTypeID = t.OfficeTypeID
         LEFT JOIN headofoffice h ON o.HeadID = h.HeadID
+        LEFT JOIN OverallOfficeStatus os ON o.OfficeID = os.OfficeID
         WHERE o.OfficeID = ?
       `, [id]);
 
@@ -78,7 +95,10 @@ const OfficesController = {
         TypeName: r.TypeName || "Unknown Type",
         HeadID: r.HeadID,
         HeadName: r.FirstName ? `${r.FirstName} ${r.LastName}` : "Unknown Head",
-        EventID: r.EventID
+        EventID: r.EventID,
+        OverallStatus: r.OverallStatus || 'Not Complied',
+        CompliancePercent: r.CompliancePercent || 0,
+        TotalRequirements: r.TotalRequirements || 0
       });
     } catch (err) {
       console.error("Error fetching office:", err);
@@ -107,6 +127,9 @@ const OfficesController = {
       );
 
       console.log('Office created successfully:', result.insertId);
+
+      // Initialize OverallOfficeStatus for the new office
+      await updateOverallOfficeStatus(result.insertId);
 
       res.json({
         success: true,
@@ -164,6 +187,10 @@ const OfficesController = {
     const id = req.params.id;
 
     try {
+      // First, delete all requirements associated with this office
+      await db.query("DELETE FROM compliancestatusoffices WHERE OfficeID = ?", [id]);
+      
+      // Then delete the office
       const [result] = await db.query("DELETE FROM offices WHERE OfficeID = ?", [id]);
 
       if (result.affectedRows === 0) {
@@ -252,6 +279,9 @@ const OfficesController = {
         ON DUPLICATE KEY UPDATE RequirementID = RequirementID
       `, [values]);
 
+      // Update the overall office status
+      await updateOverallOfficeStatus(officeId);
+
       res.json({ 
         success: true, 
         message: `${requirementIds.length} requirement(s) added successfully` 
@@ -284,6 +314,9 @@ const OfficesController = {
           message: "Requirement not found for this office" 
         });
       }
+
+      // Update the overall office status after removal
+      await updateOverallOfficeStatus(officeId);
 
       res.json({ 
         success: true, 
@@ -322,6 +355,9 @@ const OfficesController = {
         [officeId, requirementId, statusId, statusId]
       );
 
+      // Update the overall office status
+      await updateOverallOfficeStatus(officeId);
+
       res.json({
         success: true,
         message: "Compliance status updated successfully"
@@ -336,5 +372,63 @@ const OfficesController = {
     }
   }
 };
+
+// ================================
+// HELPER FUNCTION: UPDATE OVERALL OFFICE STATUS
+// ================================
+async function updateOverallOfficeStatus(officeId) {
+  try {
+    // Get counts for each status
+    const [counts] = await db.query(`
+      SELECT 
+        COUNT(*) as TotalRequirements,
+        SUM(CASE WHEN Status = 5 THEN 1 ELSE 0 END) as CompliedCount,
+        SUM(CASE WHEN Status = 4 THEN 1 ELSE 0 END) as PartiallyCompliedCount,
+        SUM(CASE WHEN Status = 3 THEN 1 ELSE 0 END) as NotCompliedCount
+      FROM compliancestatusoffices
+      WHERE OfficeID = ?
+    `, [officeId]);
+
+    const total = counts[0].TotalRequirements || 0;
+    const complied = counts[0].CompliedCount || 0;
+    const partially = counts[0].PartiallyCompliedCount || 0;
+    const notComplied = counts[0].NotCompliedCount || 0;
+
+    // Calculate percentage: Complied = 100%, Partially = 50%, Not Complied = 0%
+    let compliancePercent = 0;
+    if (total > 0) {
+      const weightedScore = (complied * 100) + (partially * 50);
+      const maxScore = total * 100;
+      compliancePercent = (weightedScore / maxScore) * 100;
+    }
+
+    // Determine overall status based on percentage
+    let overallStatus = 'Not Complied';
+    if (compliancePercent === 100) {
+      overallStatus = 'Complied';
+    } else if (compliancePercent >= 50) {
+      overallStatus = 'Partially Complied';
+    }
+
+    // Insert or update the overall status
+    await db.query(`
+      INSERT INTO OverallOfficeStatus 
+        (OfficeID, CompliedCount, PartiallyCompliedCount, NotCompliedCount, TotalRequirements, CompliancePercent, OverallStatus)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE
+        CompliedCount = VALUES(CompliedCount),
+        PartiallyCompliedCount = VALUES(PartiallyCompliedCount),
+        NotCompliedCount = VALUES(NotCompliedCount),
+        TotalRequirements = VALUES(TotalRequirements),
+        CompliancePercent = VALUES(CompliancePercent),
+        OverallStatus = VALUES(OverallStatus),
+        LastUpdated = CURRENT_TIMESTAMP
+    `, [officeId, complied, partially, notComplied, total, compliancePercent.toFixed(2), overallStatus]);
+
+  } catch (err) {
+    console.error('Error updating overall office status:', err);
+    throw err;
+  }
+}
 
 module.exports = OfficesController;
