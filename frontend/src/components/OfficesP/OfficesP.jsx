@@ -62,12 +62,17 @@ const OfficesP = forwardRef(
         const EVENT_MAP = {
             PACUCOA: 2,
             ISO: 1,
-            PASSCU: 3,
+            PASSCU: 8,
         };
 
         const filtered = filteredBySearch.filter(
             (o) => o.event_id === EVENT_MAP[eventType]
         );
+
+        console.log('Current eventType:', eventType);
+        console.log('Looking for event_id:', EVENT_MAP[eventType]);
+        console.log('All offices:', offices.map(o => ({ name: o.office_name, event_id: o.event_id })));
+        console.log('Filtered offices:', filtered.map(o => ({ name: o.office_name, event_id: o.event_id })));
 
         return (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">

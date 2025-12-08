@@ -5,6 +5,7 @@ import OfficesP from "../../components/OfficesP/OfficesP";
 import AddOfficeModal from "../../components/AddOffice/AddOfficeModal";
 import EditOfficeModal from "../../components/EditOffice/EditOfficeModal";
 import ViewReqModal from "../../components/ViewReqModal/ViewReqModal";
+import ViewReqPASSCUModal from "../../components/ViewReqPASSCUModal/ViewReqPASSCUModal";
 import AddReqOffModal from "../../components/AddReqOffModal/AddReqOffModal";
 
 export default function Organization() {
@@ -209,8 +210,18 @@ export default function Organization() {
                 />
             )}
 
-            {/* View Requirements Modal */}
-            {isViewReqModalOpen && (
+            {/* View Requirements Modal - Use PASSCU Modal for PASSCU, regular for others */}
+            {isViewReqModalOpen && selectedEventType === 'PASSCU' && (
+                <ViewReqPASSCUModal
+                    isOpen={isViewReqModalOpen}
+                    onClose={handleCloseViewReqModal}
+                    office={selectedOffice}
+                    onEditOffice={handleEditOffice}
+                    onAddRequirements={handleAddRequirements}
+                />
+            )}
+
+            {isViewReqModalOpen && selectedEventType !== 'PASSCU' && (
                 <ViewReqModal
                     isOpen={isViewReqModalOpen}
                     onClose={handleCloseViewReqModal}

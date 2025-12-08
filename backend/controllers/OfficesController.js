@@ -219,14 +219,18 @@ const OfficesController = {
           r.CriteriaID,
           c.CriteriaName,
           c.CriteriaCode,
+          c.AreaID,
+          a.AreaCode,
+          a.AreaName,
           cso.Status as ComplianceStatusID,
           cst.StatusName as ComplianceStatus
         FROM compliancestatusoffices cso
         INNER JOIN requirements r ON cso.RequirementID = r.RequirementID
         LEFT JOIN criteria c ON r.CriteriaID = c.CriteriaID
+        LEFT JOIN areas a ON c.AreaID = a.AreaID
         LEFT JOIN compliancestatustypes cst ON cso.Status = cst.StatusID
         WHERE cso.OfficeID = ?
-        ORDER BY r.RequirementCode ASC
+        ORDER BY a.SortOrder ASC, c.CriteriaCode ASC, r.RequirementCode ASC
       `;
 
         const [results] = await db.query(query, [id]);

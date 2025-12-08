@@ -9,6 +9,8 @@ const eventsRoutes = require('./routes/events');
 const requirementsRoutes = require('./routes/requirements');
 const officesRoutes = require('./routes/offices');
 const officetypes = require('./routes/officetypes');
+const areasRoutes = require('./routes/areas');
+const criteriaRoutes = require('./routes/criteria');
 
 app.use(cors({
   origin: ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'], // Add common dev server ports
@@ -40,6 +42,8 @@ app.use('/api/events', eventsRoutes);
 app.use('/api/requirements', requirementsRoutes);
 app.use('/api/offices', officesRoutes);
 app.use('/api/officestypes', officetypes);
+app.use('/api/areas', areasRoutes);
+app.use('/api/criteria', criteriaRoutes);
 /*app.use('/roles', rolesRoutes);
 app.use('/requirements', requirementsRoutes);
 app.use('/officetypes', officetypesRoutes);

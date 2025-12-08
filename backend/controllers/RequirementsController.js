@@ -56,11 +56,16 @@ const getAllRequirements = async (req, res) => {
         r.*, 
         c.CriteriaName, 
         c.CriteriaCode,
+        c.AreaID,
+        a.AreaCode,
+        a.AreaName,
+        a.SortOrder AS AreaSortOrder,
         e.EventID,
         e.EventName,
         e.EventCode
       FROM requirements r
       LEFT JOIN criteria c ON r.CriteriaID = c.CriteriaID
+      LEFT JOIN areas a ON c.AreaID = a.AreaID
       LEFT JOIN Events e ON c.EventID = e.EventID
     `;
     
@@ -72,7 +77,7 @@ const getAllRequirements = async (req, res) => {
       params.push(eventId);
     }
     
-    query += ` ORDER BY r.RequirementCode ASC`;
+    query += ` ORDER BY a.SortOrder ASC, c.CriteriaCode ASC, r.RequirementCode ASC`;
     
     const [requirements] = await db.query(query, params);
     res.json({

@@ -166,7 +166,91 @@ export default function AddReqOffModal({ isOpen, onClose, office, onSave }) {
                                     {searchTerm ? 'No requirements match your search' : 'All requirements are already assigned'}
                                 </p>
                             </div>
+                        ) : office.event_id === 8 ? (
+                            // PASSCU - Hierarchical view with Area -> Criteria -> Requirements
+                            <div className="space-y-6">
+                                {(() => {
+                                    // Group requirements by Area
+                                    const areaGroups = filteredRequirements.reduce((acc, req) => {
+                                        const areaCode = req.AreaCode || 'No Area';
+                                        if (!acc[areaCode]) {
+                                            acc[areaCode] = {
+                                                areaName: req.AreaName || 'Unknown Area',
+                                                requirements: []
+                                            };
+                                        }
+                                        acc[areaCode].requirements.push(req);
+                                        return acc;
+                                    }, {});
+
+                                    return Object.entries(areaGroups).map(([areaCode, areaData]) => (
+                                        <div key={areaCode} className="space-y-4">
+                                            {/* Area Header */}
+                                            <div className="bg-gradient-to-r from-purple-600 to-purple-700 text-white px-4 py-3 rounded-lg shadow-md">
+                                                <h3 className="text-base font-bold">{areaCode}</h3>
+                                                <p className="text-xs text-purple-100 mt-1">{areaData.areaName}</p>
+                                            </div>
+
+                                            {/* Group by Criteria within this Area */}
+                                            {(() => {
+                                                const criteriaGroups = areaData.requirements.reduce((acc, req) => {
+                                                    const criteriaCode = req.CriteriaCode || 'No Criteria';
+                                                    if (!acc[criteriaCode]) {
+                                                        acc[criteriaCode] = {
+                                                            criteriaName: req.CriteriaName || 'Unknown Criteria',
+                                                            requirements: []
+                                                        };
+                                                    }
+                                                    acc[criteriaCode].requirements.push(req);
+                                                    return acc;
+                                                }, {});
+
+                                                return Object.entries(criteriaGroups).map(([criteriaCode, criteriaData]) => (
+                                                    <div key={criteriaCode} className="ml-4 space-y-2">
+                                                        {/* Criteria Header */}
+                                                        <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white px-4 py-3 rounded-lg shadow-md">
+                                                            <h3 className="text-sm font-bold">{criteriaCode}</h3>
+                                                            <p className="text-xs text-indigo-100 mt-1">{criteriaData.criteriaName}</p>
+                                                        </div>
+
+                                                        {/* Requirements under this Criteria */}
+                                                        <div className="ml-4 space-y-2">
+                                                            {criteriaData.requirements.map((req) => (
+                                                                <div
+                                                                    key={req.RequirementID}
+                                                                    onClick={() => handleToggleRequirement(req.RequirementID)}
+                                                                    className={`border-l-4 rounded-r-lg p-4 cursor-pointer transition-all ${
+                                                                        selectedRequirements.includes(req.RequirementID)
+                                                                            ? 'bg-green-50 border-green-500 shadow-sm'
+                                                                            : 'bg-white border-indigo-200 hover:border-green-300 hover:bg-green-50/30'
+                                                                    }`}
+                                                                >
+                                                                    <div className="flex items-start gap-3">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={selectedRequirements.includes(req.RequirementID)}
+                                                                            onChange={() => handleToggleRequirement(req.RequirementID)}
+                                                                            className="w-5 h-5 text-green-600 border-gray-300 rounded focus:ring-green-500 mt-0.5"
+                                                                        />
+                                                                        <div className="flex-1">
+                                                                            <h4 className="font-semibold text-gray-800">
+                                                                                {req.RequirementCode || 'No Code'}
+                                                                            </h4>
+                                                                            <p className="text-sm text-gray-600 mt-1">{req.Description}</p>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                ));
+                                            })()}
+                                        </div>
+                                    ));
+                                })()}
+                            </div>
                         ) : (
+                            // Regular flat list for non-PASSCU events
                             <div className="space-y-2">
                                 {filteredRequirements.map((req) => (
                                     <div

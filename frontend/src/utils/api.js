@@ -61,11 +61,11 @@ export const officeHeadsAPI = {
 // Users/Auth API
 // ========================
 export const usersAPI = {
-  login: async (credentials) => (await api.post('/user/login', credentials)).data,
-  register: async (userData) => (await api.post('/user/register', userData)).data,
-  getLoggedInUser: async () => (await api.get('/user/me')).data, // JWT required
-  getAllUsers: async () => (await api.get('/user')).data,
-  getCurrentUser: async (email) => (await api.get(`/user/current/${email}`)).data,
+  login: async (credentials) => (await api.post('/api/user/login', credentials)).data,
+  register: async (userData) => (await api.post('/api/user/register', userData)).data,
+  getLoggedInUser: async () => (await api.get('/api/user/me')).data, // JWT required
+  getAllUsers: async () => (await api.get('/api/user')).data,
+  getCurrentUser: async (email) => (await api.get(`/api/user/current/${email}`)).data,
 };
 
 // ========================

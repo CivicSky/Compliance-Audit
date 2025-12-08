@@ -13,7 +13,7 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
         const eventMap = {
             'PACUCOA': 2,
             'ISO': 1,
-            'PASSCU': 3
+            'PASSCU': 8
         };
         return eventMap[eventType] || null;
     };
