@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "axios": "^1.13.2",
-    "baseline": "^0.3.0"
+    "baseline": "^0.3.0",
+    "jsonwebtoken": "^9.0.3"
   }
 }

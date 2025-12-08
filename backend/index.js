@@ -33,7 +33,7 @@ app.get('/health', (req, res) => {
   res.json({ ok: true, service: 'backend', time: new Date().toISOString() });
 }); 
 
-app.use('/user', userRoutes);
+app.use('/api/user', userRoutes);
 app.use('/api/user', userListRoutes);
 app.use('/api/officeheads', officeHeadsRoutes);
 app.use('/api/events', eventsRoutes);

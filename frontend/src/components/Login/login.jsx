@@ -1,24 +1,18 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import logo from "../../assets/images/lccb_logo.png"
-import auditrackLogo from "../../assets/images/logo.png"
-import bg from "../../assets/images/homebg.jpg"
-import axios from "axios";
+import logo from "../../assets/images/lccb_logo.png";
+import auditrackLogo from "../../assets/images/logo.png";
+import bg from "../../assets/images/homebg.jpg";
+import { usersAPI } from "../../utils/api"; // ✅ use updated usersAPI
 
 export default function Login() {
     const navigate = useNavigate();
-    const [formData, setFormData] = useState({
-        email: "",
-        password: ""
-    });
+    const [formData, setFormData] = useState({ email: "", password: "" });
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
 
     const handleChange = (e) => {
-        setFormData({
-            ...formData,
-            [e.target.name]: e.target.value
-        });
+        setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
     const handleSubmit = async (e) => {
@@ -27,28 +21,29 @@ export default function Login() {
         setError("");
 
         try {
-            console.log('Attempting login with:', { email: formData.email });
-            
-            const response = await axios.post("http://localhost:5000/user/login", {
+            console.log("Attempting login with:", { email: formData.email });
+
+            // 🔥 Use usersAPI.login
+            const response = await usersAPI.login({
                 email: formData.email,
-                password: formData.password
+                password: formData.password,
             });
 
-            console.log('Login response:', response.data);
+            console.log("Login response:", response);
 
-            if (response.data.success) {
-                // Store user data in localStorage or context
-                localStorage.setItem("user", JSON.stringify(response.data.user));
-                
-                alert('Login successful! Redirecting to home...');
-                // Redirect to home page
+            if (response.success) {
+                // Store JWT token and user info
+                localStorage.setItem("token", response.token);
+                localStorage.setItem("user", JSON.stringify(response.user));
+
+                alert("Login successful! Redirecting to home...");
                 navigate("/home");
             } else {
-                setError(response.data.message || "Login failed");
+                setError(response.message || "Login failed");
             }
         } catch (err) {
-            console.error('Login error full:', err);
-            console.error('Error response:', err.response);
+            console.error("Login error full:", err);
+            console.error("Error response:", err.response);
             setError(err.response?.data?.message || "Invalid email or password");
         } finally {
             setLoading(false);
@@ -70,7 +65,9 @@ export default function Login() {
                         <h1 className="text-2xl font-bold text-gray-900 mb-2 transition-all duration-300">
                             Welcome back
                         </h1>
-                        <p className="text-gray-600 transition-opacity duration-500">Please enter your details</p>
+                        <p className="text-gray-600 transition-opacity duration-500">
+                            Please enter your details
+                        </p>
                     </div>
 
                     <form onSubmit={handleSubmit} className="space-y-6 animate-fade-in-up">
@@ -131,11 +128,8 @@ export default function Login() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className={`w-full py-3 px-4 rounded-md font-medium transition-colors ${
-                                loading 
-                                    ? "bg-blue-300 cursor-not-allowed text-white" 
-                                    : "bg-blue-600 hover:bg-blue-700 text-white"
-                            }`}
+                            className={`w-full py-3 px-4 rounded-md font-medium transition-colors ${loading ? "bg-blue-300 cursor-not-allowed text-white" : "bg-blue-600 hover:bg-blue-700 text-white"
+                                }`}
                         >
                             <span className={loading ? "animate-pulse" : ""}>
                                 {loading ? "Signing in..." : "Sign in"}
@@ -144,10 +138,7 @@ export default function Login() {
 
                         <p className="text-center text-sm text-gray-600">
                             Don't have an account?{" "}
-                            <Link 
-                                to="/register" 
-                                className="text-blue-600 hover:text-blue-500 font-medium"
-                            >
+                            <Link to="/register" className="text-blue-600 hover:text-blue-500 font-medium">
                                 Sign up
                             </Link>
                         </p>
@@ -156,21 +147,18 @@ export default function Login() {
             </div>
 
             {/* Right side - Background Image */}
-            <div 
+            <div
                 className="w-1/2 flex items-center justify-center relative overflow-hidden transition-all duration-700 ease-in-out bg-cover bg-center bg-no-repeat"
                 style={{
                     backgroundImage: `url(${bg})`,
-                    backgroundPosition: 'center',
-                    backgroundSize: 'cover'
+                    backgroundPosition: "center",
+                    backgroundSize: "cover",
                 }}
             >
-                {/* Subtle blue overlay */}
                 <div className="absolute inset-0 bg-blue-600 bg-opacity-20"></div>
 
-                {/* Main content overlay */}
                 <div className="relative z-10 text-center text-white max-w-md animate-fade-in-right">
                     <div className="mb-6">
-                        {/* Auditrack Logo */}
                         <div className="relative mx-auto w-40 h-40 flex items-center justify-center mb-4">
                             <img
                                 src={auditrackLogo}
@@ -179,7 +167,7 @@ export default function Login() {
                             />
                         </div>
                     </div>
-                    
+
                     <h2 className="text-4xl font-bold mb-4 animate-slide-up drop-shadow-lg">Auditrack</h2>
                     <p className="text-white text-lg animate-fade-in-delayed drop-shadow-md px-4">
                         Streamline Your Compliance processes with our comprehensive audit management systems
@@ -188,5 +176,4 @@ export default function Login() {
             </div>
         </div>
     );
-};
-
+}
