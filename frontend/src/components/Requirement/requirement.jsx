@@ -146,8 +146,13 @@ export default function RequirementBars() {
             />
 
             {/* Event Type Buttons */}
+<<<<<<< HEAD
             <div className="flex gap-3 mt-6 mb-4">
                 {['PACUCOA', 'ISO', 'PASSCU'].map((type) => (
+=======
+            <div className="flex gap-3 mb-4">
+                {['PACUCOA', 'ISO', 'PAASCU'].map((type) => (
+>>>>>>> 1088d9ae9892859db485cf927c6348eedafd54d7
                     <button
                         key={type}
                         onClick={() => setSelectedEventType(type)}

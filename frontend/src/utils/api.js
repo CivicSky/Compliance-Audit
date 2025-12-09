@@ -62,54 +62,72 @@ export const officeHeadsAPI = {
 // ========================
 export const usersAPI = {
   login: async (credentials) => (await api.post('/api/user/login', credentials)).data,
-  register: async (userData) => (await api.post('/api/user/register', userData)).data,
+  register: async (userData) => (await api.post('/user/register', userData)).data,
   getLoggedInUser: async () => (await api.get('/api/user/me')).data, // JWT required
   getAllUsers: async () => (await api.get('/api/user')).data,
-  getCurrentUser: async (email) => (await api.get(`/api/user/current/${email}`)).data,
+  getCurrentUser: async (email) => (await api.get(`/user/current/${email}`)).data,
+  updateUser: async (userId, data) => {
+    if (!userId) throw new Error("updateUser: userId is required");
+
+    const token = localStorage.getItem("token");
+    if (!token) throw new Error("updateUser: JWT token not found");
+
+    // data should be a FormData instance if uploading a file
+    const response = await api.put(`/api/user/${userId}`, data, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "multipart/form-data", // required for file upload
+      },
+    });
+
+    return response.data;
+  },
 };
 
-// ========================
-// Events API
-// ========================
-export const eventsAPI = {
-  getAllEvents: async () => (await api.get('/api/events')).data,
-  addEvent: async (eventData) => (await api.post('/api/events/add', eventData)).data,
-  updateEvent: async (eventId, eventData) => (await api.put(`/api/events/update/${eventId}`, eventData)).data,
-  deleteEvents: async (eventIds) => (await api.post('/api/events/delete', { eventIds })).data,
-};
 
-// ========================
-// Requirements API
-// ========================
-export const requirementsAPI = {
-  getAllCriteria: async () => (await api.get('/api/requirements/criteria')).data,
-  getCriteriaByEvent: async (eventId) => (await api.get(`/api/requirements/criteria/event/${eventId}`)).data,
-  getAllRequirements: async () => (await api.get('/api/requirements/all')).data,
-  getRequirementsByEvent: async (eventId) => (await api.get(`/api/requirements/event/${eventId}`)).data,
-  addRequirement: async (data) => (await api.post('/api/requirements/add', data)).data,
-  updateRequirement: async (id, data) => (await api.put(`/api/requirements/update/${id}`, data)).data,
-  deleteRequirements: async (ids) => (await api.post('/api/requirements/delete', { requirementIds: ids })).data,
-};
 
-// ========================
-// Offices API
-// ========================
-export const officesAPI = {
-  getAll: async () => ({ data: (await api.get('/api/offices')).data }),
-  createOffice: async (data) => (await api.post('/api/offices', data)).data,
-  updateOffice: async (id, data) => (await api.put(`/api/offices/${id}`, data)).data,
-  deleteOffice: async (id) => (await api.delete(`/api/offices/${id}`)).data,
-};
+  // ========================
+  // Events API
+  // ========================
+  export const eventsAPI = {
+    getAllEvents: async () => (await api.get('/api/events')).data,
+    addEvent: async (eventData) => (await api.post('/api/events/add', eventData)).data,
+    updateEvent: async (eventId, eventData) => (await api.put(`/api/events/update/${eventId}`, eventData)).data,
+    deleteEvents: async (eventIds) => (await api.post('/api/events/delete', { eventIds })).data,
+  };
 
-// ========================
-// Office Types API
-// ========================
-export const officetypesAPI = {
-  getAll: async () => (await api.get('/api/officestypes')).data,
-  getById: async (id) => (await api.get(`/api/officestypes/${id}`)).data,
-  create: async (data) => (await api.post('/api/officestypes', data)).data,
-  update: async (id, data) => (await api.put(`/api/officestypes/${id}`, data)).data,
-  delete: async (id) => (await api.delete(`/api/officestypes/${id}`)).data,
-};
+  // ========================
+  // Requirements API
+  // ========================
+  export const requirementsAPI = {
+    getAllCriteria: async () => (await api.get('/api/requirements/criteria')).data,
+    getCriteriaByEvent: async (eventId) => (await api.get(`/api/requirements/criteria/event/${eventId}`)).data,
+    getAllRequirements: async () => (await api.get('/api/requirements/all')).data,
+    getRequirementsByEvent: async (eventId) => (await api.get(`/api/requirements/event/${eventId}`)).data,
+    addRequirement: async (data) => (await api.post('/api/requirements/add', data)).data,
+    updateRequirement: async (id, data) => (await api.put(`/api/requirements/update/${id}`, data)).data,
+    deleteRequirements: async (ids) => (await api.post('/api/requirements/delete', { requirementIds: ids })).data,
+  };
 
-export default api;
+  // ========================
+  // Offices API
+  // ========================
+  export const officesAPI = {
+    getAll: async () => ({ data: (await api.get('/api/offices')).data }),
+    createOffice: async (data) => (await api.post('/api/offices', data)).data,
+    updateOffice: async (id, data) => (await api.put(`/api/offices/${id}`, data)).data,
+    deleteOffice: async (id) => (await api.delete(`/api/offices/${id}`)).data,
+  };
+
+  // ========================
+  // Office Types API
+  // ========================
+  export const officetypesAPI = {
+    getAll: async () => (await api.get('/api/officestypes')).data,
+    getById: async (id) => (await api.get(`/api/officestypes/${id}`)).data,
+    create: async (data) => (await api.post('/api/officestypes', data)).data,
+    update: async (id, data) => (await api.put(`/api/officestypes/${id}`, data)).data,
+    delete: async (id) => (await api.delete(`/api/officestypes/${id}`)).data,
+  };
+
+  export default api;

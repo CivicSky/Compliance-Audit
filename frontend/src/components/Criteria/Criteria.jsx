@@ -168,7 +168,7 @@ export default function Organization() {
 
             {/* Event Type Buttons */}
             <div className="flex gap-3 mt-6 mb-4">
-                {['PACUCOA', 'ISO', 'PASSCU'].map((type) => (
+                {['PACUCOA', 'ISO', 'PAASCU'].map((type) => (
                     <button
                         key={type}
                         onClick={() => setSelectedEventType(type)}

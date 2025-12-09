@@ -3,6 +3,7 @@ const jwt = require("jsonwebtoken");
 // Middleware to protect routes and get logged-in user
 module.exports = function (req, res, next) {
   const authHeader = req.headers.authorization;
+  
 
   if (!authHeader) {
     return res.status(401).json({ success: false, message: "No token provided" });

@@ -224,3 +224,40 @@ exports.getLoggedInUser = async (req, res) => {
     res.status(500).json({ success: false, message: "Error fetching user" });
   }
 };
+
+// ===============================
+// UPDATE USER
+// ===============================
+exports.updateUser = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const tokenUserId = req.user.userId;
+
+    if (parseInt(userId) !== tokenUserId) {
+      return res.status(403).json({ success: false, message: "Not authorized" });
+    }
+
+    const { FirstName, MiddleInitial, LastName, Email } = req.body;
+    let ProfilePic = req.file ? `/uploads/${req.file.filename}` : req.body.ProfilePic || null;
+
+    const [result] = await db.query(
+      `UPDATE users SET FirstName = ?, MiddleInitial = ?, LastName = ?, Email = ?, ProfilePic = ? WHERE UserID = ?`,
+      [FirstName, MiddleInitial || null, LastName, Email, ProfilePic, userId]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    const [rows] = await db.query(
+      "SELECT UserID, FirstName, MiddleInitial, LastName, Email, RoleID, ProfilePic FROM users WHERE UserID = ?",
+      [userId]
+    );
+
+    res.json({ success: true, user: rows[0] });
+  } catch (error) {
+    console.error("Update user error:", error);
+    res.status(500).json({ success: false, message: "Error updating user" });
+  }
+};
+
