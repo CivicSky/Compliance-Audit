@@ -40,7 +40,7 @@ export default function Register() {
             });
 
             // Send registration data to backend API (backend mounts user routes at /user)
-            const response = await axios.post("http://localhost:5000/user/register", {
+            const response = await axios.post("http://localhost:5000/api/user/register", {
                 firstName: formData.firstName,
                 middleInitial: formData.middleInitial,
                 lastName: formData.lastName,
