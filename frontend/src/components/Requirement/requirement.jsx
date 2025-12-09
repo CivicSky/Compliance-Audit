@@ -128,7 +128,7 @@ export default function RequirementBars() {
     };
 
     return (
-        <div className="p-6 flex flex-col gap-4">
+        <div className="px-6 pb-6 pt-6 w-full">
             {/* Header */}
             <Header 
                 pageTitle="Requirements" 
@@ -146,14 +146,14 @@ export default function RequirementBars() {
             />
 
             {/* Event Type Buttons */}
-            <div className="flex gap-3 mb-4">
+            <div className="flex gap-3 mt-6 mb-4">
                 {['PACUCOA', 'ISO', 'PASSCU'].map((type) => (
                     <button
                         key={type}
                         onClick={() => setSelectedEventType(type)}
-                        className={`flex-1 px-6 py-3 rounded-lg font-semibold text-sm transition-all duration-300 shadow-md ${selectedEventType === type
-                            ? 'bg-blue-600 text-white shadow-lg ring-2 ring-blue-400'
-                            : 'bg-white text-gray-700 hover:bg-blue-50 border-2 border-blue-200'
+                        className={`flex-1 px-6 py-3 rounded-lg font-semibold text-sm transition-colors duration-300 border-2 focus:outline-none ${selectedEventType === type
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-white text-gray-700 hover:bg-blue-50 border-blue-200'
                             }`}
                     >
                         <div className="flex items-center justify-center gap-2">

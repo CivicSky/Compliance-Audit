@@ -360,7 +360,7 @@ const RequirementsP = forwardRef(({ searchTerm = '', filterOptions = { events: [
                     })()}
                 </div>
             ) : (
-                // PACUCOA & ISO - Group by Criteria only
+                // PACUCOA & ISO - Group by Criteria with visual hierarchy
                 <div className="space-y-6">
                     {(() => {
                         const criteriaGroups = filteredRequirements.reduce((acc, req) => {
@@ -377,14 +377,14 @@ const RequirementsP = forwardRef(({ searchTerm = '', filterOptions = { events: [
 
                         return Object.entries(criteriaGroups).map(([criteriaCode, criteriaData]) => (
                             <div key={criteriaCode} className="space-y-2">
-                                {/* Criteria Header */}
+                                {/* Criteria Header - Full width like PASSCU */}
                                 <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white px-4 py-3 rounded-lg shadow-md">
-                                    <h3 className="text-sm font-bold">{criteriaCode}</h3>
+                                    <h3 className="text-base font-bold">{criteriaCode}</h3>
                                     <p className="text-xs text-indigo-100 mt-1">{criteriaData.criteriaName}</p>
                                 </div>
 
-                                {/* Requirements under this Criteria */}
-                                <div className="space-y-2">
+                                {/* Requirements under this Criteria - Indented */}
+                                <div className="ml-4 space-y-2">
                                     {criteriaData.requirements.map((requirement) => (
                                         <div 
                                             key={requirement.RequirementID}
@@ -428,23 +428,6 @@ const RequirementsP = forwardRef(({ searchTerm = '', filterOptions = { events: [
                                                             {requirement.Description}
                                                         </p>
                                                     </div>
-                                                </div>
-                                                
-                                                {/* Right Section: Status Badge */}
-                                                <div className="flex-shrink-0">
-                                                    <span className={`px-3 py-1 rounded text-sm font-medium ${
-                                                        !requirement.ParentRequirementCode 
-                                                            ? 'bg-green-100 text-green-700' 
-                                                            : requirement.RequirementCode && requirement.RequirementCode.split('.').length > 3
-                                                            ? 'bg-orange-100 text-orange-700'
-                                                            : 'bg-purple-100 text-purple-700'
-                                                    }`}>
-                                                        {!requirement.ParentRequirementCode 
-                                                            ? 'Main' 
-                                                            : requirement.RequirementCode && requirement.RequirementCode.split('.').length > 3
-                                                            ? 'Nested'
-                                                            : 'Sub-requirement'}
-                                                    </span>
                                                 </div>
                                             </div>
                                         </div>

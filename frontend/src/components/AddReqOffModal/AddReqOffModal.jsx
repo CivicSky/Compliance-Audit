@@ -253,53 +253,62 @@ export default function AddReqOffModal({ isOpen, onClose, office, onSave }) {
                                 })()}
                             </div>
                         ) : (
-                            // Regular flat list for non-PASSCU events
-                            <div className="space-y-2">
-                                {filteredRequirements.map((req) => (
-                                    <div
-                                        key={req.RequirementID}
-                                        onClick={() => handleToggleRequirement(req.RequirementID)}
-                                        className={`border rounded-lg p-4 cursor-pointer transition-all ${
-                                            selectedRequirements.includes(req.RequirementID)
-                                                ? 'bg-green-50 border-green-300 shadow-sm'
-                                                : 'bg-white border-gray-200 hover:border-green-200 hover:bg-green-50/30'
-                                        }`}
-                                    >
-                                        <div className="flex items-start gap-3">
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedRequirements.includes(req.RequirementID)}
-                                                onChange={() => handleToggleRequirement(req.RequirementID)}
-                                                className="w-5 h-5 text-green-600 border-gray-300 rounded focus:ring-green-500 mt-0.5"
-                                            />
-                                            <div className="flex-1">
-                                                <div className="flex items-start justify-between gap-3">
-                                                    <div className="flex-1">
-                                                        <h4 className="font-semibold text-gray-800">
-                                                            {req.RequirementCode || 'No Code'}
-                                                        </h4>
-                                                        <p className="text-sm text-gray-600 mt-1">{req.Description}</p>
-                                                        {req.CriteriaCode && (
-                                                            <div className="flex items-center gap-2 mt-2">
-                                                                <span className="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded">
-                                                                    {req.CriteriaCode}
-                                                                </span>
-                                                                <span className="text-xs text-gray-600">
-                                                                    {req.CriteriaName}
-                                                                </span>
+                            // PACUCOA & ISO - Hierarchical view with Criteria -> Requirements
+                            <div className="space-y-6">
+                                {(() => {
+                                    // Group requirements by Criteria
+                                    const criteriaGroups = filteredRequirements.reduce((acc, req) => {
+                                        const criteriaCode = req.CriteriaCode || 'No Criteria';
+                                        if (!acc[criteriaCode]) {
+                                            acc[criteriaCode] = {
+                                                criteriaName: req.CriteriaName || 'Unknown Criteria',
+                                                requirements: []
+                                            };
+                                        }
+                                        acc[criteriaCode].requirements.push(req);
+                                        return acc;
+                                    }, {});
+
+                                    return Object.entries(criteriaGroups).map(([criteriaCode, criteriaData]) => (
+                                        <div key={criteriaCode} className="space-y-2">
+                                            {/* Criteria Header */}
+                                            <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white px-4 py-3 rounded-lg shadow-md">
+                                                <h3 className="text-base font-bold">{criteriaCode}</h3>
+                                                <p className="text-xs text-indigo-100 mt-1">{criteriaData.criteriaName}</p>
+                                            </div>
+
+                                            {/* Requirements under this Criteria */}
+                                            <div className="ml-4 space-y-2">
+                                                {criteriaData.requirements.map((req) => (
+                                                    <div
+                                                        key={req.RequirementID}
+                                                        onClick={() => handleToggleRequirement(req.RequirementID)}
+                                                        className={`border-l-4 rounded-r-lg p-4 cursor-pointer transition-all ${
+                                                            selectedRequirements.includes(req.RequirementID)
+                                                                ? 'bg-green-50 border-green-500 shadow-sm'
+                                                                : 'bg-white border-indigo-200 hover:border-green-300 hover:bg-green-50/30'
+                                                        }`}
+                                                    >
+                                                        <div className="flex items-start gap-3">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedRequirements.includes(req.RequirementID)}
+                                                                onChange={() => handleToggleRequirement(req.RequirementID)}
+                                                                className="w-5 h-5 text-green-600 border-gray-300 rounded focus:ring-green-500 mt-0.5"
+                                                            />
+                                                            <div className="flex-1">
+                                                                <h4 className="font-semibold text-gray-800">
+                                                                    {req.RequirementCode || 'No Code'}
+                                                                </h4>
+                                                                <p className="text-sm text-gray-600 mt-1">{req.Description}</p>
                                                             </div>
-                                                        )}
+                                                        </div>
                                                     </div>
-                                                    {req.EventName && (
-                                                        <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-full whitespace-nowrap flex-shrink-0">
-                                                            {req.EventName}
-                                                        </span>
-                                                    )}
-                                                </div>
+                                                ))}
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    ));
+                                })()}
                             </div>
                         )}
                         </div>

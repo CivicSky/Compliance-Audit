@@ -425,7 +425,24 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                                                     </svg>
                                                 </div>
                                                 <div className="flex-1">
-                                                    <h4 className="font-bold text-sm text-gray-800">{formData.RequirementCode}</h4>
+                                                    <h4 className="font-bold text-sm text-gray-800">
+                                                        {(() => {
+                                                            const criteriaCode = criteriaList.find(c => c.CriteriaID == formData.CriteriaID)?.CriteriaCode || '';
+                                                            const parentCode = formData.ParentRequirementCode || '';
+                                                            const reqCode = formData.RequirementCode || '';
+                                                            
+                                                            if (reqCode) {
+                                                                if (parentCode) {
+                                                                    // Parent already includes criteria code
+                                                                    return `${parentCode}.${reqCode}`;
+                                                                } else if (criteriaCode) {
+                                                                    return `${criteriaCode}.${reqCode}`;
+                                                                }
+                                                                return reqCode;
+                                                            }
+                                                            return 'Enter requirement code...';
+                                                        })()}
+                                                    </h4>
                                                     <p className="text-xs text-gray-600 mt-1">
                                                         {formData.Description || 'Enter a description...'}
                                                     </p>
