@@ -152,6 +152,8 @@ export default function Organization() {
         setSelectedIds(ids);
     }, []);
 
+    const isPaascu = selectedEventType === 'PAASCU' || selectedEventType === 'PASSCU';
+
     return (
         <div className="px-6 pb-6 pt-6 w-full">
             <Header
@@ -185,6 +187,11 @@ export default function Organization() {
             </div>
 
             <div className="relative z-10">
+                {/* Debug logs to verify data passed to OfficesP */}
+                {console.log('Selected Event Type:', selectedEventType)}
+                {console.log('Office Types:', officeTypes)}
+                {console.log('Heads:', heads)}
+
                 <OfficesP
                     ref={officesPRef}
                     searchTerm={searchTerm}
@@ -210,8 +217,8 @@ export default function Organization() {
                 />
             )}
 
-            {/* View Requirements Modal - Use PASSCU Modal for PASSCU, regular for others */}
-            {isViewReqModalOpen && selectedEventType === 'PASSCU' && (
+            {/* View Requirements Modal - Use PASSCU Modal for PAASCU, regular for others */}
+            {isViewReqModalOpen && isPaascu && (
                 <ViewReqPASSCUModal
                     isOpen={isViewReqModalOpen}
                     onClose={handleCloseViewReqModal}
@@ -221,7 +228,7 @@ export default function Organization() {
                 />
             )}
 
-            {isViewReqModalOpen && selectedEventType !== 'PASSCU' && (
+            {isViewReqModalOpen && !isPaascu && (
                 <ViewReqModal
                     isOpen={isViewReqModalOpen}
                     onClose={handleCloseViewReqModal}

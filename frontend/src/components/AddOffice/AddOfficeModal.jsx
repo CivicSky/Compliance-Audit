@@ -13,7 +13,8 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
         const eventMap = {
             'PACUCOA': 2,
             'ISO': 1,
-            'PASSCU': 8
+            'PAASCU': 8,
+            'PASSCU': 8 // legacy spelling support
         };
         return eventMap[eventType] || null;
     };

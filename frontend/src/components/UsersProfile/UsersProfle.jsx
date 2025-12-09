@@ -202,11 +202,14 @@ const UsersP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCha
             {filteredUsers.map((person) => {
                 // Construct full name
                 const fullName = `${person.FirstName}${person.MiddleInitial ? ' ' + person.MiddleInitial + '.' : ''} ${person.LastName}`;
-                
-                // Use uploaded profile picture or default
-                const profilePicUrl = person.ProfilePic 
-                    ? `http://localhost:5000/uploads/profile-pics/${person.ProfilePic}`
-                    : user;
+
+                // Profile photo logic: use preview if available, else use uploaded filename, else default
+                let profilePicUrl = user;
+                if (person.TempPreview) {
+                    profilePicUrl = person.TempPreview;
+                } else if (person.ProfilePic) {
+                    profilePicUrl = `http://localhost:5000/uploads/profile-pics/${person.ProfilePic}`;
+                }
 
                 return (
                     <div 
@@ -236,10 +239,7 @@ const UsersP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCha
                                     src={profilePicUrl}
                                     alt={fullName}
                                     className="w-12 h-12 rounded-full object-cover border-2 border-gray-200"
-                                    onError={(e) => {
-                                        console.error(`Failed to load profile pic: ${profilePicUrl}`);
-                                        e.target.src = user;
-                                    }}
+                                    onError={e => { e.target.onerror = null; e.target.src = user; }}
                                 />
                                 <div className="flex-1">
                                     <h3 className="font-bold text-lg" style={{color: '#121212'}}>

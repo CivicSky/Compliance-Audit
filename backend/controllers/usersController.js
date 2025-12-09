@@ -238,7 +238,8 @@ exports.updateUser = async (req, res) => {
     }
 
     const { FirstName, MiddleInitial, LastName, Email } = req.body;
-    let ProfilePic = req.file ? `/uploads/${req.file.filename}` : req.body.ProfilePic || null;
+    // Store only the filename if uploaded, like office head
+    let ProfilePic = req.file ? req.file.filename : req.body.ProfilePic || null;
 
     const [result] = await db.query(
       `UPDATE users SET FirstName = ?, MiddleInitial = ?, LastName = ?, Email = ?, ProfilePic = ? WHERE UserID = ?`,

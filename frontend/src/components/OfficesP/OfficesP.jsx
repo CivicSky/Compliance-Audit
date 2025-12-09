@@ -62,7 +62,8 @@ const OfficesP = forwardRef(
         const EVENT_MAP = {
             PACUCOA: 2,
             ISO: 1,
-            PASSCU: 8,
+            PAASCU: 8,
+            PASSCU: 8, // backward compatibility for older spelling
         };
 
         const filtered = filteredBySearch.filter(

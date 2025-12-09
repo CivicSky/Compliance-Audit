@@ -21,7 +21,8 @@ const EditProfileModal = ({ user, isOpen, onClose, onUpdate }) => {
                 email: user.Email || "",
                 profilePic: null
             });
-            setProfilePicPreview(user.ProfilePic || "");
+            // Always use the same logic as office head: if ProfilePic exists, use /uploads/profile-pics/filename
+            setProfilePicPreview(user.ProfilePic ? `/uploads/profile-pics/${user.ProfilePic}` : "/default-avatar.png");
         }
     }, [user]);
 
@@ -57,7 +58,13 @@ const EditProfileModal = ({ user, isOpen, onClose, onUpdate }) => {
 
             const response = await usersAPI.updateUser(user.UserID, formDataObj);
             if (response.success) {
+                // If a new profile pic was uploaded, use the new path from backend
+                if (response.user && response.user.ProfilePic) {
+                    setProfilePicPreview(`/uploads/profile-pics/${response.user.ProfilePic}`);
+                }
                 onUpdate(response.user);
+                // Emit a custom event to trigger navbar refresh
+                window.dispatchEvent(new Event('profileUpdated'));
                 onClose();
             } else {
                 console.error("Update failed:", response.message);
@@ -150,19 +157,12 @@ const EditProfileModal = ({ user, isOpen, onClose, onUpdate }) => {
                         <label className="block text-sm font-medium text-gray-700 mb-1">Profile Picture</label>
                         <div className="flex items-start gap-3">
                             <div className="flex-shrink-0 -mt-0.5">
-                                {profilePicPreview ? (
-                                    <img
-                                        src={profilePicPreview}
-                                        alt="Preview"
-                                        className="w-12 h-12 rounded-full object-cover border-2 border-gray-300"
-                                    />
-                                ) : (
-                                    <div className="w-12 h-12 rounded-full bg-gray-100 border-2 border-gray-300 flex items-center justify-center">
-                                        <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                        </svg>
-                                    </div>
-                                )}
+                                <img
+                                    src={profilePicPreview}
+                                    alt="Preview"
+                                    className="w-12 h-12 rounded-full object-cover border-2 border-gray-300"
+                                    onError={e => { e.target.onerror = null; e.target.src = "/default-avatar.png"; }}
+                                />
                             </div>
 
                             <div className="flex-1">

@@ -35,6 +35,14 @@ export default function Profile() {
         );
     }
 
+    // Profile photo logic: use preview if available, else use uploaded filename, else default
+    let profilePicUrl = "/default-avatar.png";
+    if (user && user.TempPreview) {
+        profilePicUrl = user.TempPreview;
+    } else if (user && user.ProfilePic) {
+        profilePicUrl = `http://localhost:5000/uploads/profile-pics/${user.ProfilePic}`;
+    }
+
     return (
         <div className="px-6 pb-6 pt-6 w-full bg-gray-100 min-h-screen">
             <Header pageTitle="Profile" showSearch={false} />
@@ -57,9 +65,10 @@ export default function Profile() {
                     <div className="bg-gradient-to-r from-blue-500 to-indigo-600 h-32 relative">
                         <div className="absolute -bottom-16 left-1/2 transform -translate-x-1/2">
                             <img
-                                src={user.ProfilePic || "/default-avatar.png"}
+                                src={profilePicUrl}
                                 alt="Profile"
-                                className="w-32 h-32 rounded-full border-4 border-white shadow-xl"
+                                className="w-32 h-32 rounded-full border-4 border-white shadow-xl object-cover"
+                                onError={e => { e.target.onerror = null; e.target.src = "/default-avatar.png"; }}
                             />
                         </div>
                     </div>

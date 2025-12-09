@@ -163,8 +163,8 @@ export default function RequirementBars() {
                 ))}
             </div>
 
-            {/* Add Requirement Modal - Use PASSCU modal for PASSCU, regular for others */}
-            {selectedEventType === 'PASSCU' ? (
+            {/* Add Requirement Modal - Use PASSCU modal for PAASCU/PASSCU, regular for others */}
+            {(selectedEventType === 'PAASCU' || selectedEventType === 'PASSCU') ? (
                 <AddPasscuRequirement
                     isOpen={isModalOpen}
                     onClose={() => setIsModalOpen(false)}

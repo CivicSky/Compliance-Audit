@@ -17,7 +17,8 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json());
-app.use('/uploads', express.static('uploads')); // Serve uploaded files
+app.use('/uploads', express.static('uploads')); // Serve all uploaded files
+app.use('/uploads/profile-pics', express.static('uploads/profile-pics')); // Explicitly serve profile-pics for user/office head
 /*const rolesRoutes = require('./routes/roles');
 const requirementsRoutes = require('./routes/requirements');
 const officetypesRoutes = require('./routes/officetypes');

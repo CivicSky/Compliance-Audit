@@ -14,22 +14,9 @@ export default function Navbar() {
     useEffect(() => {
         const getCurrentUserData = async () => {
             try {
-                const storedUser = localStorage.getItem("user");
-                if (storedUser) {
-                    const user = JSON.parse(storedUser);
-                    console.log('Stored user from localStorage:', user);
-                    
-                    // Fetch current user data from API to ensure it's up to date
-                    if (user.Email) {
-                        const response = await usersAPI.getCurrentUser(user.Email);
-                        if (response.success) {
-                            setCurrentUser(response.user);
-                            console.log('Current user updated:', response.user);
-                        }
-                    } else {
-                        // If no email in stored user, use what we have
-                        setCurrentUser(user);
-                    }
+                const response = await usersAPI.getLoggedInUser();
+                if (response.success) {
+                    setCurrentUser(response.user);
                 }
             } catch (error) {
                 console.error('Error fetching current user:', error);
@@ -40,8 +27,28 @@ export default function Navbar() {
                 }
             }
         };
-
         getCurrentUserData();
+    }, []);
+
+    // Listen for profile update event to refresh user info
+    useEffect(() => {
+        const handleProfileUpdated = () => {
+            const getCurrentUserData = async () => {
+                try {
+                    const response = await usersAPI.getLoggedInUser();
+                    if (response.success) {
+                        setCurrentUser(response.user);
+                    }
+                } catch (error) {
+                    console.error('Error fetching current user:', error);
+                }
+            };
+            getCurrentUserData();
+        };
+        window.addEventListener('profileUpdated', handleProfileUpdated);
+        return () => {
+            window.removeEventListener('profileUpdated', handleProfileUpdated);
+        };
     }, []);
 
     // Close menu when clicking outside
@@ -300,17 +307,28 @@ export default function Navbar() {
                         }}
                         className="flex items-center gap-3 flex-1"
                     >
-                        <div className="w-7 h-7 bg-blue-600 rounded-full flex items-center justify-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                            </svg>
+                        <div className="w-7 h-7 bg-blue-600 rounded-full flex items-center justify-center overflow-hidden">
+                            {currentUser && currentUser.ProfilePic ? (
+                                <img
+                                    src={`http://localhost:5000/uploads/profile-pics/${currentUser.ProfilePic}`}
+                                    alt="Profile"
+                                    className="w-7 h-7 object-cover rounded-full"
+                                    onError={e => { e.target.onerror = null; e.target.src = '/default-avatar.png'; }}
+                                />
+                            ) : (
+                                <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                </svg>
+                            )}
                         </div>
                         <div className="flex flex-col">
                             <span className="text-xs font-medium text-white">
-                                {currentUser ? currentUser.FullName : 'Loading...'}
+                                {currentUser
+                                    ? `${currentUser.FirstName}${currentUser.MiddleInitial ? ' ' + currentUser.MiddleInitial + '.' : ''} ${currentUser.LastName}`
+                                    : 'Loading...'}
                             </span>
                             <span className="text-[10px] text-gray-400">
-                                {currentUser && currentUser.RoleName ? currentUser.RoleName : 'View Profile'}
+                                View Profile
                             </span>
                         </div>
                     </NavLink>
