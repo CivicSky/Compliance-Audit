@@ -4,6 +4,7 @@ import AddRequirementModal from "../AddRequirement/AddRequirementModal";
 import AddPasscuRequirement from "../AddPasscuRequirement/AddPasscuRequirement";
 import EditRequirementsModal from "../EditRequirements/EditRequirementsModal";
 import RequirementsP from "../RequirementsProfile/RequirementsProfile";
+import { eventsAPI } from "../../utils/api";
 
 export default function RequirementBars() {
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -13,12 +14,34 @@ export default function RequirementBars() {
     const [deleteMode, setDeleteMode] = useState(false);
     const [selectedCount, setSelectedCount] = useState(0);
     const [selectedIds, setSelectedIds] = useState([]);
-    const [selectedEventType, setSelectedEventType] = useState('PACUCOA');
+    const [selectedEventType, setSelectedEventType] = useState('');
     const [filterOptions, setFilterOptions] = useState({
         events: [],
         types: []
     });
+    const [events, setEvents] = useState([]);
     const requirementsPRef = useRef();
+
+    // Fetch all events on component mount
+    useEffect(() => {
+        const fetchEvents = async () => {
+            try {
+                const allEvents = await eventsAPI.getAllEvents();
+                if (allEvents && allEvents.success && Array.isArray(allEvents.data)) {
+                    setEvents(allEvents.data);
+                    if (allEvents.data.length > 0) {
+                        setSelectedEventType(allEvents.data[0].EventName || allEvents.data[0].eventType);
+                    }
+                } else {
+                    setEvents([]);
+                }
+            } catch (error) {
+                console.error("Error fetching events:", error);
+                setEvents([]);
+            }
+        };
+        fetchEvents();
+    }, []);
 
     // Reset all states when component unmounts or navigation happens
     useEffect(() => {
@@ -145,22 +168,19 @@ export default function RequirementBars() {
                 hideSortButton={true}
             />
 
-            {/* Event Type Buttons */}
-            <div className="flex gap-3 mb-4">
-                {['PACUCOA', 'ISO', 'PAASCU'].map((type) => (
-                    <button
-                        key={type}
-                        onClick={() => setSelectedEventType(type)}
-                        className={`flex-1 px-6 py-3 rounded-lg font-semibold text-sm transition-colors duration-300 border-2 focus:outline-none ${selectedEventType === type
-                            ? 'bg-blue-600 text-white border-blue-600'
-                            : 'bg-white text-gray-700 hover:bg-blue-50 border-blue-200'
-                            }`}
-                    >
-                        <div className="flex items-center justify-center gap-2">
-                            <span>{type}</span>
-                        </div>
-                    </button>
-                ))}
+            {/* Event Type Dropdown */}
+            <div className="mb-4">
+                <select
+                    value={selectedEventType}
+                    onChange={(e) => setSelectedEventType(e.target.value)}
+                    className="w-full px-4 py-2 border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                >
+                    {events.map((event) => (
+                        <option key={event.EventID || event.eventType || event.EventName} value={event.EventName || event.eventType}>
+                            {event.EventName || event.eventType}
+                        </option>
+                    ))}
+                </select>
             </div>
 
             {/* Add Requirement Modal - Use PASSCU modal for PAASCU/PASSCU, regular for others */}
