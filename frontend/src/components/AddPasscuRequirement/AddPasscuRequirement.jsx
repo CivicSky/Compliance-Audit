@@ -296,8 +296,8 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                                     name="EventID"
                                     value={formData.EventID}
                                     onChange={handleInputChange}
-                                    className="w-full px-3 py-2 border rounded-md bg-gray-100 border-gray-300 cursor-not-allowed"
-                                    disabled={true}
+                                    className="w-full px-3 py-2 border rounded-md border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                    disabled={isSubmitting}
                                 >
                                     <option value="">Select an event</option>
                                     {eventsList.map((event) => (
@@ -306,7 +306,6 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                                         </option>
                                     ))}
                                 </select>
-                                <p className="text-green-600 text-xs mt-1">✓ PASSCU event pre-selected</p>
                             </div>
 
                             {/* Area Dropdown */}

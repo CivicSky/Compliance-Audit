@@ -183,20 +183,12 @@ export default function RequirementBars() {
                 </select>
             </div>
 
-            {/* Add Requirement Modal - Use PASSCU modal for PAASCU/PASSCU, regular for others */}
-            {(selectedEventType === 'PAASCU' || selectedEventType === 'PASSCU') ? (
-                <AddPasscuRequirement
-                    isOpen={isModalOpen}
-                    onClose={() => setIsModalOpen(false)}
-                    onSuccess={handleAddSuccess}
-                />
-            ) : (
-                <AddRequirementModal
-                    isOpen={isModalOpen}
-                    onClose={() => setIsModalOpen(false)}
-                    onSuccess={handleAddSuccess}
-                />
-            )}
+            {/* Add Requirement Modal - Always use PASSCU modal */}
+            <AddPasscuRequirement
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                onSuccess={handleAddSuccess}
+            />
 
             {/* Edit Requirement Modal */}
             <EditRequirementsModal

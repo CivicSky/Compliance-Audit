@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import Header from "../Header/header";
-import { officesAPI, officeHeadsAPI, officetypesAPI } from "../../utils/api";
-import OfficesP from "../../components/OfficesP/OfficesP";
-import AddOfficeModal from "../../components/AddOffice/AddOfficeModal";
+import { officesAPI, officeHeadsAPI, officetypesAPI, eventsAPI } from "../../utils/api";
+import CriteriaP from "../../components/CriteriaP/CriteriaP";
+import AddCriteriaModal from "../../components/AddCriteriaModal/AddCriteriaModal";
 import EditOfficeModal from "../../components/EditOffice/EditOfficeModal";
 import ViewReqModal from "../../components/ViewReqModal/ViewReqModal";
 import ViewReqPASSCUModal from "../../components/ViewReqPASSCUModal/ViewReqPASSCUModal";
@@ -11,6 +11,7 @@ import AddReqOffModal from "../../components/AddReqOffModal/AddReqOffModal";
 export default function Organization() {
     const [officeTypes, setOfficeTypes] = useState([]);
     const [heads, setHeads] = useState([]);
+    const [events, setEvents] = useState([]);
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -24,6 +25,7 @@ export default function Organization() {
     const [selectedCount, setSelectedCount] = useState(0);
     const [selectedIds, setSelectedIds] = useState([]);
     const [selectedEventType, setSelectedEventType] = useState('PACUCOA');
+    const [selectedEventId, setSelectedEventId] = useState(null);
 
     const officesPRef = useRef();
 
@@ -55,6 +57,28 @@ export default function Organization() {
         fetchHeads();
     }, []);
 
+    // Fetch all events for dropdown
+    useEffect(() => {
+        async function fetchEvents() {
+            try {
+                const res = await eventsAPI.getAllEvents();
+                if (res && res.success && Array.isArray(res.data)) {
+                    setEvents(res.data);
+                    // Optionally set default event type to first event
+                    if (res.data.length > 0) {
+                        setSelectedEventType(res.data[0].EventName || res.data[0].eventType);
+                        setSelectedEventId(res.data[0].EventID);
+                    }
+                } else {
+                    setEvents([]);
+                }
+            } catch (err) {
+                setEvents([]);
+            }
+        }
+        fetchEvents();
+    }, []);
+
     // Reset states on mount
     useEffect(() => {
         setDeleteMode(false);
@@ -62,6 +86,7 @@ export default function Organization() {
         setSelectedIds([]);
     }, []);
 
+    // Refresh CriteriaP after adding new criteria
     const handleSuccess = () => {
         if (officesPRef.current?.refresh) {
             officesPRef.current.refresh();
@@ -157,58 +182,49 @@ export default function Organization() {
     return (
         <div className="px-6 pb-6 pt-6 w-full">
             <Header
-                pageTitle="Offices"
+                pageTitle="Criteria Management"
                 onAddClick={() => setIsModalOpen(true)}
                 onSearchChange={setSearchTerm}
                 searchValue={searchTerm}
                 onDeleteModeToggle={setDeleteMode}
                 deleteMode={deleteMode}
                 selectedCount={selectedCount}
-                onDeleteSelected={handleDeleteSelected}  // Pass handleDeleteSelected to Header
+                onDeleteSelected={handleDeleteSelected}
                 hideSortButton={true}
             />
 
-            {/* Event Type Buttons */}
-            <div className="flex gap-3 mt-6 mb-4">
-                {['PACUCOA', 'ISO', 'PAASCU'].map((type) => (
-                    <button
-                        key={type}
-                        onClick={() => setSelectedEventType(type)}
-                        className={`flex-1 px-6 py-3 rounded-lg font-semibold text-sm transition-all duration-300 shadow-md ${selectedEventType === type
-                            ? 'bg-blue-600 text-white shadow-lg ring-2 ring-blue-400'
-                            : 'bg-white text-gray-700 hover:bg-blue-50 border-2 border-blue-200'
-                            }`}
-                    >
-                        <div className="flex items-center justify-center gap-2">
-                            <span>{type}</span>
-                        </div>
-                    </button>
-                ))}
+            {/* Event Type Dropdown */}
+            <div className="mb-4">
+                <select
+                    value={selectedEventId || ''}
+                    onChange={e => {
+                        const selected = events.find(ev => String(ev.EventID) === e.target.value);
+                        setSelectedEventId(e.target.value);
+                        setSelectedEventType(selected?.EventName || '');
+                    }}
+                    className="w-full px-4 py-2 border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                >
+                    {events.map(event => (
+                        <option key={event.EventID} value={event.EventID}>
+                            {event.EventName || event.eventType}
+                        </option>
+                    ))}
+                </select>
             </div>
 
             <div className="relative z-10">
-                <OfficesP
-                    ref={officesPRef}
+                <CriteriaP
                     searchTerm={searchTerm}
-                    deleteMode={deleteMode}
-                    onSelectionChange={handleSelectionChange}
-                    onOfficeClick={handleOfficeClick}
-                    eventType={selectedEventType}
-
-                    officeTypes={officeTypes}   
-                    heads={heads}
+                    eventId={selectedEventId}
                 />
             </div>
 
-            {/* Add Modal */}
+            {/* Add Criteria Modal */}
             {isModalOpen && (
-                <AddOfficeModal
+                <AddCriteriaModal
                     isOpen={isModalOpen}
                     onClose={() => setIsModalOpen(false)}
                     onSuccess={handleSuccess}
-                    officeTypes={officeTypes}
-                    heads={heads}
-                    selectedEventType={selectedEventType}
                 />
             )}
 
