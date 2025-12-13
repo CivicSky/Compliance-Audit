@@ -4,6 +4,7 @@ import AddRequirementModal from "../AddRequirement/AddRequirementModal";
 import AddAreaModal from "../AddAreaModal/AddAreaModal";
 import EditRequirementsModal from "../EditRequirements/EditRequirementsModal";
 import AreaProfile from "../AreaProfile/AreaProfile";
+import { areasAPI } from "../../utils/api";
 import EditAreaModal from "../EditArea/EditArea";
 import RequirementsP from "../RequirementsProfile/RequirementsProfile";
 import { eventsAPI } from "../../utils/api";
@@ -26,6 +27,9 @@ export default function RequirementBars() {
     const areaProfileRef = useRef();
     const [isEditAreaModalOpen, setIsEditAreaModalOpen] = useState(false);
     const [selectedArea, setSelectedArea] = useState(null);
+    // Area selection state
+    const [areaSelectionMode, setAreaSelectionMode] = useState(false);
+    const [selectedAreaIds, setSelectedAreaIds] = useState([]);
 
     // Fetch all events on component mount
     useEffect(() => {
@@ -153,15 +157,51 @@ export default function RequirementBars() {
         }
     };
 
-    // Handler for area card click
+
+    // Handler for area card click (selection or edit)
     useEffect(() => {
         if (areaProfileRef.current) {
             areaProfileRef.current.onAreaClick = (area) => {
-                setSelectedArea(area);
-                setIsEditAreaModalOpen(true);
+                if (areaSelectionMode) {
+                    setSelectedAreaIds((prev) =>
+                        prev.includes(area.AreaID)
+                            ? prev.filter((id) => id !== area.AreaID)
+                            : [...prev, area.AreaID]
+                    );
+                } else {
+                    setSelectedArea(area);
+                    setIsEditAreaModalOpen(true);
+                }
             };
         }
-    }, [areaProfileRef]);
+    }, [areaSelectionMode, areaProfileRef]);
+
+    // Toggle area selection mode
+    const handleAreaDeleteModeToggle = () => {
+        setAreaSelectionMode((prev) => !prev);
+        setSelectedAreaIds([]);
+    };
+
+    // Delete selected areas
+    const handleDeleteSelectedAreas = async () => {
+        if (selectedAreaIds.length === 0) return;
+        const confirmed = window.confirm(`Are you sure you want to delete ${selectedAreaIds.length} area(s)? This action cannot be undone.`);
+        if (!confirmed) return;
+        try {
+            // Call backend to delete areas (implement this route in backend!)
+            const response = await areasAPI.deleteAreas(selectedAreaIds);
+            if (response.success) {
+                setSelectedAreaIds([]);
+                setAreaSelectionMode(false);
+                if (areaProfileRef.current && areaProfileRef.current.refresh) areaProfileRef.current.refresh();
+                alert(`Successfully deleted ${selectedAreaIds.length} area(s)`);
+            } else {
+                alert(response.message || 'Failed to delete areas');
+            }
+        } catch (error) {
+            alert('An error occurred while deleting areas');
+        }
+    };
 
     const handleEditAreaSave = async (updatedArea) => {
         try {
@@ -201,6 +241,7 @@ export default function RequirementBars() {
             </div>
 
             {/* Header */}
+
             <Header 
                 pageTitle="Areas" 
                 onAddClick={() => setIsModalOpen(true)}
@@ -208,23 +249,34 @@ export default function RequirementBars() {
                 searchValue={searchTerm}
                 onFilterChange={handleFilterChange}
                 filterOptions={filterOptions}
-                onDeleteModeToggle={handleDeleteModeToggle}
-                deleteMode={deleteMode}
-                selectedCount={selectedCount}
-                onDeleteSelected={handleDeleteSelected}
+                onDeleteModeToggle={handleAreaDeleteModeToggle}
+                deleteMode={areaSelectionMode}
+                selectedCount={selectedAreaIds.length}
+                onDeleteSelected={handleDeleteSelectedAreas}
                 showRequirementsFilter={true}
                 hideSortButton={true}
             />
 
             {/* Area List */}
 
+
             <AreaProfile
                 eventId={selectedEventId}
                 ref={areaProfileRef}
                 onAreaClick={(area) => {
-                    setSelectedArea(area);
-                    setIsEditAreaModalOpen(true);
+                    if (areaSelectionMode) {
+                        setSelectedAreaIds((prev) =>
+                            prev.includes(area.AreaID)
+                                ? prev.filter((id) => id !== area.AreaID)
+                                : [...prev, area.AreaID]
+                        );
+                    } else {
+                        setSelectedArea(area);
+                        setIsEditAreaModalOpen(true);
+                    }
                 }}
+                selectedAreaIds={areaSelectionMode ? selectedAreaIds : []}
+                selectionMode={areaSelectionMode}
             />
             {/* Edit Area Modal */}
             {isEditAreaModalOpen && selectedArea && (

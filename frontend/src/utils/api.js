@@ -11,6 +11,7 @@ export const areasAPI = {
   getAll: async () => (await api.get('/api/areas')).data,
   getByEvent: async (eventId) => (await api.get(`/api/areas/event/${eventId}`)).data,
   addArea: async (areaData) => (await api.post('/api/areas/add', areaData)).data,
+  deleteAreas: async (areaIds) => (await api.post('/api/areas/delete', { areaIds })).data,
 };
 import axios from 'axios';
 

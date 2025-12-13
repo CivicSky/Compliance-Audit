@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useImperativeHandle, forwardRef } from "react";
 import { areasAPI } from "../../utils/api";
 
-const AreaProfile = forwardRef(function AreaProfile({ eventId, onAreaClick }, ref) {
+const AreaProfile = forwardRef(function AreaProfile({ eventId, onAreaClick, selectedAreaIds = [], selectionMode = false }, ref) {
   const [areas, setAreas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -46,21 +46,36 @@ const AreaProfile = forwardRef(function AreaProfile({ eventId, onAreaClick }, re
   return (
     <div className="mt-6 w-full space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {areas.map(area => (
-          <div
-            key={area.AreaID}
-            className="bg-white rounded-lg shadow-md p-4 border-l-4 border-purple-400 transition-all duration-200 hover:border-purple-700 hover:shadow-xl cursor-pointer"
-            onClick={() => {
-              if (onAreaClick) {
-                onAreaClick(area);
-              }
-            }}
-          >
-            <h3 className="font-semibold text-lg text-purple-700">{area.AreaCode} - {area.AreaName}</h3>
-            <p className="text-gray-600 mt-1">{area.Description}</p>
-            <p className="text-xs text-gray-400 mt-2">Event ID: {area.EventID}</p>
-          </div>
-        ))}
+        {areas.map(area => {
+          const isSelected = selectionMode && selectedAreaIds.includes(area.AreaID);
+          return (
+            <div
+              key={area.AreaID}
+              className={`bg-white rounded-lg shadow-md p-4 hover:border-purple-700 hover:shadow-xl cursor-pointer border-l-4 border-purple-400 border-solid ${isSelected ? 'area-selected-outer' : ''}`}
+              style={isSelected ? { borderLeftWidth: '8px', boxShadow: '0 0 0 4px #dc2626' } : {}}
+              onClick={() => {
+                if (onAreaClick) {
+                  onAreaClick(area);
+                }
+              }}
+            >
+              <div className="flex items-center gap-2">
+                {selectionMode && (
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => onAreaClick && onAreaClick(area)}
+                    onClick={e => e.stopPropagation()}
+                    className="accent-red-600 w-5 h-5"
+                  />
+                )}
+                <h3 className="font-semibold text-lg text-purple-700">{area.AreaCode} - {area.AreaName}</h3>
+              </div>
+              <p className="text-gray-600 mt-1">{area.Description}</p>
+              <p className="text-xs text-gray-400 mt-2">Event ID: {area.EventID}</p>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
