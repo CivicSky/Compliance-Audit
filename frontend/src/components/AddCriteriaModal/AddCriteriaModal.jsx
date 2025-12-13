@@ -214,9 +214,12 @@ export default function AddCriteriaModal({ isOpen, onClose, onSuccess }) {
                                     disabled={isSubmitting || !formData.EventID || criteriaList.length === 0}
                                 >
                                     <option value="">None (Top-level criteria)</option>
-                                    {/* Show all criteria for the selected event, except the one being created (avoid self-parenting) */}
+                                    {/* Only show criteria from the selected area, except the one being created */}
                                     {criteriaList
-                                        .filter(criteria => criteria.CriteriaCode !== formData.CriteriaCode)
+                                        .filter(criteria =>
+                                            criteria.CriteriaCode !== formData.CriteriaCode &&
+                                            (!formData.AreaID || String(criteria.AreaID) === String(formData.AreaID))
+                                        )
                                         .map(criteria => (
                                             <option key={criteria.CriteriaID} value={criteria.CriteriaID}>
                                                 {criteria.CriteriaCode} - {criteria.CriteriaName}
@@ -305,42 +308,41 @@ export default function AddCriteriaModal({ isOpen, onClose, onSuccess }) {
                         <h3 className="text-lg font-semibold text-gray-800 mb-4">Preview Structure</h3>
                         {(formData.AreaID || formData.CriteriaCode || formData.CriteriaName) ? (
                             <div className="space-y-4">
-                                {/* Area Preview */}
+                                {/* Area Preview (matches CriteriaP style) */}
                                 {formData.AreaID && (
                                     <div className="bg-gradient-to-r from-purple-600 to-purple-700 text-white px-4 py-3 rounded-lg shadow-md">
                                         <h3 className="text-base font-bold">
-                                            {areasList.find(a => a.AreaID == formData.AreaID)?.AreaCode || 'Area'}
+                                            {areasList.find(a => a.AreaID == formData.AreaID)?.AreaCode || 'No Area'}
                                         </h3>
                                         <p className="text-xs text-purple-100 mt-1">
-                                            {areasList.find(a => a.AreaID == formData.AreaID)?.AreaName || 'Select an area'}
+                                            {areasList.find(a => a.AreaID == formData.AreaID)?.AreaName || 'Unknown Area'}
                                         </p>
                                     </div>
                                 )}
-                                {/* Parent Criteria Preview */}
+                                {/* Parent Criteria Preview (matches CriteriaP style) */}
                                 {formData.ParentCriteriaID && (
                                     <div className="ml-4">
-                                        <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white px-4 py-3 rounded-lg shadow-md">
-                                            <h3 className="text-sm font-bold">
-                                                {criteriaList.find(c => c.CriteriaID == formData.ParentCriteriaID)?.CriteriaCode || 'Parent Criteria'}
-                                            </h3>
-                                            <p className="text-xs text-indigo-100 mt-1">
-                                                {criteriaList.find(c => c.CriteriaID == formData.ParentCriteriaID)?.CriteriaName || 'Select a parent criteria'}
-                                            </p>
+                                        <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white px-4 py-3 rounded-lg shadow-md flex items-center">
+                                            <div className="flex flex-col w-full">
+                                                <div className="flex items-center gap-2">
+                                                    <h3 className="font-semibold text-white text-base">
+                                                        {criteriaList.find(c => c.CriteriaID == formData.ParentCriteriaID)?.CriteriaCode || 'Parent Criteria'}
+                                                    </h3>
+                                                </div>
+                                                <p className="text-sm text-indigo-100 mt-1">
+                                                    {criteriaList.find(c => c.CriteriaID == formData.ParentCriteriaID)?.CriteriaName || 'Select a parent criteria'}
+                                                </p>
+                                            </div>
                                         </div>
                                     </div>
                                 )}
-                                {/* Criteria Preview */}
+                                {/* Criteria Preview (matches CriteriaP style) */}
                                 {(formData.CriteriaCode || formData.CriteriaName) && (
-                                    <div className="ml-8">
-                                        <div className="border-l-4 border-indigo-200 bg-white p-4 rounded-r-lg shadow-sm">
-                                            <div className="flex items-start gap-3">
-                                                <div className="flex-shrink-0 w-5 h-5 rounded-full bg-purple-100 flex items-center justify-center mt-1">
-                                                    <svg className="w-3 h-3 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
-                                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                                    </svg>
-                                                </div>
-                                                <div className="flex-1">
-                                                    <h4 className="font-bold text-sm text-gray-800">
+                                    <div className="ml-4 space-y-2">
+                                        <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white px-4 py-3 rounded-lg shadow-md flex items-center">
+                                            <div className="flex flex-col w-full">
+                                                <div className="flex items-center gap-2">
+                                                    <h3 className="font-semibold text-white text-base">
                                                         {(() => {
                                                             const parentCode = criteriaList.find(c => c.CriteriaID == formData.ParentCriteriaID)?.CriteriaCode || '';
                                                             const code = formData.CriteriaCode || '';
@@ -349,14 +351,14 @@ export default function AddCriteriaModal({ isOpen, onClose, onSuccess }) {
                                                             }
                                                             return code || 'Enter criteria code...';
                                                         })()}
-                                                    </h4>
-                                                    <p className="text-xs text-gray-600 mt-1">
-                                                        {formData.CriteriaName || 'Enter criteria name...'}
-                                                    </p>
-                                                    <p className="text-xs text-gray-500 mt-1">
-                                                        {formData.Description || 'Enter a description...'}
-                                                    </p>
+                                                    </h3>
                                                 </div>
+                                                <p className="text-sm text-indigo-100 mt-1">
+                                                    {formData.CriteriaName || 'Enter criteria name...'}
+                                                </p>
+                                                <p className="text-xs text-indigo-200 mt-1">
+                                                    {formData.Description || 'Enter a description...'}
+                                                </p>
                                             </div>
                                         </div>
                                     </div>

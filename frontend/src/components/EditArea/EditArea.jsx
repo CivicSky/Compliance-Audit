@@ -1,32 +1,34 @@
-import React, { useEffect, useState } from 'react';
 
-const EditEventModal = ({ visible, onClose, event = {}, onSave }) => {
-  const [eventCode, setEventCode] = useState('');
-  const [eventName, setEventName] = useState('');
+import React, { useState, useEffect } from 'react';
+
+const EditAreaModal = ({ visible, onClose, area = {}, onSave }) => {
+  const [areaCode, setAreaCode] = useState('');
+  const [areaName, setAreaName] = useState('');
   const [description, setDescription] = useState('');
+  // Removed sortOrder and isActive
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (event) {
-      setEventCode(event.EventCode || '');
-      setEventName(event.EventName || '');
-      setDescription(event.Description || '');
+    if (area) {
+      setAreaCode(area.AreaCode || '');
+      setAreaName(area.AreaName || '');
+      setDescription(area.Description || '');
+      // Removed sortOrder and isActive
     }
-  }, [event]);
+  }, [area]);
 
   if (!visible) return null;
 
   const handleSubmit = (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-
     const updated = {
-      EventID: event.EventID,
-      EventCode: eventCode,
-      EventName: eventName,
+      AreaID: area.AreaID,
+      AreaCode: areaCode,
+      AreaName: areaName,
       Description: description,
+      // Removed SortOrder and IsActive
     };
-
     onSave(updated);
     setIsSubmitting(false);
     onClose();
@@ -34,10 +36,10 @@ const EditEventModal = ({ visible, onClose, event = {}, onSave }) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 min-h-[40vh] max-h-[95vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-xl font-semibold text-gray-800">Edit Event</h2>
+          <h2 className="text-xl font-semibold text-gray-800">Edit Area</h2>
           <button
             onClick={onClose}
             disabled={isSubmitting}
@@ -51,59 +53,58 @@ const EditEventModal = ({ visible, onClose, event = {}, onSave }) => {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6">
-          {/* Event Code */}
-          <div className="mb-6">
-            <label htmlFor="eventCode" className="block text-sm font-medium text-gray-700 mb-2">
-              Event Code *
-            </label>
-            <input
-              type="text"
-              id="eventCode"
-              name="eventCode"
-              value={eventCode}
-              onChange={(e) => setEventCode(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="e.g., PPSG, PPJSD, SDE"
-              disabled={isSubmitting}
-              required
-            />
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            {/* Area Code */}
+            <div>
+              <label htmlFor="areaCode" className="block text-sm font-medium text-gray-700 mb-1">
+                Area Code *
+              </label>
+              <input
+                type="text"
+                id="areaCode"
+                name="areaCode"
+                value={areaCode}
+                onChange={e => setAreaCode(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g., AREA1"
+                disabled={isSubmitting}
+                required
+              />
+            </div>
+            {/* Area Name */}
+            <div>
+              <label htmlFor="areaName" className="block text-sm font-medium text-gray-700 mb-1">
+                Area Name *
+              </label>
+              <input
+                type="text"
+                id="areaName"
+                name="areaName"
+                value={areaName}
+                onChange={e => setAreaName(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g., Vision, Mission, Goals & Objectives"
+                disabled={isSubmitting}
+                required
+              />
+            </div>
           </div>
-
-          {/* Event Name */}
-          <div className="mb-6">
-            <label htmlFor="eventName" className="block text-sm font-medium text-gray-700 mb-2">
-              Event Name *
-            </label>
-            <input
-              type="text"
-              id="eventName"
-              name="eventName"
-              value={eventName}
-              onChange={(e) => setEventName(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="e.g., PPSG Event, Financial Reporting"
-              disabled={isSubmitting}
-              required
-            />
-          </div>
-
           {/* Description */}
           <div className="mb-6">
-            <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
               Description
             </label>
             <textarea
               id="description"
               name="description"
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows="4"
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-              placeholder="Enter a detailed description of this event (optional)"
+              onChange={e => setDescription(e.target.value)}
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              placeholder="Enter area description (optional)"
               disabled={isSubmitting}
             />
           </div>
-
           {/* Form Actions */}
           <div className="flex justify-end space-x-3 pt-4 border-t">
             <button
@@ -134,4 +135,4 @@ const EditEventModal = ({ visible, onClose, event = {}, onSave }) => {
   );
 };
 
-export default EditEventModal;
+export default EditAreaModal;

@@ -1,8 +1,45 @@
-
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const CriteriaController = require('../controllers/CriteriaController');
+
+// UPDATE criteria by ID
+router.put('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        let { CriteriaCode, CriteriaName, Description, AreaID, ParentCriteriaID, EventID } = req.body;
+        if (!CriteriaCode || !CriteriaName || !Description) {
+            return res.status(400).json({
+                success: false,
+                message: 'Criteria code, name, and description are required.'
+            });
+        }
+        // Ensure AreaID and ParentCriteriaID are null if empty string or 'null' string
+        if (AreaID === '' || AreaID === 'null' || AreaID === undefined) AreaID = null;
+        if (ParentCriteriaID === '' || ParentCriteriaID === 'null' || ParentCriteriaID === undefined) ParentCriteriaID = null;
+        const [result] = await db.query(
+            `UPDATE criteria SET CriteriaCode = ?, CriteriaName = ?, Description = ?, AreaID = ?, ParentCriteriaID = ?, EventID = ? WHERE CriteriaID = ?`,
+            [CriteriaCode, CriteriaName, Description, AreaID, ParentCriteriaID, EventID, id]
+        );
+        if (result.affectedRows === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Criteria not found.'
+            });
+        }
+        res.json({
+            success: true,
+            message: 'Criteria updated successfully.'
+        });
+    } catch (error) {
+        console.error('Error updating criteria:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error updating criteria: ' + (error && error.message ? error.message : String(error))
+        });
+    }
+});
+
 // DELETE criteria (bulk)
 router.delete('/delete', CriteriaController.deleteCriteria);
 

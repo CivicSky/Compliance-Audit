@@ -7,6 +7,7 @@ import EditOfficeModal from "../../components/EditOffice/EditOfficeModal";
 import ViewReqModal from "../../components/ViewReqModal/ViewReqModal";
 import ViewReqPASSCUModal from "../../components/ViewReqPASSCUModal/ViewReqPASSCUModal";
 import AddReqOffModal from "../../components/AddReqOffModal/AddReqOffModal";
+import EditCriteriaModal from "../../components/EditCriteria/EditCriteriaModal";
 
 export default function Organization() {
     const [officeTypes, setOfficeTypes] = useState([]);
@@ -15,6 +16,8 @@ export default function Organization() {
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [isEditCriteriaModalOpen, setIsEditCriteriaModalOpen] = useState(false);
+    const [editCriteria, setEditCriteria] = useState(null);
     const [isViewReqModalOpen, setIsViewReqModalOpen] = useState(false);
     const [isAddReqModalOpen, setIsAddReqModalOpen] = useState(false);
 
@@ -170,6 +173,12 @@ export default function Organization() {
             alert('Delete failed');
         }
     };
+    // Handle criteria click for editing
+    const handleCriteriaClick = (criteria) => {
+        setEditCriteria(criteria);
+        setIsEditCriteriaModalOpen(true);
+    };
+
     return (
         <div className="px-6 pb-6 pt-6 w-full">
             <Header
@@ -219,6 +228,7 @@ export default function Organization() {
                         setSelectedCount(count);
                         setSelectedIds(ids);
                     }}
+                    onCriteriaClick={handleCriteriaClick}
                 />
             </div>
 
@@ -229,6 +239,20 @@ export default function Organization() {
                     onClose={() => setIsModalOpen(false)}
                     onSuccess={() => {
                         setIsModalOpen(false);
+                        if (criteriaPRef.current?.refresh) criteriaPRef.current.refresh();
+                    }}
+                />
+            )}
+
+            {/* Edit Criteria Modal */}
+            {isEditCriteriaModalOpen && editCriteria && (
+                <EditCriteriaModal
+                    visible={isEditCriteriaModalOpen}
+                    onClose={() => setIsEditCriteriaModalOpen(false)}
+                    event={editCriteria}
+                    onSave={(updated) => {
+                        // TODO: Implement save logic for criteria
+                        setIsEditCriteriaModalOpen(false);
                         if (criteriaPRef.current?.refresh) criteriaPRef.current.refresh();
                     }}
                 />

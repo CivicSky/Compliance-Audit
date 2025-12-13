@@ -4,10 +4,11 @@ const db = require('../db');
 const getAllCriteria = async (req, res) => {
   try {
     const [criteria] = await db.query(`
-      SELECT c.*, e.EventName, e.EventCode 
+      SELECT c.*, e.EventName, e.EventCode, a.AreaID, a.AreaCode, a.AreaName, a.SortOrder
       FROM criteria c
       LEFT JOIN Events e ON c.EventID = e.EventID
-      ORDER BY c.CriteriaCode ASC
+      LEFT JOIN areas a ON c.AreaID = a.AreaID
+      ORDER BY a.SortOrder ASC, c.CriteriaCode ASC
     `);
     res.json({
       success: true,
@@ -27,11 +28,12 @@ const getCriteriaByEvent = async (req, res) => {
   try {
     const { eventId } = req.params;
     const [criteria] = await db.query(`
-      SELECT c.*, e.EventName, e.EventCode 
+      SELECT c.*, e.EventName, e.EventCode, a.AreaID, a.AreaCode, a.AreaName, a.SortOrder
       FROM criteria c
       LEFT JOIN Events e ON c.EventID = e.EventID
+      LEFT JOIN areas a ON c.AreaID = a.AreaID
       WHERE c.EventID = ?
-      ORDER BY c.CriteriaCode ASC
+      ORDER BY a.SortOrder ASC, c.CriteriaCode ASC
     `, [eventId]);
     res.json({
       success: true,

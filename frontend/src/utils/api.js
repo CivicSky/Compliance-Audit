@@ -9,6 +9,8 @@ export const criteriaAPI = {
 // ========================
 export const areasAPI = {
   getAll: async () => (await api.get('/api/areas')).data,
+  getByEvent: async (eventId) => (await api.get(`/api/areas/event/${eventId}`)).data,
+  addArea: async (areaData) => (await api.post('/api/areas/add', areaData)).data,
 };
 import axios from 'axios';
 

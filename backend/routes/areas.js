@@ -2,6 +2,9 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const AreasController = require('../controllers/AreasController');
+// POST add area
+router.post('/add', AreasController.addArea);
 
 // GET all areas
 router.get('/', async (req, res) => {

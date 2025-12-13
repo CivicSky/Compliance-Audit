@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import Header from "../../components/Header/header";
 import AddRequirementModal from "../AddRequirement/AddRequirementModal";
-import AddPasscuRequirement from "../AddPasscuRequirement/AddPasscuRequirement";
+import AddAreaModal from "../AddAreaModal/AddAreaModal";
 import EditRequirementsModal from "../EditRequirements/EditRequirementsModal";
 import AreaProfile from "../AreaProfile/AreaProfile";
+import EditAreaModal from "../EditArea/EditArea";
 import RequirementsP from "../RequirementsProfile/RequirementsProfile";
 import { eventsAPI } from "../../utils/api";
 
@@ -22,6 +23,9 @@ export default function RequirementBars() {
     });
     const [events, setEvents] = useState([]);
     const requirementsPRef = useRef();
+    const areaProfileRef = useRef();
+    const [isEditAreaModalOpen, setIsEditAreaModalOpen] = useState(false);
+    const [selectedArea, setSelectedArea] = useState(null);
 
     // Fetch all events on component mount
     useEffect(() => {
@@ -58,12 +62,10 @@ export default function RequirementBars() {
         };
     }, []);
 
-    const handleAddSuccess = (newRequirement) => {
-        console.log('New requirement added:', newRequirement);
-        
-        // Refresh the RequirementsP component to show the new data
-        if (requirementsPRef.current && requirementsPRef.current.refresh) {
-            requirementsPRef.current.refresh();
+    const handleAddAreaSuccess = (newArea) => {
+        // Refresh the AreaProfile component to show the new area
+        if (areaProfileRef.current && areaProfileRef.current.refresh) {
+            areaProfileRef.current.refresh();
         }
     };
 
@@ -151,6 +153,31 @@ export default function RequirementBars() {
         }
     };
 
+    // Handler for area card click
+    useEffect(() => {
+        if (areaProfileRef.current) {
+            areaProfileRef.current.onAreaClick = (area) => {
+                setSelectedArea(area);
+                setIsEditAreaModalOpen(true);
+            };
+        }
+    }, [areaProfileRef]);
+
+    const handleEditAreaSave = async (updatedArea) => {
+        try {
+            const { areasAPI } = await import('../../utils/api');
+            const response = await areasAPI.updateArea(updatedArea.AreaID, updatedArea);
+            if (response.success) {
+                if (areaProfileRef.current && areaProfileRef.current.refresh) areaProfileRef.current.refresh();
+                alert('Area updated successfully!');
+            } else {
+                alert(response.message || 'Failed to update area');
+            }
+        } catch (error) {
+            alert('An error occurred while updating the area');
+        }
+    };
+
     return (
         <div className="px-6 pb-6 pt-6 w-full">
             {/* Event Type Dropdown at the very top */}
@@ -190,13 +217,30 @@ export default function RequirementBars() {
             />
 
             {/* Area List */}
-            <AreaProfile />
 
-            {/* Add Requirement Modal - Always use PASSCU modal */}
-            <AddPasscuRequirement
+            <AreaProfile
+                eventId={selectedEventId}
+                ref={areaProfileRef}
+                onAreaClick={(area) => {
+                    setSelectedArea(area);
+                    setIsEditAreaModalOpen(true);
+                }}
+            />
+            {/* Edit Area Modal */}
+            {isEditAreaModalOpen && selectedArea && (
+                <EditAreaModal
+                    visible={isEditAreaModalOpen}
+                    onClose={() => setIsEditAreaModalOpen(false)}
+                    area={selectedArea}
+                    onSave={handleEditAreaSave}
+                />
+            )}
+
+            {/* Add Area Modal */}
+            <AddAreaModal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
-                onSuccess={handleAddSuccess}
+                onSuccess={handleAddAreaSuccess}
             />
 
             {/* Edit Requirement Modal */}
