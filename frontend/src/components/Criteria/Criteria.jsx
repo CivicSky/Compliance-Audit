@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import Header from "../Header/header";
-import { officesAPI, officeHeadsAPI, officetypesAPI, eventsAPI } from "../../utils/api";
+import { officesAPI, officeHeadsAPI, officetypesAPI, eventsAPI, criteriaAPI } from "../../utils/api";
 import CriteriaP from "../../components/CriteriaP/CriteriaP";
 import AddCriteriaModal from "../../components/AddCriteriaModal/AddCriteriaModal";
 import EditOfficeModal from "../../components/EditOffice/EditOfficeModal";
@@ -27,7 +27,7 @@ export default function Organization() {
     const [selectedEventType, setSelectedEventType] = useState('PACUCOA');
     const [selectedEventId, setSelectedEventId] = useState(null);
 
-    const officesPRef = useRef();
+    const criteriaPRef = useRef();
 
     // Fetch office types safely
     useEffect(() => {
@@ -146,31 +146,6 @@ export default function Organization() {
         }
     };
 
-    // Delete selected offices
-    const handleDeleteSelected = async () => {
-        if (selectedIds.length === 0) return;
-        if (!window.confirm(`Delete ${selectedIds.length} office(s)?`)) return;
-
-        try {
-            for (let id of selectedIds) {
-                await officesAPI.deleteOffice(id);
-            }
-
-            setSelectedCount(0);
-            setSelectedIds([]);
-            setDeleteMode(false);
-
-            // Refresh the list after deletion
-            if (officesPRef.current?.refresh) {
-                await officesPRef.current.refresh();
-            }
-
-            alert('Deleted successfully!');
-        } catch (err) {
-            console.error(err);
-            alert('Delete failed');
-        }
-    };
 
     const handleSelectionChange = useCallback((count, ids) => {
         setSelectedCount(count);
@@ -179,6 +154,22 @@ export default function Organization() {
 
     const isPaascu = selectedEventType === 'PAASCU' || selectedEventType === 'PASSCU';
 
+    // Delete selected criteria
+    const handleDeleteSelected = async () => {
+        if (selectedIds.length === 0) return;
+        if (!window.confirm(`Delete ${selectedIds.length} criteria?`)) return;
+        try {
+            await criteriaAPI.deleteCriteria(selectedIds);
+            setSelectedCount(0);
+            setSelectedIds([]);
+            setDeleteMode(false);
+            if (criteriaPRef.current?.refresh) criteriaPRef.current.refresh();
+            alert('Deleted successfully!');
+        } catch (err) {
+            console.error('Failed to delete criteria', err);
+            alert('Delete failed');
+        }
+    };
     return (
         <div className="px-6 pb-6 pt-6 w-full">
             <Header
@@ -195,27 +186,39 @@ export default function Organization() {
 
             {/* Event Type Dropdown */}
             <div className="mb-4">
-                <select
-                    value={selectedEventId || ''}
-                    onChange={e => {
-                        const selected = events.find(ev => String(ev.EventID) === e.target.value);
-                        setSelectedEventId(e.target.value);
-                        setSelectedEventType(selected?.EventName || '');
-                    }}
-                    className="w-full px-4 py-2 border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                >
-                    {events.map(event => (
-                        <option key={event.EventID} value={event.EventID}>
-                            {event.EventName || event.eventType}
-                        </option>
-                    ))}
-                </select>
+                <div className="relative w-full">
+                    <select
+                        value={selectedEventId || ''}
+                        onChange={e => {
+                            const selected = events.find(ev => String(ev.EventID) === e.target.value);
+                            setSelectedEventId(e.target.value);
+                            setSelectedEventType(selected?.EventName || '');
+                        }}
+                        className="w-full appearance-none px-5 py-3 border-2 border-purple-400 rounded-xl bg-white text-gray-800 font-semibold shadow focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all duration-200 hover:border-purple-600 hover:shadow-lg"
+                    >
+                        {events.map(event => (
+                            <option key={event.EventID} value={event.EventID} className="text-base">
+                                {event.EventName || event.eventType}
+                            </option>
+                        ))}
+                    </select>
+                    <span className="pointer-events-none absolute right-4 top-1/2 transform -translate-y-1/2 text-purple-500">
+                        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </span>
+                </div>
             </div>
 
             <div className="relative z-10">
                 <CriteriaP
+                    ref={criteriaPRef}
                     searchTerm={searchTerm}
                     eventId={selectedEventId}
+                    deleteMode={deleteMode}
+                    selectedIds={selectedIds}
+                    onSelectionChange={(count, ids) => {
+                        setSelectedCount(count);
+                        setSelectedIds(ids);
+                    }}
                 />
             </div>
 
@@ -224,7 +227,10 @@ export default function Organization() {
                 <AddCriteriaModal
                     isOpen={isModalOpen}
                     onClose={() => setIsModalOpen(false)}
-                    onSuccess={handleSuccess}
+                    onSuccess={() => {
+                        setIsModalOpen(false);
+                        if (criteriaPRef.current?.refresh) criteriaPRef.current.refresh();
+                    }}
                 />
             )}
 

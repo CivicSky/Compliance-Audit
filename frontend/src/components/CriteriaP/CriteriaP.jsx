@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useImperativeHandle, forwardRef } from "react";
 import { requirementsAPI } from "../../utils/api";
 
-export default function CriteriaP({ searchTerm = "", eventId = null }) {
+const CriteriaP = forwardRef(function CriteriaP({ searchTerm = "", eventId = null, deleteMode = false, onSelectionChange, selectedIds = [], onDeleteSelected }, ref) {
   const [criteria, setCriteria] = useState([]);
+  const [selected, setSelected] = useState(selectedIds || []);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -10,6 +11,10 @@ export default function CriteriaP({ searchTerm = "", eventId = null }) {
     fetchCriteria();
     // eslint-disable-next-line
   }, [eventId]);
+
+  useImperativeHandle(ref, () => ({
+    refresh: fetchCriteria
+  }));
 
   const fetchCriteria = async () => {
     setLoading(true);
@@ -58,6 +63,18 @@ export default function CriteriaP({ searchTerm = "", eventId = null }) {
     return acc;
   }, {});
 
+  // Selection logic
+  const handleSelect = (id) => {
+    let updated;
+    if (selected.includes(id)) {
+      updated = selected.filter((sid) => sid !== id);
+    } else {
+      updated = [...selected, id];
+    }
+    setSelected(updated);
+    if (onSelectionChange) onSelectionChange(updated.length, updated);
+  };
+
   if (loading) {
     return <div className="p-6">Loading criteria...</div>;
   }
@@ -80,8 +97,16 @@ export default function CriteriaP({ searchTerm = "", eventId = null }) {
           {/* CRITERIA LIST */}
           <div className="ml-4 space-y-2">
             {areaData.criteria.map((c) => (
-              <div key={c.CriteriaID} className="bg-white rounded-lg shadow-md border-l-4 border-indigo-200 p-4">
-                <div className="flex flex-col">
+              <div key={c.CriteriaID} className="bg-white rounded-lg shadow-md border-l-4 border-indigo-200 p-4 flex items-center">
+                {deleteMode && (
+                  <input
+                    type="checkbox"
+                    className="mr-3 h-5 w-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                    checked={selected.includes(c.CriteriaID)}
+                    onChange={() => handleSelect(c.CriteriaID)}
+                  />
+                )}
+                <div className="flex flex-col w-full">
                   <div className="flex items-center gap-2">
                     <h3 className="font-semibold text-gray-900 text-base">{c.CriteriaCode}</h3>
                   </div>
@@ -95,4 +120,5 @@ export default function CriteriaP({ searchTerm = "", eventId = null }) {
       ))}
     </div>
   );
-}
+});
+export default CriteriaP;

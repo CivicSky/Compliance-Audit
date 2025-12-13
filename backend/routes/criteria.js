@@ -1,6 +1,10 @@
+
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const CriteriaController = require('../controllers/CriteriaController');
+// DELETE criteria (bulk)
+router.delete('/delete', CriteriaController.deleteCriteria);
 
 // GET criteria by area
 router.get('/area/:areaId', async (req, res) => {

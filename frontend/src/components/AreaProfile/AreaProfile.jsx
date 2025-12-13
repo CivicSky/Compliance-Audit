@@ -33,7 +33,10 @@ export default function AreaProfile() {
     <div className="mt-6 w-full space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {areas.map(area => (
-          <div key={area.AreaID} className="bg-white rounded-lg shadow-md p-4 border-l-4 border-purple-400">
+          <div
+            key={area.AreaID}
+            className="bg-white rounded-lg shadow-md p-4 border-l-4 border-purple-400 transition-all duration-200 hover:border-purple-700 hover:shadow-xl"
+          >
             <h3 className="font-semibold text-lg text-purple-700">{area.AreaCode} - {area.AreaName}</h3>
             <p className="text-gray-600 mt-1">{area.Description}</p>
             <p className="text-xs text-gray-400 mt-2">Event ID: {area.EventID}</p>

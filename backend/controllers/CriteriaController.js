@@ -1,3 +1,35 @@
+// Delete criteria
+const deleteCriteria = async (req, res) => {
+  try {
+    const { criteriaIds } = req.body;
+
+    if (!criteriaIds || !Array.isArray(criteriaIds) || criteriaIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid criteria IDs provided'
+      });
+    }
+
+    // Delete criteria
+    const placeholders = criteriaIds.map(() => '?').join(',');
+    const [result] = await db.query(
+      `DELETE FROM criteria WHERE CriteriaID IN (${placeholders})`,
+      criteriaIds
+    );
+
+    res.json({
+      success: true,
+      message: `Successfully deleted ${result.affectedRows} criteria(s)` ,
+      deletedCount: result.affectedRows
+    });
+  } catch (error) {
+    console.error('Error deleting criteria:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting criteria'
+    });
+  }
+};
 const db = require('../db');
 
 // Get all criteria
@@ -492,6 +524,7 @@ module.exports = {
   addRequirement,
   updateRequirement,
   deleteRequirements,
+  deleteCriteria,
   getAllEvents,
   addEvent,
   deleteEvents,

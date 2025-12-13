@@ -1,4 +1,10 @@
 // ========================
+// Criteria API
+// ========================
+export const criteriaAPI = {
+  deleteCriteria: async (ids) => (await api.delete('/api/criteria/delete', { data: { criteriaIds: ids } })).data,
+};
+// ========================
 // Areas API
 // ========================
 export const areasAPI = {

@@ -170,17 +170,22 @@ export default function RequirementBars() {
 
             {/* Event Type Dropdown */}
             <div className="mb-4">
-                <select
-                    value={selectedEventId}
-                    onChange={(e) => setSelectedEventId(e.target.value)}
-                    className="w-full px-4 py-2 border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                >
-                    {events.map((event) => (
-                        <option key={event.EventID} value={event.EventID}>
-                            {event.EventName || event.eventType}
-                        </option>
-                    ))}
-                </select>
+                <div className="relative w-full">
+                    <select
+                        value={selectedEventId}
+                        onChange={(e) => setSelectedEventId(e.target.value)}
+                        className="w-full appearance-none px-5 py-3 border-2 border-purple-400 rounded-xl bg-white text-gray-800 font-semibold shadow focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all duration-200 hover:border-purple-600 hover:shadow-lg"
+                    >
+                        {events.map((event) => (
+                            <option key={event.EventID} value={event.EventID} className="text-base">
+                                {event.EventName || event.eventType}
+                            </option>
+                        ))}
+                    </select>
+                    <span className="pointer-events-none absolute right-4 top-1/2 transform -translate-y-1/2 text-purple-500">
+                        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </span>
+                </div>
             </div>
 
             {/* Add Requirement Modal - Always use PASSCU modal */}
