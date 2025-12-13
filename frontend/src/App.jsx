@@ -14,6 +14,7 @@ import Users from './components/Users/Users.jsx'
 import Events from './components/Events/Events.jsx'
 import Criteria from './components/Criteria/Criteria.jsx'
 import AuditLogs from './components/AuditLogs/AuditLogs.jsx'
+import Area from './components/Area/Area.jsx'
 
 export default function App() {
   const router = createBrowserRouter([
@@ -33,6 +34,7 @@ export default function App() {
         { path: 'criteria', element: <Criteria/>},
         { path: 'audit-logs', element: <AuditLogs/>},
         { path: 'profile', element: <Profile/>},
+        { path: 'area', element: <Area/>},
       ],
     },
   ])

@@ -10,7 +10,7 @@ const RequirementsP = forwardRef(
       deleteMode = false,
       onSelectionChange,
       onRequirementClick,
-      eventType = 'PACUCOA'
+      eventId = ''
     },
     ref
   ) => {
@@ -23,54 +23,15 @@ const RequirementsP = forwardRef(
     // Fetch requirements data from database
     useEffect(() => {
       fetchRequirements();
-    }, []);
+    }, [eventId]);
 
     // Filter and sort requirements based on search term and filters
     useEffect(() => {
       let filtered = requirements;
 
-      // Filter by selected event type FIRST
-      if (eventType) {
-        console.log('=== EVENT FILTERING DEBUG ===');
-        console.log('Selected eventType:', eventType);
-        console.log('Unique EventNames in database:', [...new Set(requirements.map(r => r.EventName))]);
-
-        // Map the button types to actual EventNames in database
-        // Try both exact match and partial match for flexibility
-        filtered = requirements.filter(req => {
-          if (!req.EventName) return false;
-
-          const eventNameUpper = req.EventName.toUpperCase();
-          const eventTypeUpper = eventType.toUpperCase();
-
-          // Be flexible around PASSCU / PAASCU / PASCU variations
-          if (eventTypeUpper.includes('PAASCU') || eventTypeUpper.includes('PASSCU') || eventTypeUpper.includes('PASCU')) {
-            const matches =
-              eventNameUpper.includes('PASSCU') ||
-              eventNameUpper.includes('PAASCU') ||
-              eventNameUpper.includes('PASCU');
-            // debugging per item:
-            // console.log(`Checking ${req.RequirementCode}: EventName="${req.EventName}", matches PASSCU: ${matches}`);
-            return matches;
-          }
-
-          // ISO
-          if (eventTypeUpper.includes('ISO')) {
-            return eventNameUpper.includes('ISO');
-          }
-
-          // PACUCOA
-          if (eventTypeUpper.includes('PACUCOA')) {
-            return eventNameUpper.includes('PACUCOA');
-          }
-
-          return false;
-        });
-
-        console.log(`Filtered ${eventType} requirements:`, filtered.length);
-        if (filtered.length > 0) {
-          console.log('Sample requirement:', filtered[0]);
-        }
+      // Filter by selected eventId FIRST
+      if (eventId) {
+        filtered = requirements.filter(req => String(req.EventID) === String(eventId));
       }
 
       // Apply search filter
@@ -117,7 +78,7 @@ const RequirementsP = forwardRef(
       });
 
       setFilteredRequirements(sortedFiltered);
-    }, [requirements, searchTerm, filterOptions, eventType]);
+    }, [requirements, searchTerm, filterOptions, eventId]);
 
     // Handle selection changes and notify parent component
     useEffect(() => {
@@ -300,13 +261,11 @@ const RequirementsP = forwardRef(
 
               return Object.entries(areaGroups).map(([areaCode, areaData]) => (
                 <div key={areaCode} className="space-y-4">
-                  {/* AREA HEADER: Hide for PACUCOA */}
-                  {eventType.toUpperCase() !== 'PACUCOA' && (
-                    <div className="bg-gradient-to-r from-purple-600 to-purple-700 text-white px-4 py-3 rounded-lg shadow-md">
-                      <h3 className="text-base font-bold">{areaCode}</h3>
-                      <p className="text-xs text-purple-100 mt-1">{areaData.areaName}</p>
-                    </div>
-                  )}
+                  {/* AREA HEADER */}
+                  <div className="bg-gradient-to-r from-purple-600 to-purple-700 text-white px-4 py-3 rounded-lg shadow-md">
+                    <h3 className="text-base font-bold">{areaCode}</h3>
+                    <p className="text-xs text-purple-100 mt-1">{areaData.areaName}</p>
+                  </div>
 
                   {/* Group by Criteria */}
                   {(() => {

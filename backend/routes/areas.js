@@ -1,6 +1,36 @@
+
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+
+// GET all areas
+router.get('/', async (req, res) => {
+    try {
+        const [areas] = await db.query(`
+            SELECT 
+                AreaID,
+                AreaCode,
+                AreaName,
+                EventID,
+                Description,
+                SortOrder
+            FROM areas
+            WHERE IsActive = 1
+            ORDER BY SortOrder ASC
+        `);
+        res.json({
+            success: true,
+            data: areas
+        });
+    } catch (error) {
+        console.error('Error fetching all areas:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch all areas',
+            error: error.message
+        });
+    }
+});
 
 // GET areas by event
 router.get('/event/:eventId', async (req, res) => {

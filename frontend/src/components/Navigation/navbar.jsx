@@ -214,6 +214,23 @@ export default function Navbar() {
                         </span>
                         <span className="text-sm font-medium">Criteria</span>
                     </NavLink>
+
+                    <NavLink
+                        to="/home/area"
+                        className={({ isActive }) =>
+                            `flex items-center gap-3 py-2 px-3 rounded-lg transition-colors duration-200 text-white ${
+                                isActive ? 'bg-blue-600 shadow-inner' : 'hover:bg-gray-800'
+                            }`
+                        }
+                    >
+                        <span className="w-4 text-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h8M12 8v8" />
+                            </svg>
+                        </span>
+                        <span className="text-sm font-medium">Area</span>
+                    </NavLink>
                 </div>
 
                 {/* Users Section */}

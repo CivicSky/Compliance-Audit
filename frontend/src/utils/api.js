@@ -1,3 +1,9 @@
+// ========================
+// Areas API
+// ========================
+export const areasAPI = {
+  getAll: async () => (await api.get('/api/areas')).data,
+};
 import axios from 'axios';
 
 // Backend base URL

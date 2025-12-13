@@ -43,9 +43,12 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
 
     // Filter criteria when area is selected
     useEffect(() => {
-        if (formData.AreaID && allCriteria.length > 0) {
+        if (formData.AreaID === '' && allCriteria.length > 0) {
+            // No area selected, show criteria with no AreaID (top-level for event)
+            const filtered = allCriteria.filter(c => !c.AreaID || c.AreaID === '' || c.AreaID === null);
+            setCriteriaList(filtered);
+        } else if (formData.AreaID && allCriteria.length > 0) {
             const filtered = allCriteria.filter(c => c.AreaID == formData.AreaID);
-            console.log('Filtered criteria for AreaID', formData.AreaID, ':', filtered);
             setCriteriaList(filtered);
         } else {
             setCriteriaList([]);
@@ -100,28 +103,9 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
         try {
             console.log('Fetching all criteria for EventID:', eventId);
             const { requirementsAPI } = await import('../../utils/api');
-            const response = await requirementsAPI.getAllRequirements();
-            
+            const response = await requirementsAPI.getCriteriaByEvent(eventId);
             if (response.success) {
-                // Extract unique criteria from requirements
-                const criteriaMap = new Map();
-                response.data.forEach(req => {
-                    if (req.EventID == eventId && req.CriteriaID) {
-                        if (!criteriaMap.has(req.CriteriaID)) {
-                            criteriaMap.set(req.CriteriaID, {
-                                CriteriaID: req.CriteriaID,
-                                CriteriaCode: req.CriteriaCode,
-                                CriteriaName: req.CriteriaName,
-                                AreaID: req.AreaID,
-                                EventID: req.EventID
-                            });
-                        }
-                    }
-                });
-                
-                const criteriaArray = Array.from(criteriaMap.values());
-                console.log('All criteria for event:', criteriaArray);
-                setAllCriteria(criteriaArray);
+                setAllCriteria(response.data || []);
             } else {
                 console.error('Failed to fetch criteria:', response.message);
                 setAllCriteria([]);
@@ -171,13 +155,10 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
 
     const validateForm = () => {
         const newErrors = {};
-        
         if (!formData.EventID) {
             newErrors.EventID = 'Event is required';
         }
-        if (!formData.AreaID) {
-            newErrors.AreaID = 'Area is required';
-        }
+        // Area is now optional for top-level criteria
         if (!formData.RequirementCode.trim()) {
             newErrors.RequirementCode = 'Requirement code is required';
         }
@@ -187,7 +168,6 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
         if (!formData.CriteriaID) {
             newErrors.CriteriaID = 'Criteria is required';
         }
-
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -311,7 +291,7 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                             {/* Area Dropdown */}
                             <div>
                                 <label htmlFor="AreaID" className="block text-sm font-medium text-gray-700 mb-1">
-                                    Area *
+                                    Area (Optional)
                                 </label>
                                 <select
                                     id="AreaID"
@@ -323,7 +303,7 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                                     }`}
                                     disabled={isSubmitting || isLoading || !formData.EventID}
                                 >
-                                    <option value="">Select an area</option>
+                                    <option value="">None (Top-level criteria for event)</option>
                                     {areasList.map((area) => (
                                         <option key={area.AreaID} value={area.AreaID}>
                                             {area.AreaCode} - {area.AreaName}
@@ -351,10 +331,10 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                                     className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 ${
                                         errors.CriteriaID ? 'border-red-500' : 'border-gray-300'
                                     }`}
-                                    disabled={isSubmitting || isLoading || !formData.AreaID}
+                                    disabled={isSubmitting || isLoading}
                                 >
                                     <option value="">
-                                        {!formData.AreaID ? 'Select an area first' : 'Select a criteria'}
+                                        {formData.AreaID === '' ? 'Select a criteria' : (!formData.AreaID ? 'Select an area first' : 'Select a criteria')}
                                     </option>
                                     {criteriaList.map((criteria) => (
                                         <option key={criteria.CriteriaID} value={criteria.CriteriaID}>
@@ -459,7 +439,7 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                                 </button>
                                 <button
                                     type="submit"
-                                    disabled={isSubmitting || !formData.EventID || !formData.AreaID || !formData.CriteriaID}
+                                    disabled={isSubmitting || !formData.EventID || !formData.CriteriaID}
                                     className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                                 >
                                     {isSubmitting && (

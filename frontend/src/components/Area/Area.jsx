@@ -3,6 +3,7 @@ import Header from "../../components/Header/header";
 import AddRequirementModal from "../AddRequirement/AddRequirementModal";
 import AddPasscuRequirement from "../AddPasscuRequirement/AddPasscuRequirement";
 import EditRequirementsModal from "../EditRequirements/EditRequirementsModal";
+import AreaProfileList from "../AreaProfile/AreaProfileList";
 import RequirementsP from "../RequirementsProfile/RequirementsProfile";
 import { eventsAPI } from "../../utils/api";
 
@@ -152,23 +153,7 @@ export default function RequirementBars() {
 
     return (
         <div className="px-6 pb-6 pt-6 w-full">
-            {/* Header */}
-            <Header 
-                pageTitle="Requirements" 
-                onAddClick={() => setIsModalOpen(true)}
-                onSearchChange={handleSearchChange}
-                searchValue={searchTerm}
-                onFilterChange={handleFilterChange}
-                filterOptions={filterOptions}
-                onDeleteModeToggle={handleDeleteModeToggle}
-                deleteMode={deleteMode}
-                selectedCount={selectedCount}
-                onDeleteSelected={handleDeleteSelected}
-                showRequirementsFilter={true}
-                hideSortButton={true}
-            />
-
-            {/* Event Type Dropdown */}
+            {/* Event Type Dropdown at the very top */}
             <div className="mb-4">
                 <select
                     value={selectedEventId}
@@ -182,6 +167,25 @@ export default function RequirementBars() {
                     ))}
                 </select>
             </div>
+
+            {/* Header */}
+            <Header 
+                pageTitle="Areas" 
+                onAddClick={() => setIsModalOpen(true)}
+                onSearchChange={handleSearchChange}
+                searchValue={searchTerm}
+                onFilterChange={handleFilterChange}
+                filterOptions={filterOptions}
+                onDeleteModeToggle={handleDeleteModeToggle}
+                deleteMode={deleteMode}
+                selectedCount={selectedCount}
+                onDeleteSelected={handleDeleteSelected}
+                showRequirementsFilter={true}
+                hideSortButton={true}
+            />
+
+            {/* Area List */}
+            <AreaProfileList />
 
             {/* Add Requirement Modal - Always use PASSCU modal */}
             <AddPasscuRequirement
@@ -199,17 +203,6 @@ export default function RequirementBars() {
                 }}
                 requirement={selectedRequirement}
                 onSave={handleEditSave}
-            />
-
-            {/* Requirements List */}
-            <RequirementsP
-                ref={requirementsPRef}
-                searchTerm={searchTerm}
-                filterOptions={filterOptions}
-                deleteMode={deleteMode}
-                onSelectionChange={handleSelectionChange}
-                onRequirementClick={handleRequirementClick}
-                eventId={selectedEventId}
             />
         </div>
     );
