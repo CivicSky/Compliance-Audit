@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 
@@ -14,6 +15,8 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
     const [uploadingProof, setUploadingProof] = useState(false);
     const [proofFileName, setProofFileName] = useState("");
     const [proofFileUrl, setProofFileUrl] = useState("");
+    // Persisted proof document info
+    const [persistedProof, setPersistedProof] = useState(null);
     const fileInputRef = useRef();
     // Handle file selection
     const handleProofFileChange = (e) => {
@@ -38,12 +41,13 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
             const data = await res.json();
             if (data.success && data.url) {
                 setProofFileUrl(`http://localhost:5000${data.url}`);
+                setProofFileName(data.filename);
+                setPersistedProof({ fileName: data.filename, url: `http://localhost:5000${data.url}` });
                 alert('Proof document uploaded!');
             } else {
                 alert(data.message || 'Failed to upload proof document');
             }
             setProofFile(null);
-            setProofFileName("");
         } catch (err) {
             alert('Failed to upload proof document');
         } finally {
@@ -51,10 +55,36 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
         }
     };
 
+
+    // Fetch persisted proof document when modal opens
     useEffect(() => {
+        const fetchProof = async () => {
+            if (isOpen && office) {
+                try {
+                    const res = await axios.get(`http://localhost:5000/api/officedocuments/${office.id}/proof`);
+                    if (res.data && res.data.success) {
+                        setPersistedProof({
+                            fileName: res.data.file_name,
+                            url: `http://localhost:5000${res.data.url}`
+                        });
+                        setProofFileName(res.data.file_name);
+                        setProofFileUrl(`http://localhost:5000${res.data.url}`);
+                    } else {
+                        setPersistedProof(null);
+                        setProofFileName("");
+                        setProofFileUrl("");
+                    }
+                } catch (err) {
+                    setPersistedProof(null);
+                    setProofFileName("");
+                    setProofFileUrl("");
+                }
+            }
+        };
         if (isOpen && office) {
             setOfficeData(office);
             fetchOfficeRequirements();
+            fetchProof();
         }
     }, [isOpen, office]);
 

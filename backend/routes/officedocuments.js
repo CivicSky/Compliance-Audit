@@ -32,4 +32,29 @@ router.post('/:id/proof', upload.single('file'), async (req, res) => {
   }
 });
 
+
+// Get the latest proof document for an office
+router.get('/:id/proof', async (req, res) => {
+  const db = require('../db');
+  try {
+    const [rows] = await db.query(
+      `SELECT * FROM office_proof_documents WHERE office_id = ? ORDER BY uploaded_at DESC LIMIT 1`,
+      [req.params.id]
+    );
+    if (rows.length === 0) {
+      return res.json({ success: false, message: 'No proof document found' });
+    }
+    const doc = rows[0];
+    res.json({
+      success: true,
+      file_name: doc.file_name,
+      file_path: doc.file_path,
+      url: `/uploads/documents/${doc.file_name}`,
+      uploaded_at: doc.uploaded_at
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Failed to fetch proof document', error: err.message });
+  }
+});
+
 module.exports = router;
