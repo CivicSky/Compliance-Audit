@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const router = express.Router();
 const OfficesController = require('../controllers/OfficesController');
+const { saveOfficeProofDocument } = require('../utils/officeProof');
 
 // Set up multer for document uploads
 const documentsStorage = multer.diskStorage({
@@ -23,7 +24,8 @@ const upload = multer({ storage: documentsStorage });
 router.post('/:id/proof', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
-    // Optionally, save file info to DB here
+    const officeId = req.params.id;
+    await saveOfficeProofDocument(officeId, req.file.filename, req.file.originalname);
     res.json({ success: true, filename: req.file.filename, url: `/uploads/documents/${req.file.filename}` });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Failed to upload document', error: err.message });

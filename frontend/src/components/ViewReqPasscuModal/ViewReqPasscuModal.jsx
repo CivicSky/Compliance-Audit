@@ -483,7 +483,7 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                                 {uploadingProof ? 'Uploading...' : 'Upload'}
                             </button>
                             {proofFileUrl && (
-                                <a href={proofFileUrl} target="_blank" rel="noopener noreferrer" className="ml-2 text-xs text-blue-600 underline">Preview</a>
+                                <a href={proofFileUrl} target="_blank" rel="noopener noreferrer" className="ml-2 text-xs text-blue-600 underline" download>Download</a>
                             )}
                         </div>
                         <button
