@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import * as XLSX from 'xlsx';
 
 export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffice, onAddRequirements }) {
     const [showMenu, setShowMenu] = useState(false);
@@ -17,7 +18,11 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
     const [proofFileUrl, setProofFileUrl] = useState("");
     // Persisted proof document info
     const [persistedProof, setPersistedProof] = useState(null);
+    // State for document viewer modal
+    const [showDocViewer, setShowDocViewer] = useState(false);
     const fileInputRef = useRef();
+    // State for SheetJS preview
+    const [excelHtml, setExcelHtml] = useState(null);
     // Handle file selection
     const handleProofFileChange = (e) => {
         if (e.target.files && e.target.files[0]) {
@@ -178,6 +183,27 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
     const handleCommentCancel = () => {
         setEditingCommentId(null);
         setCommentInput("");
+    };
+
+
+    // Function to fetch and render Excel file as HTML using SheetJS
+    const handleExcelPreview = async () => {
+        setExcelHtml('<div style="padding:1em;">Loading...</div>');
+        try {
+            const response = await fetch(proofFileUrl);
+            const blob = await response.blob();
+            const arrayBuffer = await blob.arrayBuffer();
+            const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+            let html = '';
+            workbook.SheetNames.forEach((sheetName) => {
+                const worksheet = workbook.Sheets[sheetName];
+                html += `<h4 style='margin-top:1em;'>${sheetName}</h4>`;
+                html += XLSX.utils.sheet_to_html(worksheet);
+            });
+            setExcelHtml(html);
+        } catch (err) {
+            setExcelHtml('<div style="color:red;">Failed to preview Excel file.</div>');
+        }
     };
 
     if (!isOpen || !office) return null;
@@ -513,8 +539,52 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                                 {uploadingProof ? 'Uploading...' : 'Upload'}
                             </button>
                             {proofFileUrl && (
-                                <a href={proofFileUrl} target="_blank" rel="noopener noreferrer" className="ml-2 text-xs text-blue-600 underline" download>Download</a>
+                                <>
+                                    <a
+                                        href={proofFileUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="ml-2 text-xs text-blue-600 underline"
+                                        download
+                                    >
+                                        Download
+                                    </a>
+                                    <button
+                                        className="ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs font-medium hover:bg-yellow-200 border border-yellow-300"
+                                        type="button"
+                                        onClick={() => setShowDocViewer(true)}
+                                    >
+                                        Preview
+                                    </button>
+                                </>
                             )}
+
+                    {/* Document Viewer Modal */}
+                    {proofFileUrl && showDocViewer && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60" onClick={() => setShowDocViewer(false)}>
+                            <div className="bg-white rounded-lg shadow-2xl p-4 max-w-3xl w-full max-h-[90vh] flex flex-col relative" onClick={e => e.stopPropagation()}>
+                                <button className="absolute top-2 right-2 text-gray-600 hover:text-red-600 text-xl font-bold" onClick={() => setShowDocViewer(false)}>&times;</button>
+                                <div className="flex-1 overflow-auto flex items-center justify-center">
+                                    {proofFileUrl.match(/\.(pdf)$/i) ? (
+                                        <iframe src={proofFileUrl} title="Document Preview" className="w-full h-[70vh] border rounded" />
+                                    ) : proofFileUrl.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i) ? (
+                                        <img src={proofFileUrl} alt="Document Preview" className="max-h-[70vh] max-w-full object-contain border rounded" />
+                                    ) : proofFileUrl.match(/\.(xlsx|xls)$/i) ? (
+                                        excelHtml ? (
+                                            <div className="w-full h-[70vh] overflow-auto border rounded bg-white" dangerouslySetInnerHTML={{ __html: excelHtml }} />
+                                        ) : (
+                                            <button className="px-4 py-2 bg-blue-600 text-white rounded" onClick={handleExcelPreview}>Load Excel Preview</button>
+                                        )
+                                    ) : proofFileUrl.match(/\.(docx|pptx)$/i) ? (
+                                        <iframe src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(proofFileUrl)}`} title="Office Preview" className="w-full h-[70vh] border rounded" />
+                                    ) : (
+                                        <div className="text-center text-gray-500">Preview not supported for this file type.</div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                         </div>
                         <button
                             onClick={onClose}
