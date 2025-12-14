@@ -128,6 +128,47 @@ export default function Header({ pageTitle = "Compliance Audit", showSearch = tr
                         
                         {/* Toolbar buttons */}
                         <div className="flex items-center gap-2">
+                            {/* Add Button */}
+                            {onAddClick && (
+                                <button
+                                    type="button"
+                                    onClick={onAddClick}
+                                    className="flex items-center justify-center lg:w-10 lg:h-10 w-8 h-8 rounded-md shadow-md border border-gray-200 bg-green-500 text-white hover:bg-green-600"
+                                    title="Add Requirement"
+                                >
+                                    <svg className="lg:w-5 lg:h-5 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                    </svg>
+                                </button>
+                            )}
+
+                            {/* Delete Button */}
+                            {onDeleteModeToggle && (
+                                <button
+                                    type="button"
+                                    onClick={handleDeleteModeToggle}
+                                    className={`flex items-center justify-center lg:w-10 lg:h-10 w-8 h-8 rounded-md shadow-md border border-gray-200 ${deleteMode ? 'bg-red-500 text-white' : 'bg-white text-gray-700 hover:bg-red-50'}`}
+                                    title={deleteMode ? "Cancel Delete" : "Delete Requirements"}
+                                >
+                                    <svg className="lg:w-5 lg:h-5 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            )}
+                                                        {/* Confirm Delete Button (only show in delete mode and if items are selected) */}
+                                                        {deleteMode && selectedCount > 0 && onDeleteSelected && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={handleDeleteSelected}
+                                                                className="flex items-center justify-center lg:w-10 lg:h-10 w-8 h-8 rounded-md shadow-md border border-gray-200 bg-red-600 text-white hover:bg-red-700"
+                                                                title="Confirm Delete"
+                                                            >
+                                                                <svg className="lg:w-5 lg:h-5 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                                                                </svg>
+                                                                <span className="ml-1 text-xs font-bold">{selectedCount}</span>
+                                                            </button>
+                                                        )}
                             {/* Filter Button for Requirements */}
                             {showRequirementsFilter && (
                                 <div className="relative" ref={filterDropdownRef}>

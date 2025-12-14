@@ -1,4 +1,10 @@
 // ========================
+// Compliance Status Offices API
+// ========================
+export const complianceStatusOfficesAPI = {
+  getAll: async () => (await api.get('/api/compliancestatusoffices')).data,
+};
+// ========================
 // Criteria API
 // ========================
 export const criteriaAPI = {

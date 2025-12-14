@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { complianceStatusOfficesAPI } from "../../utils/api";
 import Header from "../Header/header"
 import org from "../../assets/images/organization.svg"
 import user from "../../assets/images/user.svg"
@@ -6,6 +7,48 @@ import audit from "../../assets/images/audit.svg"
 import pending from "../../assets/images/pending.svg"
 
 export default function Home() {
+    const [complianceData, setComplianceData] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const data = await complianceStatusOfficesAPI.getAll();
+                setComplianceData(data);
+            } catch (err) {
+                setError("Failed to fetch compliance status data");
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, []);
+
+
+    // Group by OfficeID and determine compilation status per office
+    const officeMap = {};
+    complianceData.forEach(item => {
+        if (!officeMap[item.OfficeID]) officeMap[item.OfficeID] = [];
+        officeMap[item.OfficeID].push(item.Status);
+    });
+
+    let compiledOffices = 0;
+    let notCompiledOffices = 0;
+    let partialOffices = 0;
+    Object.values(officeMap).forEach(statuses => {
+        const allCompiled = statuses.every(s => s === 5);
+        const allNotCompiled = statuses.every(s => s === 3);
+        if (allCompiled) compiledOffices++;
+        else if (allNotCompiled) notCompiledOffices++;
+        else partialOffices++;
+    });
+
+    const officesCount = Object.keys(officeMap).length;
+
+    if (loading) return <div className="p-6">Loading dashboard...</div>;
+    if (error) return <div className="p-6 text-red-600">{error}</div>;
+
     return (
         <div className="px-6 pb-6 pt-6 w-full">
             <Header pageTitle="Dashboard"/>
@@ -19,7 +62,7 @@ export default function Home() {
                             className="absolute top-2 right-2 w-6 h-6 opacity-20"
                         />
                         <h2 className="text-sm font-semibold text-gray-700">Offices</h2>
-                        <p className="text-2xl font-bold text-blue-600 mt-1">17</p>
+                        <p className="text-2xl font-bold text-blue-600 mt-1">{officesCount}</p>
                     </div>
                     <div className="relative bg-white rounded-md p-4 text-center shadow-md hover:shadow-lg hover:bg-gray-50 transform transition-all duration-300 border border-gray-200">
                         <img
@@ -27,8 +70,8 @@ export default function Home() {
                             alt="background"
                             className="absolute top-2 right-2 w-6 h-6 opacity-20"
                         />
-                        <h2 className="text-sm font-semibold text-gray-700">Compiled</h2>
-                        <p className="text-2xl font-bold text-blue-600 mt-1">245</p>
+                        <h2 className="text-sm font-semibold text-gray-700">Compiled Offices</h2>
+                        <p className="text-2xl font-bold text-blue-600 mt-1">{compiledOffices}</p>
                     </div>
                     <div className="relative bg-white rounded-md p-4 text-center shadow-md hover:shadow-lg hover:bg-gray-50 transform transition-all duration-300 border border-gray-200">
                         <img
@@ -36,8 +79,8 @@ export default function Home() {
                             alt="background"
                             className="absolute top-2 right-2 w-6 h-6 opacity-20"
                         />
-                        <h2 className="text-sm font-semibold text-gray-700">Not Compiled</h2>
-                        <p className="text-2xl font-bold text-blue-600 mt-1">58</p>
+                        <h2 className="text-sm font-semibold text-gray-700">Not Compiled Offices</h2>
+                        <p className="text-2xl font-bold text-blue-600 mt-1">{notCompiledOffices}</p>
                     </div>
                     <div className="relative bg-white rounded-md p-4 text-center shadow-md hover:shadow-lg hover:bg-gray-50 transform transition-all duration-300 border border-gray-200">
                         <img
@@ -45,8 +88,8 @@ export default function Home() {
                             alt="background"
                             className="absolute top-2 right-2 w-6 h-6 opacity-20"
                         />
-                        <h2 className="text-sm font-semibold text-gray-700">Compiled</h2>
-                        <p className="text-2xl font-bold text-blue-600 mt-1">7</p>
+                        <h2 className="text-sm font-semibold text-gray-700">Partially Compiled Offices</h2>
+                        <p className="text-2xl font-bold text-blue-600 mt-1">{partialOffices}</p>
                     </div>
 
                     <div className="mt-4 bg-white shadow-md rounded-md p-4 border border-gray-200 w-full max-w-4xl">

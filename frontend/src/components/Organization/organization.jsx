@@ -169,6 +169,13 @@ export default function Organization() {
 
     const isPaascu = selectedEventType && (selectedEventType === 'PAASCU' || selectedEventType === 'PASSCU');
 
+    // Ensure selection is cleared in OfficesP when deleteMode is turned off
+    useEffect(() => {
+        if (!deleteMode && officesPRef.current && officesPRef.current.clearSelection) {
+            officesPRef.current.clearSelection();
+        }
+    }, [deleteMode]);
+
     return (
         <div className="px-6 pb-6 pt-6 w-full">
             <Header

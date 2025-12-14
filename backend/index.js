@@ -45,6 +45,8 @@ app.use('/api/offices', officesRoutes);
 app.use('/api/officestypes', officetypes);
 app.use('/api/areas', areasRoutes);
 app.use('/api/criteria', criteriaRoutes);
+const complianceStatusOfficesRoutes = require('./routes/ComplianceStatusOffices');
+app.use('/api/compliancestatusoffices', complianceStatusOfficesRoutes);
 /*app.use('/roles', rolesRoutes);
 app.use('/requirements', requirementsRoutes);
 app.use('/officetypes', officetypesRoutes);

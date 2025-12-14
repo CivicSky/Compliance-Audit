@@ -107,9 +107,11 @@ export default function RequirementBars() {
 
     const handleDeleteModeToggle = (mode) => {
         setDeleteMode(mode);
-        if (!mode) {
-            setSelectedCount(0);
-            setSelectedIds([]);
+        setSelectedCount(0);
+        setSelectedIds([]);
+        // Also clear selection in RequirementsP child
+        if (requirementsPRef.current && requirementsPRef.current.clearSelection) {
+            requirementsPRef.current.clearSelection();
         }
     };
 

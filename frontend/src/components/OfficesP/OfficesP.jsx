@@ -36,7 +36,12 @@ const OfficesP = forwardRef(
                     return { success: false, message: err.message };
                 }
             },
+            clearSelection: () => setSelectedIds([]),
         }));
+        // Clear selection when deleteMode is turned off
+        useEffect(() => {
+            if (!deleteMode) setSelectedIds([]);
+        }, [deleteMode]);
 
         // Load on mount
         useEffect(() => {
