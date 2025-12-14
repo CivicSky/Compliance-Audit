@@ -1,4 +1,10 @@
 // ========================
+// Compliance Status Offices API
+// ========================
+export const complianceStatusOfficesAPI = {
+  getAll: async () => (await api.get('/api/compliancestatusoffices')).data,
+};
+// ========================
 // Criteria API
 // ========================
 export const criteriaAPI = {
@@ -66,7 +72,7 @@ export const officeHeadsAPI = {
     });
     return response.data;
   },
-  getAllHeads: async () => (await api.get('/api/officeheads/all')).data.data,
+  getAllHeads: async () => (await api.get('/api/officeheads/all')).data,
   getHeadById: async (id) => (await api.get(`/api/officeheads/${id}`)).data,
   deleteHeads: async (headIds) => {
     try {

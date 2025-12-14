@@ -13,28 +13,35 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
     const [proofFile, setProofFile] = useState(null);
     const [uploadingProof, setUploadingProof] = useState(false);
     const [proofFileName, setProofFileName] = useState("");
+    const [proofFileUrl, setProofFileUrl] = useState("");
     const fileInputRef = useRef();
     // Handle file selection
     const handleProofFileChange = (e) => {
         if (e.target.files && e.target.files[0]) {
             setProofFile(e.target.files[0]);
             setProofFileName(e.target.files[0].name);
+            setProofFileUrl("");
         }
     };
 
-    // Handle file upload (to be implemented with backend API)
+    // Handle file upload (new endpoint)
     const handleProofUpload = async () => {
         if (!proofFile) return;
         setUploadingProof(true);
         const formData = new FormData();
         formData.append('file', proofFile);
-        formData.append('officeId', office.id);
         try {
-            // TODO: Replace with actual backend endpoint
-            await axios.post('http://localhost:5000/api/offices/' + office.id + '/proof', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
+            const res = await fetch(`http://localhost:5000/api/officedocuments/${office.id}/proof`, {
+                method: 'POST',
+                body: formData
             });
-            alert('Proof document uploaded!');
+            const data = await res.json();
+            if (data.success && data.url) {
+                setProofFileUrl(`http://localhost:5000${data.url}`);
+                alert('Proof document uploaded!');
+            } else {
+                alert(data.message || 'Failed to upload proof document');
+            }
             setProofFile(null);
             setProofFileName("");
         } catch (err) {
@@ -456,7 +463,7 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                                 ref={fileInputRef}
                                 style={{ display: 'none' }}
                                 onChange={handleProofFileChange}
-                                accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                                accept=".pdf,.doc,.docx,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                             />
                             <button
                                 className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium hover:bg-blue-200"
@@ -475,6 +482,9 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                             >
                                 {uploadingProof ? 'Uploading...' : 'Upload'}
                             </button>
+                            {proofFileUrl && (
+                                <a href={proofFileUrl} target="_blank" rel="noopener noreferrer" className="ml-2 text-xs text-blue-600 underline">Preview</a>
+                            )}
                         </div>
                         <button
                             onClick={onClose}

@@ -167,7 +167,8 @@ const RequirementsP = forwardRef(
     // Expose refresh function to parent
     useImperativeHandle(ref, () => ({
       refresh: refreshData,
-      deleteSelected: deleteSelectedRequirements
+      deleteSelected: deleteSelectedRequirements,
+      clearSelection: () => setSelectedRequirements(new Set())
     }));
 
     if (loading) {
