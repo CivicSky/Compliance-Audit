@@ -1,21 +1,39 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from "react";
 import Header from "../Header/header.jsx";
 import user from "../../assets/images/user.svg";
-import { officeHeadsAPI } from "../../utils/api";
+import { officeHeadsAPI, officesAPI } from "../../utils/api";
 import EditOfficeHeadModal from '../EditHead/EditOfficeHeadModal.jsx';
 
 const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode = false, onSelectionChange }, ref) => {
     const [officeHeads, setOfficeHeads] = useState([]);
+    const [offices, setOffices] = useState([]);
     const [filteredOfficeHeads, setFilteredOfficeHeads] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [selectedHeads, setSelectedHeads] = useState(new Set());
     const [expandedCards, setExpandedCards] = useState(new Set());
 
-    // Fetch office heads data from database
+    // Fetch office heads and offices data from database
     useEffect(() => {
         fetchOfficeHeads();
+        fetchOffices();
     }, []);
+
+    const fetchOffices = async () => {
+        try {
+            const res = await officesAPI.getAll();
+            // Support both {data: [...]} and [...] response
+            if (Array.isArray(res)) {
+                setOffices(res);
+            } else if (res && Array.isArray(res.data)) {
+                setOffices(res.data);
+            } else {
+                setOffices([]);
+            }
+        } catch (err) {
+            setOffices([]);
+        }
+    };
 
     // Filter and sort office heads based on search term and sort type
     useEffect(() => {
@@ -154,8 +172,10 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
             setLoading(true);
             setError(null);
             const response = await officeHeadsAPI.getAllHeads();
-            
-            if (response.success) {
+            console.log('DEBUG: officeHeadsAPI.getAllHeads() response:', response);
+            if (Array.isArray(response)) {
+                setOfficeHeads(response);
+            } else if (response && Array.isArray(response.data)) {
                 setOfficeHeads(response.data);
             } else {
                 setError('Failed to fetch office heads');
@@ -292,14 +312,17 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
             {filteredOfficeHeads.map((person) => {
                 // Construct full name
                 const fullName = `${person.FirstName}${person.MiddleInitial ? ' ' + person.MiddleInitial + '.' : ''} ${person.LastName}`;
-                
                 // Use uploaded profile picture or default
                 const profilePicUrl = person.TempPreview
                     ? person.TempPreview
                     : person.ProfilePic 
                         ? `http://localhost:5000/uploads/profile-pics/${person.ProfilePic}`
                         : user;
+                // Find all offices assigned to this head
+                const assignedOffices = offices.filter(office => office.head_id === person.HeadID || office.HeadID === person.HeadID);
 
+                // Remove any legacy reference to assignedOffice (should use assignedOffices)
+                // ...existing code...
                 return (
                     <div key={person.HeadID} className={`bg-white rounded-md shadow-lg border-2 border-gray-200 stroke-2 transition-all duration-300 ${
                         deleteMode ? 'hover:shadow-md' : 'hover:shadow-none hover:bg-gray-100'
@@ -317,7 +340,6 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                                     />
                                 </div>
                             )}
-                            
                             {/* Left section - Profile pic, name and position */}
                             <div 
                                 className="flex items-center gap-4 flex-1 cursor-pointer"
@@ -342,17 +364,14 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                                     )}
                                 </div>
                             </div>
-
                             {/* Fixed vertical separator line */}
                             <div className="h-16 w-px bg-gray-300 mx-6 flex-shrink-0"></div>
-
                             {/* Right section - Office */}
                             <div className="text-right flex-shrink-0">
                                 <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
-                                    {person.OfficeID ? `Office ${person.OfficeID}` : 'Unassigned'}
+                                    {assignedOffices.length > 0 ? 'Assigned' : 'Unassigned'}
                                 </span>
                             </div>
-
                             {/* Expand/Collapse Button - Far Right */}
                             <button
                                 onClick={() => toggleExpand(person.HeadID)}
@@ -396,12 +415,17 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                                             </svg>
                                             <div>
-                                                <p className="text-xs text-gray-500">Current Office</p>
-                                                <p className="text-sm text-gray-800 font-medium">
-                                                    {person.OfficeID ? `Office #${person.OfficeID}` : 'Not assigned to any office'}
-                                                </p>
-                                                {person.OfficeName && (
-                                                    <p className="text-xs text-gray-600 mt-1">{person.OfficeName}</p>
+                                                <p className="text-xs text-gray-500">Current Office(s)</p>
+                                                {assignedOffices.length > 0 ? (
+                                                    <ul className="text-sm text-gray-800 font-medium list-disc ml-4">
+                                                        {assignedOffices.map((office) => (
+                                                            <li key={office.id || office.OfficeID}>
+                                                                {office.OfficeName || office.office_name || `Office #${office.id || office.OfficeID}`}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                ) : (
+                                                    <p className="text-sm text-gray-800 font-medium">Not assigned to any office</p>
                                                 )}
                                             </div>
                                         </div>

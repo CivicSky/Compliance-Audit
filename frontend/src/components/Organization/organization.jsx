@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import Header from "../Header/header";
-import { officesAPI, officeHeadsAPI, officetypesAPI } from "../../utils/api";
+import { officesAPI, officeHeadsAPI, officetypesAPI, eventsAPI } from "../../utils/api";
 import OfficesP from "../../components/OfficesP/OfficesP";
 import AddOfficeModal from "../../components/AddOffice/AddOfficeModal";
 import EditOfficeModal from "../../components/EditOffice/EditOfficeModal";
-import ViewReqModal from "../../components/ViewReqModal/ViewReqModal";
+import ViewReqPasscuModal from "../../components/ViewReqPasscuModal/ViewReqPasscuModal";
 import ViewReqPASSCUModal from "../../components/ViewReqPASSCUModal/ViewReqPASSCUModal";
 import AddReqOffModal from "../../components/AddReqOffModal/AddReqOffModal";
 
@@ -23,11 +23,12 @@ export default function Organization() {
     const [deleteMode, setDeleteMode] = useState(false);
     const [selectedCount, setSelectedCount] = useState(0);
     const [selectedIds, setSelectedIds] = useState([]);
-    const [selectedEventType, setSelectedEventType] = useState('PACUCOA');
+    const [selectedEventType, setSelectedEventType] = useState(''); // will hold EventID
+    const [events, setEvents] = useState([]);
 
     const officesPRef = useRef();
 
-    // Fetch office types safely
+    // Fetch office types and events safely
     useEffect(() => {
         async function fetchOfficeTypes() {
             try {
@@ -38,22 +39,36 @@ export default function Organization() {
                 setOfficeTypes([]); // fallback to empty array
             }
         }
+        async function fetchEvents() {
+            try {
+                const res = await eventsAPI.getAllEvents();
+                if (res.success && Array.isArray(res.data)) {
+                    setEvents(res.data);
+                    if (res.data.length > 0) setSelectedEventType(res.data[0].EventID);
+                } else {
+                    setEvents([]);
+                }
+            } catch (err) {
+                setEvents([]);
+            }
+        }
         fetchOfficeTypes();
+        fetchEvents();
     }, []);
 
     // Fetch office heads safely
-    useEffect(() => {
-        async function fetchHeads() {
-            try {
-                const res = await officeHeadsAPI.getAllHeads();
-                setHeads(Array.isArray(res) ? res : []);
-            } catch (err) {
-                console.error("Failed to fetch heads:", err);
-                setHeads([]); // fallback to empty array
+        useEffect(() => {
+            async function fetchHeads() {
+                try {
+                    const res = await officeHeadsAPI.getAllHeads();
+                    setHeads(Array.isArray(res) ? res : []);
+                } catch (err) {
+                    console.error('Failed to fetch heads', err);
+                    setHeads([]);
+                }
             }
-        }
-        fetchHeads();
-    }, []);
+            fetchHeads();
+        }, []);
 
     // Reset states on mount
     useEffect(() => {
@@ -152,7 +167,7 @@ export default function Organization() {
         setSelectedIds(ids);
     }, []);
 
-    const isPaascu = selectedEventType === 'PAASCU' || selectedEventType === 'PASSCU';
+    const isPaascu = selectedEventType && (selectedEventType === 'PAASCU' || selectedEventType === 'PASSCU');
 
     return (
         <div className="px-6 pb-6 pt-6 w-full">
@@ -168,22 +183,25 @@ export default function Organization() {
                 hideSortButton={true}
             />
 
-            {/* Event Type Buttons */}
-            <div className="flex gap-3 mt-6 mb-4">
-                {['PACUCOA', 'ISO', 'PAASCU'].map((type) => (
-                    <button
-                        key={type}
-                        onClick={() => setSelectedEventType(type)}
-                        className={`flex-1 px-6 py-3 rounded-lg font-semibold text-sm transition-colors duration-300 border-2 focus:outline-none ${selectedEventType === type
-                            ? 'bg-blue-600 text-white border-blue-600'
-                            : 'bg-white text-gray-700 hover:bg-blue-50 border-blue-200'
-                            }`}
+
+            {/* Event Type Dropdown */}
+            <div className="mb-4 mt-6">
+                <div className="relative w-full max-w-xs">
+                    <select
+                        value={selectedEventType}
+                        onChange={e => setSelectedEventType(e.target.value)}
+                        className="w-full appearance-none px-5 py-3 border-2 border-blue-400 rounded-xl bg-white text-gray-800 font-semibold shadow focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 hover:border-blue-600 hover:shadow-lg"
                     >
-                        <div className="flex items-center justify-center gap-2">
-                            <span>{type}</span>
-                        </div>
-                    </button>
-                ))}
+                        {events.map(event => (
+                            <option key={event.EventID} value={event.EventID} className="text-base">
+                                {event.EventName || event.eventType}
+                            </option>
+                        ))}
+                    </select>
+                    <span className="pointer-events-none absolute right-4 top-1/2 transform -translate-y-1/2 text-blue-500">
+                        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </span>
+                </div>
             </div>
 
             <div className="relative z-10">
@@ -212,8 +230,7 @@ export default function Organization() {
                     onClose={() => setIsModalOpen(false)}
                     onSuccess={handleSuccess}
                     officeTypes={officeTypes}
-                    heads={heads}
-                    selectedEventType={selectedEventType}
+                    events={events}
                 />
             )}
 
@@ -229,7 +246,7 @@ export default function Organization() {
             )}
 
             {isViewReqModalOpen && !isPaascu && (
-                <ViewReqModal
+                <ViewReqPasscuModal
                     isOpen={isViewReqModalOpen}
                     onClose={handleCloseViewReqModal}
                     office={selectedOffice}
@@ -240,17 +257,22 @@ export default function Organization() {
 
             {/* Edit Modal */}
             {isEditModalOpen && (
-                <EditOfficeModal
-                    visible={isEditModalOpen}
-                    onClose={() => {
-                        setIsEditModalOpen(false);
-                        setIsViewReqModalOpen(true);
-                    }}
-                    office={selectedOffice}
-                    onSave={handleEditSave}
-                    officeTypes={officeTypes}
-                    heads={heads}
-                />
+                (() => {
+                    console.log('DEBUG: heads passed to EditOfficeModal:', heads);
+                    return (
+                        <EditOfficeModal
+                            visible={isEditModalOpen}
+                            onClose={() => {
+                                setIsEditModalOpen(false);
+                                setIsViewReqModalOpen(true);
+                            }}
+                            office={selectedOffice}
+                            onSave={handleEditSave}
+                            officeTypes={officeTypes}
+                            heads={heads}
+                        />
+                    );
+                })()
             )}
 
             {/* Add Requirements Modal */}

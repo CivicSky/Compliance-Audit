@@ -1,20 +1,16 @@
 import React, { useState, useEffect } from "react";
 
+
 export default function EditOfficeModal({ visible, onClose, office, onSave, officeTypes, heads }) {
     const [officeName, setOfficeName] = useState("");
     const [officeTypeID, setOfficeTypeID] = useState("");
     const [headID, setHeadID] = useState("");
-    const [status, setStatus] = useState("Active");
-    const [progress, setProgress] = useState(0);
 
     useEffect(() => {
         if (!office) return;
-
         setOfficeName(office.office_name || "");
-        setOfficeTypeID(office.office_type || "");
+        setOfficeTypeID(office.office_type || office.office_type_id || "");
         setHeadID(office.head_id || "");
-        setStatus(office.status || "Active");
-        setProgress(office.progress || 0);
     }, [office]);
 
     const handleSubmit = (e) => {
@@ -22,11 +18,10 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
         if (!office) return;
 
         const updatedOffice = {
-            office_name: officeName,
-            office_type: officeTypeID,
-            head_id: headID,
-            status,
-            progress,
+            OfficeName: officeName,
+            OfficeTypeID: officeTypeID,
+            HeadID: headID,
+            EventID: office.event_id || office.EventID || null,
         };
 
         onSave({ id: office.id, ...updatedOffice });
@@ -61,8 +56,8 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
                         >
                             <option value="">Select Type</option>
                             {officeTypes.map((type) => (
-                                <option key={type.id} value={type.id}>
-                                    {type.name}
+                                <option key={type.OfficeTypeID || type.id} value={type.OfficeTypeID || type.id}>
+                                    {type.TypeName || type.name}
                                 </option>
                             ))}
                         </select>
@@ -77,37 +72,18 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
                             required
                         >
                             <option value="">Select Head</option>
-                            {heads.map((head) => (
-                                <option key={head.id} value={head.id}>
-                                    {head.name}
-                                </option>
-                            ))}
+                            {heads.map((head) => {
+                                const id = head.HeadID || head.id;
+                                const name = head.FirstName
+                                    ? `${head.FirstName} ${head.MiddleInitial ? head.MiddleInitial + '.' : ''} ${head.LastName} - ${head.Position || ''}`
+                                    : head.name || '';
+                                return (
+                                    <option key={id} value={id}>
+                                        {name}
+                                    </option>
+                                );
+                            })}
                         </select>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-semibold">Status</label>
-                        <select
-                            value={status}
-                            onChange={(e) => setStatus(e.target.value)}
-                            className="w-full border rounded px-2 py-1"
-                        >
-                            <option value="Active">Active</option>
-                            <option value="Inactive">Inactive</option>
-                            <option value="Complied">Complied</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-semibold">Progress (%)</label>
-                        <input
-                            type="number"
-                            value={progress}
-                            onChange={(e) => setProgress(e.target.value)}
-                            className="w-full border rounded px-2 py-1"
-                            min={0}
-                            max={100}
-                        />
                     </div>
 
                     <div className="flex justify-end gap-2 mt-3">

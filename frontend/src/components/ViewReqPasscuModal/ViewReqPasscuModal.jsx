@@ -203,18 +203,17 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                         ) : (
                             <div className="space-y-4">
                                 {(() => {
-                                    // Group requirements by Area first, then by Criteria within each Area
+                                    // Group requirements by Area (always), use 'No Area' if missing
                                     const groupedByArea = requirements.reduce((areaGroups, req) => {
                                         const areaKey = req.AreaCode || 'No Area';
                                         if (!areaGroups[areaKey]) {
                                             areaGroups[areaKey] = {
-                                                name: req.AreaName || 'Uncategorized',
-                                                code: req.AreaCode,
+                                                name: req.AreaName || (req.AreaCode ? 'Uncategorized' : 'No Area'),
+                                                code: req.AreaCode || 'No Area',
                                                 criteriaGroups: {}
                                             };
                                         }
-                                        
-                                        // Now group by criteria within this area
+                                        // Group by criteria within this area
                                         const criteriaKey = req.CriteriaCode || 'No Criteria';
                                         if (!areaGroups[areaKey].criteriaGroups[criteriaKey]) {
                                             areaGroups[areaKey].criteriaGroups[criteriaKey] = {
@@ -223,7 +222,6 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                                                 requirements: []
                                             };
                                         }
-                                        
                                         areaGroups[areaKey].criteriaGroups[criteriaKey].requirements.push(req);
                                         return areaGroups;
                                     }, {});
@@ -255,55 +253,53 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                                                                         index !== criteria.requirements.length - 1 ? 'border-b border-gray-200' : ''
                                                                     }`}
                                                                 >
-                                                                    <div className="flex items-start gap-4">
-                                                                        {/* Status Checkboxes */}
-                                                                        <div className="flex flex-col gap-2 pt-1">
+                                                                    <div className="flex items-center gap-3 min-h-0 py-2">
+                                                                        {/* Status Checkboxes - now horizontal */}
+                                                                        <div className="flex flex-row gap-3 items-center">
                                                                             {/* Complied */}
-                                                                            <label className="flex items-center gap-2 cursor-pointer group">
+                                                                            <label className="flex items-center gap-1 cursor-pointer group">
                                                                                 <input
                                                                                     type="radio"
                                                                                     name={`status-${req.RequirementID}`}
                                                                                     checked={req.ComplianceStatusID === 5}
                                                                                     onChange={() => handleStatusChange(req.RequirementID, 5)}
-                                                                                    className="w-5 h-5 text-green-600 border-2 border-gray-300 focus:ring-2 focus:ring-green-500 cursor-pointer accent-green-600"
+                                                                                    className="w-4 h-4 text-green-600 border-gray-300 focus:ring-green-500 accent-green-600"
                                                                                 />
                                                                                 <span className="text-xs font-medium text-green-700 group-hover:text-green-800">Complied</span>
                                                                             </label>
-                                                                            
                                                                             {/* Partially Complied */}
-                                                                            <label className="flex items-center gap-2 cursor-pointer group">
+                                                                            <label className="flex items-center gap-1 cursor-pointer group">
                                                                                 <input
                                                                                     type="radio"
                                                                                     name={`status-${req.RequirementID}`}
                                                                                     checked={req.ComplianceStatusID === 4}
                                                                                     onChange={() => handleStatusChange(req.RequirementID, 4)}
-                                                                                    className="w-5 h-5 text-yellow-600 border-2 border-gray-300 focus:ring-2 focus:ring-yellow-500 cursor-pointer accent-yellow-600"
+                                                                                    className="w-4 h-4 text-yellow-600 border-gray-300 focus:ring-yellow-500 accent-yellow-600"
                                                                                 />
                                                                                 <span className="text-xs font-medium text-yellow-700 group-hover:text-yellow-800">Partially</span>
                                                                             </label>
-                                                                            
                                                                             {/* Not Complied */}
-                                                                            <label className="flex items-center gap-2 cursor-pointer group">
+                                                                            <label className="flex items-center gap-1 cursor-pointer group">
                                                                                 <input
                                                                                     type="radio"
                                                                                     name={`status-${req.RequirementID}`}
                                                                                     checked={req.ComplianceStatusID === 3 || !req.ComplianceStatusID}
                                                                                     onChange={() => handleStatusChange(req.RequirementID, 3)}
-                                                                                    className="w-5 h-5 text-red-600 border-2 border-gray-300 focus:ring-2 focus:ring-red-500 cursor-pointer accent-red-600"
+                                                                                    className="w-4 h-4 text-red-600 border-gray-300 focus:ring-red-500 accent-red-600"
                                                                                 />
                                                                                 <span className="text-xs font-medium text-red-700 group-hover:text-red-800">Not Complied</span>
                                                                             </label>
                                                                         </div>
 
-                                                                        {/* Requirement Details */}
-                                                                        <div className="flex-1 border-l-2 border-gray-200 pl-4">
-                                                                            <h4 className="font-bold text-lg text-gray-800">{req.RequirementCode}</h4>
-                                                                            <p className="text-sm text-gray-600 mt-1 leading-relaxed">{req.Description}</p>
+                                                                        {/* Requirement Details - smaller font and less margin */}
+                                                                        <div className="flex-1 border-l-2 border-gray-200 pl-3">
+                                                                            <h4 className="font-semibold text-base text-gray-800 leading-tight">{req.RequirementCode}</h4>
+                                                                            <p className="text-xs text-gray-600 mt-0.5 leading-snug">{req.Description}</p>
                                                                         </div>
 
-                                                                        {/* Status Badge */}
+                                                                        {/* Status Badge - smaller */}
                                                                         <div className="flex-shrink-0">
-                                                                            <span className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap ${
+                                                                            <span className={`px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap ${
                                                                                 req.ComplianceStatusID === 5 ? 'bg-green-100 text-green-800 border border-green-300' :
                                                                                 req.ComplianceStatusID === 4 ? 'bg-yellow-100 text-yellow-800 border border-yellow-300' :
                                                                                 'bg-red-100 text-red-800 border border-red-300'

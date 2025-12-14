@@ -58,20 +58,15 @@ const OfficesP = forwardRef(
             o.office_name?.toLowerCase().includes(searchTerm.toLowerCase())
         );
 
-        // Event Type Filter (uses EventID)
-        const EVENT_MAP = {
-            PACUCOA: 2,
-            ISO: 1,
-            PAASCU: 8,
-            PASSCU: 8, // backward compatibility for older spelling
-        };
 
-        const filtered = filteredBySearch.filter(
-            (o) => o.event_id === EVENT_MAP[eventType]
-        );
 
-        console.log('Current eventType:', eventType);
-        console.log('Looking for event_id:', EVENT_MAP[eventType]);
+        // Show all offices if no eventType selected, otherwise filter by eventType (EventID)
+        const filtered = eventType
+            ? filteredBySearch.filter((o) => String(o.event_id) === String(eventType))
+            : filteredBySearch;
+
+        // Debug logs
+        console.log('Current eventType (EventID):', eventType);
         console.log('All offices:', offices.map(o => ({ name: o.office_name, event_id: o.event_id })));
         console.log('Filtered offices:', filtered.map(o => ({ name: o.office_name, event_id: o.event_id })));
 

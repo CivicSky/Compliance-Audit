@@ -4,7 +4,7 @@ import { officesAPI, officeHeadsAPI, officetypesAPI, eventsAPI, criteriaAPI } fr
 import CriteriaP from "../../components/CriteriaP/CriteriaP";
 import AddCriteriaModal from "../../components/AddCriteriaModal/AddCriteriaModal";
 import EditOfficeModal from "../../components/EditOffice/EditOfficeModal";
-import ViewReqModal from "../../components/ViewReqModal/ViewReqModal";
+import ViewReqPasscuModal from "../../components/ViewReqPasscuModal/ViewReqPasscuModal";
 import ViewReqPASSCUModal from "../../components/ViewReqPASSCUModal/ViewReqPASSCUModal";
 import AddReqOffModal from "../../components/AddReqOffModal/AddReqOffModal";
 import EditCriteriaModal from "../../components/EditCriteria/EditCriteriaModal";
@@ -270,7 +270,7 @@ export default function Organization() {
             )}
 
             {isViewReqModalOpen && !isPaascu && (
-                <ViewReqModal
+                <ViewReqPasscuModal
                     isOpen={isViewReqModalOpen}
                     onClose={handleCloseViewReqModal}
                     office={selectedOffice}

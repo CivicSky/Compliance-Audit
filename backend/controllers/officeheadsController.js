@@ -110,6 +110,7 @@ exports.addHead = async (req, res) => {
 
 exports.getAllHeads = async (req, res) => {
   try {
+    console.log('DEBUG: getAllHeads route hit');
     const query = `
       SELECT 
         HeadID,
@@ -125,6 +126,7 @@ exports.getAllHeads = async (req, res) => {
     `;
 
     const [rows] = await db.execute(query);
+    console.log('DEBUG: getAllHeads DB rows:', rows);
 
     res.status(200).json({
       success: true,

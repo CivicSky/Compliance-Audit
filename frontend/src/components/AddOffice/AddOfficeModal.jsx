@@ -1,23 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { officesAPI, officeHeadsAPI } from "../../utils/api";
 
-export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes, selectedEventType }) {
+export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes, events }) {
     const [officeName, setOfficeName] = useState("");
     const [officeTypeID, setOfficeTypeID] = useState("");
     const [headID, setHeadID] = useState("");
+    const [eventID, setEventID] = useState("");
     const [heads, setHeads] = useState([]);
     const [loading, setLoading] = useState(false);
 
-    // Map event type to EventID
-    const getEventID = (eventType) => {
-        const eventMap = {
-            'PACUCOA': 2,
-            'ISO': 1,
-            'PAASCU': 8,
-            'PASSCU': 8 // legacy spelling support
-        };
-        return eventMap[eventType] || null;
-    };
+
 
     // Reset form & fetch heads when modal opens
     useEffect(() => {
@@ -25,6 +17,7 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
             setOfficeName("");
             setOfficeTypeID("");
             setHeadID("");
+            setEventID("");
 
             // Fetch available office heads
             const fetchHeads = async () => {
@@ -45,7 +38,7 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        if (!officeName || !officeTypeID || !headID) {
+        if (!officeName || !officeTypeID || !headID || !eventID) {
             alert("Please fill out all required fields.");
             return;
         }
@@ -57,11 +50,10 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
                 OfficeName: officeName,
                 OfficeTypeID: parseInt(officeTypeID),
                 HeadID: parseInt(headID),
-                EventID: getEventID(selectedEventType)
+                EventID: parseInt(eventID)
             };
 
             console.log('Submitting office:', newOffice);
-            console.log('Selected Event Type:', selectedEventType, 'EventID:', getEventID(selectedEventType));
             const res = await officesAPI.createOffice(newOffice);
             console.log('Response:', res);
             
@@ -89,9 +81,25 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
             <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
                 <h2 className="text-lg font-bold mb-4">
-                    Add New Office - {selectedEventType}
+                    Add New Office
                 </h2>
                 <form onSubmit={handleSubmit} className="space-y-3">
+                    <div>
+                        <label className="block text-sm font-semibold">Event</label>
+                        <select
+                            value={eventID}
+                            onChange={(e) => setEventID(e.target.value)}
+                            className="w-full border rounded px-2 py-1"
+                            required
+                        >
+                            <option value="">Select Event</option>
+                            {events && events.map((event) => (
+                                <option key={event.EventID} value={event.EventID}>
+                                    {event.EventName}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
                     <div>
                         <label className="block text-sm font-semibold">Office Name</label>
                         <input
@@ -149,7 +157,7 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
                         <button
                             type="submit"
                             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                            disabled={loading} // Disable button while loading
+                            disabled={loading}
                         >
                             {loading ? (
                                 <span className="spinner-border spinner-border-sm text-white" role="status" aria-hidden="true"></span>
