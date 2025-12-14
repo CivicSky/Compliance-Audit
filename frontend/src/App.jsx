@@ -1,5 +1,6 @@
 import './index.css'
-import { createBrowserRouter, RouterProvider } from 'react-router-dom'
+import { createBrowserRouter, RouterProvider, Navigate } from "react-router-dom";
+
 
 import Login from './components/Login/login.jsx'
 import Register from './components/Register/register.jsx'
@@ -15,30 +16,52 @@ import Events from './components/Events/Events.jsx'
 import Criteria from './components/Criteria/Criteria.jsx'
 import AuditLogs from './components/AuditLogs/AuditLogs.jsx'
 import Area from './components/Area/Area.jsx'
+import ProtectedRoute from "./components/ProtectedRoute/ProtectedRoute.jsx";
+import PublicRoute from "./components/ProtectedRoute/PublicRoute.jsx";
 
 export default function App() {
   const router = createBrowserRouter([
-    { path: '/', element: <Login /> },
-    { path: '/login', element: <Login /> },
-    { path: '/register', element: <Register /> },
     {
-      path: '/home',
-      element: <AppLayout />,
+      path: "/login",
+      element: (
+        <PublicRoute>
+          <Login />
+        </PublicRoute>
+      ),
+    },
+    {
+      path: "/register",
+      element: (
+        <PublicRoute>
+          <Register />
+        </PublicRoute>
+      ),
+    },
+    {
+      path: "/home",
+      element: (
+        <ProtectedRoute>
+          <AppLayout />
+        </ProtectedRoute>
+      ),
       children: [
         { index: true, element: <Home /> },
-        { path: 'organizations', element: <Organization/>},
-        { path: 'audit', element: <Audit/>},
-        { path: 'requirements', element: <Requirements/>},
-        { path: 'officehead', element: <OfficeHead/>},
-        { path: 'users', element: <Users/>},
-        { path: 'events', element: <Events/>},
-        { path: 'criteria', element: <Criteria/>},
-        { path: 'audit-logs', element: <AuditLogs/>},
-        { path: 'profile', element: <Profile/>},
-        { path: 'area', element: <Area/>},
+        { path: "organizations", element: <Organization /> },
+        { path: "audit", element: <Audit /> },
+        { path: "requirements", element: <Requirements /> },
+        { path: "officehead", element: <OfficeHead /> },
+        { path: "users", element: <Users /> },
+        { path: "events", element: <Events /> },
+        { path: "criteria", element: <Criteria /> },
+        { path: "audit-logs", element: <AuditLogs /> },
+        { path: "profile", element: <Profile /> },
+        { path: "area", element: <Area /> },
       ],
     },
-  ])
+  
+    { path: "/", element: <Navigate to="/login" replace /> },
+  ]);
+
 
   return <RouterProvider router={router} />
 }

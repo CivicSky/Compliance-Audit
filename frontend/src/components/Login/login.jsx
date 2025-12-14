@@ -1,15 +1,24 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import axios from "axios";
 import logo from "../../assets/images/lccb_logo.png";
 import auditrackLogo from "../../assets/images/logo.png";
 import bg from "../../assets/images/homebg.jpg";
-import { usersAPI } from "../../utils/api"; // ✅ use updated usersAPI
+import { usersAPI } from "../../utils/api";
 
 export default function Login() {
     const navigate = useNavigate();
     const [formData, setFormData] = useState({ email: "", password: "" });
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+
+    // 🔒 Redirect if already logged in
+    useEffect(() => {
+        const token = localStorage.getItem("token");
+        if (token) {
+            navigate("/home", { replace: true });
+        }
+    }, [navigate]);
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -21,32 +30,29 @@ export default function Login() {
         setError("");
 
         try {
-            console.log("Attempting login with:", { email: formData.email });
-
-            // 🔥 Use usersAPI.login
             const response = await usersAPI.login({
                 email: formData.email,
                 password: formData.password,
             });
 
-            console.log("Login response:", response);
-
             if (response.success) {
-                // Store JWT token and user info
+                // 🔐 Store token
                 localStorage.setItem("token", response.token);
                 localStorage.setItem("user", JSON.stringify(response.user));
 
-                alert("Login successful! Redirecting to home...");
-                navigate("/home");
+                // 🔥 Attach token globally
+                axios.defaults.headers.common["Authorization"] =
+                    `Bearer ${response.token}`;
+
+                navigate("/home", { replace: true });
             } else {
                 setError(response.message || "Login failed");
-                // Do not redirect, just show error
             }
         } catch (err) {
-            console.error("Login error full:", err);
-            console.error("Error response:", err.response);
-            setError(err.response?.data?.message || "Invalid email or password");
-            // Do not redirect, just show error
+            setError(
+                err.response?.data?.message ||
+                "Invalid email or password"
+            );
         } finally {
             setLoading(false);
         }
@@ -55,92 +61,52 @@ export default function Login() {
     return (
         <div className="flex h-screen overflow-hidden">
             {/* Left side - Login form */}
-            <div className="w-1/2 flex items-center justify-center bg-white transition-all duration-700 ease-in-out transform">
-                <div className="w-full max-w-md px-8 animate-fade-in-left">
-                    {/* Logo and title */}
-                    <div className="text-center mb-8 animate-slide-down">
-                        <img
-                            src={logo}
-                            alt="App Logo"
-                            className="w-16 h-16 mx-auto mb-4 transition-transform duration-500 hover:scale-110"
-                        />
-                        <h1 className="text-2xl font-bold text-gray-900 mb-2 transition-all duration-300">
-                            Welcome back
-                        </h1>
-                        <p className="text-gray-600 transition-opacity duration-500">
-                            Please enter your details
-                        </p>
+            <div className="w-1/2 flex items-center justify-center bg-white">
+                <div className="w-full max-w-md px-8">
+                    <div className="text-center mb-8">
+                        <img src={logo} alt="Logo" className="w-16 h-16 mx-auto mb-4" />
+                        <h1 className="text-2xl font-bold text-gray-900">Welcome back</h1>
+                        <p className="text-gray-600">Please enter your details</p>
                     </div>
 
-                    <form onSubmit={handleSubmit} className="space-y-6 animate-fade-in-up">
+                    <form onSubmit={handleSubmit} className="space-y-6">
                         {error && (
-                            <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm animate-shake">
+                            <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
                                 {error}
                             </div>
                         )}
 
-                        <div>
-                            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                                Email address
-                            </label>
-                            <input
-                                type="email"
-                                id="email"
-                                name="email"
-                                required
-                                value={formData.email}
-                                onChange={handleChange}
-                                className="w-full px-3 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                placeholder="Enter your email"
-                            />
-                        </div>
+                        <input
+                            type="email"
+                            name="email"
+                            required
+                            value={formData.email}
+                            onChange={handleChange}
+                            placeholder="Email"
+                            className="w-full px-3 py-3 border rounded-md"
+                        />
 
-                        <div>
-                            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                                Password
-                            </label>
-                            <input
-                                type="password"
-                                id="password"
-                                name="password"
-                                required
-                                value={formData.password}
-                                onChange={handleChange}
-                                className="w-full px-3 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                placeholder="Enter your password"
-                            />
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                                <input
-                                    type="checkbox"
-                                    id="remember"
-                                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded transition-all duration-200"
-                                />
-                                <label htmlFor="remember" className="ml-2 text-sm text-gray-700">
-                                    Remember for 30 days
-                                </label>
-                            </div>
-                            <button type="button" className="text-sm text-blue-600 hover:text-blue-500 transition-colors duration-200">
-                                Forgot password
-                            </button>
-                        </div>
+                        <input
+                            type="password"
+                            name="password"
+                            required
+                            value={formData.password}
+                            onChange={handleChange}
+                            placeholder="Password"
+                            className="w-full px-3 py-3 border rounded-md"
+                        />
 
                         <button
                             type="submit"
                             disabled={loading}
-                            className={`w-full py-3 px-4 rounded-md font-medium transition-colors ${loading ? "bg-blue-300 cursor-not-allowed text-white" : "bg-blue-600 hover:bg-blue-700 text-white"
-                                }`}
+                            className="w-full py-3 bg-blue-600 text-white rounded-md"
                         >
-                            <span className={loading ? "animate-pulse" : ""}>
-                                {loading ? "Signing in..." : "Sign in"}
-                            </span>
+                            {loading ? "Signing in..." : "Sign in"}
                         </button>
 
-                        <p className="text-center text-sm text-gray-600">
+                        <p className="text-center text-sm">
                             Don't have an account?{" "}
-                            <Link to="/register" className="text-blue-600 hover:text-blue-500 font-medium">
+                            <Link to="/register" className="text-blue-600">
                                 Sign up
                             </Link>
                         </p>
@@ -148,32 +114,19 @@ export default function Login() {
                 </div>
             </div>
 
-            {/* Right side - Background Image */}
+            {/* Right side */}
             <div
-                className="w-1/2 flex items-center justify-center relative overflow-hidden transition-all duration-700 ease-in-out bg-cover bg-center bg-no-repeat"
-                style={{
-                    backgroundImage: `url(${bg})`,
-                    backgroundPosition: "center",
-                    backgroundSize: "cover",
-                }}
+                className="w-1/2 bg-cover bg-center"
+                style={{ backgroundImage: `url(${bg})` }}
             >
-                <div className="absolute inset-0 bg-blue-600 bg-opacity-20"></div>
-
-                <div className="relative z-10 text-center text-white max-w-md animate-fade-in-right">
-                    <div className="mb-6">
-                        <div className="relative mx-auto w-40 h-40 flex items-center justify-center mb-4">
-                            <img
-                                src={auditrackLogo}
-                                alt="Auditrack Logo"
-                                className="w-32 h-32 object-contain transition-all duration-500 hover:scale-105 drop-shadow-2xl"
-                            />
-                        </div>
+                <div className="flex items-center justify-center h-full bg-blue-600 bg-opacity-20">
+                    <div className="text-white text-center">
+                        <img src={auditrackLogo} className="w-32 mx-auto mb-4" />
+                        <h2 className="text-4xl font-bold">Auditrack</h2>
+                        <p className="mt-2">
+                            Streamline your compliance processes
+                        </p>
                     </div>
-
-                    <h2 className="text-4xl font-bold mb-4 animate-slide-up drop-shadow-lg">Auditrack</h2>
-                    <p className="text-white text-lg animate-fade-in-delayed drop-shadow-md px-4">
-                        Streamline Your Compliance processes with our comprehensive audit management systems
-                    </p>
                 </div>
             </div>
         </div>
