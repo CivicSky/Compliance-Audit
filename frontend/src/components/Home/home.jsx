@@ -18,34 +18,34 @@ export default function Home() {
                             alt="background"
                             className="absolute top-2 right-2 w-6 h-6 opacity-20"
                         />
-                        <h2 className="text-sm font-semibold text-gray-700">Organizations</h2>
+                        <h2 className="text-sm font-semibold text-gray-700">Offices</h2>
                         <p className="text-2xl font-bold text-blue-600 mt-1">17</p>
                     </div>
-                        <div className="relative bg-white rounded-md p-4 text-center shadow-md hover:shadow-lg hover:bg-gray-50 transform transition-all duration-300 border border-gray-200">
+                    <div className="relative bg-white rounded-md p-4 text-center shadow-md hover:shadow-lg hover:bg-gray-50 transform transition-all duration-300 border border-gray-200">
                         <img
                             src={user}
                             alt="background"
                             className="absolute top-2 right-2 w-6 h-6 opacity-20"
                         />
-                        <h2 className="text-sm font-semibold text-gray-700">User</h2>
+                        <h2 className="text-sm font-semibold text-gray-700">Compiled</h2>
                         <p className="text-2xl font-bold text-blue-600 mt-1">245</p>
                     </div>
-                        <div className="relative bg-white rounded-md p-4 text-center shadow-md hover:shadow-lg hover:bg-gray-50 transform transition-all duration-300 border border-gray-200">
+                    <div className="relative bg-white rounded-md p-4 text-center shadow-md hover:shadow-lg hover:bg-gray-50 transform transition-all duration-300 border border-gray-200">
                         <img
                             src={audit}
                             alt="background"
                             className="absolute top-2 right-2 w-6 h-6 opacity-20"
                         />
-                        <h2 className="text-sm font-semibold text-gray-700">Total Audits</h2>
+                        <h2 className="text-sm font-semibold text-gray-700">Not Compiled</h2>
                         <p className="text-2xl font-bold text-blue-600 mt-1">58</p>
                     </div>
-                        <div className="relative bg-white rounded-md p-4 text-center shadow-md hover:shadow-lg hover:bg-gray-50 transform transition-all duration-300 border border-gray-200">
+                    <div className="relative bg-white rounded-md p-4 text-center shadow-md hover:shadow-lg hover:bg-gray-50 transform transition-all duration-300 border border-gray-200">
                         <img
                             src={pending}
                             alt="background"
                             className="absolute top-2 right-2 w-6 h-6 opacity-20"
                         />
-                        <h2 className="text-sm font-semibold text-gray-700">Pending Audits</h2>
+                        <h2 className="text-sm font-semibold text-gray-700">Compiled</h2>
                         <p className="text-2xl font-bold text-blue-600 mt-1">7</p>
                     </div>
 

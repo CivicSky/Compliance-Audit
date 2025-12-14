@@ -165,7 +165,6 @@ export default function RequirementBars() {
                 selectedCount={selectedCount}
                 onDeleteSelected={handleDeleteSelected}
                 showRequirementsFilter={true}
-                hideSortButton={true}
             />
 
             {/* Event Type Dropdown */}

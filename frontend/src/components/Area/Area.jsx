@@ -254,7 +254,6 @@ export default function RequirementBars() {
                 selectedCount={selectedAreaIds.length}
                 onDeleteSelected={handleDeleteSelectedAreas}
                 showRequirementsFilter={true}
-                hideSortButton={true}
             />
 
             {/* Area List */}

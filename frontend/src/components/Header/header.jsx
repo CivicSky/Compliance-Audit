@@ -150,7 +150,6 @@ export default function Header({ pageTitle = "Compliance Audit", showSearch = tr
                                             </span>
                                         )}
                                     </button>
-                                    
                                     {/* Filter Dropdown */}
                                     {showFilterDropdown && (
                                         <div className="absolute right-0 mt-2 w-72 bg-white rounded-md shadow-lg border border-gray-200 z-50 max-h-96 overflow-y-auto">
@@ -165,7 +164,6 @@ export default function Header({ pageTitle = "Compliance Audit", showSearch = tr
                                                     </button>
                                                 )}
                                             </div>
-                                            
                                             {/* By Events */}
                                             <div className="p-3 border-b border-gray-200">
                                                 <h4 className="text-sm font-medium text-gray-700 mb-2">By Event</h4>
@@ -183,7 +181,6 @@ export default function Header({ pageTitle = "Compliance Audit", showSearch = tr
                                                     ))}
                                                 </div>
                                             </div>
-                                            
                                             {/* By Type */}
                                             <div className="p-3">
                                                 <h4 className="text-sm font-medium text-gray-700 mb-2">By Type</h4>
@@ -209,76 +206,6 @@ export default function Header({ pageTitle = "Compliance Audit", showSearch = tr
                                     )}
                                 </div>
                             )}
-                            
-                            <button
-                                type="button"
-                                onClick={onAddClick}
-                                className="flex items-center justify-center lg:w-10 lg:h-10 w-8 h-8 bg-white hover:bg-gray-50 rounded-md text-green-600 shadow-md border border-gray-200"
-                                title="Add Office Head"
-                            >
-                                <svg className="lg:w-5 lg:h-5 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                </svg>
-                            </button>
-                            
-                            <div className="relative" ref={deleteDropdownRef}>
-                                <button
-                                    type="button"
-                                    onClick={() => setShowDeleteDropdown(!showDeleteDropdown)}
-                                    className={`flex items-center justify-center lg:w-10 lg:h-10 w-8 h-8 hover:bg-gray-50 rounded-md shadow-md border border-gray-200 ${
-                                        deleteMode ? 'bg-red-50 text-red-600' : 'bg-white text-red-600'
-                                    }`}
-                                    title="Delete Mode"
-                                >
-                                    <svg className="lg:w-5 lg:h-5 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                    </svg>
-                                </button>
-                                
-                                {/* Delete Dropdown */}
-                                {showDeleteDropdown && (
-                                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg border border-gray-200 z-50">
-                                        <div className="py-1">
-                                            {!deleteMode ? (
-                                                <button
-                                                    onClick={handleDeleteModeToggle}
-                                                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 transition-colors text-gray-700"
-                                                >
-                                                    <svg className="w-4 h-4 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                    </svg>
-                                                    Enable Selection Mode
-                                                </button>
-                                            ) : (
-                                                <>
-                                                    <div className="px-4 py-2 text-sm text-gray-500 border-b">
-                                                        {selectedCount} item(s) selected
-                                                    </div>
-                                                    <button
-                                                        onClick={handleDeleteSelected}
-                                                        disabled={selectedCount === 0}
-                                                        className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 transition-colors text-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                                                    >
-                                                        <svg className="w-4 h-4 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                        </svg>
-                                                        Delete Selected
-                                                    </button>
-                                                    <button
-                                                        onClick={handleDeleteModeToggle}
-                                                        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 transition-colors text-gray-700"
-                                                    >
-                                                        <svg className="w-4 h-4 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                                        </svg>
-                                                        Cancel Selection
-                                                    </button>
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
                         </div>
                     </div>
                 )}
@@ -286,4 +213,3 @@ export default function Header({ pageTitle = "Compliance Audit", showSearch = tr
         </div>
     );
 }
-

@@ -41,7 +41,14 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const originalRequest = error.config;
+    // Only redirect if not a login or register request
+    if (
+      error.response?.status === 401 &&
+      originalRequest &&
+      !originalRequest.url.endsWith('/login') &&
+      !originalRequest.url.endsWith('/register')
+    ) {
       localStorage.removeItem('token');
       window.location.href = '/login';
     }

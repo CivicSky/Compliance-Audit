@@ -19,6 +19,7 @@ import Area from './components/Area/Area.jsx'
 export default function App() {
   const router = createBrowserRouter([
     { path: '/', element: <Login /> },
+    { path: '/login', element: <Login /> },
     { path: '/register', element: <Register /> },
     {
       path: '/home',

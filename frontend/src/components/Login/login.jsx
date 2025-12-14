@@ -40,11 +40,13 @@ export default function Login() {
                 navigate("/home");
             } else {
                 setError(response.message || "Login failed");
+                // Do not redirect, just show error
             }
         } catch (err) {
             console.error("Login error full:", err);
             console.error("Error response:", err.response);
             setError(err.response?.data?.message || "Invalid email or password");
+            // Do not redirect, just show error
         } finally {
             setLoading(false);
         }
