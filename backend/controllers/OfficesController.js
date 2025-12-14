@@ -223,7 +223,8 @@ const OfficesController = {
           a.AreaCode,
           a.AreaName,
           cso.Status as ComplianceStatusID,
-          cst.StatusName as ComplianceStatus
+          cst.StatusName as ComplianceStatus,
+          cso.comments
         FROM compliancestatusoffices cso
         INNER JOIN requirements r ON cso.RequirementID = r.RequirementID
         LEFT JOIN criteria c ON r.CriteriaID = c.CriteriaID
@@ -341,7 +342,7 @@ const OfficesController = {
   // ================================
   updateRequirementStatus: async (req, res) => {
     const { id: officeId, requirementId } = req.params;
-    const { statusId } = req.body;
+    const { statusId, comments } = req.body;
 
     if (!statusId || ![3, 4, 5].includes(Number(statusId))) {
       return res.status(400).json({
@@ -351,12 +352,12 @@ const OfficesController = {
     }
 
     try {
-      // Use INSERT ... ON DUPLICATE KEY UPDATE to handle both insert and update
+      // Use INSERT ... ON DUPLICATE KEY UPDATE to handle both insert and update, including comments
       await db.query(
-        `INSERT INTO compliancestatusoffices (OfficeID, RequirementID, Status)
-         VALUES (?, ?, ?)
-         ON DUPLICATE KEY UPDATE Status = ?`,
-        [officeId, requirementId, statusId, statusId]
+        `INSERT INTO compliancestatusoffices (OfficeID, RequirementID, Status, comments)
+         VALUES (?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE Status = ?, comments = ?`,
+        [officeId, requirementId, statusId, comments || null, statusId, comments || null]
       );
 
       // Update the overall office status
@@ -364,7 +365,7 @@ const OfficesController = {
 
       res.json({
         success: true,
-        message: "Compliance status updated successfully"
+        message: "Compliance status and comment updated successfully"
       });
     } catch (err) {
       console.error("Error updating requirement status:", err);

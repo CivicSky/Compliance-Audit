@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 
 export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffice, onAddRequirements }) {
@@ -6,6 +6,43 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
     const [requirements, setRequirements] = useState([]);
     const [loading, setLoading] = useState(false);
     const [officeData, setOfficeData] = useState(office);
+    const [editingCommentId, setEditingCommentId] = useState(null);
+    const [commentInput, setCommentInput] = useState("");
+    const [savingComment, setSavingComment] = useState(false);
+    // File upload state for proof document
+    const [proofFile, setProofFile] = useState(null);
+    const [uploadingProof, setUploadingProof] = useState(false);
+    const [proofFileName, setProofFileName] = useState("");
+    const fileInputRef = useRef();
+    // Handle file selection
+    const handleProofFileChange = (e) => {
+        if (e.target.files && e.target.files[0]) {
+            setProofFile(e.target.files[0]);
+            setProofFileName(e.target.files[0].name);
+        }
+    };
+
+    // Handle file upload (to be implemented with backend API)
+    const handleProofUpload = async () => {
+        if (!proofFile) return;
+        setUploadingProof(true);
+        const formData = new FormData();
+        formData.append('file', proofFile);
+        formData.append('officeId', office.id);
+        try {
+            // TODO: Replace with actual backend endpoint
+            await axios.post('http://localhost:5000/api/offices/' + office.id + '/proof', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            alert('Proof document uploaded!');
+            setProofFile(null);
+            setProofFileName("");
+        } catch (err) {
+            alert('Failed to upload proof document');
+        } finally {
+            setUploadingProof(false);
+        }
+    };
 
     useEffect(() => {
         if (isOpen && office) {
@@ -38,12 +75,12 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
         }
     };
 
+    // Handle status change for a requirement
     const handleStatusChange = async (reqId, newStatusId) => {
         try {
             await axios.put(`http://localhost:5000/api/offices/${office.id}/requirements/${reqId}/status`, {
                 statusId: newStatusId
             });
-            
             // Update local state
             setRequirements(prev => prev.map(req => 
                 req.RequirementID === reqId 
@@ -55,7 +92,6 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                       }
                     : req
             ));
-
             // Refresh office data to update compliance percentage
             const officeResponse = await axios.get(`http://localhost:5000/api/offices/${office.id}`);
             if (officeResponse.data) {
@@ -70,6 +106,41 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
             console.error('Error updating status:', error);
             alert('Failed to update compliance status');
         }
+    };
+
+    // Handle comment box click
+    const handleCommentClick = (req) => {
+        setEditingCommentId(req.RequirementID);
+        setCommentInput(req.comments || "");
+    };
+
+    // Handle comment input change (auto-expand textarea)
+    const handleCommentInputChange = (e) => {
+        setCommentInput(e.target.value);
+    };
+
+    // Save comment to backend
+    const handleCommentSave = async (req) => {
+        setSavingComment(true);
+        try {
+            await axios.put(`http://localhost:5000/api/offices/${office.id}/requirements/${req.RequirementID}/status`, {
+                statusId: req.ComplianceStatusID || 3, // keep current status
+                comments: commentInput
+            });
+            // Re-fetch requirements to ensure latest data from DB
+            await fetchOfficeRequirements();
+            setEditingCommentId(null);
+        } catch (error) {
+            alert('Failed to save comment');
+        } finally {
+            setSavingComment(false);
+        }
+    };
+
+    // Cancel editing
+    const handleCommentCancel = () => {
+        setEditingCommentId(null);
+        setCommentInput("");
     };
 
     if (!isOpen || !office) return null;
@@ -249,11 +320,11 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                                                             {criteria.requirements.map((req, index) => (
                                                                 <div 
                                                                     key={req.RequirementID} 
-                                                                    className={`p-5 hover:bg-gray-50 transition-all ${
+                                                                    className={`p-3 hover:bg-gray-50 transition-all ${
                                                                         index !== criteria.requirements.length - 1 ? 'border-b border-gray-200' : ''
                                                                     }`}
                                                                 >
-                                                                    <div className="flex items-center gap-3 min-h-0 py-2">
+                                                                    <div className="flex items-center gap-2 min-h-0 py-1">
                                                                         {/* Status Checkboxes - now horizontal */}
                                                                         <div className="flex flex-row gap-3 items-center">
                                                                             {/* Complied */}
@@ -292,10 +363,62 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                                                                         </div>
 
                                                                         {/* Requirement Details - smaller font and less margin */}
-                                                                        <div className="flex-1 border-l-2 border-gray-200 pl-3">
-                                                                            <h4 className="font-semibold text-base text-gray-800 leading-tight">{req.RequirementCode}</h4>
-                                                                            <p className="text-xs text-gray-600 mt-0.5 leading-snug">{req.Description}</p>
-                                                                        </div>
+                                                                                                                                                <div className="flex-1 border-l-2 border-gray-200 pl-2">
+                                                                                                                                                    <h4 className="font-semibold text-sm text-gray-800 leading-tight">{req.RequirementCode}</h4>
+                                                                                                                                                    <p className="text-xs text-gray-600 mt-0.5 leading-snug">{req.Description}</p>
+                                                                        {editingCommentId === req.RequirementID ? (
+                                                                            <div className="mt-1 text-xs text-blue-700 bg-blue-50 rounded px-2 py-1 border border-blue-200 flex items-start gap-2">
+                                                                                <strong className="mt-1">Comment:</strong>
+                                                                                <textarea
+                                                                                    className="ml-1 flex-1 px-2 py-1 rounded border border-blue-300 text-blue-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-200 resize-vertical min-h-[80px] max-h-60 font-mono"
+                                                                                    value={commentInput}
+                                                                                    onChange={handleCommentInputChange}
+                                                                                    autoFocus
+                                                                                    rows={Math.max(4, commentInput.split('\n').length)}
+                                                                                    onKeyDown={e => {
+                                                                                        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleCommentSave(req); }
+                                                                                        if (e.key === 'Escape') handleCommentCancel();
+                                                                                    }}
+                                                                                    placeholder="Enter comment..."
+                                                                                    style={{ width: '100%', resize: 'vertical', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+                                                                                    wrap="soft"
+                                                                                />
+                                                                                <div className="flex flex-col gap-1 mt-1">
+                                                                                    <button className="text-xs text-green-700 font-bold px-2 py-0.5 hover:underline disabled:opacity-50" onClick={() => handleCommentSave(req)} disabled={savingComment}>{savingComment ? 'Saving...' : 'Save'}</button>
+                                                                                    <button className="text-xs text-gray-500 px-2 py-0.5 hover:underline" onClick={handleCommentCancel}>Cancel</button>
+                                                                                </div>
+                                                                            </div>
+                                                                        ) : (
+                                                                            <div
+                                                                                className="mt-1 text-xs text-blue-700 bg-blue-50 rounded px-2 py-1 border border-blue-200 cursor-pointer hover:bg-blue-100"
+                                                                                onClick={() => handleCommentClick(req)}
+                                                                                title={req.comments ? req.comments : 'No comment available'}
+                                                                                style={{
+                                                                                    height: '40px',
+                                                                                    maxWidth: '350px',
+                                                                                    overflow: 'hidden',
+                                                                                    textOverflow: 'ellipsis',
+                                                                                    whiteSpace: 'nowrap',
+                                                                                    display: 'flex',
+                                                                                    minWidth: 0,
+                                                                                }}
+                                                                            >
+                                                                                <strong>Comment:</strong>&nbsp;
+                                                                                {req.comments ? (
+                                                                                    <span style={{
+                                                                                        overflow: 'hidden',
+                                                                                        textOverflow: 'ellipsis',
+                                                                                        whiteSpace: 'nowrap',
+                                                                                        flex: 1,
+                                                                                        flexShrink: 1,
+                                                                                        display: 'inline-block',
+                                                                                    }}>{req.comments}</span>
+                                                                                ) : (
+                                                                                    <span className="text-gray-400 italic">No comment available</span>
+                                                                                )}
+                                                                            </div>
+                                                                        )}
+                                                                                                                                                </div>
 
                                                                         {/* Status Badge - smaller */}
                                                                         <div className="flex-shrink-0">
@@ -324,7 +447,35 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                     </div>
 
                     {/* Footer */}
-                    <div className="px-5 py-3 bg-gray-50 border-t border-gray-200 flex justify-end flex-shrink-0">
+                    <div className="px-5 py-3 bg-gray-50 border-t border-gray-200 flex justify-end items-center gap-4 flex-shrink-0">
+                        {/* Proof Document Upload (footer, left of Close) */}
+                        <div className="flex flex-row items-center gap-2">
+                            <label className="text-xs text-gray-500">Proof Document</label>
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                style={{ display: 'none' }}
+                                onChange={handleProofFileChange}
+                                accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                            />
+                            <button
+                                className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium hover:bg-blue-200"
+                                onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                                disabled={uploadingProof}
+                            >
+                                {proofFileName ? 'Change File' : 'Choose File'}
+                            </button>
+                            {proofFileName && (
+                                <span className="text-xs text-gray-700 max-w-[120px] truncate" title={proofFileName}>{proofFileName}</span>
+                            )}
+                            <button
+                                className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium hover:bg-green-200 disabled:opacity-50"
+                                onClick={handleProofUpload}
+                                disabled={!proofFile || uploadingProof}
+                            >
+                                {uploadingProof ? 'Uploading...' : 'Upload'}
+                            </button>
+                        </div>
                         <button
                             onClick={onClose}
                             className="px-5 py-1.5 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium transition-colors text-sm"
