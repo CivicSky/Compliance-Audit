@@ -1,10 +1,13 @@
+
 import React, { useState, useEffect } from "react";
+import { officeHeadsAPI } from "../../utils/api";
 
-
-export default function EditOfficeModal({ visible, onClose, office, onSave, officeTypes, heads }) {
+export default function EditOfficeModal({ visible, onClose, office, onSave, officeTypes }) {
     const [officeName, setOfficeName] = useState("");
     const [officeTypeID, setOfficeTypeID] = useState("");
     const [headID, setHeadID] = useState("");
+    const [heads, setHeads] = useState([]);
+    const [loadingHeads, setLoadingHeads] = useState(false);
 
     useEffect(() => {
         if (!office) return;
@@ -12,6 +15,31 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
         setOfficeTypeID(office.office_type || office.office_type_id || "");
         setHeadID(office.head_id || "");
     }, [office]);
+
+    // Fetch heads when modal opens
+    useEffect(() => {
+        if (!visible) return;
+        setLoadingHeads(true);
+        const fetchHeads = async () => {
+            try {
+                const headsArr = await officeHeadsAPI.getAllHeads();
+               setHeads(headsArr.data || []);
+            } catch (err) {
+                setHeads([]);
+            } finally {
+                setLoadingHeads(false);
+            }
+        };
+        fetchHeads();
+    }, [visible]);
+
+    // Filter heads: show only unassigned heads or the currently assigned head
+    const safeHeads = Array.isArray(heads) ? heads : [];
+    const availableHeads = safeHeads.filter((head) => {
+        const officeId = head.OfficeID ?? head.office_id ?? head.officeId;
+        // Always show the currently assigned head (even if assigned), plus all unassigned
+        return !officeId || officeId === 0 || officeId === '' || String(head.HeadID) === String(headID);
+    });
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -72,7 +100,7 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
                             required
                         >
                             <option value="">Select Head</option>
-                            {heads.map((head) => {
+                            {availableHeads.map((head) => {
                                 const id = head.HeadID || head.id;
                                 const name = head.FirstName
                                     ? `${head.FirstName} ${head.MiddleInitial ? head.MiddleInitial + '.' : ''} ${head.LastName} - ${head.Position || ''}`

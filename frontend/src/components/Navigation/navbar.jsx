@@ -122,57 +122,10 @@ export default function Navbar() {
                         <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Management</span>
                     </div>
                     
-                    <NavLink
-                        to="/home/organizations"
-                        onClick={(e) => {
-                            // Force navigation if React Router seems blocked
-                            if (window.location.pathname === '/home/officehead') {
-                                e.preventDefault();
-                                window.location.href = '/home/organizations';
-                            }
-                        }}
-                        className={({ isActive }) =>
-                            `flex items-center gap-3 py-2 px-3 rounded-lg transition-colors duration-200 text-white ${
-                                isActive ? 'bg-blue-600 shadow-inner' : 'hover:bg-gray-800'
-                            }`
-                        }
-                    >
-                        <span className="w-4 text-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21h18M7 21V7a2 2 0 012-2h6a2 2 0 012 2v14" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 10h.01M15 10h.01M9 14h.01M15 14h.01" />
-                            </svg>
-                        </span>
-                        <span className="text-sm font-medium">Offices</span>
-                    </NavLink>
-
-                    <NavLink
-                        to="/home/requirements"
-                        onClick={(e) => {
-                            // Force navigation if React Router seems blocked
-                            if (window.location.pathname === '/home/officehead') {
-                                e.preventDefault();
-                                window.location.href = '/home/requirements';
-                            }
-                        }}
-                        className={({ isActive }) =>
-                            `flex items-center gap-3 py-2 px-3 rounded-lg transition-colors duration-200 text-white ${
-                                isActive ? 'bg-blue-600 shadow-inner' : 'hover:bg-gray-800'
-                            }`
-                        }
-                    >
-                        <span className="w-4 text-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                        </span>
-                        <span className="text-sm font-medium">Requirements</span>
-                    </NavLink>
-
+                    {/* Reordered: Events > Areas > Criteria > Requirements > Offices */}
                     <NavLink
                         to="/home/events"
                         onClick={(e) => {
-                            // Force navigation if React Router seems blocked
                             if (window.location.pathname === '/home/officehead') {
                                 e.preventDefault();
                                 window.location.href = '/home/events';
@@ -193,9 +146,25 @@ export default function Navbar() {
                     </NavLink>
 
                     <NavLink
+                        to="/home/area"
+                        className={({ isActive }) =>
+                            `flex items-center gap-3 py-2 px-3 rounded-lg transition-colors duration-200 text-white ${
+                                isActive ? 'bg-blue-600 shadow-inner' : 'hover:bg-gray-800'
+                            }`
+                        }
+                    >
+                        <span className="w-4 text-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h8M12 8v8" />
+                            </svg>
+                        </span>
+                        <span className="text-sm font-medium">Area</span>
+                    </NavLink>
+
+                    <NavLink
                         to="/home/criteria"
                         onClick={(e) => {
-                            // Force navigation if React Router seems blocked
                             if (window.location.pathname === '/home/officehead') {
                                 e.preventDefault();
                                 window.location.href = '/home/criteria';
@@ -216,7 +185,13 @@ export default function Navbar() {
                     </NavLink>
 
                     <NavLink
-                        to="/home/area"
+                        to="/home/requirements"
+                        onClick={(e) => {
+                            if (window.location.pathname === '/home/officehead') {
+                                e.preventDefault();
+                                window.location.href = '/home/requirements';
+                            }
+                        }}
                         className={({ isActive }) =>
                             `flex items-center gap-3 py-2 px-3 rounded-lg transition-colors duration-200 text-white ${
                                 isActive ? 'bg-blue-600 shadow-inner' : 'hover:bg-gray-800'
@@ -225,11 +200,33 @@ export default function Navbar() {
                     >
                         <span className="w-4 text-center">
                             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h8M12 8v8" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
                         </span>
-                        <span className="text-sm font-medium">Area</span>
+                        <span className="text-sm font-medium">Requirements</span>
+                    </NavLink>
+
+                    <NavLink
+                        to="/home/organizations"
+                        onClick={(e) => {
+                            if (window.location.pathname === '/home/officehead') {
+                                e.preventDefault();
+                                window.location.href = '/home/organizations';
+                            }
+                        }}
+                        className={({ isActive }) =>
+                            `flex items-center gap-3 py-2 px-3 rounded-lg transition-colors duration-200 text-white ${
+                                isActive ? 'bg-blue-600 shadow-inner' : 'hover:bg-gray-800'
+                            }`
+                        }
+                    >
+                        <span className="w-4 text-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21h18M7 21V7a2 2 0 012-2h6a2 2 0 012 2v14" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 10h.01M15 10h.01M9 14h.01M15 14h.01" />
+                            </svg>
+                        </span>
+                        <span className="text-sm font-medium">Offices</span>
                     </NavLink>
                 </div>
 

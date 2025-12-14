@@ -189,7 +189,10 @@ const OfficesController = {
     try {
       // First, delete all requirements associated with this office
       await db.query("DELETE FROM compliancestatusoffices WHERE OfficeID = ?", [id]);
-      
+
+      // Unassign office heads from this office (if OfficeID is stored in headofoffice)
+      await db.query("UPDATE headofoffice SET OfficeID = NULL WHERE OfficeID = ?", [id]);
+
       // Then delete the office
       const [result] = await db.query("DELETE FROM offices WHERE OfficeID = ?", [id]);
 
