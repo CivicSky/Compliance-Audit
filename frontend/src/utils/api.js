@@ -132,6 +132,7 @@ export const usersAPI = {
     getCriteriaByEvent: async (eventId) => (await api.get(`/api/requirements/criteria/event/${eventId}`)).data,
     getAllRequirements: async () => (await api.get('/api/requirements/all')).data,
     getRequirementsByEvent: async (eventId) => (await api.get(`/api/requirements/event/${eventId}`)).data,
+    addCriteria: async (data) => (await api.post('/api/criteria/add', data)).data,
     addRequirement: async (data) => (await api.post('/api/requirements/add', data)).data,
     updateRequirement: async (id, data) => (await api.put(`/api/requirements/update/${id}`, data)).data,
     deleteRequirements: async (ids) => (await api.post('/api/requirements/delete', { requirementIds: ids })).data,

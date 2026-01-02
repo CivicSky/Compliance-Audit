@@ -4,11 +4,14 @@ import AddRequirementModal from "../AddRequirement/AddRequirementModal";
 import AddPasscuRequirement from "../AddPasscuRequirement/AddPasscuRequirement";
 import EditRequirementsModal from "../EditRequirements/EditRequirementsModal";
 import RequirementsP from "../RequirementsProfile/RequirementsProfile";
+import UnifiedSetupWizard from "../UnifiedSetupWizard/UnifiedSetupWizard";
 import { eventsAPI } from "../../utils/api";
+import { Wand2 } from "lucide-react";
 
 export default function RequirementBars() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [showWizard, setShowWizard] = useState(false);
     const [selectedRequirement, setSelectedRequirement] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [deleteMode, setDeleteMode] = useState(false);
@@ -155,18 +158,38 @@ export default function RequirementBars() {
     return (
         <div className="px-6 pb-6 pt-6 w-full">
             {/* Header */}
-            <Header 
-                pageTitle="Requirements" 
-                onAddClick={() => setIsModalOpen(true)}
-                onSearchChange={handleSearchChange}
-                searchValue={searchTerm}
-                onFilterChange={handleFilterChange}
-                filterOptions={filterOptions}
-                onDeleteModeToggle={handleDeleteModeToggle}
-                deleteMode={deleteMode}
-                selectedCount={selectedCount}
-                onDeleteSelected={handleDeleteSelected}
-                showRequirementsFilter={true}
+            <div className="flex items-center justify-between mb-4">
+                <Header 
+                    pageTitle="Requirements" 
+                    onAddClick={() => setIsModalOpen(true)}
+                    onSearchChange={handleSearchChange}
+                    searchValue={searchTerm}
+                    onFilterChange={handleFilterChange}
+                    filterOptions={filterOptions}
+                    onDeleteModeToggle={handleDeleteModeToggle}
+                    deleteMode={deleteMode}
+                    selectedCount={selectedCount}
+                    onDeleteSelected={handleDeleteSelected}
+                    showRequirementsFilter={true}
+                />
+                <button 
+                    onClick={() => setShowWizard(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition text-sm"
+                    title="Quick setup with wizard"
+                >
+                    <Wand2 size={18} /> Wizard
+                </button>
+            </div>
+
+            <UnifiedSetupWizard 
+                isOpen={showWizard} 
+                onClose={() => setShowWizard(false)}
+                onSuccess={() => {
+                    // Refresh the requirements view after successful setup
+                    if (requirementsPRef.current?.refetch) {
+                        requirementsPRef.current.refetch();
+                    }
+                }}
             />
 
             {/* Event Type Dropdown */}

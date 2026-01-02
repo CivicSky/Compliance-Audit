@@ -8,6 +8,8 @@ import ViewReqPasscuModal from "../../components/ViewReqPasscuModal/ViewReqPassc
 import ViewReqPASSCUModal from "../../components/ViewReqPASSCUModal/ViewReqPASSCUModal";
 import AddReqOffModal from "../../components/AddReqOffModal/AddReqOffModal";
 import EditCriteriaModal from "../../components/EditCriteria/EditCriteriaModal";
+import UnifiedSetupWizard from "../UnifiedSetupWizard/UnifiedSetupWizard";
+import { Wand2 } from "lucide-react";
 
 export default function Organization() {
     const [officeTypes, setOfficeTypes] = useState([]);
@@ -17,6 +19,7 @@ export default function Organization() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isEditCriteriaModalOpen, setIsEditCriteriaModalOpen] = useState(false);
+    const [showWizard, setShowWizard] = useState(false);
     const [editCriteria, setEditCriteria] = useState(null);
     const [isViewReqModalOpen, setIsViewReqModalOpen] = useState(false);
     const [isAddReqModalOpen, setIsAddReqModalOpen] = useState(false);
@@ -181,16 +184,36 @@ export default function Organization() {
 
     return (
         <div className="px-6 pb-6 pt-6 w-full">
-            <Header
-                pageTitle="Criteria Management"
-                onAddClick={() => setIsModalOpen(true)}
-                onSearchChange={setSearchTerm}
-                searchValue={searchTerm}
-                onDeleteModeToggle={setDeleteMode}
-                deleteMode={deleteMode}
-                selectedCount={selectedCount}
-                onDeleteSelected={handleDeleteSelected}
-                hideSortButton={true}
+            <div className="flex items-center justify-between mb-4">
+                <Header
+                    pageTitle="Criteria Management"
+                    onAddClick={() => setIsModalOpen(true)}
+                    onSearchChange={setSearchTerm}
+                    searchValue={searchTerm}
+                    onDeleteModeToggle={setDeleteMode}
+                    deleteMode={deleteMode}
+                    selectedCount={selectedCount}
+                    onDeleteSelected={handleDeleteSelected}
+                    hideSortButton={true}
+                />
+                <button 
+                    onClick={() => setShowWizard(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition text-sm"
+                    title="Quick setup with wizard"
+                >
+                    <Wand2 size={18} /> Wizard
+                </button>
+            </div>
+
+            <UnifiedSetupWizard 
+                isOpen={showWizard} 
+                onClose={() => setShowWizard(false)}
+                onSuccess={() => {
+                    // Refresh the criteria view after successful setup
+                    if (criteriaPRef.current?.refetch) {
+                        criteriaPRef.current.refetch();
+                    }
+                }}
             />
 
             {/* Event Type Dropdown */}

@@ -27,7 +27,7 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
     const handleProofFileChange = (e) => {
         if (e.target.files && e.target.files[0]) {
             setProofFile(e.target.files[0]);
-            setProofFileName(e.target.files[0].name);
+            setProofFileName(e.target.files[0].name);//
             setProofFileUrl("");
         }
     };

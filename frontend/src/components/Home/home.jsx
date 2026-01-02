@@ -1,15 +1,18 @@
 import React, { useEffect, useState } from "react";
 import { complianceStatusOfficesAPI } from "../../utils/api";
 import Header from "../Header/header"
+import UnifiedSetupWizard from "../UnifiedSetupWizard/UnifiedSetupWizard"
 import org from "../../assets/images/organization.svg"
 import user from "../../assets/images/user.svg"
 import audit from "../../assets/images/audit.svg"
 import pending from "../../assets/images/pending.svg"
+import { Plus } from "lucide-react"
 
 export default function Home() {
     const [complianceData, setComplianceData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [showWizard, setShowWizard] = useState(false);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -51,7 +54,32 @@ export default function Home() {
 
     return (
         <div className="px-6 pb-6 pt-6 w-full">
-            <Header pageTitle="Dashboard"/>
+            <div className="flex items-center justify-between mb-6">
+                <Header pageTitle="Dashboard"/>
+                <button 
+                    onClick={() => setShowWizard(true)}
+                    className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition transform hover:scale-105"
+                >
+                    <Plus size={20} /> Quick Setup
+                </button>
+            </div>
+
+            <UnifiedSetupWizard 
+                isOpen={showWizard} 
+                onClose={() => setShowWizard(false)}
+                onSuccess={() => {
+                    // Refresh compliance data after successful setup
+                    const fetchData = async () => {
+                        try {
+                            const data = await complianceStatusOfficesAPI.getAll();
+                            setComplianceData(data);
+                        } catch (err) {
+                            console.error("Failed to refresh data");
+                        }
+                    };
+                    fetchData();
+                }}
+            />
 
             <div className="relative z-10">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
