@@ -18,6 +18,9 @@ const upload = multer({ storage: multerStorage });
 // upload profile
 router.put('/:id', auth, upload.single('profilePic'), userController.updateUser);
 
+// Update approval status
+router.put('/:id/approval-status', auth, userController.updateApprovalStatus);
+
 router.get("/me", auth, userController.getLoggedInUser);
 router.use(express.json());
 

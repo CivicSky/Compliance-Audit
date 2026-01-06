@@ -46,7 +46,16 @@ export default function Login() {
 
                 navigate("/home", { replace: true });
             } else {
-                setError(response.message || "Login failed");
+                // Check approval status
+                if (response.approvalStatus === 'pending') {
+                    setError("Your account is pending approval. Please wait for admin approval.");
+                    alert("⏳ Account Pending\n\nYour account is still pending approval. Please wait for the administrator to review your account.");
+                } else if (response.approvalStatus === 'denied') {
+                    setError("Your account has been denied access.");
+                    alert("❌ Access Denied\n\nYour account has been denied access. Please contact the administrator for more information.");
+                } else {
+                    setError(response.message || "Login failed");
+                }
             }
         } catch (err) {
             setError(

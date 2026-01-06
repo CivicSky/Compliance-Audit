@@ -3,19 +3,35 @@ import Header from "../Header/header.jsx";
 import user from "../../assets/images/user.svg";
 import { usersAPI } from "../../utils/api";
 
-const UsersP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionChange, onUserClick }, ref) => {
+const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = false, onSelectionChange, onUserClick }, ref) => {
     const [users, setUsers] = useState([]);
     const [filteredUsers, setFilteredUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [selectedUsers, setSelectedUsers] = useState(new Set());
+    const [currentUserID, setCurrentUserID] = useState(null);
+
+    // Fetch current user ID from token
+    useEffect(() => {{
+        const fetchCurrentUser = async () => {{
+            try {{
+                const response = await usersAPI.getLoggedInUser();
+                if (response.success && response.user) {{
+                    setCurrentUserID(response.user.UserID);
+                }}
+            }} catch (error) {{
+                console.error('Error fetching current user:', error);
+            }}
+        }};
+        fetchCurrentUser();
+    }}, []);
 
     // Fetch users data from database
-    useEffect(() => {
+    useEffect(() => {{
         fetchUsers();
-    }, []);
+    }}, []);
 
-    // Filter and sort users based on search term
+    // Filter and sort users based on search term and approval status
     useEffect(() => {
         let filtered = users;
         
@@ -33,6 +49,13 @@ const UsersP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCha
             });
         }
 
+        // Apply approval status filter
+        if (filterOptions.approvalStatus && filterOptions.approvalStatus.length > 0) {
+            filtered = filtered.filter(person => 
+                filterOptions.approvalStatus.includes(person.approval_status || 'pending')
+            );
+        }
+
         // Sort by name in ascending order
         const sortedFiltered = [...filtered].sort((a, b) => {
             const nameA = `${a.FirstName} ${a.LastName}`.toLowerCase();
@@ -41,7 +64,7 @@ const UsersP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCha
         });
 
         setFilteredUsers(sortedFiltered);
-    }, [users, searchTerm]);
+    }, [users, searchTerm, filterOptions]);
 
     // Handle selection changes and notify parent component
     useEffect(() => {
@@ -215,9 +238,11 @@ const UsersP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCha
                     <div 
                         key={person.UserID} 
                         onClick={() => !deleteMode && onUserClick && onUserClick(person)}
-                        className={`bg-white rounded-md p-4 shadow-lg border-2 border-gray-200 stroke-2 transition-all duration-300 ${
+                        className={`bg-white rounded-md p-4 shadow-lg border-2 stroke-2 transition-all duration-300 relative ${
+                            currentUserID === person.UserID ? 'border-blue-400 bg-blue-50' : 'border-gray-200'
+                        } ${
                             deleteMode ? 'hover:shadow-md' : 'hover:shadow-none hover:bg-gray-100 cursor-pointer'
-                        } ${selectedUsers.has(person.UserID) ? 'ring-2 ring-blue-500 bg-blue-50' : ''}`}
+                        } ${selectedUsers.has(person.UserID) ? 'ring-2 ring-blue-500 bg-blue-100' : ''}`}
                     >
                         <div className="flex items-center justify-between min-h-[4rem]">
                             {/* Checkbox for delete mode */}
@@ -251,10 +276,10 @@ const UsersP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCha
                             </div>
 
                             {/* Fixed vertical separator line */}
-                            <div className="h-16 w-px bg-gray-300 mx-6 flex-shrink-0"></div>
+                            <div className="absolute top-4 bottom-4 w-px bg-gray-300" style={{left: 'calc(88% - 12px)'}}></div>
 
-                            {/* Right section - Role Badge */}
-                            <div className="text-right flex-shrink-0">
+                            {/* Right section - Role and Approval Status Badges */}
+                            <div className="text-right flex-shrink-0 flex flex-col gap-2 ml-6">
                                 <span className={`px-3 py-1 rounded-full text-sm font-medium ${
                                     person.RoleID === 1 ? 'bg-purple-100 text-purple-800' : 
                                     person.RoleID === 2 ? 'bg-blue-100 text-blue-800' : 
@@ -262,6 +287,14 @@ const UsersP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCha
                                     'bg-gray-100 text-gray-800'
                                 }`}>
                                     {person.RoleName || 'Unassigned'}
+                                </span>
+                                <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                                    person.approval_status === 'approved' ? 'bg-green-100 text-green-800' :
+                                    person.approval_status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                    person.approval_status === 'denied' ? 'bg-red-100 text-red-800' :
+                                    'bg-gray-100 text-gray-800'
+                                }`}>
+                                    {person.approval_status ? person.approval_status.charAt(0).toUpperCase() + person.approval_status.slice(1) : 'Pending'}
                                 </span>
                             </div>
                         </div>

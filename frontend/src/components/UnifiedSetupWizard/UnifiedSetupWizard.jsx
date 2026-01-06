@@ -383,6 +383,18 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
     const handleAddRequirement = async () => {
         if (!validateRequirement()) return;
 
+        // Check if CriteriaID is set
+        if (!createdIds.criteriaId && !criteriaData.CriteriaID) {
+            alert('Please select a criteria before adding a requirement');
+            return;
+        }
+
+        // Check if Description is provided
+        if (!requirementData.Description || requirementData.Description.trim() === '') {
+            alert('Please provide a description for the requirement');
+            return;
+        }
+
         setIsSubmitting(true);
         try {
             const { requirementsAPI } = await import('../../utils/api');
@@ -390,7 +402,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                 EventID: createdIds.eventId,
                 RequirementCode: requirementData.RequirementCode,
                 Description: requirementData.Description || null,
-                CriteriaID: createdIds.criteriaId || null,
+                CriteriaID: createdIds.criteriaId || criteriaData.CriteriaID,
                 ParentRequirementCode: requirementData.ParentRequirementCode || null
             });
 
@@ -434,6 +446,9 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                     return;
                 }
                 setCurrentStep(3);
+            } else if (areaMode === 'skip') {
+                // Skip area and go to criteria
+                setCurrentStep(3);
             }
         } else if (currentStep === 3) {
             // Criteria mode selection step
@@ -467,7 +482,16 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
 
     const handlePrevious = () => {
         if (currentStep > 0) {
-            setCurrentStep(currentStep - 1);
+            // Skip step 1 when going back from step 2 - go directly to step 0 (event choice)
+            if (currentStep === 2) {
+                setCurrentStep(0);
+                setEventMode(null);
+            } else if (currentStep === 1) {
+                setCurrentStep(0);
+                setEventMode(null);
+            } else {
+                setCurrentStep(currentStep - 1);
+            }
             setSuccessMessage('');
         }
     };
@@ -513,40 +537,40 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                 </div>
 
                 {/* Progress Bar */}
-                <div className="bg-gray-100 px-6 py-4 flex items-center gap-4">
-                    {[0, 1, 2, 3, 4, 5].map((step) => (
-                        <React.Fragment key={step}>
-                            {step === 0 ? null : (
-                                <div
-                                    className={`flex items-center justify-center w-10 h-10 rounded-full font-bold transition ${
-                                        step < currentStep
-                                            ? 'bg-green-500 text-white'
-                                            : step === currentStep
-                                            ? 'bg-blue-600 text-white'
-                                            : 'bg-gray-300 text-gray-600'
-                                    }`}
-                                >
-                                    {step < currentStep ? <Check size={20} /> : step}
+                <div className="bg-gray-100 px-6 py-6">
+                    <div className="flex items-center justify-between mb-3">
+                        {[1, 2, 3, 4, 5].map((step, idx) => (
+                            <React.Fragment key={step}>
+                                <div className="flex flex-col items-center gap-2 flex-1">
+                                    <div
+                                        className={`flex items-center justify-center w-10 h-10 rounded-full font-bold transition ${
+                                            step < currentStep
+                                                ? 'bg-green-500 text-white'
+                                                : step === currentStep
+                                                ? 'bg-blue-600 text-white'
+                                                : 'bg-gray-300 text-gray-600'
+                                        }`}
+                                    >
+                                        {step < currentStep ? <Check size={20} /> : step}
+                                    </div>
+                                    <span className="text-xs font-semibold text-gray-700 text-center">
+                                        {step === 1 && 'Event'}
+                                        {step === 2 && 'Area'}
+                                        {step === 3 && 'Criteria'}
+                                        {step === 4 && 'Requirement'}
+                                        {step === 5 && 'Complete'}
+                                    </span>
                                 </div>
-                            )}
-                            {step < 5 && step > 0 && (
-                                <div
-                                    className={`flex-1 h-1 ${
-                                        step < currentStep ? 'bg-green-500' : 'bg-gray-300'
-                                    }`}
-                                />
-                            )}
-                        </React.Fragment>
-                    ))}
-                </div>
-
-                {/* Step Labels */}
-                <div className="bg-gray-50 px-6 py-3 grid grid-cols-5 gap-2 text-xs text-center font-semibold text-gray-700">
-                    <div>Event</div>
-                    <div>Area</div>
-                    <div>Criteria</div>
-                    <div>Requirement</div>
-                    <div>Complete</div>
+                                {step < 5 && (
+                                    <div
+                                        className={`h-1 flex-1 mx-2 ${
+                                            step < currentStep ? 'bg-green-500' : 'bg-gray-300'
+                                        }`}
+                                    />
+                                )}
+                            </React.Fragment>
+                        ))}
+                    </div>
                 </div>
 
                 {/* Content */}
@@ -558,11 +582,11 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                         </div>
                     )}
 
-                    {/* Step 0: Event Selection */}
+                    {/* Step 1: Event Selection */}
                     {currentStep === 0 && (
                         <div className="space-y-6">
                             <div>
-                                <h3 className="text-xl font-bold text-gray-800 mb-2">Step 0: Choose Event</h3>
+                                <h3 className="text-xl font-bold text-gray-800 mb-2">Step 1: Choose Event</h3>
                                 <p className="text-gray-600">Would you like to create a new event or select an existing one?</p>
                             </div>
 
@@ -631,7 +655,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                             <option value="">-- Select an event --</option>
                                             {availableEvents.map((event) => (
                                                 <option key={event.EventID} value={event.EventID}>
-                                                    {event.EventName} ({event.EventCode})
+                                                    {event.EventCode} - {event.EventName}
                                                 </option>
                                             ))}
                                         </select>
@@ -706,67 +730,92 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                         </div>
                     )}
 
-                    {/* Step 1: Event Creation (only if creating new) */}
-                    {currentStep === 1 && eventMode === 'create' && (
+                    {/* Step 2: Area */}
+                    {currentStep === 1 && (
                         <div className="space-y-4">
-                            <h3 className="text-xl font-bold text-gray-800">Step 1: Create Event</h3>
-                            <p className="text-gray-600">Start by creating a new event for your audit process.</p>
-                            
-                            <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Event Code *
-                                </label>
-                                <input
-                                    type="text"
-                                    name="EventCode"
-                                    value={eventData.EventCode}
-                                    onChange={handleEventChange}
-                                    placeholder="e.g., AUD-2024-001"
-                                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
-                                        errors.eventData?.EventCode
-                                            ? 'border-red-500 focus:ring-red-500'
-                                            : 'border-gray-300 focus:ring-blue-500'
-                                    }`}
-                                />
-                                {errors.eventData?.EventCode && (
-                                    <p className="text-red-500 text-sm mt-1">{errors.eventData.EventCode}</p>
-                                )}
-                            </div>
+                            {eventMode === 'create' ? (
+                                <>
+                                    <h3 className="text-xl font-bold text-gray-800">Step 1: Create Event</h3>
+                                    <p className="text-gray-600">Start by creating a new event for your audit process.</p>
+                                    
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                            Event Code *
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="EventCode"
+                                            value={eventData.EventCode}
+                                            onChange={handleEventChange}
+                                            placeholder="e.g., AUD-2024-001"
+                                            className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                                                errors.eventData?.EventCode
+                                                    ? 'border-red-500 focus:ring-red-500'
+                                                    : 'border-gray-300 focus:ring-blue-500'
+                                            }`}
+                                        />
+                                        {errors.eventData?.EventCode && (
+                                            <p className="text-red-500 text-sm mt-1">{errors.eventData.EventCode}</p>
+                                        )}
+                                    </div>
 
-                            <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Event Name *
-                                </label>
-                                <input
-                                    type="text"
-                                    name="EventName"
-                                    value={eventData.EventName}
-                                    onChange={handleEventChange}
-                                    placeholder="e.g., Annual Compliance Audit"
-                                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
-                                        errors.eventData?.EventName
-                                            ? 'border-red-500 focus:ring-red-500'
-                                            : 'border-gray-300 focus:ring-blue-500'
-                                    }`}
-                                />
-                                {errors.eventData?.EventName && (
-                                    <p className="text-red-500 text-sm mt-1">{errors.eventData.EventName}</p>
-                                )}
-                            </div>
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                            Event Name *
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="EventName"
+                                            value={eventData.EventName}
+                                            onChange={handleEventChange}
+                                            placeholder="e.g., Annual Compliance Audit"
+                                            className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                                                errors.eventData?.EventName
+                                                    ? 'border-red-500 focus:ring-red-500'
+                                                    : 'border-gray-300 focus:ring-blue-500'
+                                            }`}
+                                        />
+                                        {errors.eventData?.EventName && (
+                                            <p className="text-red-500 text-sm mt-1">{errors.eventData.EventName}</p>
+                                        )}
+                                    </div>
 
-                            <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Description (Optional)
-                                </label>
-                                <textarea
-                                    name="Description"
-                                    value={eventData.Description}
-                                    onChange={handleEventChange}
-                                    placeholder="Add event details..."
-                                    rows={3}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                            </div>
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                            Description (Optional)
+                                        </label>
+                                        <textarea
+                                            name="Description"
+                                            value={eventData.Description}
+                                            onChange={handleEventChange}
+                                            placeholder="Add event details..."
+                                            rows={3}
+                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <h3 className="text-xl font-bold text-gray-800">Step 1: Event Selected</h3>
+                                    <p className="text-gray-600">Review your selected event:</p>
+                                    
+                                    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                                        <p className="text-sm text-gray-600 mb-2">
+                                            <strong>Event Name:</strong> {eventData.EventName || 'N/A'}
+                                        </p>
+                                        <p className="text-sm text-gray-600 mb-2">
+                                            <strong>Event Code:</strong> {eventData.EventCode || 'N/A'}
+                                        </p>
+                                        {eventData.Description && (
+                                            <p className="text-sm text-gray-600">
+                                                <strong>Description:</strong> {eventData.Description}
+                                            </p>
+                                        )}
+                                    </div>
+                                    
+                                    <p className="text-sm text-gray-500">Click "Next" to continue with this event.</p>
+                                </>
+                            )}
                         </div>
                     )}
 
@@ -775,10 +824,10 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                         <div className="space-y-6">
                             <div>
                                 <h3 className="text-xl font-bold text-gray-800 mb-2">Step 2: Choose Area</h3>
-                                <p className="text-gray-600">Would you like to create a new area or select an existing one?</p>
+                                <p className="text-gray-600">Would you like to create a new area, select an existing one, or skip this step?</p>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-3 gap-4">
                                 {/* Create New Area Option */}
                                 <div
                                     onClick={() => setAreaMode('create')}
@@ -811,6 +860,30 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                         <div>
                                             <h4 className="font-semibold text-gray-800">Select Existing Area</h4>
                                             <p className="text-sm text-gray-600">Add to an existing area</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* No Area Option */}
+                                <div
+                                    onClick={() => {
+                                        setAreaMode('skip');
+                                        // Clear area data when skipping
+                                        setAreaData({ AreaCode: '', AreaName: '', Description: '' });
+                                        setCreatedIds(prev => ({ ...prev, areaId: null }));
+                                        setCriteriaData(prev => ({ ...prev, AreaID: '' }));
+                                    }}
+                                    className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                                        areaMode === 'skip'
+                                            ? 'border-blue-500 bg-blue-50'
+                                            : 'border-gray-300 bg-gray-50 hover:border-blue-300'
+                                    }`}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <X size={24} className={areaMode === 'skip' ? 'text-blue-500' : 'text-gray-400'} />
+                                        <div>
+                                            <h4 className="font-semibold text-gray-800">No Area</h4>
+                                            <p className="text-sm text-gray-600">Skip this step</p>
                                         </div>
                                     </div>
                                 </div>
@@ -1001,7 +1074,8 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                 <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
                                     <p className="text-sm text-gray-600">Select an existing criteria:</p>
                                     
-                                    {availableCriteria.filter(c => !criteriaData.AreaID || String(c.AreaID) === String(criteriaData.AreaID)).length > 0 ? (
+                                    {criteriaData.AreaID ? (
+                                        availableCriteria.filter(c => String(c.AreaID) === String(criteriaData.AreaID)).length > 0 ? (
                                         <select
                                             value={criteriaData.CriteriaCode || ''}
                                             onChange={(e) => {
@@ -1021,15 +1095,18 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                         >
                                             <option value="">-- Select a criteria --</option>
                                             {availableCriteria
-                                                .filter(c => !criteriaData.AreaID || String(c.AreaID) === String(criteriaData.AreaID))
+                                                .filter(c => String(c.AreaID) === String(criteriaData.AreaID))
                                                 .map((crit) => (
                                                     <option key={crit.CriteriaID} value={crit.CriteriaCode}>
                                                         {crit.CriteriaCode} - {crit.CriteriaName}
                                                     </option>
                                                 ))}
                                             </select>
+                                        ) : (
+                                            <p className="text-gray-600 text-sm">No criteria available for selected area.</p>
+                                        )
                                     ) : (
-                                        <p className="text-gray-600 text-sm">No criteria available for selected area.</p>
+                                        <p className="text-gray-600 text-sm">Please select an area first to view available criteria.</p>
                                     )}
                                 </div>
                             )}
@@ -1085,29 +1162,29 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                         <label className="block text-sm font-semibold text-gray-700 mb-2">
                                             Parent Criteria (Optional)
                                         </label>
-                                        <select
-                                            name="ParentCriteriaID"
-                                            value={criteriaData.ParentCriteriaID}
-                                            onChange={handleCriteriaChange}
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        >
-                                            <option value="">None (Top-level criteria)</option>
-                                            {parentCriteria
-                                                .filter(c => 
-                                                    c.CriteriaCode !== criteriaData.CriteriaCode &&
-                                                    (!criteriaData.AreaID || String(c.AreaID) === String(criteriaData.AreaID))
-                                                )
-                                                .map(c => (
-                                                    <option key={c.CriteriaID} value={c.CriteriaID}>
-                                                        {c.CriteriaCode} - {c.CriteriaName}
-                                                    </option>
-                                                ))}
+                                        {criteriaData.AreaID ? (
+                                            <select
+                                                name="ParentCriteriaID"
+                                                value={criteriaData.ParentCriteriaID}
+                                                onChange={handleCriteriaChange}
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            >
+                                                <option value="">None (Top-level criteria)</option>
+                                                {parentCriteria
+                                                    .filter(c => 
+                                                        String(c.AreaID) === String(criteriaData.AreaID)
+                                                    )
+                                                    .map(c => (
+                                                        <option key={c.CriteriaID} value={c.CriteriaID}>
+                                                            {c.CriteriaCode} - {c.CriteriaName}
+                                                        </option>
+                                                    ))}
                                             </select>
-                                            {parentCriteria.length > 0 && (
-                                                <p className="text-green-600 text-xs mt-1">
-                                                    ✓ {parentCriteria.length} existing criteria available
-                                                </p>
-                                            )}
+                                        ) : (
+                                            <p className="text-gray-600 text-sm p-2 bg-gray-50 rounded border border-gray-200">
+                                                Please select an area first to choose a parent criteria
+                                            </p>
+                                        )}
                                     </div>
 
                                     <div>
@@ -1328,16 +1405,6 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                     </button>
 
                     <div className="flex gap-3">
-                        {currentStep > 1 && currentStep < 5 && (
-                            <button
-                                onClick={handleSkipStep}
-                                className="px-4 py-2 bg-gray-400 hover:bg-gray-500 text-white font-semibold rounded-lg transition"
-                                disabled={isSubmitting}
-                            >
-                                Skip
-                            </button>
-                        )}
-                        
                         {currentStep < 5 ? (
                             <button
                                 onClick={handleNext}

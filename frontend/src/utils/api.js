@@ -110,6 +110,12 @@ export const usersAPI = {
 
     return response.data;
   },
+  updateApprovalStatus: async (userId, approvalStatus) => {
+    const response = await api.put(`/api/user/${userId}/approval-status`, {
+      approval_status: approvalStatus
+    });
+    return response.data;
+  },
 };
 
 

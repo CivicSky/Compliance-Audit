@@ -11,6 +11,7 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
     const [editingCommentId, setEditingCommentId] = useState(null);
     const [commentInput, setCommentInput] = useState("");
     const [savingComment, setSavingComment] = useState(false);
+    const [searchTerm, setSearchTerm] = useState("");
     // File upload state for proof document
     const [proofFile, setProofFile] = useState(null);
     const [uploadingProof, setUploadingProof] = useState(false);
@@ -319,8 +320,23 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                     </div>
 
                     {/* Requirements List */}
-                    <div className="flex-1 overflow-y-auto px-6 py-4">
-                        <h3 className="text-lg font-semibold text-gray-800 mb-4 text-center">Requirements</h3>
+                    <div className="flex-1 overflow-y-auto px-6 py-3">
+                        <div className="flex items-center justify-between mb-3 gap-2">
+                            <h3 className="text-base font-semibold text-gray-800">Requirements</h3>
+                            {/* Search Bar - Compact */}
+                            <div className="relative max-w-xs">
+                                <input
+                                    type="text"
+                                    placeholder="Search..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-xs"
+                                />
+                                <svg className="absolute right-2 top-1.5 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                            </div>
+                        </div>
                         
                         {loading ? (
                             <div className="flex items-center justify-center py-12">
@@ -360,7 +376,46 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                                         return areaGroups;
                                     }, {});
 
-                                    return Object.entries(groupedByArea).map(([areaKey, area]) => (
+                                    // Filter requirements based on search term
+                                    const filteredGroupedByArea = Object.entries(groupedByArea).reduce((acc, [areaKey, area]) => {
+                                        const filteredCriteriaGroups = Object.entries(area.criteriaGroups).reduce((criteriaAcc, [criteriaKey, criteria]) => {
+                                            const filteredReqs = criteria.requirements.filter(req => {
+                                                const searchLower = searchTerm.toLowerCase();
+                                                return (
+                                                    req.RequirementCode.toLowerCase().includes(searchLower) ||
+                                                    req.Description.toLowerCase().includes(searchLower) ||
+                                                    req.AreaCode.toLowerCase().includes(searchLower) ||
+                                                    req.AreaName.toLowerCase().includes(searchLower) ||
+                                                    req.CriteriaCode.toLowerCase().includes(searchLower) ||
+                                                    req.CriteriaName.toLowerCase().includes(searchLower) ||
+                                                    (req.comments && req.comments.toLowerCase().includes(searchLower))
+                                                );
+                                            });
+                                            if (filteredReqs.length > 0) {
+                                                criteriaAcc[criteriaKey] = { ...criteria, requirements: filteredReqs };
+                                            }
+                                            return criteriaAcc;
+                                        }, {});
+
+                                        if (Object.keys(filteredCriteriaGroups).length > 0) {
+                                            acc[areaKey] = { ...area, criteriaGroups: filteredCriteriaGroups };
+                                        }
+                                        return acc;
+                                    }, {});
+
+                                    // Show no results message if search found nothing
+                                    if (searchTerm && Object.keys(filteredGroupedByArea).length === 0) {
+                                        return (
+                                            <div className="text-center py-8">
+                                                <svg className="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                                </svg>
+                                                <p className="text-gray-500 font-medium">No requirements match "{searchTerm}"</p>
+                                            </div>
+                                        );
+                                    }
+
+                                    return Object.entries(filteredGroupedByArea).map(([areaKey, area]) => (
                                         <div key={areaKey} className="mb-8">
                                             {/* Area Header */}
                                             <div className="bg-gradient-to-r from-purple-600 to-purple-700 text-white px-5 py-4 rounded-lg shadow-lg mb-4">

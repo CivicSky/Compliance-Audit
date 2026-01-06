@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import logo from "../../assets/images/lccb_logo.png"
 import search from "../../assets/images/search.svg"
 
-export default function Header({ pageTitle = "Compliance Audit", showSearch = true, onAddClick, onSearchChange, searchValue = '', onSortChange, sortValue = 'name', onFilterChange, filterOptions = { events: [], types: [] }, onDeleteModeToggle, deleteMode = false, selectedCount = 0, onDeleteSelected, hideSortButton = false, showRequirementsFilter = false }) {
+export default function Header({ pageTitle = "Compliance Audit", showSearch = true, onAddClick, onSearchChange, searchValue = '', onSortChange, sortValue = 'name', onFilterChange, filterOptions = { events: [], types: [], approvalStatus: [] }, onDeleteModeToggle, deleteMode = false, selectedCount = 0, onDeleteSelected, hideSortButton = false, showRequirementsFilter = false, showApprovalFilter = false }) {
     const [showSortDropdown, setShowSortDropdown] = useState(false);
     const [showDeleteDropdown, setShowDeleteDropdown] = useState(false);
     const [showFilterDropdown, setShowFilterDropdown] = useState(false);
@@ -54,6 +54,12 @@ export default function Header({ pageTitle = "Compliance Audit", showSearch = tr
             } else {
                 newFilters.types.push(value);
             }
+        } else if (filterType === 'approvalStatus') {
+            if (newFilters.approvalStatus.includes(value)) {
+                newFilters.approvalStatus = newFilters.approvalStatus.filter(s => s !== value);
+            } else {
+                newFilters.approvalStatus.push(value);
+            }
         }
         
         onFilterChange(newFilters);
@@ -61,7 +67,7 @@ export default function Header({ pageTitle = "Compliance Audit", showSearch = tr
 
     const clearAllFilters = () => {
         if (onFilterChange) {
-            onFilterChange({ events: [], types: [] });
+            onFilterChange({ events: [], types: [], approvalStatus: [] });
         }
     };
 
@@ -239,6 +245,71 @@ export default function Header({ pageTitle = "Compliance Audit", showSearch = tr
                                                                 className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                                                             />
                                                             <span className="ml-2 text-sm text-gray-700">{type.label}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Filter Button for Approval Status */}
+                            {showApprovalFilter && (
+                                <div className="relative" ref={filterDropdownRef}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                                        className={`flex items-center justify-center lg:w-10 lg:h-10 w-8 h-8 rounded-md shadow-md border border-gray-200 ${
+                                            filterOptions.approvalStatus && filterOptions.approvalStatus.length > 0
+                                                ? 'bg-blue-500 text-white hover:bg-blue-600'
+                                                : 'bg-white text-gray-700 hover:bg-gray-50'
+                                        }`}
+                                        title="Filter by Approval Status"
+                                    >
+                                        <svg className="lg:w-5 lg:h-5 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                                        </svg>
+                                        {filterOptions.approvalStatus && filterOptions.approvalStatus.length > 0 && (
+                                            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                                                {filterOptions.approvalStatus.length}
+                                            </span>
+                                        )}
+                                    </button>
+                                    {/* Filter Dropdown */}
+                                    {showFilterDropdown && (
+                                        <div className="absolute right-0 mt-2 w-72 bg-white rounded-md shadow-lg border border-gray-200 z-50 max-h-96 overflow-y-auto">
+                                            <div className="p-3 border-b border-gray-200 flex items-center justify-between">
+                                                <h3 className="font-semibold text-gray-800">Filter by Status</h3>
+                                                {filterOptions.approvalStatus && filterOptions.approvalStatus.length > 0 && (
+                                                    <button
+                                                        onClick={clearAllFilters}
+                                                        className="text-xs text-blue-600 hover:text-blue-700"
+                                                    >
+                                                        Clear All
+                                                    </button>
+                                                )}
+                                            </div>
+                                            {/* By Approval Status */}
+                                            <div className="p-3">
+                                                <h4 className="text-sm font-medium text-gray-700 mb-2">Approval Status</h4>
+                                                <div className="space-y-2">
+                                                    {[
+                                                        { value: 'approved', label: 'Approved', color: 'bg-green-100 text-green-800' },
+                                                        { value: 'pending', label: 'Pending', color: 'bg-yellow-100 text-yellow-800' },
+                                                        { value: 'denied', label: 'Denied', color: 'bg-red-100 text-red-800' }
+                                                    ].map((status) => (
+                                                        <label key={status.value} className="flex items-center cursor-pointer hover:bg-gray-50 p-1 rounded">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={filterOptions.approvalStatus && filterOptions.approvalStatus.includes(status.value)}
+                                                                onChange={() => handleFilterToggle('approvalStatus', status.value)}
+                                                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                                            />
+                                                            <span className="ml-2 text-sm text-gray-700 capitalize">{status.label}</span>
+                                                            <span className={`ml-auto text-xs px-2 py-1 rounded ${status.color}`}>
+                                                                {status.label}
+                                                            </span>
                                                         </label>
                                                     ))}
                                                 </div>

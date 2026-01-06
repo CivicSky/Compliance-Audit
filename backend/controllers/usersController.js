@@ -24,7 +24,7 @@ exports.loginUser = async (req, res) => {
 
     // Find user
     const [users] = await db.query(
-      "SELECT UserID, FirstName, MiddleInitial, LastName, Email, RoleID, ProfilePic FROM users WHERE Email = ? AND PasswordHash = ?",
+      "SELECT UserID, FirstName, MiddleInitial, LastName, Email, RoleID, ProfilePic, approval_status FROM users WHERE Email = ? AND PasswordHash = ?",
       [email, hashedPassword]
     );
 
@@ -37,7 +37,24 @@ exports.loginUser = async (req, res) => {
 
     const user = users[0];
 
-    // 🔥 Create JWT
+    // � Check approval status
+    if (user.approval_status === 'pending') {
+      return res.status(403).json({
+        success: false,
+        message: "Your account is pending approval. Please wait for admin approval.",
+        approvalStatus: 'pending'
+      });
+    }
+
+    if (user.approval_status === 'denied') {
+      return res.status(403).json({
+        success: false,
+        message: "Your account has been denied. Please contact the administrator.",
+        approvalStatus: 'denied'
+      });
+    }
+
+    // �🔥 Create JWT
     const token = jwt.sign(
       { userId: user.UserID },
       "MY_SECRET_KEY", // ✔ change to env later
@@ -126,7 +143,7 @@ exports.registerUser = async (req, res) => {
 exports.getUsers = async (req, res) => {
   try {
     const [users] = await db.query(
-      "SELECT u.UserID, u.FirstName, u.MiddleInitial, u.LastName, u.Email, u.RoleID, u.ProfilePic, r.RoleName FROM users u LEFT JOIN roles r ON u.RoleID = r.RoleID"
+      "SELECT u.UserID, u.FirstName, u.MiddleInitial, u.LastName, u.Email, u.RoleID, u.ProfilePic, u.approval_status, r.RoleName FROM users u LEFT JOIN roles r ON u.RoleID = r.RoleID"
     );
 
     const usersWithFullName = users.map((user) => ({
@@ -165,7 +182,7 @@ exports.getCurrentUser = async (req, res) => {
     }
 
     const [users] = await db.query(
-      "SELECT u.UserID, u.FirstName, u.MiddleInitial, u.LastName, u.Email, u.RoleID, u.ProfilePic, r.RoleName FROM users u LEFT JOIN roles r ON u.RoleID = r.RoleID WHERE u.Email = ?",
+      "SELECT u.UserID, u.FirstName, u.MiddleInitial, u.LastName, u.Email, u.RoleID, u.ProfilePic, u.approval_status, r.RoleName FROM users u LEFT JOIN roles r ON u.RoleID = r.RoleID WHERE u.Email = ?",
       [email]
     );
 
@@ -206,7 +223,7 @@ exports.getLoggedInUser = async (req, res) => {
     const userId = req.user.userId; // from decoded token
 
     const [rows] = await db.query(
-      "SELECT UserID, FirstName, MiddleInitial, LastName, Email, RoleID, ProfilePic FROM users WHERE UserID = ?",
+      "SELECT UserID, FirstName, MiddleInitial, LastName, Email, RoleID, ProfilePic, approval_status FROM users WHERE UserID = ?",
       [userId]
     );
 
@@ -251,7 +268,7 @@ exports.updateUser = async (req, res) => {
     }
 
     const [rows] = await db.query(
-      "SELECT UserID, FirstName, MiddleInitial, LastName, Email, RoleID, ProfilePic FROM users WHERE UserID = ?",
+      "SELECT UserID, FirstName, MiddleInitial, LastName, Email, RoleID, ProfilePic, approval_status FROM users WHERE UserID = ?",
       [userId]
     );
 
@@ -259,6 +276,47 @@ exports.updateUser = async (req, res) => {
   } catch (error) {
     console.error("Update user error:", error);
     res.status(500).json({ success: false, message: "Error updating user" });
+  }
+};
+
+// ===============================
+// UPDATE USER APPROVAL STATUS
+// ===============================
+exports.updateApprovalStatus = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { approval_status } = req.body;
+
+    // Validate approval_status
+    if (!['approved', 'pending', 'denied'].includes(approval_status)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Invalid approval status. Must be 'approved', 'pending', or 'denied'" 
+      });
+    }
+
+    const [result] = await db.query(
+      "UPDATE users SET approval_status = ? WHERE UserID = ?",
+      [approval_status, userId]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    const [rows] = await db.query(
+      "SELECT UserID, FirstName, MiddleInitial, LastName, Email, RoleID, ProfilePic, approval_status FROM users WHERE UserID = ?",
+      [userId]
+    );
+
+    res.json({ 
+      success: true, 
+      message: `User approval status updated to ${approval_status}`,
+      user: rows[0] 
+    });
+  } catch (error) {
+    console.error("Update approval status error:", error);
+    res.status(500).json({ success: false, message: "Error updating approval status" });
   }
 };
 
