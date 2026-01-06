@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronRight, ChevronLeft, X, Check } from 'lucide-react';
+import { ChevronRight, ChevronLeft, X, Check, Plus, Wand2 } from 'lucide-react';
 
 export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
     const [currentStep, setCurrentStep] = useState(0); // 0 = event selection, 1-5 = wizard steps
@@ -8,6 +8,12 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
     const [successMessage, setSuccessMessage] = useState('');
     const [eventMode, setEventMode] = useState(null); // 'create' or 'select'
     const [availableEvents, setAvailableEvents] = useState([]);
+    const [areaMode, setAreaMode] = useState(null); // 'create' or 'select'
+    const [availableAreas, setAvailableAreas] = useState([]);
+    const [criteriaMode, setCriteriaMode] = useState(null); // 'create' or 'select'
+    const [availableCriteria, setAvailableCriteria] = useState([]);
+    const [requirementMode, setRequirementMode] = useState(null); // 'create', 'select', or null
+    const [availableRequirements, setAvailableRequirements] = useState([]);
     
     // Event data
     const [eventData, setEventData] = useState({
@@ -25,6 +31,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
     
     // Criteria data
     const [criteriaData, setCriteriaData] = useState({
+        AreaID: '',
         CriteriaCode: '',
         CriteriaName: '',
         Description: '',
@@ -41,6 +48,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
     // Supporting data
     const [criteriaList, setCriteriaList] = useState([]);
     const [parentCriteria, setParentCriteria] = useState([]);
+    const [areasList, setAreasList] = useState([]);
     const [parentRequirements, setParentRequirements] = useState([]);
     
     // Errors
@@ -59,15 +67,22 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
         if (isOpen) {
             setCurrentStep(0);
             setEventMode(null);
+            setAreaMode(null);
+            setCriteriaMode(null);
+            setRequirementMode(null);
             setEventData({ EventCode: '', EventName: '', Description: '' });
             setAreaData({ AreaCode: '', AreaName: '', Description: '' });
-            setCriteriaData({ CriteriaCode: '', CriteriaName: '', Description: '', ParentCriteriaID: '' });
+            setCriteriaData({ AreaID: '', CriteriaCode: '', CriteriaName: '', Description: '', ParentCriteriaID: '' });
             setRequirementData({ RequirementCode: '', Description: '', ParentRequirementCode: '' });
             setErrors({});
             setSuccessMessage('');
             setCreatedIds({ eventId: null, areaId: null, criteriaId: null, requirementId: null });
             setCriteriaList([]);
             setParentCriteria([]);
+            setAvailableCriteria([]);
+            setAreasList([]);
+            setAvailableAreas([]);
+            setAvailableRequirements([]);
             setParentRequirements([]);
             setAvailableEvents([]);
             fetchEvents();
@@ -87,24 +102,111 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
         }
     };
 
-    // Fetch criteria list when step 3 opens
-    useEffect(() => {
-        if (currentStep === 3 && createdIds.eventId) {
-            fetchCriteriaForEvent();
+    // Fetch areas for the selected event (for display in Step 2 selection)
+    const fetchAvailableAreas = async (eventId) => {
+        try {
+            const response = await fetch(`http://localhost:5000/api/areas/event/${eventId}`);
+            const data = await response.json();
+            if (data.success) {
+                setAvailableAreas(data.data || []);
+            } else {
+                setAvailableAreas([]);
+            }
+        } catch (error) {
+            console.error('Error fetching areas:', error);
+            setAvailableAreas([]);
         }
-    }, [currentStep]);
+    };
 
-    const fetchCriteriaForEvent = async () => {
+    // Fetch areas for the selected event (for criteria step)
+    const fetchAreasByEvent = async (eventId) => {
+        try {
+            const response = await fetch(`http://localhost:5000/api/areas/event/${eventId}`);
+            const data = await response.json();
+            if (data.success) {
+                setAreasList(data.data || []);
+            } else {
+                setAreasList([]);
+            }
+        } catch (error) {
+            console.error('Error fetching areas:', error);
+            setAreasList([]);
+        }
+    };
+
+    // Fetch criteria for the selected event
+    const fetchCriteriaForEvent = async (eventId) => {
         try {
             const { requirementsAPI } = await import('../../utils/api');
-            const response = await requirementsAPI.getCriteriaByEvent(createdIds.eventId);
+            const response = await requirementsAPI.getCriteriaByEvent(eventId);
             if (response.success) {
                 setParentCriteria(response.data || []);
+            } else {
+                setParentCriteria([]);
             }
         } catch (error) {
             console.error('Error fetching criteria:', error);
+            setParentCriteria([]);
         }
     };
+
+    // Fetch available criteria for the selected event (for Step 3 selection)
+    const fetchAvailableCriteria = async (eventId) => {
+        try {
+            const { requirementsAPI } = await import('../../utils/api');
+            const response = await requirementsAPI.getCriteriaByEvent(eventId);
+            if (response.success) {
+                setAvailableCriteria(response.data || []);
+            } else {
+                setAvailableCriteria([]);
+            }
+        } catch (error) {
+            console.error('Error fetching criteria:', error);
+            setAvailableCriteria([]);
+        }
+    };
+
+    // Fetch requirements for the selected event (for Step 4 selection)
+    const fetchAvailableRequirements = async (eventId) => {
+        try {
+            const { requirementsAPI } = await import('../../utils/api');
+            const response = await requirementsAPI.getRequirementsByEvent(eventId);
+            if (response.success) {
+                setAvailableRequirements(response.data || []);
+            } else {
+                setAvailableRequirements([]);
+            }
+        } catch (error) {
+            console.error('Error fetching requirements:', error);
+            setAvailableRequirements([]);
+        }
+    };
+
+    // Fetch available areas when step 2 opens and reset areaMode
+    useEffect(() => {
+        if (currentStep === 2 && createdIds.eventId) {
+            setAreaMode(null);
+            fetchAvailableAreas(createdIds.eventId);
+        }
+    }, [currentStep, createdIds.eventId]);
+
+    // Fetch available criteria when step 3 opens and reset criteriaMode
+    useEffect(() => {
+        if (currentStep === 3 && createdIds.eventId) {
+            setCriteriaMode(null);
+            fetchAvailableCriteria(createdIds.eventId);
+            fetchAreasByEvent(createdIds.eventId);
+            fetchCriteriaForEvent(createdIds.eventId);
+        }
+    }, [currentStep]);
+
+    // Fetch available requirements when step 4 opens and reset requirementMode
+    useEffect(() => {
+        if (currentStep === 4 && createdIds.eventId) {
+            setRequirementMode(null);
+            fetchAvailableRequirements(createdIds.eventId);
+        }
+    }, [currentStep, createdIds.eventId]);
 
     const handleEventChange = (e) => {
         const { name, value } = e.target;
@@ -225,7 +327,10 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
             });
 
             if (response.success) {
-                setCreatedIds(prev => ({ ...prev, areaId: response.data.id || response.data.AreaID }));
+                const areaId = response.data.id || response.data.AreaID;
+                setCreatedIds(prev => ({ ...prev, areaId: areaId }));
+                // Auto-select this area in criteria step
+                setCriteriaData(prev => ({ ...prev, AreaID: areaId }));
                 setSuccessMessage(`✓ Area "${areaData.AreaName}" created successfully!`);
                 setTimeout(() => {
                     setSuccessMessage('');
@@ -250,7 +355,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
             const { requirementsAPI } = await import('../../utils/api');
             const response = await requirementsAPI.addCriteria({
                 EventID: createdIds.eventId,
-                AreaID: createdIds.areaId || null,
+                AreaID: criteriaData.AreaID || null,
                 CriteriaCode: criteriaData.CriteriaCode,
                 CriteriaName: criteriaData.CriteriaName,
                 Description: criteriaData.Description || null,
@@ -320,11 +425,43 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                 setCurrentStep(2);
             }
         } else if (currentStep === 2) {
-            handleAddArea();
+            // Area selection step
+            if (areaMode === 'create') {
+                handleAddArea();
+            } else if (areaMode === 'select') {
+                if (!createdIds.areaId) {
+                    alert('Please select an area');
+                    return;
+                }
+                setCurrentStep(3);
+            }
         } else if (currentStep === 3) {
-            handleAddCriteria();
+            // Criteria mode selection step
+            if (criteriaMode === 'create') {
+                handleAddCriteria();
+            } else if (criteriaMode === 'select') {
+                if (!criteriaData.CriteriaCode) {
+                    alert('Please select a criteria');
+                    return;
+                }
+                setCreatedIds(prev => ({ ...prev, criteriaId: criteriaData.CriteriaID }));
+                setCurrentStep(4);
+            }
         } else if (currentStep === 4) {
-            handleAddRequirement();
+            // Requirement mode selection step
+            if (requirementMode === 'create') {
+                handleAddRequirement();
+            } else if (requirementMode === 'select') {
+                if (!requirementData.ParentRequirementCode) {
+                    alert('Please select a parent requirement');
+                    return;
+                }
+                if (!requirementData.RequirementCode.trim()) {
+                    alert('Please enter a requirement code');
+                    return;
+                }
+                handleAddRequirement();
+            }
         }
     };
 
@@ -404,8 +541,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                 </div>
 
                 {/* Step Labels */}
-                <div className="bg-gray-50 px-6 py-3 grid grid-cols-6 gap-2 text-xs text-center font-semibold text-gray-700">
-                    <div>Select</div>
+                <div className="bg-gray-50 px-6 py-3 grid grid-cols-5 gap-2 text-xs text-center font-semibold text-gray-700">
                     <div>Event</div>
                     <div>Area</div>
                     <div>Criteria</div>
@@ -478,22 +614,23 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                         <select
                                             value={eventData.EventId || ''}
                                             onChange={(e) => {
-                                                const selected = availableEvents.find(ev => ev.EventId === parseInt(e.target.value));
+                                                const selected = availableEvents.find(ev => ev.EventID === parseInt(e.target.value));
                                                 if (selected) {
                                                     setEventData({
                                                         ...eventData,
-                                                        EventId: selected.EventId,
+                                                        EventId: selected.EventID,
                                                         EventName: selected.EventName,
                                                         EventCode: selected.EventCode,
                                                         Description: selected.Description || ''
                                                     });
+                                                    setCreatedIds(prev => ({ ...prev, eventId: selected.EventID }));
                                                 }
                                             }}
                                             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         >
                                             <option value="">-- Select an event --</option>
                                             {availableEvents.map((event) => (
-                                                <option key={event.EventId} value={event.EventId}>
+                                                <option key={event.EventID} value={event.EventID}>
                                                     {event.EventName} ({event.EventCode})
                                                 </option>
                                             ))}
@@ -635,191 +772,525 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
 
                     {/* Step 2: Area */}
                     {currentStep === 2 && (
-                        <div className="space-y-4">
-                            <h3 className="text-xl font-bold text-gray-800">Step 2: Create Area</h3>
-                            <p className="text-gray-600">Add an area within the event "{eventData.EventName}".</p>
-                            
+                        <div className="space-y-6">
                             <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Area Code *
-                                </label>
-                                <input
-                                    type="text"
-                                    name="AreaCode"
-                                    value={areaData.AreaCode}
-                                    onChange={handleAreaChange}
-                                    placeholder="e.g., AREA-001"
-                                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
-                                        errors.areaData?.AreaCode
-                                            ? 'border-red-500 focus:ring-red-500'
-                                            : 'border-gray-300 focus:ring-blue-500'
-                                    }`}
-                                />
-                                {errors.areaData?.AreaCode && (
-                                    <p className="text-red-500 text-sm mt-1">{errors.areaData.AreaCode}</p>
-                                )}
+                                <h3 className="text-xl font-bold text-gray-800 mb-2">Step 2: Choose Area</h3>
+                                <p className="text-gray-600">Would you like to create a new area or select an existing one?</p>
                             </div>
 
-                            <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Area Name *
-                                </label>
-                                <input
-                                    type="text"
-                                    name="AreaName"
-                                    value={areaData.AreaName}
-                                    onChange={handleAreaChange}
-                                    placeholder="e.g., Financial Controls"
-                                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
-                                        errors.areaData?.AreaName
-                                            ? 'border-red-500 focus:ring-red-500'
-                                            : 'border-gray-300 focus:ring-blue-500'
+                            <div className="grid grid-cols-2 gap-4">
+                                {/* Create New Area Option */}
+                                <div
+                                    onClick={() => setAreaMode('create')}
+                                    className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                                        areaMode === 'create'
+                                            ? 'border-blue-500 bg-blue-50'
+                                            : 'border-gray-300 bg-gray-50 hover:border-blue-300'
                                     }`}
-                                />
-                                {errors.areaData?.AreaName && (
-                                    <p className="text-red-500 text-sm mt-1">{errors.areaData.AreaName}</p>
-                                )}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <Plus size={24} className={areaMode === 'create' ? 'text-blue-500' : 'text-gray-400'} />
+                                        <div>
+                                            <h4 className="font-semibold text-gray-800">Create New Area</h4>
+                                            <p className="text-sm text-gray-600">Start fresh with a new area</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Select Existing Area Option */}
+                                <div
+                                    onClick={() => setAreaMode('select')}
+                                    className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                                        areaMode === 'select'
+                                            ? 'border-blue-500 bg-blue-50'
+                                            : 'border-gray-300 bg-gray-50 hover:border-blue-300'
+                                    }`}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <Wand2 size={24} className={areaMode === 'select' ? 'text-blue-500' : 'text-gray-400'} />
+                                        <div>
+                                            <h4 className="font-semibold text-gray-800">Select Existing Area</h4>
+                                            <p className="text-sm text-gray-600">Add to an existing area</p>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
-                            <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Description (Optional)
-                                </label>
-                                <textarea
-                                    name="Description"
-                                    value={areaData.Description}
-                                    onChange={handleAreaChange}
-                                    placeholder="Add area details..."
-                                    rows={3}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                            </div>
+                            {/* Area Selection Form */}
+                            {areaMode === 'select' && (
+                                <div className="space-y-4">
+                                    <label className="block text-sm font-semibold text-gray-700">
+                                        Select Area *
+                                    </label>
+                                    {availableAreas.length > 0 ? (
+                                        <select
+                                            value={areaData.AreaCode || ''}
+                                            onChange={(e) => {
+                                                const selected = availableAreas.find(ar => ar.AreaCode === e.target.value);
+                                                if (selected) {
+                                                    setAreaData({
+                                                        ...areaData,
+                                                        AreaCode: selected.AreaCode,
+                                                        AreaName: selected.AreaName,
+                                                        Description: selected.Description || ''
+                                                    });
+                                                    setCreatedIds(prev => ({ ...prev, areaId: selected.AreaID }));
+                                                    // Auto-select this area in criteria step
+                                                    setCriteriaData(prev => ({ ...prev, AreaID: selected.AreaID }));
+                                                }
+                                            }}
+                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        >
+                                            <option value="">-- Select an area --</option>
+                                            {availableAreas.map((area) => (
+                                                <option key={area.AreaID} value={area.AreaCode}>
+                                                    {area.AreaName} ({area.AreaCode})
+                                                </option>
+                                            ))}
+                                        </select>
+                                    ) : (
+                                        <p className="text-gray-600 text-sm">No areas available. Please create a new area first.</p>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Create New Area Form */}
+                            {areaMode === 'create' && (
+                                <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
+                                    <p className="text-sm text-gray-600">Enter details for your new area:</p>
+                                    
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                            Area Code *
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="AreaCode"
+                                            value={areaData.AreaCode}
+                                            onChange={handleAreaChange}
+                                            placeholder="e.g., AREA-001"
+                                            className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                                                errors.areaData?.AreaCode
+                                                    ? 'border-red-500 focus:ring-red-500'
+                                                    : 'border-gray-300 focus:ring-blue-500'
+                                            }`}
+                                        />
+                                        {errors.areaData?.AreaCode && (
+                                            <p className="text-red-500 text-sm mt-1">{errors.areaData.AreaCode}</p>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                            Area Name *
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="AreaName"
+                                            value={areaData.AreaName}
+                                            onChange={handleAreaChange}
+                                            placeholder="e.g., Financial Controls"
+                                            className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                                                errors.areaData?.AreaName
+                                                    ? 'border-red-500 focus:ring-red-500'
+                                                    : 'border-gray-300 focus:ring-blue-500'
+                                            }`}
+                                        />
+                                        {errors.areaData?.AreaName && (
+                                            <p className="text-red-500 text-sm mt-1">{errors.areaData.AreaName}</p>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                            Description (Optional)
+                                        </label>
+                                        <textarea
+                                            name="Description"
+                                            value={areaData.Description}
+                                            onChange={handleAreaChange}
+                                            placeholder="Add area details..."
+                                            rows={3}
+                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
                     {/* Step 3: Criteria */}
                     {currentStep === 3 && (
-                        <div className="space-y-4">
-                            <h3 className="text-xl font-bold text-gray-800">Step 3: Create Criteria</h3>
-                            <p className="text-gray-600">Add criteria for the area "{areaData.AreaName}".</p>
-                            
+                        <div className="space-y-6">
                             <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Criteria Code *
-                                </label>
-                                <input
-                                    type="text"
-                                    name="CriteriaCode"
-                                    value={criteriaData.CriteriaCode}
-                                    onChange={handleCriteriaChange}
-                                    placeholder="e.g., CRIT-001"
-                                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
-                                        errors.criteriaData?.CriteriaCode
-                                            ? 'border-red-500 focus:ring-red-500'
-                                            : 'border-gray-300 focus:ring-blue-500'
-                                    }`}
-                                />
-                                {errors.criteriaData?.CriteriaCode && (
-                                    <p className="text-red-500 text-sm mt-1">{errors.criteriaData.CriteriaCode}</p>
-                                )}
+                                <h3 className="text-xl font-bold text-gray-800 mb-2">Step 3: Choose Criteria</h3>
+                                <p className="text-gray-600">Would you like to create a new criteria or select an existing one?</p>
                             </div>
 
-                            <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Criteria Name *
-                                </label>
-                                <input
-                                    type="text"
-                                    name="CriteriaName"
-                                    value={criteriaData.CriteriaName}
-                                    onChange={handleCriteriaChange}
-                                    placeholder="e.g., Payment Controls"
-                                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
-                                        errors.criteriaData?.CriteriaName
-                                            ? 'border-red-500 focus:ring-red-500'
-                                            : 'border-gray-300 focus:ring-blue-500'
+                            <div className="grid grid-cols-2 gap-4">
+                                {/* Create New Criteria Option */}
+                                <div
+                                    onClick={() => setCriteriaMode('create')}
+                                    className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                                        criteriaMode === 'create'
+                                            ? 'border-blue-500 bg-blue-50'
+                                            : 'border-gray-300 bg-gray-50 hover:border-blue-300'
                                     }`}
-                                />
-                                {errors.criteriaData?.CriteriaName && (
-                                    <p className="text-red-500 text-sm mt-1">{errors.criteriaData.CriteriaName}</p>
-                                )}
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Parent Criteria (Optional)
-                                </label>
-                                <select
-                                    name="ParentCriteriaID"
-                                    value={criteriaData.ParentCriteriaID}
-                                    onChange={handleCriteriaChange}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 >
-                                    <option value="">None</option>
-                                    {parentCriteria.map(c => (
-                                        <option key={c.CriteriaID} value={c.CriteriaID}>
-                                            {c.CriteriaName}
-                                        </option>
-                                    ))}
-                                </select>
+                                    <div className="flex items-center gap-3">
+                                        <Plus size={24} className={criteriaMode === 'create' ? 'text-blue-500' : 'text-gray-400'} />
+                                        <div>
+                                            <h4 className="font-semibold text-gray-800">Create New</h4>
+                                            <p className="text-sm text-gray-600">Add a new criteria</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Select Existing Criteria Option */}
+                                <div
+                                    onClick={() => setCriteriaMode('select')}
+                                    className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                                        criteriaMode === 'select'
+                                            ? 'border-blue-500 bg-blue-50'
+                                            : 'border-gray-300 bg-gray-50 hover:border-blue-300'
+                                    }`}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <Wand2 size={24} className={criteriaMode === 'select' ? 'text-blue-500' : 'text-gray-400'} />
+                                        <div>
+                                            <h4 className="font-semibold text-gray-800">Select Existing</h4>
+                                            <p className="text-sm text-gray-600">Choose from available</p>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
-                            <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Description (Optional)
-                                </label>
-                                <textarea
-                                    name="Description"
-                                    value={criteriaData.Description}
-                                    onChange={handleCriteriaChange}
-                                    placeholder="Add criteria details..."
-                                    rows={3}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                            </div>
+                            {/* Area Display (Auto-selected from Step 2) */}
+                            {criteriaData.AreaID && (
+                                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                    <p className="text-sm text-gray-600">
+                                        <span className="font-semibold">Selected Area:</span> {areasList.find(a => a.AreaID == criteriaData.AreaID)?.AreaName || 'Area'} ({areasList.find(a => a.AreaID == criteriaData.AreaID)?.AreaCode || ''})
+                                    </p>
+                                </div>
+                            )}
+                            
+                            {/* Optional Area Selection for Change */}
+                            {!criteriaData.AreaID && (
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                        Area (Optional)
+                                    </label>
+                                    <select
+                                        name="AreaID"
+                                        value={criteriaData.AreaID}
+                                        onChange={handleCriteriaChange}
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    >
+                                        <option value="">-- Select an area (optional) --</option>
+                                        {areasList.map(area => (
+                                            <option key={area.AreaID} value={area.AreaID}>
+                                                {area.AreaCode} - {area.AreaName}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+
+                            {/* Select Existing Criteria */}
+                            {criteriaMode === 'select' && (
+                                <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
+                                    <p className="text-sm text-gray-600">Select an existing criteria:</p>
+                                    
+                                    {availableCriteria.filter(c => !criteriaData.AreaID || String(c.AreaID) === String(criteriaData.AreaID)).length > 0 ? (
+                                        <select
+                                            value={criteriaData.CriteriaCode || ''}
+                                            onChange={(e) => {
+                                                const selected = availableCriteria.find(c => c.CriteriaCode === e.target.value);
+                                                if (selected) {
+                                                    setCriteriaData({
+                                                        AreaID: criteriaData.AreaID,
+                                                        CriteriaID: selected.CriteriaID,
+                                                        CriteriaCode: selected.CriteriaCode,
+                                                        CriteriaName: selected.CriteriaName,
+                                                        Description: selected.Description || '',
+                                                        ParentCriteriaID: selected.ParentCriteriaID || ''
+                                                    });
+                                                }
+                                            }}
+                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        >
+                                            <option value="">-- Select a criteria --</option>
+                                            {availableCriteria
+                                                .filter(c => !criteriaData.AreaID || String(c.AreaID) === String(criteriaData.AreaID))
+                                                .map((crit) => (
+                                                    <option key={crit.CriteriaID} value={crit.CriteriaCode}>
+                                                        {crit.CriteriaCode} - {crit.CriteriaName}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                    ) : (
+                                        <p className="text-gray-600 text-sm">No criteria available for selected area.</p>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Create New Criteria Form */}
+                            {criteriaMode === 'create' && (
+                                <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
+                                    <p className="text-sm text-gray-600">Enter details for your new criteria:</p>
+                                    
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                            Criteria Code *
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="CriteriaCode"
+                                            value={criteriaData.CriteriaCode}
+                                            onChange={handleCriteriaChange}
+                                            placeholder="e.g., CRIT-001"
+                                            className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                                                errors.criteriaData?.CriteriaCode
+                                                    ? 'border-red-500 focus:ring-red-500'
+                                                    : 'border-gray-300 focus:ring-blue-500'
+                                            }`}
+                                        />
+                                        {errors.criteriaData?.CriteriaCode && (
+                                            <p className="text-red-500 text-sm mt-1">{errors.criteriaData.CriteriaCode}</p>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                            Criteria Name *
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="CriteriaName"
+                                            value={criteriaData.CriteriaName}
+                                            onChange={handleCriteriaChange}
+                                            placeholder="e.g., Payment Controls"
+                                            className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                                                errors.criteriaData?.CriteriaName
+                                                    ? 'border-red-500 focus:ring-red-500'
+                                                    : 'border-gray-300 focus:ring-blue-500'
+                                            }`}
+                                        />
+                                        {errors.criteriaData?.CriteriaName && (
+                                            <p className="text-red-500 text-sm mt-1">{errors.criteriaData.CriteriaName}</p>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                            Parent Criteria (Optional)
+                                        </label>
+                                        <select
+                                            name="ParentCriteriaID"
+                                            value={criteriaData.ParentCriteriaID}
+                                            onChange={handleCriteriaChange}
+                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        >
+                                            <option value="">None (Top-level criteria)</option>
+                                            {parentCriteria
+                                                .filter(c => 
+                                                    c.CriteriaCode !== criteriaData.CriteriaCode &&
+                                                    (!criteriaData.AreaID || String(c.AreaID) === String(criteriaData.AreaID))
+                                                )
+                                                .map(c => (
+                                                    <option key={c.CriteriaID} value={c.CriteriaID}>
+                                                        {c.CriteriaCode} - {c.CriteriaName}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            {parentCriteria.length > 0 && (
+                                                <p className="text-green-600 text-xs mt-1">
+                                                    ✓ {parentCriteria.length} existing criteria available
+                                                </p>
+                                            )}
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                            Description (Optional)
+                                        </label>
+                                        <textarea
+                                            name="Description"
+                                            value={criteriaData.Description}
+                                            onChange={handleCriteriaChange}
+                                            placeholder="Add criteria details..."
+                                            rows={3}
+                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
                     {/* Step 4: Requirement */}
                     {currentStep === 4 && (
-                        <div className="space-y-4">
-                            <h3 className="text-xl font-bold text-gray-800">Step 4: Create Requirement</h3>
-                            <p className="text-gray-600">Add a requirement for the criteria "{criteriaData.CriteriaName}".</p>
-                            
+                        <div className="space-y-6">
                             <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Requirement Code *
-                                </label>
-                                <input
-                                    type="text"
-                                    name="RequirementCode"
-                                    value={requirementData.RequirementCode}
-                                    onChange={handleRequirementChange}
-                                    placeholder="e.g., REQ-001"
-                                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
-                                        errors.requirementData?.RequirementCode
-                                            ? 'border-red-500 focus:ring-red-500'
-                                            : 'border-gray-300 focus:ring-blue-500'
-                                    }`}
-                                />
-                                {errors.requirementData?.RequirementCode && (
-                                    <p className="text-red-500 text-sm mt-1">{errors.requirementData.RequirementCode}</p>
-                                )}
+                                <h3 className="text-xl font-bold text-gray-800 mb-2">Step 4: Choose Requirement</h3>
+                                <p className="text-gray-600">Would you like to create a new standalone requirement or link it to an existing parent requirement?</p>
                             </div>
 
-                            <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Description (Optional)
-                                </label>
-                                <textarea
-                                    name="Description"
-                                    value={requirementData.Description}
-                                    onChange={handleRequirementChange}
-                                    placeholder="Add requirement details..."
-                                    rows={4}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
+                            <div className="grid grid-cols-2 gap-4">
+                                {/* Create New Requirement Option */}
+                                <div
+                                    onClick={() => setRequirementMode('create')}
+                                    className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                                        requirementMode === 'create'
+                                            ? 'border-blue-500 bg-blue-50'
+                                            : 'border-gray-300 bg-gray-50 hover:border-blue-300'
+                                    }`}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <Plus size={24} className={requirementMode === 'create' ? 'text-blue-500' : 'text-gray-400'} />
+                                        <div>
+                                            <h4 className="font-semibold text-gray-800">Create New</h4>
+                                            <p className="text-sm text-gray-600">Standalone requirement</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Select Existing Requirement as Parent */}
+                                <div
+                                    onClick={() => setRequirementMode('select')}
+                                    className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                                        requirementMode === 'select'
+                                            ? 'border-blue-500 bg-blue-50'
+                                            : 'border-gray-300 bg-gray-50 hover:border-blue-300'
+                                    }`}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <Wand2 size={24} className={requirementMode === 'select' ? 'text-blue-500' : 'text-gray-400'} />
+                                        <div>
+                                            <h4 className="font-semibold text-gray-800">Link to Parent</h4>
+                                            <p className="text-sm text-gray-600">Child requirement</p>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
+
+                            {/* Select Parent Requirement & Enter Details */}
+                            {requirementMode === 'select' && (
+                                <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
+                                    <p className="text-sm text-gray-600">Select a parent requirement and enter details for the child:</p>
+                                    
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                            Parent Requirement *
+                                        </label>
+                                        {(() => {
+                                            // Filter requirements to only show those from the same criteria
+                                            const criteriaRequirements = availableRequirements.filter(
+                                                req => req.CriteriaID === criteriaData.CriteriaID
+                                            );
+                                            
+                                            return criteriaRequirements.length > 0 ? (
+                                                <select
+                                                    value={requirementData.ParentRequirementCode || ''}
+                                                    onChange={(e) => {
+                                                        setRequirementData({
+                                                            ...requirementData,
+                                                            ParentRequirementCode: e.target.value
+                                                        });
+                                                    }}
+                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                >
+                                                    <option value="">-- Select a requirement --</option>
+                                                    {criteriaRequirements.map((req) => (
+                                                        <option key={req.RequirementID} value={req.RequirementCode}>
+                                                            {req.RequirementCode}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            ) : (
+                                                <p className="text-gray-600 text-sm">No requirements available in this criteria.</p>
+                                            );
+                                        })()}
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                            Requirement Code *
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="RequirementCode"
+                                            value={requirementData.RequirementCode}
+                                            onChange={handleRequirementChange}
+                                            placeholder="e.g., REQ-001"
+                                            className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                                                errors.requirementData?.RequirementCode
+                                                    ? 'border-red-500 focus:ring-red-500'
+                                                    : 'border-gray-300 focus:ring-blue-500'
+                                            }`}
+                                        />
+                                        {errors.requirementData?.RequirementCode && (
+                                            <p className="text-red-500 text-sm mt-1">{errors.requirementData.RequirementCode}</p>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                            Description (Optional)
+                                        </label>
+                                        <textarea
+                                            name="Description"
+                                            value={requirementData.Description}
+                                            onChange={handleRequirementChange}
+                                            placeholder="Add requirement details..."
+                                            rows={3}
+                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Create New Requirement Form */}
+                            {requirementMode === 'create' && (
+                                <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
+                                    <p className="text-sm text-gray-600">Enter details for your new requirement:</p>
+                                    
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                            Requirement Code *
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="RequirementCode"
+                                            value={requirementData.RequirementCode}
+                                            onChange={handleRequirementChange}
+                                            placeholder="e.g., REQ-001"
+                                            className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                                                errors.requirementData?.RequirementCode
+                                                    ? 'border-red-500 focus:ring-red-500'
+                                                    : 'border-gray-300 focus:ring-blue-500'
+                                            }`}
+                                        />
+                                        {errors.requirementData?.RequirementCode && (
+                                            <p className="text-red-500 text-sm mt-1">{errors.requirementData.RequirementCode}</p>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                            Description (Optional)
+                                        </label>
+                                        <textarea
+                                            name="Description"
+                                            value={requirementData.Description}
+                                            onChange={handleRequirementChange}
+                                            placeholder="Add requirement details..."
+                                            rows={3}
+                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
