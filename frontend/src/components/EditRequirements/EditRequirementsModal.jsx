@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
-const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave }) => {
+const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, userRole = 'user' }) => {
   const [formData, setFormData] = useState({
     EventID: '',
     RequirementCode: '',
@@ -15,6 +15,7 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave }) =
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const isAdmin = userRole === 'admin' || userRole === 1;
 
   // Populate form when requirement data is loaded
   useEffect(() => {
@@ -179,7 +180,7 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave }) =
       <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 min-h-[70vh] max-h-[95vh] flex flex-col">
         {/* Header - Sticky */}
         <div className="flex items-center justify-between p-6 border-b sticky top-0 bg-white z-10 rounded-t-lg">
-          <h2 className="text-xl font-semibold text-gray-800">Edit Requirement</h2>
+          <h2 className="text-xl font-semibold text-gray-800">{isAdmin ? 'Edit Requirement' : 'View Requirement'}</h2>
           <button
             onClick={onClose}
             disabled={isSubmitting}
@@ -207,7 +208,7 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave }) =
                 className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                   errors.EventID ? 'border-red-500' : 'border-gray-300'
                 }`}
-                disabled={isSubmitting}
+                disabled={isSubmitting || !isAdmin}
               >
                 <option value="">Select an event</option>
                 {eventsList.map((event) => (
@@ -234,7 +235,7 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave }) =
                 className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                   errors.CriteriaID ? 'border-red-500' : 'border-gray-300'
                 }`}
-                disabled={isSubmitting || isLoading || !formData.EventID}
+                disabled={isSubmitting || isLoading || !formData.EventID || !isAdmin}
               >
                 <option value="">
                   {!formData.EventID ? 'Select an event first' : 'Select a criteria'}
@@ -264,7 +265,7 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave }) =
                 value={formData.ParentRequirementCode}
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                disabled={isSubmitting || !formData.CriteriaID}
+                disabled={isSubmitting || !formData.CriteriaID || !isAdmin}
               >
                 <option value="">
                   {!formData.CriteriaID ? 'Select a criteria first' : 'None (Top-level requirement)'}
@@ -306,7 +307,7 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave }) =
                   errors.RequirementCode ? 'border-red-500' : 'border-gray-300'
                 }`}
                 placeholder="e.g., A.1 or just enter a number"
-                disabled={isSubmitting}
+                disabled={isSubmitting || !isAdmin}
               />
               {errors.RequirementCode && (
                 <p className="text-red-500 text-sm mt-1">{errors.RequirementCode}</p>
@@ -333,7 +334,7 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave }) =
                   errors.Description ? 'border-red-500' : 'border-gray-300'
                 }`}
                 placeholder="Enter a detailed description of this requirement"
-                disabled={isSubmitting}
+                disabled={isSubmitting || !isAdmin}
               />
               {errors.Description && (
                 <p className="text-red-500 text-sm mt-1">{errors.Description}</p>
@@ -341,29 +342,42 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave }) =
             </div>
           </div>
 
-          {/* Form Actions - Sticky Bottom */}
-          <div className="flex justify-end space-x-3 p-6 pt-4 border-t bg-white sticky bottom-0">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={isSubmitting}
-              className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors disabled:opacity-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting || !formData.EventID || !formData.CriteriaID}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {isSubmitting && (
-                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"></circle>
-                  <path fill="currentColor" className="opacity-75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-              )}
-              {isSubmitting ? 'Saving...' : 'Save Changes'}
-            </button>
+          {/* Form Actions */}
+          <div className="flex justify-end space-x-3 p-6 pt-4 border-t">
+            {isAdmin && (
+              <>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  disabled={isSubmitting}
+                  className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {isSubmitting && (
+                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"></circle>
+                      <path fill="currentColor" className="opacity-75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  )}
+                  {isSubmitting ? 'Saving...' : 'Save Changes'}
+                </button>
+              </>
+            )}
+            {!isAdmin && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
+              >
+                Close
+              </button>
+            )}
           </div>
         </form>
       </div>

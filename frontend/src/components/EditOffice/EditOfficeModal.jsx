@@ -2,12 +2,13 @@
 import React, { useState, useEffect } from "react";
 import { officeHeadsAPI } from "../../utils/api";
 
-export default function EditOfficeModal({ visible, onClose, office, onSave, officeTypes }) {
+export default function EditOfficeModal({ visible, onClose, office, onSave, officeTypes, userRole = 'user' }) {
     const [officeName, setOfficeName] = useState("");
     const [officeTypeID, setOfficeTypeID] = useState("");
     const [headID, setHeadID] = useState("");
     const [heads, setHeads] = useState([]);
     const [loadingHeads, setLoadingHeads] = useState(false);
+    const isAdmin = userRole === 'admin' || userRole === 1;
 
     useEffect(() => {
         if (!office) return;
@@ -61,7 +62,7 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
             <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
-                <h2 className="text-lg font-bold mb-4">Edit Office</h2>
+                <h2 className="text-lg font-bold mb-4">{isAdmin ? 'Edit Office' : 'View Office'}</h2>
                 <form onSubmit={handleSubmit} className="space-y-3">
                     <div>
                         <label className="block text-sm font-semibold">Office Name</label>
@@ -70,6 +71,7 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
                             value={officeName}
                             onChange={(e) => setOfficeName(e.target.value)}
                             className="w-full border rounded px-2 py-1"
+                            disabled={!isAdmin}
                             required
                         />
                     </div>
@@ -80,6 +82,7 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
                             value={officeTypeID}
                             onChange={(e) => setOfficeTypeID(e.target.value)}
                             className="w-full border rounded px-2 py-1"
+                            disabled={!isAdmin}
                             required
                         >
                             <option value="">Select Type</option>
@@ -97,6 +100,7 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
                             value={headID}
                             onChange={(e) => setHeadID(e.target.value)}
                             className="w-full border rounded px-2 py-1"
+                            disabled={!isAdmin}
                             required
                         >
                             <option value="">Select Head</option>
@@ -115,19 +119,32 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
                     </div>
 
                     <div className="flex justify-end gap-2 mt-3">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="px-4 py-2 border rounded hover:bg-gray-100"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                        >
-                            Save
-                        </button>
+                        {isAdmin && (
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={onClose}
+                                    className="px-4 py-2 border rounded hover:bg-gray-100"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                                >
+                                    Save
+                                </button>
+                            </>
+                        )}
+                        {!isAdmin && (
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                className="px-4 py-2 border rounded hover:bg-gray-100"
+                            >
+                                Close
+                            </button>
+                        )}
                     </div>
                 </form>
             </div>

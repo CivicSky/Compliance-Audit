@@ -6,6 +6,7 @@ import AddEventModal from "../AddEvent/AddEventModal";
 import EditEventModal from "../EditEvents/EditeventsModal";
 import UnifiedSetupWizard from "../UnifiedSetupWizard/UnifiedSetupWizard";
 import { Wand2 } from "lucide-react";
+import { usersAPI } from "../../utils/api";
 
 export default function Events() {
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -16,7 +17,24 @@ export default function Events() {
     const [deleteMode, setDeleteMode] = useState(false);
     const [selectedCount, setSelectedCount] = useState(0);
     const [selectedIds, setSelectedIds] = useState([]);
+    const [currentUser, setCurrentUser] = useState(null);
     const eventsPRef = useRef();
+
+    // Default to admin (show features) until we confirm otherwise
+    const isAdmin = !currentUser || currentUser.RoleName === 'admin';
+
+    // Fetch current user on mount
+    useEffect(() => {
+        const fetchCurrentUser = async () => {
+            try {
+                const response = await usersAPI.getLoggedInUser();
+                if (response.success) setCurrentUser(response.user);
+            } catch (error) {
+                console.error('Error fetching current user:', error);
+            }
+        };
+        fetchCurrentUser();
+    }, []);
 
     // Reset all states when component unmounts or navigation happens
     useEffect(() => {
@@ -139,14 +157,17 @@ export default function Events() {
                     selectedCount={selectedCount}
                     onDeleteSelected={handleDeleteSelected}
                     hideSortButton={true}
+                    userRole={currentUser?.RoleID}
                 />
-                <button 
-                    onClick={() => setShowWizard(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition text-sm"
-                    title="Quick setup with wizard"
-                >
-                    <Wand2 size={18} /> Wizard
-                </button>
+                {isAdmin && (
+                    <button 
+                        onClick={() => setShowWizard(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition text-sm"
+                        title="Quick setup with wizard"
+                    >
+                        <Wand2 size={18} /> Wizard
+                    </button>
+                )}
             </div>
 
             <UnifiedSetupWizard 
@@ -184,6 +205,7 @@ export default function Events() {
                     }}
                     event={selectedEvent}
                     onSave={handleEditSave}
+                    userRole={currentUser?.RoleID}
                 />
             )}
         </div>

@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
 
-const EditAreaModal = ({ visible, onClose, area = {}, onSave }) => {
+const EditAreaModal = ({ visible, onClose, area = {}, onSave, userRole = 'user' }) => {
   const [areaCode, setAreaCode] = useState('');
   const [areaName, setAreaName] = useState('');
   const [description, setDescription] = useState('');
   // Removed sortOrder and isActive
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isAdmin = userRole === 'admin' || userRole === 1;
 
   useEffect(() => {
     if (area) {
@@ -39,7 +40,7 @@ const EditAreaModal = ({ visible, onClose, area = {}, onSave }) => {
       <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 min-h-[40vh] max-h-[95vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-xl font-semibold text-gray-800">Edit Area</h2>
+          <h2 className="text-xl font-semibold text-gray-800">{isAdmin ? 'Edit Area' : 'View Area'}</h2>
           <button
             onClick={onClose}
             disabled={isSubmitting}
@@ -67,7 +68,7 @@ const EditAreaModal = ({ visible, onClose, area = {}, onSave }) => {
                 onChange={e => setAreaCode(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="e.g., AREA1"
-                disabled={isSubmitting}
+                disabled={isSubmitting || !isAdmin}
                 required
               />
             </div>
@@ -84,7 +85,7 @@ const EditAreaModal = ({ visible, onClose, area = {}, onSave }) => {
                 onChange={e => setAreaName(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="e.g., Vision, Mission, Goals & Objectives"
-                disabled={isSubmitting}
+                disabled={isSubmitting || !isAdmin}
                 required
               />
             </div>
@@ -102,32 +103,45 @@ const EditAreaModal = ({ visible, onClose, area = {}, onSave }) => {
               rows={3}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
               placeholder="Enter area description (optional)"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !isAdmin}
             />
           </div>
           {/* Form Actions */}
           <div className="flex justify-end space-x-3 pt-4 border-t">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={isSubmitting}
-              className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors disabled:opacity-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {isSubmitting && (
-                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"></circle>
-                  <path fill="currentColor" className="opacity-75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-              )}
-              {isSubmitting ? 'Saving...' : 'Save Changes'}
-            </button>
+            {isAdmin && (
+              <>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  disabled={isSubmitting}
+                  className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {isSubmitting && (
+                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"></circle>
+                      <path fill="currentColor" className="opacity-75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  )}
+                  {isSubmitting ? 'Saving...' : 'Save Changes'}
+                </button>
+              </>
+            )}
+            {!isAdmin && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
+              >
+                Close
+              </button>
+            )}
           </div>
         </form>
       </div>

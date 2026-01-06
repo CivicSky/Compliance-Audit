@@ -86,19 +86,21 @@ export default function Navbar() {
                     </div>
 
                     {/* Sections */}
-                    <div className="space-y-2">
-                        <div className="flex items-center gap-2 px-3 py-1">
-                            <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Analyze</span>
+                    {currentUser && currentUser.RoleID === 1 && (
+                        <div className="space-y-2">
+                            <div className="flex items-center gap-2 px-3 py-1">
+                                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Analyze</span>
+                            </div>
+                            <NavLink to="/home" className={navLinkClass}>
+                                <span className="w-4 text-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9.75L12 4l9 5.75V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1V9.75z" />
+                                    </svg>
+                                </span>
+                                <span className="text-sm font-medium">Dashboard</span>
+                            </NavLink>
                         </div>
-                        <NavLink to="/home" className={navLinkClass}>
-                            <span className="w-4 text-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9.75L12 4l9 5.75V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1V9.75z" />
-                                </svg>
-                            </span>
-                            <span className="text-sm font-medium">Dashboard</span>
-                        </NavLink>
-                    </div>
+                    )}
 
                 {/* Management Section */}
                 <div className="space-y-2">
@@ -219,17 +221,23 @@ export default function Navbar() {
                         <div className="flex items-center gap-2 px-3 py-1">
                             <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Users</span>
                         </div>
-                        <NavLink to="/home/officehead" className={navLinkClass}>Office Heads</NavLink>
-                        <NavLink to="/home/users" className={navLinkClass}>Users</NavLink>
+                        {currentUser && currentUser.RoleID === 1 && (
+                            <NavLink to="/home/officehead" className={navLinkClass}>Office Heads</NavLink>
+                        )}
+                        {currentUser && currentUser.RoleID === 1 && (
+                            <NavLink to="/home/users" className={navLinkClass}>Users</NavLink>
+                        )}
                     </div>
 
                     {/* Logs */}
-                    <div className="space-y-2">
-                        <div className="flex items-center gap-2 px-3 py-1">
-                            <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Logs</span>
+                    {currentUser && currentUser.RoleID === 1 && (
+                        <div className="space-y-2">
+                            <div className="flex items-center gap-2 px-3 py-1">
+                                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Logs</span>
+                            </div>
+                            <NavLink to="/home/audit-logs" className={navLinkClass}>Audit Logs</NavLink>
                         </div>
-                        <NavLink to="/home/audit-logs" className={navLinkClass}>Audit Logs</NavLink>
-                    </div>
+                    )}
                 </div>
 
                 {/* Profile Menu */}

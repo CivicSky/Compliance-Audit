@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import Header from "../Header/header";
-import { officesAPI, officeHeadsAPI, officetypesAPI, eventsAPI, criteriaAPI } from "../../utils/api";
+import { officesAPI, officeHeadsAPI, officetypesAPI, eventsAPI, criteriaAPI, usersAPI } from "../../utils/api";
 import CriteriaP from "../../components/CriteriaP/CriteriaP";
 import AddCriteriaModal from "../../components/AddCriteriaModal/AddCriteriaModal";
 import EditOfficeModal from "../../components/EditOffice/EditOfficeModal";
@@ -23,6 +23,7 @@ export default function Organization() {
     const [editCriteria, setEditCriteria] = useState(null);
     const [isViewReqModalOpen, setIsViewReqModalOpen] = useState(false);
     const [isAddReqModalOpen, setIsAddReqModalOpen] = useState(false);
+    const [currentUser, setCurrentUser] = useState(null);
 
     const [selectedOffice, setSelectedOffice] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
@@ -34,6 +35,22 @@ export default function Organization() {
     const [selectedEventId, setSelectedEventId] = useState(null);
 
     const criteriaPRef = useRef();
+
+    // Default to admin (show features) until we confirm otherwise
+    const isAdmin = !currentUser || currentUser.RoleName === 'admin';
+
+    // Fetch current user on mount
+    useEffect(() => {
+        const fetchCurrentUser = async () => {
+            try {
+                const response = await usersAPI.getLoggedInUser();
+                if (response.success) setCurrentUser(response.user);
+            } catch (error) {
+                console.error('Error fetching current user:', error);
+            }
+        };
+        fetchCurrentUser();
+    }, []);
 
     // Fetch office types safely
     useEffect(() => {
@@ -195,14 +212,17 @@ export default function Organization() {
                     selectedCount={selectedCount}
                     onDeleteSelected={handleDeleteSelected}
                     hideSortButton={true}
+                    userRole={currentUser?.RoleID}
                 />
-                <button 
-                    onClick={() => setShowWizard(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition text-sm"
-                    title="Quick setup with wizard"
-                >
-                    <Wand2 size={18} /> Wizard
-                </button>
+                {isAdmin && (
+                    <button 
+                        onClick={() => setShowWizard(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition text-sm"
+                        title="Quick setup with wizard"
+                    >
+                        <Wand2 size={18} /> Wizard
+                    </button>
+                )}
             </div>
 
             <UnifiedSetupWizard 
@@ -278,6 +298,7 @@ export default function Organization() {
                         setIsEditCriteriaModalOpen(false);
                         if (criteriaPRef.current?.refresh) criteriaPRef.current.refresh();
                     }}
+                    userRole={currentUser?.RoleID}
                 />
             )}
 

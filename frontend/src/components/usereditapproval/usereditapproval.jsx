@@ -3,6 +3,7 @@ import { usersAPI } from "../../utils/api";
 
 export default function UserEditApproval({ selectedUser, onClose, onSuccess }) {
     const [newApprovalStatus, setNewApprovalStatus] = useState(selectedUser?.approval_status || 'pending');
+    const [newRoleID, setNewRoleID] = useState(selectedUser?.RoleID || 2);
     const [updating, setUpdating] = useState(false);
 
     const handleApprovalStatusUpdate = async () => {
@@ -10,20 +11,41 @@ export default function UserEditApproval({ selectedUser, onClose, onSuccess }) {
         
         try {
             setUpdating(true);
-            const response = await usersAPI.updateApprovalStatus(selectedUser.UserID, newApprovalStatus);
             
-            if (response.success) {
-                alert(`User approval status updated to ${newApprovalStatus}`);
+            // Update approval status
+            const approvalResponse = await usersAPI.updateApprovalStatus(selectedUser.UserID, newApprovalStatus);
+            
+            // Update role if it changed
+            let roleUpdated = false;
+            if (newRoleID !== selectedUser.RoleID) {
+                const roleResponse = await usersAPI.updateUserRole(selectedUser.UserID, newRoleID);
+                roleUpdated = roleResponse.success;
+            }
+            
+            if (approvalResponse.success) {
+                const statusChanged = newApprovalStatus !== selectedUser.approval_status;
+                const roleChanged = newRoleID !== selectedUser.RoleID;
+                
+                let message = 'User updated successfully';
+                if (statusChanged && roleChanged) {
+                    message = `User approval status updated to ${newApprovalStatus} and role changed to ${newRoleID === 1 ? 'Admin' : 'User'}`;
+                } else if (statusChanged) {
+                    message = `User approval status updated to ${newApprovalStatus}`;
+                } else if (roleChanged) {
+                    message = `User role changed to ${newRoleID === 1 ? 'Admin' : 'User'}`;
+                }
+                
+                alert(message);
                 onClose();
                 if (onSuccess) {
                     onSuccess();
                 }
             } else {
-                alert(response.message || 'Failed to update approval status');
+                alert(approvalResponse.message || 'Failed to update user');
             }
         } catch (error) {
-            console.error('Error updating approval status:', error);
-            alert('Error updating approval status');
+            console.error('Error updating user:', error);
+            alert('Error updating user');
         } finally {
             setUpdating(false);
         }
@@ -43,6 +65,18 @@ export default function UserEditApproval({ selectedUser, onClose, onSuccess }) {
                     <p className="text-gray-600 mb-4">
                         <strong>Email:</strong> {selectedUser.Email}
                     </p>
+
+                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                        User Role
+                    </label>
+                    <select 
+                        value={newRoleID}
+                        onChange={(e) => setNewRoleID(parseInt(e.target.value))}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+                    >
+                        <option value={2}>User</option>
+                        <option value={1}>Admin</option>
+                    </select>
 
                     <label className="block text-sm font-medium text-gray-700 mb-3">
                         Approval Status
@@ -69,7 +103,7 @@ export default function UserEditApproval({ selectedUser, onClose, onSuccess }) {
                     <button
                         onClick={handleApprovalStatusUpdate}
                         className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium disabled:bg-blue-400"
-                        disabled={updating || newApprovalStatus === selectedUser.approval_status}
+                        disabled={updating || (newApprovalStatus === selectedUser.approval_status && newRoleID === selectedUser.RoleID)}
                     >
                         {updating ? 'Updating...' : 'Update'}
                     </button>

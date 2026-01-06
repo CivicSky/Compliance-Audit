@@ -17,18 +17,47 @@ export default function Register() {
     });
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+    const [passwordError, setPasswordError] = useState("");
 
     const handleChange = (e) => {
+        const { name, value } = e.target;
         setFormData({
             ...formData,
-            [e.target.name]: e.target.value
+            [name]: value
         });
+
+        // Validate password on change
+        if (name === 'password') {
+            validatePassword(value);
+        }
+    };
+
+    const validatePassword = (password) => {
+        const numberCount = (password.match(/\d/g) || []).length;
+        
+        if (password.length < 8) {
+            setPasswordError("Password must be at least 8 characters long");
+            return false;
+        } else if (numberCount < 3) {
+            setPasswordError("Password must contain at least 3 numbers");
+            return false;
+        } else {
+            setPasswordError("");
+            return true;
+        }
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
         setError("");
+
+        // Validate password before submitting
+        if (!validatePassword(formData.password)) {
+            setLoading(false);
+            setError("Please fix the password errors before submitting");
+            return;
+        }
 
         try {
             console.log('Submitting registration with data:', {
@@ -52,7 +81,7 @@ export default function Register() {
             console.log('Registration response:', response.data);
 
             if (response.data.success) {
-                alert('Registration successful! Redirecting to login...');
+                alert('Registration successful! Your account is pending approval. Please wait for the administrator to approve your account before you can login.');
                 // Redirect to login page on success (login component is mounted at '/')
                 navigate("/");
             } else {
@@ -201,33 +230,31 @@ export default function Register() {
                                 required
                                 value={formData.password}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 text-sm ${
+                                    passwordError 
+                                        ? 'border-red-300 focus:ring-red-500' 
+                                        : 'border-gray-300 focus:ring-blue-500 focus:border-transparent'
+                                }`}
                                 placeholder="Create a password"
                             />
-                        </div>
-
-                        <div>
-                            <label htmlFor="roleId" className="block text-sm font-medium text-gray-700 mb-1">
-                                Account Type *
-                            </label>
-                            <select
-                                id="roleId"
-                                name="roleId"
-                                value={formData.roleId}
-                                onChange={handleChange}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                                required
-                            >
-                                <option value="2">User</option>
-                                <option value="1">Admin</option>
-                            </select>
+                            <div className="mt-1 text-xs space-y-1">
+                                <p className={`${formData.password.length >= 8 ? 'text-green-600' : 'text-gray-500'}`}>
+                                    • At least 8 characters
+                                </p>
+                                <p className={`${(formData.password.match(/\d/g) || []).length >= 3 ? 'text-green-600' : 'text-gray-500'}`}>
+                                    • At least 3 numbers
+                                </p>
+                            </div>
+                            {passwordError && (
+                                <p className="mt-1 text-xs text-red-600">{passwordError}</p>
+                            )}
                         </div>
 
                         <button
                             type="submit"
-                            disabled={loading}
+                            disabled={loading || passwordError}
                             className={`w-full py-2 px-4 rounded-md font-medium transition-colors text-sm ${
-                                loading 
+                                loading || passwordError
                                     ? "bg-blue-300 cursor-not-allowed text-white" 
                                     : "bg-blue-600 hover:bg-blue-700 text-white"
                             }`}

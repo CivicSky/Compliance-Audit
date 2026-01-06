@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import Header from "../Header/header";
-import { officesAPI, officeHeadsAPI, officetypesAPI, eventsAPI } from "../../utils/api";
+import { officesAPI, officeHeadsAPI, officetypesAPI, eventsAPI, usersAPI } from "../../utils/api";
 import OfficesP from "../../components/OfficesP/OfficesP";
 import AddOfficeModal from "../../components/AddOffice/AddOfficeModal";
 import EditOfficeModal from "../../components/EditOffice/EditOfficeModal";
@@ -25,6 +25,7 @@ export default function Organization() {
     const [selectedIds, setSelectedIds] = useState([]);
     const [selectedEventType, setSelectedEventType] = useState(''); // will hold EventID
     const [events, setEvents] = useState([]);
+    const [currentUser, setCurrentUser] = useState(null);
 
     const officesPRef = useRef();
 
@@ -54,6 +55,19 @@ export default function Organization() {
         }
         fetchOfficeTypes();
         fetchEvents();
+    }, []);
+
+    // Fetch current user on mount
+    useEffect(() => {
+        const fetchCurrentUser = async () => {
+            try {
+                const response = await usersAPI.getLoggedInUser();
+                if (response.success) setCurrentUser(response.user);
+            } catch (error) {
+                console.error('Error fetching current user:', error);
+            }
+        };
+        fetchCurrentUser();
     }, []);
 
     // Fetch office heads safely
@@ -188,6 +202,7 @@ export default function Organization() {
                 selectedCount={selectedCount}
                 onDeleteSelected={handleDeleteSelected}  // Pass handleDeleteSelected to Header
                 hideSortButton={true}
+                userRole={currentUser?.RoleID}
             />
 
 
@@ -277,6 +292,7 @@ export default function Organization() {
                             onSave={handleEditSave}
                             officeTypes={officeTypes}
                             heads={heads}
+                            userRole={currentUser?.RoleID}
                         />
                     );
                 })()

@@ -116,6 +116,12 @@ export const usersAPI = {
     });
     return response.data;
   },
+  updateUserRole: async (userId, roleId) => {
+    const response = await api.put(`/api/user/${userId}/role`, {
+      roleId: roleId
+    });
+    return response.data;
+  },
 };
 
 

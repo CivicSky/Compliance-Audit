@@ -320,3 +320,46 @@ exports.updateApprovalStatus = async (req, res) => {
   }
 };
 
+// ===============================
+// UPDATE USER ROLE
+// ===============================
+exports.updateUserRole = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { roleId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ success: false, message: "User ID is required" });
+    }
+
+    if (!roleId || ![1, 2].includes(parseInt(roleId))) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Invalid role ID. Must be 1 (Admin) or 2 (User)" 
+      });
+    }
+
+    const [result] = await db.query(
+      "UPDATE users SET RoleID = ? WHERE UserID = ?",
+      [roleId, userId]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    const [rows] = await db.query(
+      "SELECT UserID, FirstName, MiddleInitial, LastName, Email, RoleID, ProfilePic, approval_status FROM users WHERE UserID = ?",
+      [userId]
+    );
+
+    res.json({ 
+      success: true, 
+      message: `User role updated to ${roleId === 1 ? 'Admin' : 'User'}`,
+      user: rows[0] 
+    });
+  } catch (error) {
+    console.error("Update user role error:", error);
+    res.status(500).json({ success: false, message: "Error updating user role" });
+  }
+};

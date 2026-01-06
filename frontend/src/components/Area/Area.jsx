@@ -4,7 +4,7 @@ import AddRequirementModal from "../AddRequirement/AddRequirementModal";
 import AddAreaModal from "../AddAreaModal/AddAreaModal";
 import EditRequirementsModal from "../EditRequirements/EditRequirementsModal";
 import AreaProfile from "../AreaProfile/AreaProfile";
-import { areasAPI } from "../../utils/api";
+import { areasAPI, usersAPI } from "../../utils/api";
 import EditAreaModal from "../EditArea/EditArea";
 import RequirementsP from "../RequirementsProfile/RequirementsProfile";
 import { eventsAPI } from "../../utils/api";
@@ -21,6 +21,7 @@ export default function RequirementBars() {
     const [selectedCount, setSelectedCount] = useState(0);
     const [selectedIds, setSelectedIds] = useState([]);
     const [selectedEventId, setSelectedEventId] = useState('');
+    const [currentUser, setCurrentUser] = useState(null);
     const [filterOptions, setFilterOptions] = useState({
         events: [],
         types: []
@@ -33,6 +34,22 @@ export default function RequirementBars() {
     // Area selection state
     const [areaSelectionMode, setAreaSelectionMode] = useState(false);
     const [selectedAreaIds, setSelectedAreaIds] = useState([]);
+
+    // Default to admin (show features) until we confirm otherwise
+    const isAdmin = !currentUser || currentUser.RoleName === 'admin';
+
+    // Fetch current user on mount
+    useEffect(() => {
+        const fetchCurrentUser = async () => {
+            try {
+                const response = await usersAPI.getLoggedInUser();
+                if (response.success) setCurrentUser(response.user);
+            } catch (error) {
+                console.error('Error fetching current user:', error);
+            }
+        };
+        fetchCurrentUser();
+    }, []);
 
     // Fetch all events on component mount
     useEffect(() => {
@@ -258,14 +275,17 @@ export default function RequirementBars() {
                     selectedCount={selectedAreaIds.length}
                     onDeleteSelected={handleDeleteSelectedAreas}
                     showRequirementsFilter={true}
+                    userRole={currentUser?.RoleID}
                 />
-                <button 
-                    onClick={() => setShowWizard(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition text-sm"
-                    title="Quick setup with wizard"
-                >
-                    <Wand2 size={18} /> Wizard
-                </button>
+                {isAdmin && (
+                    <button 
+                        onClick={() => setShowWizard(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition text-sm"
+                        title="Quick setup with wizard"
+                    >
+                        <Wand2 size={18} /> Wizard
+                    </button>
+                )}
             </div>
 
             <UnifiedSetupWizard 
@@ -307,6 +327,7 @@ export default function RequirementBars() {
                     onClose={() => setIsEditAreaModalOpen(false)}
                     area={selectedArea}
                     onSave={handleEditAreaSave}
+                    userRole={currentUser?.RoleID}
                 />
             )}
 
@@ -326,6 +347,7 @@ export default function RequirementBars() {
                 }}
                 requirement={selectedRequirement}
                 onSave={handleEditSave}
+                userRole={currentUser?.RoleID}
             />
         </div>
     );

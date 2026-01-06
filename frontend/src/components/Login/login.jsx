@@ -15,8 +15,11 @@ export default function Login() {
     // 🔒 Redirect if already logged in
     useEffect(() => {
         const token = localStorage.getItem("token");
-        if (token) {
-            navigate("/home", { replace: true });
+        const user = localStorage.getItem("user");
+        if (token && user) {
+            const userData = JSON.parse(user);
+            const destination = userData.RoleID === 1 ? "/home" : "/home/organizations";
+            navigate(destination, { replace: true });
         }
     }, [navigate]);
 
@@ -44,7 +47,9 @@ export default function Login() {
                 axios.defaults.headers.common["Authorization"] =
                     `Bearer ${response.token}`;
 
-                navigate("/home", { replace: true });
+                // Redirect based on role: Admin to /home, User to /home/organizations
+                const destination = response.user.RoleID === 1 ? "/home" : "/home/organizations";
+                navigate(destination, { replace: true });
             } else {
                 // Check approval status
                 if (response.approvalStatus === 'pending') {

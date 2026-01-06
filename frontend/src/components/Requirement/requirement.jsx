@@ -5,7 +5,7 @@ import AddPasscuRequirement from "../AddPasscuRequirement/AddPasscuRequirement";
 import EditRequirementsModal from "../EditRequirements/EditRequirementsModal";
 import RequirementsP from "../RequirementsProfile/RequirementsProfile";
 import UnifiedSetupWizard from "../UnifiedSetupWizard/UnifiedSetupWizard";
-import { eventsAPI } from "../../utils/api";
+import { eventsAPI, usersAPI } from "../../utils/api";
 import { Wand2 } from "lucide-react";
 
 export default function RequirementBars() {
@@ -18,12 +18,29 @@ export default function RequirementBars() {
     const [selectedCount, setSelectedCount] = useState(0);
     const [selectedIds, setSelectedIds] = useState([]);
     const [selectedEventId, setSelectedEventId] = useState('');
+    const [currentUser, setCurrentUser] = useState(null);
     const [filterOptions, setFilterOptions] = useState({
         events: [],
         types: []
     });
     const [events, setEvents] = useState([]);
     const requirementsPRef = useRef();
+
+    // Default to admin (show features) until we confirm otherwise
+    const isAdmin = !currentUser || currentUser.RoleName === 'admin';
+
+    // Fetch current user on mount
+    useEffect(() => {
+        const fetchCurrentUser = async () => {
+            try {
+                const response = await usersAPI.getLoggedInUser();
+                if (response.success) setCurrentUser(response.user);
+            } catch (error) {
+                console.error('Error fetching current user:', error);
+            }
+        };
+        fetchCurrentUser();
+    }, []);
 
     // Fetch all events on component mount
     useEffect(() => {
@@ -171,14 +188,17 @@ export default function RequirementBars() {
                     selectedCount={selectedCount}
                     onDeleteSelected={handleDeleteSelected}
                     showRequirementsFilter={true}
+                    userRole={currentUser?.RoleID}
                 />
-                <button 
-                    onClick={() => setShowWizard(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition text-sm"
-                    title="Quick setup with wizard"
-                >
-                    <Wand2 size={18} /> Wizard
-                </button>
+                {isAdmin && (
+                    <button 
+                        onClick={() => setShowWizard(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition text-sm"
+                        title="Quick setup with wizard"
+                    >
+                        <Wand2 size={18} /> Wizard
+                    </button>
+                )}
             </div>
 
             <UnifiedSetupWizard 
@@ -228,6 +248,7 @@ export default function RequirementBars() {
                 }}
                 requirement={selectedRequirement}
                 onSave={handleEditSave}
+                userRole={currentUser?.RoleID}
             />
 
             {/* Requirements List */}

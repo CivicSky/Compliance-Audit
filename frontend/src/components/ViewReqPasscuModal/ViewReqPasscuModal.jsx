@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
+import { usersAPI } from '../../utils/api';
 
 export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffice, onAddRequirements }) {
     const [showMenu, setShowMenu] = useState(false);
@@ -12,6 +13,7 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
     const [commentInput, setCommentInput] = useState("");
     const [savingComment, setSavingComment] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
+    const [currentUser, setCurrentUser] = useState(null);
     // File upload state for proof document
     const [proofFile, setProofFile] = useState(null);
     const [uploadingProof, setUploadingProof] = useState(false);
@@ -24,6 +26,24 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
     const fileInputRef = useRef();
     // State for SheetJS preview
     const [excelHtml, setExcelHtml] = useState(null);
+
+    // Default to admin (show features) until we confirm otherwise
+    const isAdmin = !currentUser || currentUser.RoleID === 1;
+
+    // Fetch current user on mount
+    useEffect(() => {
+        const fetchCurrentUser = async () => {
+            try {
+                const response = await usersAPI.getLoggedInUser();
+                if (response.success) setCurrentUser(response.user);
+            } catch (error) {
+                console.error('Error fetching current user:', error);
+            }
+        };
+        if (isOpen) {
+            fetchCurrentUser();
+        }
+    }, [isOpen]);
     // Handle file selection
     const handleProofFileChange = (e) => {
         if (e.target.files && e.target.files[0]) {
@@ -39,9 +59,16 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
         setUploadingProof(true);
         const formData = new FormData();
         formData.append('file', proofFile);
+        
+        // Get authentication token
+        const token = localStorage.getItem('token');
+        
         try {
             const res = await fetch(`http://localhost:5000/api/officedocuments/${office.id}/proof`, {
                 method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
                 body: formData
             });
             const data = await res.json();
@@ -55,6 +82,7 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
             }
             setProofFile(null);
         } catch (err) {
+            console.error('Upload error:', err);
             alert('Failed to upload proof document');
         } finally {
             setUploadingProof(false);
@@ -319,25 +347,25 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                         </div>
                     </div>
 
+                    {/* Search Bar - Fixed Header */}
+                    <div className="px-6 py-3 bg-white border-b border-gray-200 flex items-center justify-between flex-shrink-0">
+                        <h3 className="text-base font-semibold text-gray-800">Requirements</h3>
+                        <div className="relative max-w-xs">
+                            <input
+                                type="text"
+                                placeholder="Search..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-xs"
+                            />
+                            <svg className="absolute right-2 top-1.5 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                        </div>
+                    </div>
+
                     {/* Requirements List */}
                     <div className="flex-1 overflow-y-auto px-6 py-3">
-                        <div className="flex items-center justify-between mb-3 gap-2">
-                            <h3 className="text-base font-semibold text-gray-800">Requirements</h3>
-                            {/* Search Bar - Compact */}
-                            <div className="relative max-w-xs">
-                                <input
-                                    type="text"
-                                    placeholder="Search..."
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-xs"
-                                />
-                                <svg className="absolute right-2 top-1.5 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                </svg>
-                            </div>
-                        </div>
-                        
                         {loading ? (
                             <div className="flex items-center justify-center py-12">
                                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -443,42 +471,60 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                                                                     }`}
                                                                 >
                                                                     <div className="flex items-center gap-2 min-h-0 py-1">
-                                                                        {/* Status Checkboxes - now horizontal */}
-                                                                        <div className="flex flex-row gap-3 items-center">
-                                                                            {/* Complied */}
-                                                                            <label className="flex items-center gap-1 cursor-pointer group">
-                                                                                <input
-                                                                                    type="radio"
-                                                                                    name={`status-${req.RequirementID}`}
-                                                                                    checked={req.ComplianceStatusID === 5}
-                                                                                    onChange={() => handleStatusChange(req.RequirementID, 5)}
-                                                                                    className="w-4 h-4 text-green-600 border-gray-300 focus:ring-green-500 accent-green-600"
-                                                                                />
-                                                                                <span className="text-xs font-medium text-green-700 group-hover:text-green-800">Complied</span>
-                                                                            </label>
-                                                                            {/* Partially Complied */}
-                                                                            <label className="flex items-center gap-1 cursor-pointer group">
-                                                                                <input
-                                                                                    type="radio"
-                                                                                    name={`status-${req.RequirementID}`}
-                                                                                    checked={req.ComplianceStatusID === 4}
-                                                                                    onChange={() => handleStatusChange(req.RequirementID, 4)}
-                                                                                    className="w-4 h-4 text-yellow-600 border-gray-300 focus:ring-yellow-500 accent-yellow-600"
-                                                                                />
-                                                                                <span className="text-xs font-medium text-yellow-700 group-hover:text-yellow-800">Partially</span>
-                                                                            </label>
-                                                                            {/* Not Complied */}
-                                                                            <label className="flex items-center gap-1 cursor-pointer group">
-                                                                                <input
-                                                                                    type="radio"
-                                                                                    name={`status-${req.RequirementID}`}
-                                                                                    checked={req.ComplianceStatusID === 3 || !req.ComplianceStatusID}
-                                                                                    onChange={() => handleStatusChange(req.RequirementID, 3)}
-                                                                                    className="w-4 h-4 text-red-600 border-gray-300 focus:ring-red-500 accent-red-600"
-                                                                                />
-                                                                                <span className="text-xs font-medium text-red-700 group-hover:text-red-800">Not Complied</span>
-                                                                            </label>
-                                                                        </div>
+                                                                        {/* Status Display - only for admins show radio buttons */}
+                                                                        {isAdmin ? (
+                                                                            <div className="flex flex-row gap-3 items-center">
+                                                                                {/* Complied */}
+                                                                                <label className="flex items-center gap-1 cursor-pointer group">
+                                                                                    <input
+                                                                                        type="radio"
+                                                                                        name={`status-${req.RequirementID}`}
+                                                                                        checked={req.ComplianceStatusID === 5}
+                                                                                        onChange={() => handleStatusChange(req.RequirementID, 5)}
+                                                                                        disabled={!isAdmin}
+                                                                                        className="w-4 h-4 text-green-600 border-gray-300 focus:ring-green-500 accent-green-600"
+                                                                                        style={{ accentColor: '#16a34a' }}
+                                                                                    />
+                                                                                    <span className="text-xs font-medium text-green-700 group-hover:text-green-800">Complied</span>
+                                                                                </label>
+                                                                                {/* Partially Complied */}
+                                                                                <label className="flex items-center gap-1 cursor-pointer group">
+                                                                                    <input
+                                                                                        type="radio"
+                                                                                        name={`status-${req.RequirementID}`}
+                                                                                        checked={req.ComplianceStatusID === 4}
+                                                                                        onChange={() => handleStatusChange(req.RequirementID, 4)}
+                                                                                        disabled={!isAdmin}
+                                                                                        className="w-4 h-4 text-yellow-600 border-gray-300 focus:ring-yellow-500 accent-yellow-600"
+                                                                                        style={{ accentColor: '#ca8a04' }}
+                                                                                    />
+                                                                                    <span className="text-xs font-medium text-yellow-700 group-hover:text-yellow-800">Partially</span>
+                                                                                </label>
+                                                                                {/* Not Complied */}
+                                                                                <label className="flex items-center gap-1 cursor-pointer group">
+                                                                                    <input
+                                                                                        type="radio"
+                                                                                        name={`status-${req.RequirementID}`}
+                                                                                        checked={req.ComplianceStatusID === 3 || !req.ComplianceStatusID}
+                                                                                        onChange={() => handleStatusChange(req.RequirementID, 3)}
+                                                                                        disabled={!isAdmin}
+                                                                                        className="w-4 h-4 text-red-600 border-gray-300 focus:ring-red-500 accent-red-600"
+                                                                                        style={{ accentColor: '#dc2626' }}
+                                                                                    />
+                                                                                    <span className="text-xs font-medium text-red-700 group-hover:text-red-800">Not Complied</span>
+                                                                                </label>
+                                                                            </div>
+                                                                        ) : (
+                                                                            <span className={`px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap ${
+                                                                                req.ComplianceStatusID === 5 ? 'bg-green-100 text-green-800 border border-green-300' :
+                                                                                req.ComplianceStatusID === 4 ? 'bg-yellow-100 text-yellow-800 border border-yellow-300' :
+                                                                                'bg-red-100 text-red-800 border border-red-300'
+                                                                            }`}>
+                                                                                {req.ComplianceStatusID === 5 ? 'Complied' :
+                                                                                 req.ComplianceStatusID === 4 ? 'Partially Complied' :
+                                                                                 'Not Complied'}
+                                                                            </span>
+                                                                        )}
 
                                                                         {/* Requirement Details - smaller font and less margin */}
                                                                                                                                                 <div className="flex-1 border-l-2 border-gray-200 pl-2">
@@ -509,7 +555,7 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                                                                         ) : (
                                                                             <div
                                                                                 className="mt-1 text-xs text-blue-700 bg-blue-50 rounded px-2 py-1 border border-blue-200 cursor-pointer hover:bg-blue-100"
-                                                                                onClick={() => handleCommentClick(req)}
+                                                                                onClick={() => isAdmin && handleCommentClick(req)}
                                                                                 title={req.comments ? req.comments : 'No comment available'}
                                                                                 style={{
                                                                                     height: '40px',
@@ -537,19 +583,6 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                                                                             </div>
                                                                         )}
                                                                                                                                                 </div>
-
-                                                                        {/* Status Badge - smaller */}
-                                                                        <div className="flex-shrink-0">
-                                                                            <span className={`px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap ${
-                                                                                req.ComplianceStatusID === 5 ? 'bg-green-100 text-green-800 border border-green-300' :
-                                                                                req.ComplianceStatusID === 4 ? 'bg-yellow-100 text-yellow-800 border border-yellow-300' :
-                                                                                'bg-red-100 text-red-800 border border-red-300'
-                                                                            }`}>
-                                                                                {req.ComplianceStatusID === 5 ? 'Complied' :
-                                                                                 req.ComplianceStatusID === 4 ? 'Partially Complied' :
-                                                                                 'Not Complied'}
-                                                                            </span>
-                                                                        </div>
                                                                     </div>
                                                                 </div>
                                                             ))}

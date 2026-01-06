@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import logo from "../../assets/images/lccb_logo.png"
 import search from "../../assets/images/search.svg"
 
-export default function Header({ pageTitle = "Compliance Audit", showSearch = true, onAddClick, onSearchChange, searchValue = '', onSortChange, sortValue = 'name', onFilterChange, filterOptions = { events: [], types: [], approvalStatus: [] }, onDeleteModeToggle, deleteMode = false, selectedCount = 0, onDeleteSelected, hideSortButton = false, showRequirementsFilter = false, showApprovalFilter = false }) {
+export default function Header({ pageTitle = "Compliance Audit", showSearch = true, onAddClick, onSearchChange, searchValue = '', onSortChange, sortValue = 'name', onFilterChange, filterOptions = { events: [], types: [], approvalStatus: [] }, onDeleteModeToggle, deleteMode = false, selectedCount = 0, onDeleteSelected, hideSortButton = false, showRequirementsFilter = false, showApprovalFilter = false, userRole = 'user' }) {
+    const isAdmin = userRole === 'admin' || userRole === 1;
     const [showSortDropdown, setShowSortDropdown] = useState(false);
     const [showDeleteDropdown, setShowDeleteDropdown] = useState(false);
     const [showFilterDropdown, setShowFilterDropdown] = useState(false);
@@ -134,8 +135,8 @@ export default function Header({ pageTitle = "Compliance Audit", showSearch = tr
                         
                         {/* Toolbar buttons */}
                         <div className="flex items-center gap-2">
-                            {/* Add Button */}
-                            {onAddClick && (
+                            {/* Add Button - Only for admins */}
+                            {isAdmin && onAddClick && (
                                 <button
                                     type="button"
                                     onClick={onAddClick}
@@ -148,8 +149,8 @@ export default function Header({ pageTitle = "Compliance Audit", showSearch = tr
                                 </button>
                             )}
 
-                            {/* Delete Button */}
-                            {onDeleteModeToggle && (
+                            {/* Delete Button - Only for admins */}
+                            {isAdmin && onDeleteModeToggle && (
                                 <button
                                     type="button"
                                     onClick={handleDeleteModeToggle}
@@ -161,8 +162,8 @@ export default function Header({ pageTitle = "Compliance Audit", showSearch = tr
                                     </svg>
                                 </button>
                             )}
-                                                        {/* Confirm Delete Button (only show in delete mode and if items are selected) */}
-                                                        {deleteMode && selectedCount > 0 && onDeleteSelected && (
+                                                        {/* Confirm Delete Button (only show in delete mode and if items are selected and admin) */}
+                                                        {isAdmin && deleteMode && selectedCount > 0 && onDeleteSelected && (
                                                             <button
                                                                 type="button"
                                                                 onClick={handleDeleteSelected}
