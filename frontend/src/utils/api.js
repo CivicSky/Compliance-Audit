@@ -72,6 +72,10 @@ export const officeHeadsAPI = {
     });
     return response.data;
   },
+  addMultipleHeads: async (userIds, position) => {
+    const response = await api.post('/api/officeheads/add-multiple', { userIds, position });
+    return response.data;
+  },
   getAllHeads: async () => {
     try {
       const response = await api.get('/api/officeheads/all');
@@ -167,6 +171,27 @@ export const usersAPI = {
     addRequirement: async (data) => (await api.post('/api/requirements/add', data)).data,
     updateRequirement: async (id, data) => (await api.put(`/api/requirements/update/${id}`, data)).data,
     deleteRequirements: async (ids) => (await api.post('/api/requirements/delete', { requirementIds: ids })).data,
+    // User assignment functions
+    assignUsersToRequirement: async (requirementId, officeId, userIds, assignedBy) => 
+      (await api.post('/api/requirements/assign-users', { requirementId, officeId, userIds, assignedBy })).data,
+    getAssignedUsers: async (requirementId, officeId) => {
+      const params = officeId ? `?officeId=${officeId}` : '';
+      return (await api.get(`/api/requirements/assigned-users/${requirementId}${params}`)).data;
+    },
+    removeUserAssignment: async (assignmentId) => 
+      (await api.delete(`/api/requirements/assignment/${assignmentId}`)).data,
+    getUserAssignmentCount: async (userId) => 
+      (await api.get(`/api/requirements/user-assignment-count/${userId}`)).data,
+    getAvailableUsersForAssignment: async (requirementId, officeId) => {
+      const params = new URLSearchParams();
+      if (requirementId) params.append('requirementId', requirementId);
+      if (officeId) params.append('officeId', officeId);
+      return (await api.get(`/api/requirements/available-users?${params.toString()}`)).data;
+    },
+    updateUserUploadStatus: async (assignmentId, hasUploaded) => 
+      (await api.put(`/api/requirements/assignment/${assignmentId}/upload-status`, { hasUploaded })).data,
+    markUserAsUploaded: async (requirementId, userId) => 
+      (await api.post('/api/requirements/mark-uploaded', { requirementId, userId })).data,
   };
 
   // ========================

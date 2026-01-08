@@ -107,6 +107,82 @@ exports.addHead = async (req, res) => {
   }
 };
 
+// Add multiple office heads at once from selected users
+exports.addMultipleHeads = async (req, res) => {
+  try {
+    const { userIds, position } = req.body;
+    
+    // Validate required fields
+    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'At least one user must be selected'
+      });
+    }
+
+    if (!position) {
+      return res.status(400).json({
+        success: false,
+        message: 'Position is required'
+      });
+    }
+
+    const addedHeads = [];
+    const errors = [];
+
+    for (const userId of userIds) {
+      try {
+        // Check if user exists
+        const [userCheck] = await db.execute('SELECT UserID, FirstName, LastName, Email FROM users WHERE UserID = ?', [userId]);
+        if (userCheck.length === 0) {
+          errors.push({ userId, error: 'User not found' });
+          continue;
+        }
+
+        // Check if user is already an office head
+        const [existingHead] = await db.execute('SELECT HeadID FROM headofoffice WHERE UserID = ?', [userId]);
+        if (existingHead.length > 0) {
+          errors.push({ userId, error: `${userCheck[0].FirstName} ${userCheck[0].LastName} is already an office head` });
+          continue;
+        }
+
+        // Insert new office head
+        const query = `
+          INSERT INTO headofoffice (UserID, Position, ContactInfo, OfficeID)
+          VALUES (?, ?, ?, ?)
+        `;
+        const values = [userId, position.trim(), userCheck[0].Email || null, null];
+        const [result] = await db.execute(query, values);
+
+        addedHeads.push({
+          HeadID: result.insertId,
+          UserID: userId,
+          FirstName: userCheck[0].FirstName,
+          LastName: userCheck[0].LastName,
+          Position: position.trim()
+        });
+      } catch (err) {
+        errors.push({ userId, error: err.message });
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      message: `Successfully added ${addedHeads.length} office head(s)`,
+      data: addedHeads,
+      errors: errors.length > 0 ? errors : undefined
+    });
+
+  } catch (error) {
+    console.error('Error adding multiple office heads:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error while adding office heads',
+      error: error.message
+    });
+  }
+};
+
 // Get all office heads with user information from users table
 exports.getAllHeads = async (req, res) => {
   try {

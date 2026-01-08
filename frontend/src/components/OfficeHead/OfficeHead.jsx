@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import Header from "../Header/header"
 import OfficeHeadP from "../OfficeHeadP/OfficeHeadP";
 import AddOfficeHeadModal from "../AddHead/AddOfficeHeadModal";
+import { usersAPI } from "../../utils/api";
 
 export default function Home() {
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -10,7 +11,21 @@ export default function Home() {
     const [deleteMode, setDeleteMode] = useState(false);
     const [selectedCount, setSelectedCount] = useState(0);
     const [selectedIds, setSelectedIds] = useState([]);
+    const [currentUser, setCurrentUser] = useState(null);
     const officePRef = useRef();
+
+    // Fetch current user on mount
+    useEffect(() => {
+        const fetchCurrentUser = async () => {
+            try {
+                const response = await usersAPI.getLoggedInUser();
+                if (response.success) setCurrentUser(response.user);
+            } catch (error) {
+                console.error('Error fetching current user:', error);
+            }
+        };
+        fetchCurrentUser();
+    }, []);
 
     // Reset all states when component unmounts or navigation happens
     useEffect(() => {
@@ -106,6 +121,7 @@ export default function Home() {
                 deleteMode={deleteMode}
                 selectedCount={selectedCount}
                 onDeleteSelected={handleDeleteSelected}
+                userRole={currentUser?.RoleID}
             />
 
             <div className="relative z-10">

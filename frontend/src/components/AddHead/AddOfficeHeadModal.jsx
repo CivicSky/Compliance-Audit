@@ -1,127 +1,126 @@
-import React, { useState } from 'react';
-import { officeHeadsAPI } from '../../utils/api';
+import React, { useState, useEffect } from 'react';
+import { officeHeadsAPI, usersAPI } from '../../utils/api';
 
 export default function AddOfficeHeadModal({ isOpen, onClose, onSuccess }) {
-    const [formData, setFormData] = useState({
-        firstName: '',
-        middleInitial: '',
-        lastName: '',
-        position: '',
-        contactInfo: '',
-        profilePic: null
+    const [availableUsers, setAvailableUsers] = useState([]);
+    const [selectedUserIds, setSelectedUserIds] = useState([]);
+    const [position, setPosition] = useState('');
+    const [searchTerm, setSearchTerm] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [error, setError] = useState('');
+
+    // Fetch available users when modal opens
+    useEffect(() => {
+        if (isOpen) {
+            fetchAvailableUsers();
+            setSelectedUserIds([]);
+            setPosition('');
+            setSearchTerm('');
+            setError('');
+        }
+    }, [isOpen]);
+
+    const fetchAvailableUsers = async () => {
+        setIsLoading(true);
+        try {
+            // Get all users - response format: { success: true, users: [...] }
+            const usersResponse = await usersAPI.getAllUsers();
+            const allUsers = usersResponse.users || usersResponse.data || usersResponse || [];
+            
+            // Get existing office heads to exclude them
+            const headsResponse = await officeHeadsAPI.getAllHeads();
+            const existingHeadUserIds = (headsResponse || []).map(h => h.UserID);
+            
+            // Filter: only users with RoleID = 2 (regular users) who are not already heads
+            // and are approved
+            const filteredUsers = allUsers.filter(user => 
+                user.RoleID === 2 && 
+                !existingHeadUserIds.includes(user.UserID) &&
+                user.approval_status === 'approved'
+            );
+            
+            setAvailableUsers(filteredUsers);
+        } catch (err) {
+            console.error('Error fetching users:', err);
+            setError('Failed to load users. Please try again.');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // Toggle user selection
+    const toggleUserSelection = (userId) => {
+        setSelectedUserIds(prev => {
+            if (prev.includes(userId)) {
+                return prev.filter(id => id !== userId);
+            } else {
+                return [...prev, userId];
+            }
+        });
+    };
+
+    // Filter users by search term
+    const filteredUsers = availableUsers.filter(user => {
+        const fullName = `${user.FirstName} ${user.MiddleInitial ? user.MiddleInitial + '.' : ''} ${user.LastName}`.toLowerCase();
+        const email = (user.Email || '').toLowerCase();
+        const search = searchTerm.toLowerCase();
+        return fullName.includes(search) || email.includes(search);
     });
 
-    const [errors, setErrors] = useState({});
-    const [isSubmitting, setIsSubmitting] = useState(false);
-
-    const handleInputChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: value
-        }));
-        // Clear error when user starts typing
-        if (errors[name]) {
-            setErrors(prev => ({
-                ...prev,
-                [name]: ''
-            }));
-        }
+    // Select all filtered users
+    const selectAll = () => {
+        const filteredUserIds = filteredUsers.map(u => u.UserID);
+        setSelectedUserIds(filteredUserIds);
     };
 
-    const handleFileChange = (e) => {
-        const file = e.target.files[0];
-        setFormData(prev => ({
-            ...prev,
-            profilePic: file
-        }));
-    };
-
-    const validateForm = () => {
-        const newErrors = {};
-        
-        if (!formData.firstName.trim()) {
-            newErrors.firstName = 'First name is required';
-        }
-        if (!formData.lastName.trim()) {
-            newErrors.lastName = 'Last name is required';
-        }
-        if (!formData.position.trim()) {
-            newErrors.position = 'Position is required';
-        }
-        if (!formData.contactInfo.trim()) {
-            newErrors.contactInfo = 'Contact info is required';
-        }
-
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
+    // Clear all selections
+    const clearAll = () => {
+        setSelectedUserIds([]);
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         
-        if (!validateForm()) {
+        if (selectedUserIds.length === 0) {
+            setError('Please select at least one user');
+            return;
+        }
+        
+        if (!position.trim()) {
+            setError('Please enter a position');
             return;
         }
 
         setIsSubmitting(true);
-        
-        try {
-            // Create FormData for file upload
-            const submitData = new FormData();
-            submitData.append('firstName', formData.firstName);
-            submitData.append('middleInitial', formData.middleInitial);
-            submitData.append('lastName', formData.lastName);
-            submitData.append('position', formData.position);
-            submitData.append('contactInfo', formData.contactInfo);
-            
-            if (formData.profilePic) {
-                submitData.append('profilePic', formData.profilePic);
-            }
+        setError('');
 
-            // Call API to submit data
-            const response = await officeHeadsAPI.addHead(submitData);
+        try {
+            const response = await officeHeadsAPI.addMultipleHeads(selectedUserIds, position);
             
-            console.log('Office head added successfully:', response);
-            
-            // Reset form and close modal
-            setFormData({
-                firstName: '',
-                middleInitial: '',
-                lastName: '',
-                position: '',
-                contactInfo: '',
-                profilePic: null
-            });
-            
-            // Call onSuccess callback if provided
-            if (onSuccess) {
-                onSuccess(response.data);
-            }
-            
-            onClose();
-            
-        } catch (error) {
-            console.error('Error submitting form:', error);
-            console.error('Error response:', error.response);
-            console.error('Error message:', error.message);
-            
-            // Handle API errors
-            if (error.response?.data?.message) {
-                alert(`Error: ${error.response.data.message}`);
-            } else if (error.message) {
-                alert(`Network Error: ${error.message}`);
+            if (response.success) {
+                // Show success message
+                const addedCount = response.data?.length || selectedUserIds.length;
+                alert(`Successfully added ${addedCount} office head(s)!`);
+                
+                // Show any errors that occurred
+                if (response.errors && response.errors.length > 0) {
+                    const errorMessages = response.errors.map(e => e.error).join('\n');
+                    alert(`Some users could not be added:\n${errorMessages}`);
+                }
+                
+                if (onSuccess) {
+                    onSuccess(response.data);
+                }
+                onClose();
             } else {
-                alert('An error occurred while adding the office head. Please try again.');
+                setError(response.message || 'Failed to add office heads');
             }
+        } catch (err) {
+            console.error('Error adding office heads:', err);
+            setError(err.response?.data?.message || err.message || 'An error occurred');
         } finally {
             setIsSubmitting(false);
-        }
-    };
-
-    const handleClose = () => {
-        if (!isSubmitting) {
-            onClose();
         }
     };
 
@@ -129,14 +128,17 @@ export default function AddOfficeHeadModal({ isOpen, onClose, onSuccess }) {
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 min-h-[70vh] max-h-[95vh] overflow-y-auto">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] flex flex-col">
                 {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b">
-                    <h2 className="text-xl font-semibold text-gray-800">Add Office Head</h2>
+                <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg">
+                    <div>
+                        <h2 className="text-xl font-semibold">Add Office Heads</h2>
+                        <p className="text-sm text-blue-100">Select users to make them office heads</p>
+                    </div>
                     <button
-                        onClick={handleClose}
+                        onClick={onClose}
                         disabled={isSubmitting}
-                        className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                        className="text-white hover:bg-white/20 rounded-lg p-1.5 transition-colors disabled:opacity-50"
                     >
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -145,178 +147,166 @@ export default function AddOfficeHeadModal({ isOpen, onClose, onSuccess }) {
                 </div>
 
                 {/* Form */}
-                <form onSubmit={handleSubmit} className="p-6">
-                    {/* Grid Layout - 2x3 */}
-                    <div className="grid grid-cols-2 gap-4 mb-6">
-                        {/* First Name */}
-                        <div>
-                            <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1">
-                                First Name *
-                            </label>
-                            <input
-                                type="text"
-                                id="firstName"
-                                name="firstName"
-                                value={formData.firstName}
-                                onChange={handleInputChange}
-                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                                    errors.firstName ? 'border-red-500' : 'border-gray-300'
-                                }`}
-                                placeholder="Enter first name"
-                                disabled={isSubmitting}
-                            />
-                            {errors.firstName && (
-                                <p className="text-red-500 text-sm mt-1">{errors.firstName}</p>
-                            )}
-                        </div>
-
-                        {/* Middle Initial */}
-                        <div>
-                            <label htmlFor="middleInitial" className="block text-sm font-medium text-gray-700 mb-1">
-                                Middle Initial
-                            </label>
-                            <input
-                                type="text"
-                                id="middleInitial"
-                                name="middleInitial"
-                                value={formData.middleInitial}
-                                onChange={handleInputChange}
-                                maxLength="1"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder="Enter Middle Initial"
-                                disabled={isSubmitting}
-                            />
-                        </div>
-
-                        {/* Last Name */}
-                        <div>
-                            <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1">
-                                Last Name *
-                            </label>
-                            <input
-                                type="text"
-                                id="lastName"
-                                name="lastName"
-                                value={formData.lastName}
-                                onChange={handleInputChange}
-                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                                    errors.lastName ? 'border-red-500' : 'border-gray-300'
-                                }`}
-                                placeholder="Enter last name"
-                                disabled={isSubmitting}
-                            />
-                            {errors.lastName && (
-                                <p className="text-red-500 text-sm mt-1">{errors.lastName}</p>
-                            )}
-                        </div>
-
-                        {/* Position */}
-                        <div>
-                            <label htmlFor="position" className="block text-sm font-medium text-gray-700 mb-1">
-                                Position *
-                            </label>
-                            <input
-                                type="text"
-                                id="position"
-                                name="position"
-                                value={formData.position}
-                                onChange={handleInputChange}
-                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                                    errors.position ? 'border-red-500' : 'border-gray-300'
-                                }`}
-                                placeholder="Enter position/title"
-                                disabled={isSubmitting}
-                            />
-                            {errors.position && (
-                                <p className="text-red-500 text-sm mt-1">{errors.position}</p>
-                            )}
-                        </div>
-
-                        {/* Contact Info */}
-                        <div>
-                            <label htmlFor="contactInfo" className="block text-sm font-medium text-gray-700 mb-1">
-                                Contact Info *
-                            </label>
-                            <input
-                                type="text"
-                                id="contactInfo"
-                                name="contactInfo"
-                                value={formData.contactInfo}
-                                onChange={handleInputChange}
-                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                                    errors.contactInfo ? 'border-red-500' : 'border-gray-300'
-                                }`}
-                                placeholder="Phone number or email"
-                                disabled={isSubmitting}
-                            />
-                            {errors.contactInfo && (
-                                <p className="text-red-500 text-sm mt-1">{errors.contactInfo}</p>
-                            )}
-                        </div>
-
-                        {/* Profile Picture */}
-                        <div>
-                            <label htmlFor="profilePic" className="block text-sm font-medium text-gray-700 mb-1">
-                                Profile Picture
-                            </label>
-                            <div className="flex items-start gap-3">
-                                {/* Image Preview Circle */}
-                                <div className="flex-shrink-0 -mt-0.5">
-                                    {formData.profilePic ? (
-                                        <img
-                                            src={URL.createObjectURL(formData.profilePic)}
-                                            alt="Preview"
-                                            className="w-12 h-12 rounded-full object-cover border-2 border-gray-300"
-                                        />
-                                    ) : (
-                                        <div className="w-12 h-12 rounded-full bg-gray-100 border-2 border-gray-300 flex items-center justify-center">
-                                            <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                            </svg>
-                                        </div>
-                                    )}
-                                </div>
-                                
-                                {/* File Input */}
-                                <div className="flex-1">
-                                    <input
-                                        type="file"
-                                        id="profilePic"
-                                        name="profilePic"
-                                        onChange={handleFileChange}
-                                        accept="image/*"
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                                        disabled={isSubmitting}
-                                    />
-                                    <p className="text-xs text-gray-500 mt-1">Upload an image file (JPG, PNG, etc.)</p>
-                                </div>
-                            </div>
-                        </div>
+                <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+                    {/* Position Input */}
+                    <div className="p-4 border-b bg-gray-50">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Position/Title for selected users *
+                        </label>
+                        <input
+                            type="text"
+                            value={position}
+                            onChange={(e) => setPosition(e.target.value)}
+                            placeholder="e.g., Department Head, Program Chair, Director"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            disabled={isSubmitting}
+                        />
                     </div>
 
-                    {/* Form Actions */}
-                    <div className="flex justify-end space-x-3 pt-4 border-t">
+                    {/* Search and Selection Controls */}
+                    <div className="p-4 border-b flex items-center gap-3">
+                        <div className="relative flex-1">
+                            <input
+                                type="text"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                placeholder="Search users..."
+                                className="w-full px-3 py-2 pl-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                        </div>
                         <button
                             type="button"
-                            onClick={handleClose}
-                            disabled={isSubmitting}
-                            className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors disabled:opacity-50"
+                            onClick={selectAll}
+                            className="px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
                         >
-                            Cancel
+                            Select All
                         </button>
                         <button
-                            type="submit"
-                            disabled={isSubmitting}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                            type="button"
+                            onClick={clearAll}
+                            className="px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
                         >
-                            {isSubmitting && (
-                                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"></circle>
-                                    <path fill="currentColor" className="opacity-75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                            )}
-                            {isSubmitting ? 'Adding...' : 'Add Office Head'}
+                            Clear
                         </button>
+                    </div>
+
+                    {/* User List */}
+                    <div className="flex-1 overflow-y-auto p-4">
+                        {isLoading ? (
+                            <div className="flex items-center justify-center py-8">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                                <span className="ml-3 text-gray-600">Loading users...</span>
+                            </div>
+                        ) : filteredUsers.length === 0 ? (
+                            <div className="text-center py-8 text-gray-500">
+                                <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                                <p className="mt-2">No available users found</p>
+                                <p className="text-sm">All approved users are either already office heads or are admins</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-2">
+                                {filteredUsers.map(user => {
+                                    const isSelected = selectedUserIds.includes(user.UserID);
+                                    const fullName = `${user.FirstName} ${user.MiddleInitial ? user.MiddleInitial + '.' : ''} ${user.LastName}`;
+                                    
+                                    return (
+                                        <label
+                                            key={user.UserID}
+                                            className={`flex items-center p-3 rounded-lg border cursor-pointer transition-all ${
+                                                isSelected 
+                                                    ? 'bg-blue-50 border-blue-300 ring-1 ring-blue-300' 
+                                                    : 'bg-white border-gray-200 hover:bg-gray-50'
+                                            }`}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={isSelected}
+                                                onChange={() => toggleUserSelection(user.UserID)}
+                                                className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                            />
+                                            <div className="ml-3 flex items-center flex-1">
+                                                {/* Profile Picture */}
+                                                <div className="flex-shrink-0">
+                                                    {user.ProfilePic ? (
+                                                        <img
+                                                            src={`http://localhost:5000/uploads/profile-pics/${user.ProfilePic}`}
+                                                            alt={fullName}
+                                                            className="w-10 h-10 rounded-full object-cover border-2 border-gray-200"
+                                                            onError={(e) => {
+                                                                e.target.style.display = 'none';
+                                                                e.target.nextElementSibling.style.display = 'flex';
+                                                            }}
+                                                        />
+                                                    ) : null}
+                                                    <div 
+                                                        className={`w-10 h-10 rounded-full bg-blue-100 items-center justify-center text-blue-600 font-semibold ${user.ProfilePic ? 'hidden' : 'flex'}`}
+                                                    >
+                                                        {user.FirstName[0]}{user.LastName[0]}
+                                                    </div>
+                                                </div>
+                                                <div className="ml-3 flex-1">
+                                                    <p className="text-sm font-medium text-gray-900">{fullName}</p>
+                                                    <p className="text-xs text-gray-500">{user.Email}</p>
+                                                </div>
+                                            </div>
+                                            {isSelected && (
+                                                <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                                </svg>
+                                            )}
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Error Message */}
+                    {error && (
+                        <div className="px-4 py-2 bg-red-50 border-t border-red-200">
+                            <p className="text-sm text-red-600">{error}</p>
+                        </div>
+                    )}
+
+                    {/* Footer */}
+                    <div className="flex items-center justify-between p-4 border-t bg-gray-50">
+                        <div className="text-sm text-gray-600">
+                            {selectedUserIds.length > 0 ? (
+                                <span className="font-medium text-blue-600">
+                                    {selectedUserIds.length} user{selectedUserIds.length !== 1 ? 's' : ''} selected
+                                </span>
+                            ) : (
+                                <span>No users selected</span>
+                            )}
+                        </div>
+                        <div className="flex gap-3">
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                disabled={isSubmitting}
+                                className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={isSubmitting || selectedUserIds.length === 0}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                            >
+                                {isSubmitting && (
+                                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"></circle>
+                                        <path fill="currentColor" className="opacity-75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                )}
+                                {isSubmitting ? 'Adding...' : `Add ${selectedUserIds.length > 0 ? selectedUserIds.length : ''} Office Head${selectedUserIds.length !== 1 ? 's' : ''}`}
+                            </button>
+                        </div>
                     </div>
                 </form>
             </div>

@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
-import { usersAPI } from '../../utils/api';
+import { usersAPI, requirementsAPI } from '../../utils/api';
+import AssignUserModal from '../AssignUserModal/AssignUserModal';
 
 export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffice, onAddRequirements }) {
     const [showMenu, setShowMenu] = useState(false);
@@ -14,6 +15,11 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
     const [savingComment, setSavingComment] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const [currentUser, setCurrentUser] = useState(null);
+    // Assign user modal state
+    const [showAssignModal, setShowAssignModal] = useState(false);
+    const [selectedRequirement, setSelectedRequirement] = useState(null);
+    // Assigned users per requirement (keyed by RequirementID)
+    const [assignedUsersMap, setAssignedUsersMap] = useState({});
     // File upload state for proof document
     const [proofFile, setProofFile] = useState(null);
     const [uploadingProof, setUploadingProof] = useState(false);
@@ -26,16 +32,23 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
     const fileInputRef = useRef();
     // State for SheetJS preview
     const [excelHtml, setExcelHtml] = useState(null);
+    // State for user requirement upload
+    const [userUploadingReqId, setUserUploadingReqId] = useState(null);
+    const userReqFileInputRef = useRef();
 
-    // Default to admin (show features) until we confirm otherwise
-    const isAdmin = !currentUser || currentUser.RoleID === 1;
+    // RoleID 1 = admin (can edit/upload), RoleID 2+ = regular user
+    const isAdmin = currentUser && currentUser.RoleID === 1;
 
     // Fetch current user on mount
     useEffect(() => {
         const fetchCurrentUser = async () => {
             try {
                 const response = await usersAPI.getLoggedInUser();
-                if (response.success) setCurrentUser(response.user);
+                console.log('DEBUG: Logged in user response:', response);
+                if (response.success) {
+                    console.log('DEBUG: User RoleID:', response.user.RoleID);
+                    setCurrentUser(response.user);
+                }
             } catch (error) {
                 console.error('Error fetching current user:', error);
             }
@@ -126,7 +139,21 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
         setLoading(true);
         try {
             const response = await axios.get(`http://localhost:5000/api/offices/${office.id}/requirements`);
-            setRequirements(response.data.data || []);
+            const reqs = response.data.data || [];
+            setRequirements(reqs);
+            
+            // Fetch assigned users for all requirements
+            const assignedMap = {};
+            await Promise.all(reqs.map(async (req) => {
+                try {
+                    const assignedRes = await requirementsAPI.getAssignedUsers(req.RequirementID);
+                    assignedMap[req.RequirementID] = assignedRes.data || [];
+                } catch (err) {
+                    console.error(`Error fetching assigned users for req ${req.RequirementID}:`, err);
+                    assignedMap[req.RequirementID] = [];
+                }
+            }));
+            setAssignedUsersMap(assignedMap);
             
             // Also refresh the office data to get updated compliance stats
             const officeResponse = await axios.get(`http://localhost:5000/api/offices/${office.id}`);
@@ -214,6 +241,72 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
         setCommentInput("");
     };
 
+    // Handle user requirement file upload (for non-admin assigned users)
+    const handleUserReqFileUpload = async (e, requirementId) => {
+        const file = e.target.files?.[0];
+        if (!file || !currentUser) return;
+        
+        setUserUploadingReqId(requirementId);
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('userId', currentUser.UserID);
+        formData.append('requirementId', requirementId);
+        
+        const token = localStorage.getItem('token');
+        
+        try {
+            // Upload file to a user-specific requirement document endpoint
+            const res = await fetch(`http://localhost:5000/api/requirements/user-upload`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                body: formData
+            });
+            const data = await res.json();
+            
+            if (data.success) {
+                // Mark the user as uploaded
+                await requirementsAPI.markUserAsUploaded(requirementId, currentUser.UserID);
+                
+                // Refresh assigned users for this requirement to show green border
+                const assignedRes = await requirementsAPI.getAssignedUsers(requirementId);
+                if (assignedRes.success) {
+                    setAssignedUsersMap(prev => ({
+                        ...prev,
+                        [requirementId]: assignedRes.users
+                    }));
+                }
+                
+                alert('File uploaded successfully!');
+            } else {
+                alert(data.message || 'Failed to upload file');
+            }
+        } catch (err) {
+            console.error('Upload error:', err);
+            alert('Failed to upload file');
+        } finally {
+            setUserUploadingReqId(null);
+            // Reset file input
+            if (userReqFileInputRef.current) {
+                userReqFileInputRef.current.value = '';
+            }
+        }
+    };
+
+    // Check if current user is assigned to a requirement
+    const isUserAssignedToRequirement = (requirementId) => {
+        if (!currentUser || !assignedUsersMap[requirementId]) return false;
+        return assignedUsersMap[requirementId].some(u => u.UserID === currentUser.UserID);
+    };
+
+    // Check if current user has already uploaded for a requirement
+    const hasUserUploadedForRequirement = (requirementId) => {
+        if (!currentUser || !assignedUsersMap[requirementId]) return false;
+        const userAssignment = assignedUsersMap[requirementId].find(u => u.UserID === currentUser.UserID);
+        return userAssignment && (userAssignment.HasUploaded === 1 || userAssignment.HasUploaded === true);
+    };
+
 
     // Function to fetch and render Excel file as HTML using SheetJS
     const handleExcelPreview = async () => {
@@ -256,46 +349,48 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
 
                         {/* 3-Dots Menu and Close Button */}
                         <div className="flex items-center gap-2">
-                            <div className="relative">
-                                <button
-                                    onClick={() => setShowMenu(!showMenu)}
-                                    className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
-                                >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                                    </svg>
-                                </button>
+                            {isAdmin && (
+                                <div className="relative">
+                                    <button
+                                        onClick={() => setShowMenu(!showMenu)}
+                                        className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                                        </svg>
+                                    </button>
 
-                                {/* Dropdown Menu */}
-                                {showMenu && (
-                                    <div className="absolute right-0 top-12 bg-white rounded-lg shadow-xl border border-gray-200 py-2 w-56 z-10">
-                                        <button
-                                            onClick={() => {
-                                                setShowMenu(false);
-                                                onEditOffice(office);
-                                            }}
-                                            className="w-full px-4 py-2 text-left text-gray-700 hover:bg-blue-50 flex items-center gap-3"
-                                        >
-                                            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                            </svg>
-                                            <span className="text-sm font-medium">Edit Office Info</span>
-                                        </button>
-                                        <button
-                                            onClick={() => {
-                                                setShowMenu(false);
-                                                onAddRequirements(office);
-                                            }}
-                                            className="w-full px-4 py-2 text-left text-gray-700 hover:bg-green-50 flex items-center gap-3"
-                                        >
-                                            <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                            </svg>
-                                            <span className="text-sm font-medium">Add Requirements</span>
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
+                                    {/* Dropdown Menu */}
+                                    {showMenu && (
+                                        <div className="absolute right-0 top-12 bg-white rounded-lg shadow-xl border border-gray-200 py-2 w-56 z-10">
+                                            <button
+                                                onClick={() => {
+                                                    setShowMenu(false);
+                                                    onEditOffice(office);
+                                                }}
+                                                className="w-full px-4 py-2 text-left text-gray-700 hover:bg-blue-50 flex items-center gap-3"
+                                            >
+                                                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                </svg>
+                                                <span className="text-sm font-medium">Edit Office Info</span>
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    setShowMenu(false);
+                                                    onAddRequirements(office);
+                                                }}
+                                                className="w-full px-4 py-2 text-left text-gray-700 hover:bg-green-50 flex items-center gap-3"
+                                            >
+                                                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                                </svg>
+                                                <span className="text-sm font-medium">Add Requirements</span>
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
                             <button
                                 onClick={onClose}
@@ -653,6 +748,101 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                                                                             </div>
                                                                         )}
                                                                                                                                                 </div>
+                                                                        
+                                                                        {/* Assigned Users Profile Pictures and Upload Button - Vertical Layout */}
+                                                                        <div className="flex flex-col items-center gap-1 ml-2">
+                                                                            {/* Profile Pictures Row */}
+                                                                            {assignedUsersMap[req.RequirementID] && assignedUsersMap[req.RequirementID].length > 0 && (
+                                                                                <div className="flex items-center gap-1">
+                                                                                    {assignedUsersMap[req.RequirementID].slice(0, 4).map((user) => {
+                                                                                        // Green border if the user has uploaded, grey otherwise
+                                                                                        const hasUploaded = user.HasUploaded === 1 || user.HasUploaded === true;
+                                                                                        const borderColor = hasUploaded ? 'border-green-500' : 'border-gray-400';
+                                                                                        const initials = `${user.FirstName?.[0] || ''}${user.LastName?.[0] || ''}`.toUpperCase();
+                                                                                        const fullName = `${user.FirstName} ${user.MiddleInitial ? user.MiddleInitial + '.' : ''} ${user.LastName}`;
+                                                                                        
+                                                                                        return (
+                                                                                            <div
+                                                                                                key={user.UserID}
+                                                                                                className="relative group"
+                                                                                            >
+                                                                                                {/* Profile Picture */}
+                                                                                                <div className={`w-7 h-7 rounded-full border-2 ${borderColor} bg-white flex items-center justify-center overflow-hidden shadow-sm cursor-pointer hover:scale-110 transition-transform`}>
+                                                                                                    {user.ProfilePic ? (
+                                                                                                        <img
+                                                                                                            src={`http://localhost:5000/uploads/profile-pics/${user.ProfilePic}`}
+                                                                                                            alt={fullName}
+                                                                                                            className="w-full h-full object-cover"
+                                                                                                        />
+                                                                                                    ) : (
+                                                                                                        <span className="text-xs font-medium text-gray-600">{initials}</span>
+                                                                                                    )}
+                                                                                                </div>
+                                                                                                {/* Tooltip on hover */}
+                                                                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg shadow-xl whitespace-nowrap invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-200 z-[100]">
+                                                                                                    <div className="font-semibold text-sm">{fullName}</div>
+                                                                                                    <div className={`mt-0.5 ${hasUploaded ? 'text-green-400' : 'text-red-400'}`}>
+                                                                                                        {hasUploaded ? '✓ Uploaded' : '✗ Not uploaded'}
+                                                                                                    </div>
+                                                                                                    {/* Arrow pointing down */}
+                                                                                                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-[6px] border-transparent border-t-gray-900"></div>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        );
+                                                                                    })}
+                                                                                </div>
+                                                                            )}
+
+                                                                            {/* Upload Button for non-admin assigned users - Below Profiles */}
+                                                                            {!isAdmin && isUserAssignedToRequirement(req.RequirementID) && (
+                                                                                <div className="flex items-center gap-1">
+                                                                                    <input
+                                                                                        type="file"
+                                                                                        ref={userReqFileInputRef}
+                                                                                        style={{ display: 'none' }}
+                                                                                        onChange={(e) => handleUserReqFileUpload(e, req.RequirementID)}
+                                                                                        accept=".pdf,.doc,.docx,.xlsx,.xls,.jpg,.jpeg,.png"
+                                                                                    />
+                                                                                    {hasUserUploadedForRequirement(req.RequirementID) ? (
+                                                                                        <span className="px-2 py-0.5 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded flex items-center gap-1">
+                                                                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                                                            </svg>
+                                                                                            Uploaded
+                                                                                        </span>
+                                                                                    ) : (
+                                                                                        <button
+                                                                                            onClick={() => userReqFileInputRef.current?.click()}
+                                                                                            disabled={userUploadingReqId === req.RequirementID}
+                                                                                            className="px-2 py-0.5 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors flex items-center gap-1 whitespace-nowrap disabled:opacity-50"
+                                                                                            title="Upload your document for this requirement"
+                                                                                        >
+                                                                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                                                                            </svg>
+                                                                                            {userUploadingReqId === req.RequirementID ? 'Uploading...' : 'Upload'}
+                                                                                        </button>
+                                                                                    )}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+
+                                                                        {/* Assign Button */}
+                                                                        {isAdmin && (
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    setSelectedRequirement(req);
+                                                                                    setShowAssignModal(true);
+                                                                                }}
+                                                                                className="ml-2 px-2 py-1 text-xs font-medium text-indigo-600 bg-indigo-50 border border-indigo-200 rounded hover:bg-indigo-100 transition-colors flex items-center gap-1 whitespace-nowrap"
+                                                                                title="Assign users to this requirement"
+                                                                            >
+                                                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                                                                                </svg>
+                                                                                Assign
+                                                                            </button>
+                                                                        )}
                                                                     </div>
                                                                 </div>
                                                             ))}
@@ -669,53 +859,56 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
 
                     {/* Footer */}
                     <div className="px-5 py-3 bg-gray-50 border-t border-gray-200 flex justify-end items-center gap-4 flex-shrink-0">
-                        {/* Proof Document Upload (footer, left of Close) */}
-                        <div className="flex flex-row items-center gap-2">
-                            <label className="text-xs text-gray-500">Proof Document</label>
-                            <input
-                                type="file"
-                                ref={fileInputRef}
-                                style={{ display: 'none' }}
-                                onChange={handleProofFileChange}
-                                accept=".pdf,.doc,.docx,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                            />
-                            <button
-                                className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium hover:bg-blue-200"
-                                onClick={() => fileInputRef.current && fileInputRef.current.click()}
-                                disabled={uploadingProof}
-                            >
-                                {proofFileName ? 'Change File' : 'Choose File'}
-                            </button>
-                            {proofFileName && (
-                                <span className="text-xs text-gray-700 max-w-[120px] truncate" title={proofFileName}>{proofFileName}</span>
-                            )}
-                            <button
-                                className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium hover:bg-green-200 disabled:opacity-50"
-                                onClick={handleProofUpload}
-                                disabled={!proofFile || uploadingProof}
-                            >
-                                {uploadingProof ? 'Uploading...' : 'Upload'}
-                            </button>
-                            {proofFileUrl && (
-                                <>
-                                    <a
-                                        href={proofFileUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="ml-2 text-xs text-blue-600 underline"
-                                        download
-                                    >
-                                        Download
-                                    </a>
-                                    <button
-                                        className="ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs font-medium hover:bg-yellow-200 border border-yellow-300"
-                                        type="button"
-                                        onClick={() => setShowDocViewer(true)}
-                                    >
-                                        Preview
-                                    </button>
-                                </>
-                            )}
+                        {/* Proof Document Upload (footer, left of Close) - Admin only */}
+                        {isAdmin && (
+                            <div className="flex flex-row items-center gap-2">
+                                <label className="text-xs text-gray-500">Proof Document</label>
+                                <input
+                                    type="file"
+                                    ref={fileInputRef}
+                                    style={{ display: 'none' }}
+                                    onChange={handleProofFileChange}
+                                    accept=".pdf,.doc,.docx,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                />
+                                <button
+                                    className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium hover:bg-blue-200"
+                                    onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                                    disabled={uploadingProof}
+                                >
+                                    {proofFileName ? 'Change File' : 'Choose File'}
+                                </button>
+                                {proofFileName && (
+                                    <span className="text-xs text-gray-700 max-w-[120px] truncate" title={proofFileName}>{proofFileName}</span>
+                                )}
+                                <button
+                                    className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium hover:bg-green-200 disabled:opacity-50"
+                                    onClick={handleProofUpload}
+                                    disabled={!proofFile || uploadingProof}
+                                >
+                                    {uploadingProof ? 'Uploading...' : 'Upload'}
+                                </button>
+                                {proofFileUrl && (
+                                    <>
+                                        <a
+                                            href={proofFileUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="ml-2 text-xs text-blue-600 underline"
+                                            download
+                                        >
+                                            Download
+                                        </a>
+                                        <button
+                                            className="ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs font-medium hover:bg-yellow-200 border border-yellow-300"
+                                            type="button"
+                                            onClick={() => setShowDocViewer(true)}
+                                        >
+                                            Preview
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                        )}
 
                     {/* Document Viewer Modal */}
                     {proofFileUrl && showDocViewer && (
@@ -743,7 +936,6 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                         </div>
                     )}
 
-                        </div>
                         <button
                             onClick={onClose}
                             className="px-5 py-1.5 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium transition-colors text-sm"
@@ -752,6 +944,23 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                         </button>
                     </div>
                 </div>
+
+            {/* Assign User Modal */}
+            <AssignUserModal
+                isOpen={showAssignModal}
+                onClose={() => {
+                    setShowAssignModal(false);
+                    setSelectedRequirement(null);
+                }}
+                requirement={selectedRequirement}
+                officeId={office?.id}
+                currentUserId={currentUser?.UserID}
+                isAdmin={isAdmin}
+                onSuccess={() => {
+                    // Optionally refresh requirements after assignment
+                    fetchOfficeRequirements();
+                }}
+            />
         </div>
     );
 }

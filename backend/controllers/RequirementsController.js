@@ -486,6 +486,317 @@ const deleteRequirements = async (req, res) => {
   }
 };
 
+// ========================
+// REQUIREMENT USER ASSIGNMENTS
+// ========================
+
+// Assign users to a requirement (max 4 users per requirement)
+const assignUsersToRequirement = async (req, res) => {
+  try {
+    const { requirementId, officeId, userIds, assignedBy } = req.body;
+
+    if (!requirementId || !userIds || !Array.isArray(userIds)) {
+      return res.status(400).json({
+        success: false,
+        message: 'RequirementID and userIds array are required'
+      });
+    }
+
+    if (userIds.length > 4) {
+      return res.status(400).json({
+        success: false,
+        message: 'Maximum 4 users can be assigned to a requirement'
+      });
+    }
+
+    // Check how many users are already assigned to this requirement
+    const existingQuery = 'SELECT COUNT(*) as count FROM requirement_user_assignments WHERE RequirementID = ?';
+    const existingParams = [requirementId];
+    
+    const [existingCount] = await db.query(existingQuery, existingParams);
+    
+    // Calculate how many more can be added
+    const currentCount = existingCount[0].count;
+    const remainingSlots = 4 - currentCount;
+    
+    if (remainingSlots <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'This requirement already has 4 users assigned (maximum reached)'
+      });
+    }
+
+    if (userIds.length > remainingSlots) {
+      return res.status(400).json({
+        success: false,
+        message: `Only ${remainingSlots} more user(s) can be assigned to this requirement`
+      });
+    }
+
+    // Check which users are already assigned (unique constraint is on RequirementID + UserID)
+    const checkQuery = 'SELECT UserID FROM requirement_user_assignments WHERE RequirementID = ? AND UserID IN (?)';
+    const checkParams = [requirementId, userIds];
+    
+    const [alreadyAssigned] = await db.query(checkQuery, checkParams);
+    const alreadyAssignedIds = alreadyAssigned.map(a => a.UserID);
+    
+    // Filter out already assigned users
+    const newUserIds = userIds.filter(id => !alreadyAssignedIds.includes(id));
+    
+    if (newUserIds.length === 0) {
+      return res.json({
+        success: true,
+        message: 'All selected users are already assigned to this requirement',
+        data: []
+      });
+    }
+
+    // Insert new assignments
+    const insertValues = newUserIds.map(userId => [requirementId, officeId || null, userId, assignedBy || null]);
+    
+    await db.query(
+      'INSERT INTO requirement_user_assignments (RequirementID, OfficeID, UserID, AssignedBy) VALUES ?',
+      [insertValues]
+    );
+
+    res.json({
+      success: true,
+      message: `Successfully assigned ${newUserIds.length} user(s) to the requirement`,
+      data: { assignedUserIds: newUserIds }
+    });
+  } catch (error) {
+    console.error('Error assigning users to requirement:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error assigning users to requirement'
+    });
+  }
+};
+
+// Get users assigned to a requirement
+const getAssignedUsers = async (req, res) => {
+  try {
+    const { requirementId } = req.params;
+
+    const query = `
+      SELECT 
+        rua.AssignmentID,
+        rua.RequirementID,
+        rua.OfficeID,
+        rua.UserID,
+        rua.AssignedAt,
+        rua.AssignedBy,
+        rua.HasUploaded,
+        u.FirstName,
+        u.MiddleInitial,
+        u.LastName,
+        u.Email,
+        u.ProfilePic
+      FROM requirement_user_assignments rua
+      JOIN users u ON rua.UserID = u.UserID
+      WHERE rua.RequirementID = ?
+      ORDER BY rua.AssignedAt DESC
+    `;
+    const params = [requirementId];
+
+    const [assignments] = await db.query(query, params);
+
+    res.json({
+      success: true,
+      data: assignments
+    });
+  } catch (error) {
+    console.error('Error fetching assigned users:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching assigned users'
+    });
+  }
+};
+
+// Remove user assignment from a requirement
+const removeUserAssignment = async (req, res) => {
+  try {
+    const { assignmentId } = req.params;
+
+    const [result] = await db.query(
+      'DELETE FROM requirement_user_assignments WHERE AssignmentID = ?',
+      [assignmentId]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Assignment not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'User assignment removed successfully'
+    });
+  } catch (error) {
+    console.error('Error removing user assignment:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error removing user assignment'
+    });
+  }
+};
+
+// Get all requirements a user is assigned to (with count check - max 4)
+const getUserAssignmentCount = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const [result] = await db.query(
+      'SELECT COUNT(*) as count FROM requirement_user_assignments WHERE UserID = ?',
+      [userId]
+    );
+
+    res.json({
+      success: true,
+      data: {
+        userId,
+        assignmentCount: result[0].count,
+        canAssignMore: result[0].count < 4,
+        remainingSlots: Math.max(0, 4 - result[0].count)
+      }
+    });
+  } catch (error) {
+    console.error('Error getting user assignment count:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error getting user assignment count'
+    });
+  }
+};
+
+// Get available users for assignment (all approved users with RoleID = 2)
+const getAvailableUsersForAssignment = async (req, res) => {
+  try {
+    const { requirementId, officeId } = req.query;
+
+    // Get all approved users with RoleID = 2
+    const [users] = await db.query(`
+      SELECT 
+        u.UserID,
+        u.FirstName,
+        u.MiddleInitial,
+        u.LastName,
+        u.Email,
+        u.ProfilePic
+      FROM users u
+      WHERE u.RoleID = 2 AND u.approval_status = 'approved'
+      ORDER BY u.FirstName, u.LastName
+    `);
+
+    // If requirementId is provided, also check which users are already assigned to it
+    if (requirementId) {
+      let assignedQuery = 'SELECT UserID FROM requirement_user_assignments WHERE RequirementID = ?';
+      const assignedParams = [requirementId];
+      
+      if (officeId) {
+        assignedQuery += ' AND OfficeID = ?';
+        assignedParams.push(officeId);
+      }
+      
+      const [alreadyAssigned] = await db.query(assignedQuery, assignedParams);
+      const assignedUserIds = alreadyAssigned.map(a => a.UserID);
+      
+      // Mark users that are already assigned to this requirement
+      const usersWithStatus = users.map(user => ({
+        ...user,
+        isAssigned: assignedUserIds.includes(user.UserID)
+      }));
+      
+      return res.json({
+        success: true,
+        data: usersWithStatus
+      });
+    }
+
+    res.json({
+      success: true,
+      data: users
+    });
+  } catch (error) {
+    console.error('Error fetching available users:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching available users'
+    });
+  }
+};
+
+// Update user's upload status for a requirement
+const updateUserUploadStatus = async (req, res) => {
+  try {
+    const { assignmentId } = req.params;
+    const { hasUploaded } = req.body;
+
+    const [result] = await db.query(
+      'UPDATE requirement_user_assignments SET HasUploaded = ? WHERE AssignmentID = ?',
+      [hasUploaded ? 1 : 0, assignmentId]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Assignment not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `Upload status updated to ${hasUploaded ? 'uploaded' : 'not uploaded'}`
+    });
+  } catch (error) {
+    console.error('Error updating upload status:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating upload status'
+    });
+  }
+};
+
+// Mark user as uploaded by requirementId and userId
+const markUserAsUploaded = async (req, res) => {
+  try {
+    const { requirementId, userId } = req.body;
+
+    if (!requirementId || !userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'RequirementID and UserID are required'
+      });
+    }
+
+    const [result] = await db.query(
+      'UPDATE requirement_user_assignments SET HasUploaded = 1 WHERE RequirementID = ? AND UserID = ?',
+      [requirementId, userId]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Assignment not found for this user and requirement'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'User marked as uploaded successfully'
+    });
+  } catch (error) {
+    console.error('Error marking user as uploaded:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error marking user as uploaded'
+    });
+  }
+};
+
 module.exports = {
   getAllCriteria,
   getCriteriaByEvent,
@@ -497,5 +808,13 @@ module.exports = {
   getAllEvents,
   addEvent,
   deleteEvents,
-  updateEvent
+  updateEvent,
+  // User assignment functions
+  assignUsersToRequirement,
+  getAssignedUsers,
+  removeUserAssignment,
+  getUserAssignmentCount,
+  getAvailableUsersForAssignment,
+  updateUserUploadStatus,
+  markUserAsUploaded
 };
