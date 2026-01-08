@@ -1,5 +1,4 @@
 const db = require('../db');
-const crypto = require('crypto');
 const multer = require('multer');
 const path = require('path');
 
@@ -32,59 +31,59 @@ const upload = multer({
 
 exports.uploadProfilePic = upload.single('profilePic');
 
+// Add a new office head - now requires UserID since names come from users table
 exports.addHead = async (req, res) => {
   try {
-    const { firstName, middleInitial, lastName, position, contactInfo } = req.body;
+    const { userId, position, contactInfo } = req.body;
     
     // Validate required fields
-    if (!firstName || !lastName || !position || !contactInfo) {
+    if (!userId || !position) {
       return res.status(400).json({
         success: false,
-        message: 'First name, last name, position, and contact info are required'
+        message: 'User ID and position are required'
       });
     }
 
-    // Get profile picture filename if uploaded (store only filename, not full path)
-    const profilePicFilename = req.file ? req.file.filename : null;
+    // Check if user exists
+    const [userCheck] = await db.execute('SELECT UserID, FirstName, LastName FROM users WHERE UserID = ?', [userId]);
+    if (userCheck.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
 
-    // Create the SQL query to insert the new office head using correct table and column names
+    // Create the SQL query to insert the new office head
     const query = `
       INSERT INTO headofoffice (
-        FirstName, 
-        MiddleInitial, 
-        LastName, 
+        UserID, 
         Position, 
         ContactInfo, 
-        ProfilePic,
         OfficeID
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?)
     `;
 
     const values = [
-      firstName.trim(),
-      middleInitial ? middleInitial.trim() : null,
-      lastName.trim(),
+      userId,
       position.trim(),
-      contactInfo.trim(),
-      profilePicFilename, // Store only filename
-      null // OfficeID will be assigned later as mentioned
+      contactInfo ? contactInfo.trim() : null,
+      null // OfficeID will be assigned later
     ];
 
     // Execute the query
     const [result] = await db.execute(query, values);
 
-    // Return success response
+    // Return success response with joined user data
     res.status(201).json({
       success: true,
       message: 'Office head added successfully',
       data: {
         HeadID: result.insertId,
-        FirstName: firstName.trim(),
-        MiddleInitial: middleInitial ? middleInitial.trim() : null,
-        LastName: lastName.trim(),
+        UserID: userId,
+        FirstName: userCheck[0].FirstName,
+        LastName: userCheck[0].LastName,
         Position: position.trim(),
-        ContactInfo: contactInfo.trim(),
-        ProfilePic: profilePicFilename,
+        ContactInfo: contactInfo ? contactInfo.trim() : null,
         OfficeID: null
       }
     });
@@ -96,7 +95,7 @@ exports.addHead = async (req, res) => {
     if (error.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({
         success: false,
-        message: 'An office head with this information already exists'
+        message: 'This user is already an office head'
       });
     }
 
@@ -108,25 +107,28 @@ exports.addHead = async (req, res) => {
   }
 };
 
+// Get all office heads with user information from users table
 exports.getAllHeads = async (req, res) => {
   try {
     console.log('DEBUG: getAllHeads route hit');
     const query = `
       SELECT 
-        HeadID,
-        FirstName,
-        MiddleInitial,
-        LastName,
-        Position,
-        ContactInfo,
-        ProfilePic,
-        OfficeID
-      FROM headofoffice 
-      ORDER BY LastName, FirstName
+        h.HeadID,
+        h.UserID,
+        u.FirstName,
+        u.MiddleInitial,
+        u.LastName,
+        h.Position,
+        h.ContactInfo,
+        u.ProfilePic,
+        h.OfficeID
+      FROM headofoffice h
+      LEFT JOIN users u ON h.UserID = u.UserID
+      ORDER BY u.LastName, u.FirstName
     `;
 
     const [rows] = await db.execute(query);
-    console.log('DEBUG: getAllHeads DB rows:', rows);
+    console.log('DEBUG: getAllHeads DB rows count:', rows.length);
 
     res.status(200).json({
       success: true,
@@ -135,29 +137,34 @@ exports.getAllHeads = async (req, res) => {
 
   } catch (error) {
     console.error('Error fetching office heads:', error);
+    console.error('Error stack:', error.stack);
     res.status(500).json({
       success: false,
-      message: 'Internal server error while fetching office heads'
+      message: 'Internal server error while fetching office heads',
+      error: error.message
     });
   }
 };
 
+// Get office head by ID
 exports.getHeadById = async (req, res) => {
   try {
     const { id } = req.params;
 
     const query = `
       SELECT 
-        HeadID,
-        FirstName,
-        MiddleInitial,
-        LastName,
-        Position,
-        ContactInfo,
-        ProfilePic,
-        OfficeID
-      FROM headofoffice 
-      WHERE HeadID = ?
+        h.HeadID,
+        h.UserID,
+        u.FirstName,
+        u.MiddleInitial,
+        u.LastName,
+        h.Position,
+        h.ContactInfo,
+        u.ProfilePic,
+        h.OfficeID
+      FROM headofoffice h
+      LEFT JOIN users u ON h.UserID = u.UserID
+      WHERE h.HeadID = ?
     `;
 
     const [rows] = await db.execute(query, [id]);
@@ -183,6 +190,7 @@ exports.getHeadById = async (req, res) => {
   }
 };
 
+// Delete office heads
 exports.deleteHeads = async (req, res) => {
   try {
     console.log('Delete request received');

@@ -124,18 +124,6 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
             console.log('Attempting to delete heads:', headIds);
             console.log('API Base URL:', 'http://localhost:5000/api/officeheads/delete');
             
-            // First test the connection
-            try {
-                await officeHeadsAPI.testConnection();
-                console.log('Backend connection test successful');
-            } catch (connError) {
-                console.error('Backend connection failed:', connError);
-                return { 
-                    success: false, 
-                    message: 'Cannot connect to backend server. Please make sure the backend is running on port 5000.' 
-                };
-            }
-            
             // Make API call to delete heads
             const response = await officeHeadsAPI.deleteHeads(headIds);
             console.log('Delete response:', response);
@@ -178,10 +166,13 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
             } else if (response && Array.isArray(response.data)) {
                 setOfficeHeads(response.data);
             } else {
-                setError('Failed to fetch office heads');
+                console.error('Unexpected response format:', response);
+                setError('Failed to fetch office heads - unexpected data format');
             }
         } catch (error) {
             console.error('Error fetching office heads:', error);
+            console.error('Error message:', error.message);
+            console.error('Error response:', error.response?.data);
             setError('Error loading office heads. Please try again.');
         } finally {
             setLoading(false);

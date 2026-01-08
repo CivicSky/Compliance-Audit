@@ -24,7 +24,9 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
         const fetchHeads = async () => {
             try {
                 const headsArr = await officeHeadsAPI.getAllHeads();
-               setHeads(headsArr.data || []);
+                // API returns array directly now
+                const headsData = Array.isArray(headsArr) ? headsArr : (headsArr?.data || []);
+                setHeads(headsData);
             } catch (err) {
                 setHeads([]);
             } finally {

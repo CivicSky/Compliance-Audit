@@ -24,8 +24,10 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
                 try {
                     const headsArr = await officeHeadsAPI.getAllHeads();
                     console.log('Fetched heads:', headsArr);
+                    // API returns array directly now
+                    const headsData = Array.isArray(headsArr) ? headsArr : (headsArr?.data || []);
                     // Accept heads with OfficeID null, 0, undefined, or empty string
-                    const availableHeads = (headsArr.data || []).filter((head) => {
+                    const availableHeads = headsData.filter((head) => {
                         const officeId = head.OfficeID ?? head.office_id ?? head.officeId;
                         return !officeId || officeId === 0 || officeId === '';
                     });

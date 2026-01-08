@@ -45,7 +45,8 @@ export default function Organization() {
                 const res = await eventsAPI.getAllEvents();
                 if (res.success && Array.isArray(res.data)) {
                     setEvents(res.data);
-                    if (res.data.length > 0) setSelectedEventType(res.data[0].EventID);
+                    // Default to "All Offices" (empty string) instead of first event
+                    // if (res.data.length > 0) setSelectedEventType(res.data[0].EventID);
                 } else {
                     setEvents([]);
                 }
@@ -214,6 +215,7 @@ export default function Organization() {
                         onChange={e => setSelectedEventType(e.target.value)}
                         className="w-full appearance-none px-5 py-3 border-2 border-blue-400 rounded-xl bg-white text-gray-800 font-semibold shadow focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 hover:border-blue-600 hover:shadow-lg"
                     >
+                        <option value="" className="text-base">All Offices</option>
                         {events.map(event => (
                             <option key={event.EventID} value={event.EventID} className="text-base">
                                 {event.EventName || event.eventType}

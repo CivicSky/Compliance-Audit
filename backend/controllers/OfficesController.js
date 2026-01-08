@@ -14,9 +14,9 @@ const OfficesController = {
           o.HeadID,
           o.EventID,
           ot.TypeName,
-          h.FirstName,
-          h.LastName,
-          h.ProfilePic,
+          u.FirstName,
+          u.LastName,
+          u.ProfilePic,
           os.OverallStatus,
           os.CompliancePercent,
           os.TotalRequirements,
@@ -26,6 +26,7 @@ const OfficesController = {
         FROM offices o
         LEFT JOIN officetypes ot ON o.OfficeTypeID = ot.OfficeTypeID
         LEFT JOIN headofoffice h ON o.HeadID = h.HeadID
+        LEFT JOIN users u ON h.UserID = u.UserID
         LEFT JOIN OverallOfficeStatus os ON o.OfficeID = os.OfficeID
       `);
 
@@ -47,7 +48,7 @@ const OfficesController = {
       }));
 
       console.log('Formatted offices with profile pics:', formatted);
-      res.json(formatted);
+      res.json({ success: true, data: formatted });
     } catch (err) {
       console.error("Error fetching offices:", err);
       console.error("Error details:", err.message);
@@ -70,14 +71,15 @@ const OfficesController = {
           o.HeadID,
           o.EventID,
           t.TypeName,
-          h.FirstName,
-          h.LastName,
+          u.FirstName,
+          u.LastName,
           os.OverallStatus,
           os.CompliancePercent,
           os.TotalRequirements
         FROM offices o
         LEFT JOIN officetypes t ON o.OfficeTypeID = t.OfficeTypeID
         LEFT JOIN headofoffice h ON o.HeadID = h.HeadID
+        LEFT JOIN users u ON h.UserID = u.UserID
         LEFT JOIN OverallOfficeStatus os ON o.OfficeID = os.OfficeID
         WHERE o.OfficeID = ?
       `, [id]);

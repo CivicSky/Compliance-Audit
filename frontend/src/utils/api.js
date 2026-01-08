@@ -72,7 +72,26 @@ export const officeHeadsAPI = {
     });
     return response.data;
   },
-  getAllHeads: async () => (await api.get('/api/officeheads/all')).data,
+  getAllHeads: async () => {
+    try {
+      const response = await api.get('/api/officeheads/all');
+      console.log('getAllHeads full response:', response);
+      // Backend returns { success: true, data: [...] }
+      // response.data is { success: true, data: [...] }
+      // So we need response.data.data for the array
+      if (response.data && response.data.data) {
+        return response.data.data;
+      } else if (Array.isArray(response.data)) {
+        return response.data;
+      } else {
+        console.error('Unexpected response format:', response.data);
+        return [];
+      }
+    } catch (error) {
+      console.error('getAllHeads error:', error);
+      throw error;
+    }
+  },
   getHeadById: async (id) => (await api.get(`/api/officeheads/${id}`)).data,
   deleteHeads: async (headIds) => {
     try {
@@ -154,7 +173,10 @@ export const usersAPI = {
   // Offices API
   // ========================
   export const officesAPI = {
-    getAll: async () => ({ data: (await api.get('/api/offices')).data }),
+    getAll: async () => {
+      const response = await api.get('/api/offices');
+      return response.data.data || response.data; // Handle both { data: [...] } and [...]
+    },
     createOffice: async (data) => (await api.post('/api/offices', data)).data,
     updateOffice: async (id, data) => (await api.put(`/api/offices/${id}`, data)).data,
     deleteOffice: async (id) => (await api.delete(`/api/offices/${id}`)).data,
