@@ -8,7 +8,8 @@ import { usersAPI } from "../../utils/api";
 export default function Users() {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterOptions, setFilterOptions] = useState({
-        approvalStatus: []
+        approvalStatus: [],
+        roles: []
     });
     const [selectedUser, setSelectedUser] = useState(null);
     const [showApprovalModal, setShowApprovalModal] = useState(false);

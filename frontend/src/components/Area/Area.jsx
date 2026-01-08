@@ -36,7 +36,7 @@ export default function RequirementBars() {
     const [selectedAreaIds, setSelectedAreaIds] = useState([]);
 
     // Default to admin (show features) until we confirm otherwise
-    const isAdmin = !currentUser || currentUser.RoleName === 'admin';
+    const isAdmin = !currentUser || currentUser.RoleName === 'admin' || currentUser.RoleID === 1;
 
     // Fetch current user on mount
     useEffect(() => {

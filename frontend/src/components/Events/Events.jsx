@@ -21,7 +21,7 @@ export default function Events() {
     const eventsPRef = useRef();
 
     // Default to admin (show features) until we confirm otherwise
-    const isAdmin = !currentUser || currentUser.RoleName === 'admin';
+    const isAdmin = !currentUser || currentUser.RoleName === 'admin' || currentUser.RoleID === 1;
 
     // Fetch current user on mount
     useEffect(() => {

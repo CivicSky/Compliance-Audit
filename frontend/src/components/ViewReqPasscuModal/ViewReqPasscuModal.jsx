@@ -311,17 +311,87 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                     {/* Office Info */}
                     <div className="px-6 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
                         <div className="flex items-center gap-3">
-                            <img
-                                src={officeData.head_profile_pic 
-                                    ? `http://localhost:5000/uploads/profile-pics/${officeData.head_profile_pic}`
-                                    : '/src/assets/images/user.svg'}
-                                alt={officeData.head_name}
-                                className="w-10 h-10 rounded-full object-cover border-2 border-blue-200"
-                            />
-                            <div>
-                                <p className="text-xs text-gray-500">Office Head</p>
-                                <p className="font-semibold text-sm text-gray-800">{officeData.head_name}</p>
-                            </div>
+                            {/* Multiple Heads Display with Overlapping Avatars */}
+                            {(() => {
+                                const officeHeads = officeData.heads || [];
+                                const hasMultipleHeads = officeHeads.length > 1;
+                                
+                                if (officeHeads.length === 0) {
+                                    // No heads - show single placeholder
+                                    return (
+                                        <>
+                                            <img
+                                                src={officeData.head_profile_pic 
+                                                    ? `http://localhost:5000/uploads/profile-pics/${officeData.head_profile_pic}`
+                                                    : '/src/assets/images/user.svg'}
+                                                alt={officeData.head_name}
+                                                className="w-10 h-10 rounded-full object-cover border-2 border-blue-200"
+                                            />
+                                            <div>
+                                                <p className="text-xs text-gray-500">Office Head</p>
+                                                <p className="font-semibold text-sm text-gray-800">{officeData.head_name || 'Unassigned'}</p>
+                                            </div>
+                                        </>
+                                    );
+                                } else if (hasMultipleHeads) {
+                                    // Multiple heads - show overlapping avatars
+                                    return (
+                                        <>
+                                            <div className="flex -space-x-2">
+                                                {officeHeads.slice(0, 4).map((head, index) => {
+                                                    const headPicUrl = head.ProfilePic 
+                                                        ? `http://localhost:5000/uploads/profile-pics/${head.ProfilePic}`
+                                                        : '/src/assets/images/user.svg';
+                                                    return (
+                                                        <img
+                                                            key={head.HeadID}
+                                                            src={headPicUrl}
+                                                            alt={head.full_name || 'Head'}
+                                                            className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm"
+                                                            style={{ zIndex: 10 - index }}
+                                                            onError={(e) => { e.target.src = '/src/assets/images/user.svg'; }}
+                                                            title={head.full_name}
+                                                        />
+                                                    );
+                                                })}
+                                                {officeHeads.length > 4 && (
+                                                    <div className="w-10 h-10 rounded-full bg-gray-200 border-2 border-white flex items-center justify-center text-xs font-medium text-gray-600 shadow-sm">
+                                                        +{officeHeads.length - 4}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div>
+                                                <p className="text-xs text-gray-500">Office Heads ({officeHeads.length})</p>
+                                                <p className="font-semibold text-sm text-gray-800 max-w-[200px] truncate" title={officeData.head_name}>
+                                                    {officeData.head_name}
+                                                </p>
+                                            </div>
+                                        </>
+                                    );
+                                } else {
+                                    // Single head
+                                    const primaryHead = officeHeads[0];
+                                    const headPicUrl = primaryHead?.ProfilePic 
+                                        ? `http://localhost:5000/uploads/profile-pics/${primaryHead.ProfilePic}`
+                                        : (officeData.head_profile_pic 
+                                            ? `http://localhost:5000/uploads/profile-pics/${officeData.head_profile_pic}`
+                                            : '/src/assets/images/user.svg');
+                                    return (
+                                        <>
+                                            <img
+                                                src={headPicUrl}
+                                                alt={primaryHead?.full_name || officeData.head_name}
+                                                className="w-10 h-10 rounded-full object-cover border-2 border-blue-200"
+                                                onError={(e) => { e.target.src = '/src/assets/images/user.svg'; }}
+                                            />
+                                            <div>
+                                                <p className="text-xs text-gray-500">Office Head</p>
+                                                <p className="font-semibold text-sm text-gray-800">{primaryHead?.full_name || officeData.head_name}</p>
+                                            </div>
+                                        </>
+                                    );
+                                }
+                            })()}
                         </div>
 
                         {/* Overall Status and Compliance Percentage */}

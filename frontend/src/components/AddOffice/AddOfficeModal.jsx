@@ -4,10 +4,11 @@ import { officesAPI, officeHeadsAPI } from "../../utils/api";
 export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes, events }) {
     const [officeName, setOfficeName] = useState("");
     const [officeTypeID, setOfficeTypeID] = useState("");
-    const [headID, setHeadID] = useState("");
+    const [selectedHeadIDs, setSelectedHeadIDs] = useState([]); // Array for multiple heads
     const [eventID, setEventID] = useState("");
     const [heads, setHeads] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [showHeadDropdown, setShowHeadDropdown] = useState(false);
 
 
 
@@ -16,8 +17,9 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
         if (isOpen) {
             setOfficeName("");
             setOfficeTypeID("");
-            setHeadID("");
+            setSelectedHeadIDs([]);
             setEventID("");
+            setShowHeadDropdown(false);
 
             // Fetch available office heads
             const fetchHeads = async () => {
@@ -26,12 +28,9 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
                     console.log('Fetched heads:', headsArr);
                     // API returns array directly now
                     const headsData = Array.isArray(headsArr) ? headsArr : (headsArr?.data || []);
-                    // Accept heads with OfficeID null, 0, undefined, or empty string
-                    const availableHeads = headsData.filter((head) => {
-                        const officeId = head.OfficeID ?? head.office_id ?? head.officeId;
-                        return !officeId || officeId === 0 || officeId === '';
-                    });
-                    setHeads(availableHeads);
+                    // Show all heads - don't filter by assignment status
+                    // Users can choose any head, assigned or not
+                    setHeads(headsData);
                 } catch (err) {
                     console.error("Failed to fetch office heads:", err);
                     setHeads([]);
@@ -41,11 +40,33 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
         }
     }, [isOpen]);
 
+    // Toggle head selection
+    const toggleHeadSelection = (headId) => {
+        setSelectedHeadIDs(prev => {
+            if (prev.includes(headId)) {
+                return prev.filter(id => id !== headId);
+            } else {
+                return [...prev, headId];
+            }
+        });
+    };
+
+    // Get selected heads display text
+    const getSelectedHeadsText = () => {
+        if (selectedHeadIDs.length === 0) return "Select Head(s)";
+        const selectedHeads = heads.filter(h => selectedHeadIDs.includes(h.HeadID));
+        if (selectedHeads.length === 1) {
+            const h = selectedHeads[0];
+            return `${h.FirstName} ${h.LastName}`;
+        }
+        return `${selectedHeads.length} heads selected`;
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        if (!officeName || !officeTypeID || !headID || !eventID) {
-            alert("Please fill out all required fields.");
+        if (!officeName || !officeTypeID || selectedHeadIDs.length === 0 || !eventID) {
+            alert("Please fill out all required fields (at least one head must be selected).");
             return;
         }
 
@@ -55,7 +76,7 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
             const newOffice = {
                 OfficeName: officeName,
                 OfficeTypeID: parseInt(officeTypeID),
-                HeadID: parseInt(headID),
+                HeadIDs: selectedHeadIDs.map(id => parseInt(id)), // Send array of head IDs
                 EventID: parseInt(eventID)
             };
 
@@ -134,22 +155,51 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
                         </select>
                     </div>
 
-                    <div>
-                        <label className="block text-sm font-semibold">Head</label>
-                        <select
-                            value={headID}
-                            onChange={(e) => setHeadID(e.target.value)}
-                            className="w-full border rounded px-2 py-1"
-                            required
+                    <div className="relative">
+                        <label className="block text-sm font-semibold">Head(s) <span className="text-gray-500 font-normal text-xs">(select one or more)</span></label>
+                        <button
+                            type="button"
+                            onClick={() => setShowHeadDropdown(!showHeadDropdown)}
+                            className="w-full border rounded px-2 py-1 text-left bg-white flex justify-between items-center"
                         >
-                            <option value="">Select Head</option>
-                            {heads.map((head) => (
-                                <option key={head.HeadID} value={head.HeadID}>
-                                    {head.FirstName} {head.MiddleInitial ? head.MiddleInitial + "." : ""}{" "}
-                                    {head.LastName} - {head.Position}
-                                </option>
-                            ))}
-                        </select>
+                            <span className={selectedHeadIDs.length === 0 ? "text-gray-400" : ""}>
+                                {getSelectedHeadsText()}
+                            </span>
+                            <svg className={`w-4 h-4 transition-transform ${showHeadDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                        
+                        {showHeadDropdown && (
+                            <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                                {heads.length === 0 ? (
+                                    <div className="px-3 py-2 text-gray-500 text-sm">No heads available</div>
+                                ) : (
+                                    heads.map((head) => {
+                                        const isSelected = selectedHeadIDs.includes(head.HeadID);
+                                        const isAssigned = head.OfficeID && head.OfficeID !== 0;
+                                        return (
+                                            <label
+                                                key={head.HeadID}
+                                                className={`flex items-center px-3 py-2 cursor-pointer hover:bg-blue-50 ${isSelected ? 'bg-blue-100' : ''}`}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isSelected}
+                                                    onChange={() => toggleHeadSelection(head.HeadID)}
+                                                    className="mr-2"
+                                                />
+                                                <span className="flex-1">
+                                                    {head.FirstName} {head.MiddleInitial ? head.MiddleInitial + "." : ""}{" "}
+                                                    {head.LastName} - {head.Position}
+                                                    {isAssigned && <span className="text-orange-500 text-xs ml-1">(Already Assigned)</span>}
+                                                </span>
+                                            </label>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex justify-end gap-2 mt-3">

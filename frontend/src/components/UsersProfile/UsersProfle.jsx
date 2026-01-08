@@ -56,6 +56,14 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
             );
         }
 
+        // Apply role filter
+        if (filterOptions.roles && filterOptions.roles.length > 0) {
+            filtered = filtered.filter(person => {
+                const userRole = person.RoleName?.toLowerCase() || 'user';
+                return filterOptions.roles.includes(userRole);
+            });
+        }
+
         // Sort by name in ascending order
         const sortedFiltered = [...filtered].sort((a, b) => {
             const nameA = `${a.FirstName} ${a.LastName}`.toLowerCase();

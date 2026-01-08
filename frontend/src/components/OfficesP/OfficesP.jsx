@@ -103,12 +103,19 @@ const OfficesP = forwardRef(
         return (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
                 {filtered.map((office) => {
-                    // Construct profile pic URL
-                    const profilePicUrl = office.head_profile_pic 
-                        ? `http://localhost:5000/uploads/profile-pics/${office.head_profile_pic}`
-                        : userIcon;
+                    // Get all heads for this office
+                    const officeHeads = office.heads || [];
+                    const hasMultipleHeads = officeHeads.length > 1;
+                    
+                    // For profile pics, show first head or default
+                    const primaryHead = officeHeads[0];
+                    const profilePicUrl = primaryHead?.ProfilePic 
+                        ? `http://localhost:5000/uploads/profile-pics/${primaryHead.ProfilePic}`
+                        : (office.head_profile_pic 
+                            ? `http://localhost:5000/uploads/profile-pics/${office.head_profile_pic}`
+                            : userIcon);
 
-                    console.log('Office:', office.office_name, 'ProfilePic:', office.head_profile_pic, 'URL:', profilePicUrl);
+                    console.log('Office:', office.office_name, 'Heads:', officeHeads.length, 'ProfilePic:', office.head_profile_pic);
 
                     return (
                         <div
@@ -144,23 +151,75 @@ const OfficesP = forwardRef(
                                 </span>
                             </div>
 
-                            <div className="flex items-center gap-3 mt-3">
-                                <img
-                                    src={profilePicUrl}
-                                    alt={office.head_name || 'Unassigned'}
-                                    className="w-10 h-10 rounded-full object-cover border-2 border-gray-200"
-                                    onError={(e) => {
-                                        e.target.src = userIcon;
-                                    }}
-                                />
-                                <div className="flex-1">
-                                    <p className="text-sm text-gray-600">
-                                        <span className="font-medium">Head:</span>{' '}
-                                        <span className={!office.head_id || office.head_name === 'Unassigned' ? 'text-gray-400 italic' : ''}>
-                                            {office.head_name || 'Unassigned'}
-                                        </span>
-                                    </p>
-                                </div>
+                            {/* Office Heads Section */}
+                            <div className="mt-3">
+                                <p className="text-xs font-medium text-gray-500 mb-2">
+                                    {officeHeads.length > 0 ? `Head${hasMultipleHeads ? 's' : ''}:` : 'Head:'}
+                                </p>
+                                
+                                {officeHeads.length === 0 ? (
+                                    <div className="flex items-center gap-3">
+                                        <img
+                                            src={userIcon}
+                                            alt="Unassigned"
+                                            className="w-10 h-10 rounded-full object-cover border-2 border-gray-200"
+                                        />
+                                        <span className="text-sm text-gray-400 italic">Unassigned</span>
+                                    </div>
+                                ) : hasMultipleHeads ? (
+                                    <div className="space-y-2">
+                                        {/* Stacked avatar display for multiple heads */}
+                                        <div className="flex items-center">
+                                            <div className="flex -space-x-2">
+                                                {officeHeads.slice(0, 3).map((head, index) => {
+                                                    const headPicUrl = head.ProfilePic 
+                                                        ? `http://localhost:5000/uploads/profile-pics/${head.ProfilePic}`
+                                                        : userIcon;
+                                                    return (
+                                                        <img
+                                                            key={head.HeadID}
+                                                            src={headPicUrl}
+                                                            alt={head.full_name || 'Head'}
+                                                            className="w-8 h-8 rounded-full object-cover border-2 border-white shadow-sm"
+                                                            style={{ zIndex: 10 - index }}
+                                                            onError={(e) => { e.target.src = userIcon; }}
+                                                            title={head.full_name}
+                                                        />
+                                                    );
+                                                })}
+                                                {officeHeads.length > 3 && (
+                                                    <div className="w-8 h-8 rounded-full bg-gray-200 border-2 border-white flex items-center justify-center text-xs font-medium text-gray-600">
+                                                        +{officeHeads.length - 3}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <span className="ml-3 text-sm text-gray-600">
+                                                {officeHeads.length} office heads
+                                            </span>
+                                        </div>
+                                        {/* List of names */}
+                                        <div className="text-xs text-gray-500 pl-1">
+                                            {officeHeads.map(h => h.full_name).join(', ')}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center gap-3">
+                                        <img
+                                            src={profilePicUrl}
+                                            alt={primaryHead?.full_name || 'Head'}
+                                            className="w-10 h-10 rounded-full object-cover border-2 border-gray-200"
+                                            onError={(e) => { e.target.src = userIcon; }}
+                                        />
+                                        <div className="flex-1">
+                                            <p className="text-sm text-gray-700 font-medium">
+                                                {primaryHead?.full_name || office.head_name || 'Unassigned'}
+                                            </p>
+                                            {primaryHead?.Position && (
+                                                <p className="text-xs text-gray-500">{primaryHead.Position}</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             {deleteMode && (

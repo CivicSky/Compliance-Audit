@@ -16,7 +16,7 @@ export default function Home() {
     const [currentUser, setCurrentUser] = useState(null);
 
     // Default to admin (show features) until we confirm otherwise
-    const isAdmin = !currentUser || currentUser.RoleName === 'admin';
+    const isAdmin = !currentUser || currentUser.RoleName === 'admin' || currentUser.RoleID === 1;
 
     useEffect(() => {
         const fetchCurrentUser = async () => {

@@ -1,4 +1,6 @@
 const db = require('../db');
+const fs = require('fs');
+const path = require('path');
 
 // Get all events
 const getAllEvents = async (req, res) => {
@@ -15,6 +17,11 @@ const getAllEvents = async (req, res) => {
       message: 'Error fetching events'
     });
   }
+};
+
+// Helper function to sanitize folder name (remove invalid characters)
+const sanitizeFolderName = (name) => {
+  return name.replace(/[<>:"/\\|?*]/g, '_').trim();
 };
 
 // Add new event
@@ -36,6 +43,22 @@ const addEvent = async (req, res) => {
       [EventName, EventCode, Description || null]
     );
 
+    // Create folder for the event inside uploads/events
+    const sanitizedName = sanitizeFolderName(EventName);
+    const eventFolderPath = path.join(__dirname, '..', 'uploads', 'events', sanitizedName);
+    
+    // Ensure uploads/events directory exists
+    const eventsBasePath = path.join(__dirname, '..', 'uploads', 'events');
+    if (!fs.existsSync(eventsBasePath)) {
+      fs.mkdirSync(eventsBasePath, { recursive: true });
+    }
+    
+    // Create the event-specific folder
+    if (!fs.existsSync(eventFolderPath)) {
+      fs.mkdirSync(eventFolderPath, { recursive: true });
+      console.log(`Created event folder: ${eventFolderPath}`);
+    }
+
     res.json({
       success: true,
       message: 'Event added successfully',
@@ -43,7 +66,8 @@ const addEvent = async (req, res) => {
         EventID: result.insertId,
         EventName,
         EventCode,
-        Description
+        Description,
+        FolderPath: sanitizedName
       }
     });
   } catch (error) {

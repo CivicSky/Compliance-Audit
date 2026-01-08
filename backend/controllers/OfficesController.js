@@ -2,11 +2,12 @@ const db = require("../db");
 
 const OfficesController = {
   // ================================
-  // GET ALL OFFICES (WITH JOINED DATA)
+  // GET ALL OFFICES (WITH JOINED DATA - SUPPORTS MULTIPLE HEADS)
   // ================================
   getAll: async (req, res) => {
     try {
-      const [rows] = await db.query(`
+      // First get all offices with basic info
+      const [officeRows] = await db.query(`
         SELECT 
           o.OfficeID,
           o.OfficeName,
@@ -14,9 +15,6 @@ const OfficesController = {
           o.HeadID,
           o.EventID,
           ot.TypeName,
-          u.FirstName,
-          u.LastName,
-          u.ProfilePic,
           os.OverallStatus,
           os.CompliancePercent,
           os.TotalRequirements,
@@ -25,29 +23,69 @@ const OfficesController = {
           os.NotCompliedCount
         FROM offices o
         LEFT JOIN officetypes ot ON o.OfficeTypeID = ot.OfficeTypeID
-        LEFT JOIN headofoffice h ON o.HeadID = h.HeadID
-        LEFT JOIN users u ON h.UserID = u.UserID
         LEFT JOIN OverallOfficeStatus os ON o.OfficeID = os.OfficeID
       `);
 
-      const formatted = rows.map(r => ({
-        id: r.OfficeID,
-        office_name: r.OfficeName,
-        office_type_id: r.OfficeTypeID,
-        office_type_name: r.TypeName || "Unknown Type",
-        head_id: r.HeadID,
-        head_name: r.FirstName ? `${r.FirstName} ${r.LastName}` : "Unassigned",
-        head_profile_pic: r.ProfilePic,
-        event_id: r.EventID,
-        overall_status: r.OverallStatus || 'Not Complied',
-        compliance_percent: r.CompliancePercent || 0,
-        total_requirements: r.TotalRequirements || 0,
-        complied_count: r.CompliedCount || 0,
-        partially_complied_count: r.PartiallyCompliedCount || 0,
-        not_complied_count: r.NotCompliedCount || 0
-      }));
+      // Get all heads assigned to offices (via headofoffice.OfficeID)
+      const [headRows] = await db.query(`
+        SELECT 
+          h.HeadID,
+          h.OfficeID,
+          h.Position,
+          u.FirstName,
+          u.MiddleInitial,
+          u.LastName,
+          u.ProfilePic
+        FROM headofoffice h
+        LEFT JOIN users u ON h.UserID = u.UserID
+        WHERE h.OfficeID IS NOT NULL
+      `);
 
-      console.log('Formatted offices with profile pics:', formatted);
+      // Group heads by OfficeID
+      const headsByOffice = {};
+      headRows.forEach(head => {
+        if (!headsByOffice[head.OfficeID]) {
+          headsByOffice[head.OfficeID] = [];
+        }
+        headsByOffice[head.OfficeID].push({
+          HeadID: head.HeadID,
+          FirstName: head.FirstName,
+          MiddleInitial: head.MiddleInitial,
+          LastName: head.LastName,
+          Position: head.Position,
+          ProfilePic: head.ProfilePic,
+          full_name: head.FirstName ? `${head.FirstName} ${head.MiddleInitial ? head.MiddleInitial + '.' : ''} ${head.LastName}`.trim() : 'Unknown'
+        });
+      });
+
+      const formatted = officeRows.map(r => {
+        const officeHeads = headsByOffice[r.OfficeID] || [];
+        // For backward compatibility, also include primary head info
+        const primaryHead = officeHeads[0] || null;
+        
+        return {
+          id: r.OfficeID,
+          office_name: r.OfficeName,
+          office_type_id: r.OfficeTypeID,
+          office_type_name: r.TypeName || "Unknown Type",
+          head_id: r.HeadID, // Legacy single head ID
+          head_ids: officeHeads.map(h => h.HeadID), // Array of head IDs
+          heads: officeHeads, // Full head objects
+          head_name: officeHeads.length > 0 
+            ? officeHeads.map(h => h.full_name).join(', ')
+            : "Unassigned",
+          head_profile_pic: primaryHead?.ProfilePic || null,
+          event_id: r.EventID,
+          overall_status: r.OverallStatus || 'Not Complied',
+          compliance_percent: r.CompliancePercent || 0,
+          total_requirements: r.TotalRequirements || 0,
+          complied_count: r.CompliedCount || 0,
+          partially_complied_count: r.PartiallyCompliedCount || 0,
+          not_complied_count: r.NotCompliedCount || 0
+        };
+      });
+
+      console.log('Formatted offices with multiple heads:', formatted);
       res.json({ success: true, data: formatted });
     } catch (err) {
       console.error("Error fetching offices:", err);
@@ -109,38 +147,54 @@ const OfficesController = {
   },
 
   // ================================
-  // CREATE NEW OFFICE
+  // CREATE NEW OFFICE (SUPPORTS MULTIPLE HEADS)
   // ================================
   create: async (req, res) => {
-    const { OfficeName, OfficeTypeID, HeadID, EventID } = req.body;
+    const { OfficeName, OfficeTypeID, HeadID, HeadIDs, EventID } = req.body;
 
-    console.log('Received create office request:', { OfficeName, OfficeTypeID, HeadID, EventID });
+    // Support both single HeadID (legacy) and HeadIDs array (new)
+    const headIdArray = HeadIDs || (HeadID ? [HeadID] : []);
+
+    console.log('Received create office request:', { OfficeName, OfficeTypeID, headIdArray, EventID });
 
     try {
+      // Create the office (HeadID field kept for backward compatibility, stores first head)
       const [result] = await db.query(
         `INSERT INTO offices (OfficeName, OfficeTypeID, HeadID, EventID)
          VALUES (?, ?, ?, ?)`,
         [
           OfficeName,
           OfficeTypeID || null,
-          HeadID || null,
+          headIdArray.length > 0 ? headIdArray[0] : null,
           EventID || null
         ]
       );
 
-      console.log('Office created successfully:', result.insertId);
+      const newOfficeId = result.insertId;
+      console.log('Office created successfully:', newOfficeId);
+
+      // Assign all heads to this office (update headofoffice.OfficeID)
+      if (headIdArray.length > 0) {
+        for (const hid of headIdArray) {
+          await db.query(
+            `UPDATE headofoffice SET OfficeID = ? WHERE HeadID = ?`,
+            [newOfficeId, hid]
+          );
+        }
+        console.log('Assigned heads to office:', headIdArray);
+      }
 
       // Initialize OverallOfficeStatus for the new office
-      await updateOverallOfficeStatus(result.insertId);
+      await updateOverallOfficeStatus(newOfficeId);
 
       res.json({
         success: true,
         message: 'Office created successfully',
         data: {
-          OfficeID: result.insertId,
+          OfficeID: newOfficeId,
           OfficeName,
           OfficeTypeID,
-          HeadID,
+          HeadIDs: headIdArray,
           EventID
         }
       });
@@ -157,22 +211,43 @@ const OfficesController = {
   },
 
   // ================================
-  // UPDATE OFFICE
+  // UPDATE OFFICE (SUPPORTS MULTIPLE HEADS)
   // ================================
   update: async (req, res) => {
     const id = req.params.id;
-    const { OfficeName, OfficeTypeID, HeadID, EventID } = req.body;
+    const { OfficeName, OfficeTypeID, HeadID, HeadIDs, EventID } = req.body;
+
+    // Support both single HeadID (legacy) and HeadIDs array (new)
+    const headIdArray = HeadIDs || (HeadID ? [HeadID] : []);
 
     try {
+      // Update the office basic info (HeadID for backward compatibility)
       const [result] = await db.query(
         `UPDATE offices 
          SET OfficeName = ?, OfficeTypeID = ?, HeadID = ?, EventID = ?
          WHERE OfficeID = ?`,
-        [OfficeName, OfficeTypeID, HeadID, EventID, id]
+        [OfficeName, OfficeTypeID, headIdArray.length > 0 ? headIdArray[0] : null, EventID, id]
       );
 
       if (result.affectedRows === 0) {
         return res.status(404).json({ success: false, message: "Office not found" });
+      }
+
+      // Unassign all heads currently assigned to this office
+      await db.query(
+        `UPDATE headofoffice SET OfficeID = NULL WHERE OfficeID = ?`,
+        [id]
+      );
+
+      // Assign all new heads to this office
+      if (headIdArray.length > 0) {
+        for (const hid of headIdArray) {
+          await db.query(
+            `UPDATE headofoffice SET OfficeID = ? WHERE HeadID = ?`,
+            [id, hid]
+          );
+        }
+        console.log('Updated heads for office', id, ':', headIdArray);
       }
 
       res.json({ success: true, message: "Office updated successfully" });

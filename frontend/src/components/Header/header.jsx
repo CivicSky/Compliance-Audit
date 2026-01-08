@@ -61,6 +61,13 @@ export default function Header({ pageTitle = "Compliance Audit", showSearch = tr
             } else {
                 newFilters.approvalStatus.push(value);
             }
+        } else if (filterType === 'role') {
+            if (!newFilters.roles) newFilters.roles = [];
+            if (newFilters.roles.includes(value)) {
+                newFilters.roles = newFilters.roles.filter(r => r !== value);
+            } else {
+                newFilters.roles.push(value);
+            }
         }
         
         onFilterChange(newFilters);
@@ -68,7 +75,7 @@ export default function Header({ pageTitle = "Compliance Audit", showSearch = tr
 
     const clearAllFilters = () => {
         if (onFilterChange) {
-            onFilterChange({ events: [], types: [], approvalStatus: [] });
+            onFilterChange({ events: [], types: [], approvalStatus: [], roles: [] });
         }
     };
 
@@ -262,18 +269,19 @@ export default function Header({ pageTitle = "Compliance Audit", showSearch = tr
                                         type="button"
                                         onClick={() => setShowFilterDropdown(!showFilterDropdown)}
                                         className={`flex items-center justify-center lg:w-10 lg:h-10 w-8 h-8 rounded-md shadow-md border border-gray-200 ${
-                                            filterOptions.approvalStatus && filterOptions.approvalStatus.length > 0
+                                            (filterOptions.approvalStatus && filterOptions.approvalStatus.length > 0) || (filterOptions.roles && filterOptions.roles.length > 0)
                                                 ? 'bg-blue-500 text-white hover:bg-blue-600'
                                                 : 'bg-white text-gray-700 hover:bg-gray-50'
                                         }`}
-                                        title="Filter by Approval Status"
+                                        title="Filter Users"
                                     >
+                                        {/* Users Filter Icon */}
                                         <svg className="lg:w-5 lg:h-5 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                                         </svg>
-                                        {filterOptions.approvalStatus && filterOptions.approvalStatus.length > 0 && (
+                                        {((filterOptions.approvalStatus && filterOptions.approvalStatus.length > 0) || (filterOptions.roles && filterOptions.roles.length > 0)) && (
                                             <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                                                {filterOptions.approvalStatus.length}
+                                                {(filterOptions.approvalStatus?.length || 0) + (filterOptions.roles?.length || 0)}
                                             </span>
                                         )}
                                     </button>
@@ -281,8 +289,8 @@ export default function Header({ pageTitle = "Compliance Audit", showSearch = tr
                                     {showFilterDropdown && (
                                         <div className="absolute right-0 mt-2 w-72 bg-white rounded-md shadow-lg border border-gray-200 z-50 max-h-96 overflow-y-auto">
                                             <div className="p-3 border-b border-gray-200 flex items-center justify-between">
-                                                <h3 className="font-semibold text-gray-800">Filter by Status</h3>
-                                                {filterOptions.approvalStatus && filterOptions.approvalStatus.length > 0 && (
+                                                <h3 className="font-semibold text-gray-800">Filter Users</h3>
+                                                {((filterOptions.approvalStatus && filterOptions.approvalStatus.length > 0) || (filterOptions.roles && filterOptions.roles.length > 0)) && (
                                                     <button
                                                         onClick={clearAllFilters}
                                                         className="text-xs text-blue-600 hover:text-blue-700"
@@ -291,9 +299,32 @@ export default function Header({ pageTitle = "Compliance Audit", showSearch = tr
                                                     </button>
                                                 )}
                                             </div>
+                                            {/* By Role */}
+                                            <div className="p-3 border-b border-gray-200">
+                                                <h4 className="text-sm font-medium text-gray-700 mb-2">By Role</h4>
+                                                <div className="space-y-2">
+                                                    {[
+                                                        { value: 'admin', label: 'Admin', color: 'bg-purple-100 text-purple-800' },
+                                                        { value: 'user', label: 'User', color: 'bg-blue-100 text-blue-800' }
+                                                    ].map((role) => (
+                                                        <label key={role.value} className="flex items-center cursor-pointer hover:bg-gray-50 p-1 rounded">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={filterOptions.roles && filterOptions.roles.includes(role.value)}
+                                                                onChange={() => handleFilterToggle('role', role.value)}
+                                                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                                            />
+                                                            <span className="ml-2 text-sm text-gray-700">{role.label}</span>
+                                                            <span className={`ml-auto text-xs px-2 py-1 rounded ${role.color}`}>
+                                                                {role.label}
+                                                            </span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            </div>
                                             {/* By Approval Status */}
                                             <div className="p-3">
-                                                <h4 className="text-sm font-medium text-gray-700 mb-2">Approval Status</h4>
+                                                <h4 className="text-sm font-medium text-gray-700 mb-2">By Approval Status</h4>
                                                 <div className="space-y-2">
                                                     {[
                                                         { value: 'approved', label: 'Approved', color: 'bg-green-100 text-green-800' },
