@@ -8,10 +8,15 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [selectedEvents, setSelectedEvents] = useState(new Set());
+    const [downloadableFolders, setDownloadableFolders] = useState([]);
 
     // Fetch events data from database
     useEffect(() => {
         fetchEvents();
+        // Fetch downloadable folders on mount
+        eventsAPI.getDownloadableFolders().then(res => {
+            if (res.success) setDownloadableFolders(res.folders);
+        });
     }, []);
 
     // Filter and sort events based on search term
@@ -210,13 +215,12 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
                 return (
                     <div 
                         key={event.EventID} 
-                        onClick={() => !deleteMode && onEventClick && onEventClick(event)}
                         className={`bg-white rounded-lg shadow-md border border-gray-200 transition-all duration-200 ${
                         deleteMode ? 'hover:shadow-lg' : 'hover:shadow-lg cursor-pointer'
                     } ${selectedEvents.has(event.EventID) ? 'ring-2 ring-blue-500 bg-blue-50' : ''}`}>
                         <div className="flex items-center justify-between p-4">
                             {/* Left Section: Checkbox + Avatar + Info */}
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-4" onClick={() => !deleteMode && onEventClick && onEventClick(event)}>
                                 {/* Checkbox for delete mode */}
                                 {deleteMode && (
                                     <input
@@ -251,8 +255,8 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
                                 </div>
                             </div>
                             
-                            {/* Right Section: Status Badge */}
-                            <div className="flex-shrink-0">
+                            {/* Right Section: Status Badge and Download */}
+                            <div className="flex-shrink-0 flex flex-col items-end gap-2">
                                 <span className={`px-3 py-1 rounded text-sm font-medium ${
                                     event.CreatedAt 
                                         ? 'bg-blue-100 text-blue-700' 
@@ -260,6 +264,41 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
                                 }`}>
                                     {event.CreatedAt ? 'Active' : 'Unassigned'}
                                 </span>
+                                {downloadableFolders.includes(event.EventName.replace(/[<>:"/\\|?*]/g, '_').trim()) && (
+                                    <button
+                                        className="mt-1 px-3 py-1.5 bg-green-600 text-white rounded text-xs font-medium hover:bg-green-700 transition-colors flex items-center gap-1.5"
+                                        title="Download event folder as zip"
+                                        onClick={async (e) => {
+                                            e.stopPropagation();
+                                            e.preventDefault();
+                                            try {
+                                                const sanitizedName = event.EventName.replace(/[<>:"/\\|?*]/g, '_').trim();
+                                                const url = await eventsAPI.downloadEventZip(event.EventName);
+                                                
+                                                // Create download link
+                                                const link = document.createElement('a');
+                                                link.href = url;
+                                                link.download = `${sanitizedName}.zip`;
+                                                document.body.appendChild(link);
+                                                link.click();
+                                                document.body.removeChild(link);
+                                                
+                                                // Clean up blob URL after a delay
+                                                setTimeout(() => {
+                                                    window.URL.revokeObjectURL(url);
+                                                }, 100);
+                                            } catch (err) {
+                                                console.error('Download error:', err);
+                                                alert('Download failed: ' + (err.message || 'Unknown error'));
+                                            }
+                                        }}
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                        </svg>
+                                        Download
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>

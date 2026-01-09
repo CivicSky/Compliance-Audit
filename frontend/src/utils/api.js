@@ -157,6 +157,24 @@ export const usersAPI = {
     addEvent: async (eventData) => (await api.post('/api/events/add', eventData)).data,
     updateEvent: async (eventId, eventData) => (await api.put(`/api/events/update/${eventId}`, eventData)).data,
     deleteEvents: async (eventIds) => (await api.post('/api/events/delete', { eventIds })).data,
+    getDownloadableFolders: async () => (await api.get('/api/events/downloadable-folders')).data,
+    downloadEventZip: async (eventName) => {
+      try {
+        const response = await api.get(`/api/events/download/${encodeURIComponent(eventName)}`, {
+          responseType: 'blob'
+        });
+        // response.data is already a Blob when responseType is 'blob'
+        return window.URL.createObjectURL(response.data);
+      } catch (error) {
+        console.error('Download error:', error);
+        // If error response has a blob (error message), try to extract it
+        if (error.response && error.response.data instanceof Blob) {
+          const errorText = await error.response.data.text();
+          throw new Error(errorText || 'Download failed');
+        }
+        throw error;
+      }
+    },
   };
 
   // ========================

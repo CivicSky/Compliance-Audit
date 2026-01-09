@@ -509,51 +509,51 @@ const assignUsersToRequirement = async (req, res) => {
       });
     }
 
-    // Check how many users are already assigned to this requirement
-    const existingQuery = 'SELECT COUNT(*) as count FROM requirement_user_assignments WHERE RequirementID = ?';
-    const existingParams = [requirementId];
-    
+    // Check how many users are already assigned to this requirement in this office
+    const existingQuery = 'SELECT COUNT(*) as count FROM requirement_user_assignments WHERE RequirementID = ? AND OfficeID = ?';
+    const existingParams = [requirementId, officeId];
+
     const [existingCount] = await db.query(existingQuery, existingParams);
-    
+
     // Calculate how many more can be added
     const currentCount = existingCount[0].count;
     const remainingSlots = 4 - currentCount;
-    
+
     if (remainingSlots <= 0) {
       return res.status(400).json({
         success: false,
-        message: 'This requirement already has 4 users assigned (maximum reached)'
+        message: 'This requirement already has 4 users assigned in this office (maximum reached)'
       });
     }
 
     if (userIds.length > remainingSlots) {
       return res.status(400).json({
         success: false,
-        message: `Only ${remainingSlots} more user(s) can be assigned to this requirement`
+        message: `Only ${remainingSlots} more user(s) can be assigned to this requirement in this office`
       });
     }
 
-    // Check which users are already assigned (unique constraint is on RequirementID + UserID)
-    const checkQuery = 'SELECT UserID FROM requirement_user_assignments WHERE RequirementID = ? AND UserID IN (?)';
-    const checkParams = [requirementId, userIds];
-    
+    // Check which users are already assigned (unique constraint is on RequirementID + OfficeID + UserID)
+    const checkQuery = 'SELECT UserID FROM requirement_user_assignments WHERE RequirementID = ? AND OfficeID = ? AND UserID IN (?)';
+    const checkParams = [requirementId, officeId, userIds];
+
     const [alreadyAssigned] = await db.query(checkQuery, checkParams);
     const alreadyAssignedIds = alreadyAssigned.map(a => a.UserID);
-    
+
     // Filter out already assigned users
     const newUserIds = userIds.filter(id => !alreadyAssignedIds.includes(id));
-    
+
     if (newUserIds.length === 0) {
       return res.json({
         success: true,
-        message: 'All selected users are already assigned to this requirement',
+        message: 'All selected users are already assigned to this requirement in this office',
         data: []
       });
     }
 
     // Insert new assignments
     const insertValues = newUserIds.map(userId => [requirementId, officeId || null, userId, assignedBy || null]);
-    
+
     await db.query(
       'INSERT INTO requirement_user_assignments (RequirementID, OfficeID, UserID, AssignedBy) VALUES ?',
       [insertValues]
@@ -561,7 +561,7 @@ const assignUsersToRequirement = async (req, res) => {
 
     res.json({
       success: true,
-      message: `Successfully assigned ${newUserIds.length} user(s) to the requirement`,
+      message: `Successfully assigned ${newUserIds.length} user(s) to the requirement in this office`,
       data: { assignedUserIds: newUserIds }
     });
   } catch (error) {
@@ -577,8 +577,9 @@ const assignUsersToRequirement = async (req, res) => {
 const getAssignedUsers = async (req, res) => {
   try {
     const { requirementId } = req.params;
+    const { officeId } = req.query;
 
-    const query = `
+    let query = `
       SELECT 
         rua.AssignmentID,
         rua.RequirementID,
@@ -595,9 +596,13 @@ const getAssignedUsers = async (req, res) => {
       FROM requirement_user_assignments rua
       JOIN users u ON rua.UserID = u.UserID
       WHERE rua.RequirementID = ?
-      ORDER BY rua.AssignedAt DESC
     `;
     const params = [requirementId];
+    if (officeId) {
+      query += ' AND rua.OfficeID = ?';
+      params.push(officeId);
+    }
+    query += ' ORDER BY rua.AssignedAt DESC';
 
     const [assignments] = await db.query(query, params);
 

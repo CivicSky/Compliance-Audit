@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
@@ -35,6 +34,9 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
     // State for user requirement upload
     const [userUploadingReqId, setUserUploadingReqId] = useState(null);
     const userReqFileInputRef = useRef();
+    // Add state for selected user file preview
+    const [selectedUserFile, setSelectedUserFile] = useState(null);
+    const [showUserFileViewer, setShowUserFileViewer] = useState(false);
 
     // RoleID 1 = admin (can edit/upload), RoleID 2+ = regular user
     const isAdmin = currentUser && currentUser.RoleID === 1;
@@ -146,7 +148,8 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
             const assignedMap = {};
             await Promise.all(reqs.map(async (req) => {
                 try {
-                    const assignedRes = await requirementsAPI.getAssignedUsers(req.RequirementID);
+                    // Pass office.id to ensure assignments are per office and requirement
+                    const assignedRes = await requirementsAPI.getAssignedUsers(req.RequirementID, office.id);
                     assignedMap[req.RequirementID] = assignedRes.data || [];
                 } catch (err) {
                     console.error(`Error fetching assigned users for req ${req.RequirementID}:`, err);
@@ -268,7 +271,7 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
             if (data.success) {
                 // Mark the user as uploaded
                 await requirementsAPI.markUserAsUploaded(requirementId, currentUser.UserID);
-                
+
                 // Refresh assigned users for this requirement to show green border
                 const assignedRes = await requirementsAPI.getAssignedUsers(requirementId);
                 if (assignedRes.success) {
@@ -277,7 +280,10 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                         [requirementId]: assignedRes.users
                     }));
                 }
-                
+
+                // Refresh all requirements and compliance status so UI updates instantly
+                await fetchOfficeRequirements();
+
                 alert('File uploaded successfully!');
             } else {
                 alert(data.message || 'Failed to upload file');
@@ -325,6 +331,23 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
             setExcelHtml(html);
         } catch (err) {
             setExcelHtml('<div style="color:red;">Failed to preview Excel file.</div>');
+        }
+    };
+
+    // Function to handle user avatar click (admin only, only if uploaded)
+    const handleUserAvatarClick = async (user, requirementId) => {
+        if (!isAdmin || !(user.HasUploaded === 1 || user.HasUploaded === true)) return;
+        try {
+            // Fetch the uploaded file for this user and requirement
+            const res = await axios.get(`http://localhost:5000/api/requirements/${requirementId}/user-file/${user.UserID}`);
+            if (res.data && res.data.success && res.data.file) {
+                setSelectedUserFile(res.data.file);
+                setShowUserFileViewer(true);
+            } else {
+                alert('No file found for this user.');
+            }
+        } catch (err) {
+            alert('Error fetching user file.');
         }
     };
 
@@ -765,9 +788,11 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                                                                                             <div
                                                                                                 key={user.UserID}
                                                                                                 className="relative group"
+                                                                                                onClick={() => handleUserAvatarClick(user, req.RequirementID)}
+                                                                                                style={{ cursor: isAdmin && (user.HasUploaded === 1 || user.HasUploaded === true) ? 'pointer' : 'default' }}
                                                                                             >
                                                                                                 {/* Profile Picture */}
-                                                                                                <div className={`w-7 h-7 rounded-full border-2 ${borderColor} bg-white flex items-center justify-center overflow-hidden shadow-sm cursor-pointer hover:scale-110 transition-transform`}>
+                                                                                                <div className={`w-7 h-7 rounded-full border-2 ${borderColor} bg-white flex items-center justify-center overflow-hidden shadow-sm hover:scale-110 transition-transform`}>
                                                                                                     {user.ProfilePic ? (
                                                                                                         <img
                                                                                                             src={`http://localhost:5000/uploads/profile-pics/${user.ProfilePic}`}
@@ -921,11 +946,24 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                                     ) : proofFileUrl.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i) ? (
                                         <img src={proofFileUrl} alt="Document Preview" className="max-h-[70vh] max-w-full object-contain border rounded" />
                                     ) : proofFileUrl.match(/\.(xlsx|xls)$/i) ? (
-                                        excelHtml ? (
-                                            <div className="w-full h-[70vh] overflow-auto border rounded bg-white" dangerouslySetInnerHTML={{ __html: excelHtml }} />
-                                        ) : (
-                                            <button className="px-4 py-2 bg-blue-600 text-white rounded" onClick={handleExcelPreview}>Load Excel Preview</button>
-                                        )
+                                        <>
+                                            <iframe
+                                                src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(proofFileUrl)}`}
+                                                title="Excel Preview"
+                                                className="w-full h-[70vh] border rounded"
+                                                onError={(e) => {
+                                                    e.target.style.display = 'none';
+                                                    if (!excelHtml) handleExcelPreview();
+                                                }}
+                                            />
+                                            {/* Fallback: show SheetJS preview if excelHtml is available */}
+                                            {excelHtml && (
+                                                <div className="w-full h-[70vh] overflow-auto border rounded bg-white" dangerouslySetInnerHTML={{ __html: excelHtml }} />
+                                            )}
+                                            {!excelHtml && (
+                                                <button className="px-4 py-2 bg-blue-600 text-white rounded" onClick={handleExcelPreview}>Load Excel Preview</button>
+                                            )}
+                                        </>
                                     ) : proofFileUrl.match(/\.(docx|pptx)$/i) ? (
                                         <iframe src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(proofFileUrl)}`} title="Office Preview" className="w-full h-[70vh] border rounded" />
                                     ) : (
@@ -961,6 +999,45 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                     fetchOfficeRequirements();
                 }}
             />
+
+            {/* User File Preview Modal - Admin only */}
+            {showUserFileViewer && selectedUserFile && (
+                <div className="fixed inset-0 z-[101] flex items-center justify-center bg-black/60" onClick={() => setShowUserFileViewer(false)}>
+                    <div className="bg-white rounded-lg shadow-2xl p-4 max-w-3xl w-full max-h-[90vh] flex flex-col relative" onClick={e => e.stopPropagation()}>
+                        <button className="absolute top-2 right-2 text-gray-600 hover:text-red-600 text-xl font-bold" onClick={() => setShowUserFileViewer(false)}>&times;</button>
+                        <div className="flex-1 overflow-auto flex items-center justify-center">
+                            {selectedUserFile.url.match(/\.(pdf)$/i) ? (
+                                <iframe src={selectedUserFile.url} title="Document Preview" className="w-full h-[70vh] border rounded" />
+                            ) : selectedUserFile.url.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i) ? (
+                                <img src={selectedUserFile.url} alt="Document Preview" className="max-h-[70vh] max-w-full object-contain border rounded" />
+                            ) : selectedUserFile.url.match(/\.(xlsx|xls)$/i) ? (
+                                <>
+                                    <iframe
+                                        src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(selectedUserFile.url)}`}
+                                        title="Excel Preview"
+                                        className="w-full h-[70vh] border rounded"
+                                        onError={(e) => {
+                                            e.target.style.display = 'none';
+                                            if (!excelHtml) handleExcelPreview();
+                                        }}
+                                    />
+                                    {/* Fallback: show SheetJS preview if excelHtml is available */}
+                                    {excelHtml && (
+                                        <div className="w-full h-[70vh] overflow-auto border rounded bg-white" dangerouslySetInnerHTML={{ __html: excelHtml }} />
+                                    )}
+                                    {!excelHtml && (
+                                        <button className="px-4 py-2 bg-blue-600 text-white rounded" onClick={handleExcelPreview}>Load Excel Preview</button>
+                                    )}
+                                </>
+                            ) : selectedUserFile.url.match(/\.(docx|pptx)$/i) ? (
+                                <iframe src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(selectedUserFile.url)}`} title="Office Preview" className="w-full h-[70vh] border rounded" />
+                            ) : (
+                                <div className="text-center text-gray-500">Preview not supported for this file type.</div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

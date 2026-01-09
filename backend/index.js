@@ -58,6 +58,16 @@ app.use('/headofoffice', headofofficeRoutes);
 app.use('/compliancestatusoffices', complinancestatusofficesRoutes);
 app.use('/compliancestatus', complinancestatusRoutes);*/
 
+// Catch-all error handler (always return JSON)
+app.use((err, req, res, next) => {
+  console.error('GLOBAL ERROR:', err);
+  res.status(err.status || 500).json({
+    success: false,
+    message: err.message || 'Internal Server Error',
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+  });
+});
+
 app.listen(port, () => {
   console.log(`Example app listening at http://localhost:${port}`);
 });

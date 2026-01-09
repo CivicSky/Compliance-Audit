@@ -1,6 +1,7 @@
 const db = require('../db');
 const fs = require('fs');
 const path = require('path');
+const archiver = require('archiver');
 
 // Get all events
 const getAllEvents = async (req, res) => {
@@ -158,9 +159,116 @@ const updateEvent = async (req, res) => {
   }
 };
 
+// Get list of downloadable event folders
+const getDownloadableFolders = async (req, res) => {
+  try {
+    const eventsBasePath = path.join(__dirname, '..', 'uploads', 'events');
+    
+    // Check if events directory exists
+    if (!fs.existsSync(eventsBasePath)) {
+      return res.json({
+        success: true,
+        folders: []
+      });
+    }
+
+    // Read all directories in uploads/events
+    const entries = fs.readdirSync(eventsBasePath, { withFileTypes: true });
+    const folders = entries
+      .filter(entry => entry.isDirectory())
+      .map(entry => entry.name);
+
+    res.json({
+      success: true,
+      folders
+    });
+  } catch (error) {
+    console.error('Error fetching downloadable folders:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching downloadable folders'
+    });
+  }
+};
+
+// Download event folder as zip
+const downloadEventZip = async (req, res) => {
+  try {
+    const { eventName } = req.params;
+
+    if (!eventName) {
+      return res.status(400).json({
+        success: false,
+        message: 'Event name is required'
+      });
+    }
+
+    // Sanitize the event name to match folder name
+    const sanitizedName = sanitizeFolderName(eventName);
+    const eventFolderPath = path.join(__dirname, '..', 'uploads', 'events', sanitizedName);
+
+    // Check if folder exists
+    if (!fs.existsSync(eventFolderPath)) {
+      return res.status(404).json({
+        success: false,
+        message: 'Event folder not found'
+      });
+    }
+
+    // Check if folder is actually a directory
+    const stats = fs.statSync(eventFolderPath);
+    if (!stats.isDirectory()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Event path is not a directory'
+      });
+    }
+
+    // Set headers for zip download
+    const zipFileName = `${sanitizedName}.zip`;
+    res.attachment(zipFileName);
+    res.contentType('application/zip');
+
+    // Create archiver instance
+    const archive = archiver('zip', {
+      zlib: { level: 9 } // Maximum compression
+    });
+
+    // Handle errors
+    archive.on('error', (err) => {
+      console.error('Archive error:', err);
+      if (!res.headersSent) {
+        res.status(500).json({
+          success: false,
+          message: 'Error creating zip file'
+        });
+      }
+    });
+
+    // Pipe archive data to response
+    archive.pipe(res);
+
+    // Add the entire folder to the archive
+    archive.directory(eventFolderPath, false);
+
+    // Finalize the archive
+    await archive.finalize();
+  } catch (error) {
+    console.error('Error downloading event zip:', error);
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        message: 'Error downloading event folder'
+      });
+    }
+  }
+};
+
 module.exports = {
   getAllEvents,
   addEvent,
   deleteEvents,
-  updateEvent
+  updateEvent,
+  getDownloadableFolders,
+  downloadEventZip
 };
