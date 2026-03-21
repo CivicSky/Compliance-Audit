@@ -1,53 +1,5 @@
 const db = require('../db');
 
-// Get all criteria
-const getAllCriteria = async (req, res) => {
-  try {
-    const [criteria] = await db.query(`
-      SELECT c.*, e.EventName, e.EventCode, a.AreaID, a.AreaCode, a.AreaName, a.SortOrder
-      FROM criteria c
-      LEFT JOIN Events e ON c.EventID = e.EventID
-      LEFT JOIN areas a ON c.AreaID = a.AreaID
-      ORDER BY a.SortOrder ASC, c.CriteriaCode ASC
-    `);
-    res.json({
-      success: true,
-      data: criteria
-    });
-  } catch (error) {
-    console.error('Error fetching criteria:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching criteria'
-    });
-  }
-};
-
-// Get criteria by event
-const getCriteriaByEvent = async (req, res) => {
-  try {
-    const { eventId } = req.params;
-    const [criteria] = await db.query(`
-      SELECT c.*, e.EventName, e.EventCode, a.AreaID, a.AreaCode, a.AreaName, a.SortOrder
-      FROM criteria c
-      LEFT JOIN Events e ON c.EventID = e.EventID
-      LEFT JOIN areas a ON c.AreaID = a.AreaID
-      WHERE c.EventID = ?
-      ORDER BY a.SortOrder ASC, c.CriteriaCode ASC
-    `, [eventId]);
-    res.json({
-      success: true,
-      data: criteria
-    });
-  } catch (error) {
-    console.error('Error fetching criteria:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching criteria'
-    });
-  }
-};
-
 // Get all requirements
 const getAllRequirements = async (req, res) => {
   try {
@@ -803,8 +755,6 @@ const markUserAsUploaded = async (req, res) => {
 };
 
 module.exports = {
-  getAllCriteria,
-  getCriteriaByEvent,
   getAllRequirements,
   getRequirementsByEvent,
   addRequirement,

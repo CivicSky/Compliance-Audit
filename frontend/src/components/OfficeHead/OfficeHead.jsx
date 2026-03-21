@@ -82,7 +82,7 @@ export default function Home() {
         
         // Confirm deletion
         const confirmed = window.confirm(
-            `Are you sure you want to delete ${selectedIds.length} office head(s)? This action cannot be undone.`
+            `Are you sure you want to delete ${selectedIds.length} office personnel? This action cannot be undone.`
         );
         
         if (!confirmed) return;
@@ -96,22 +96,22 @@ export default function Home() {
                 setDeleteMode(false);
                 // Show success message
                 console.log('Successfully deleted selected office heads');
-                alert(`Successfully deleted ${selectedIds.length} office head(s)`);
+                alert(`Successfully deleted ${selectedIds.length} office personnel`);
             } else {
                 // Show error message
                 console.error('Failed to delete office heads:', result.message);
-                alert(result.message || 'Failed to delete office heads');
+                alert(result.message || 'Failed to delete office personnel');
             }
         } catch (error) {
             console.error('Error deleting office heads:', error);
-            alert('An error occurred while deleting office heads');
+            alert('An error occurred while deleting office personnel');
         }
     };
 
     return (
         <div className="px-6 pb-6 pt-6 w-full">
             <Header 
-                pageTitle="Office Heads" 
+                pageTitle="Office Personnel" 
                 onAddClick={() => setIsModalOpen(true)}
                 onSearchChange={handleSearchChange}
                 searchValue={searchTerm}

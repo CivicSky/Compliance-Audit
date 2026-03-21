@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useImperativeHandle, forwardRef } from "react";
-import { requirementsAPI } from "../../utils/api";
+import { criteriaAPI } from "../../utils/api";
 
 const CriteriaP = forwardRef(function CriteriaP({ searchTerm = "", eventId = null, deleteMode = false, onSelectionChange, selectedIds = [], onDeleteSelected, onCriteriaClick }, ref) {
   const [criteria, setCriteria] = useState([]);
@@ -24,9 +24,9 @@ const CriteriaP = forwardRef(function CriteriaP({ searchTerm = "", eventId = nul
     try {
       let response;
       if (eventId) {
-        response = await requirementsAPI.getCriteriaByEvent(eventId);
+        response = await criteriaAPI.getByEvent(eventId);
       } else {
-        response = await requirementsAPI.getAllCriteria();
+        response = await criteriaAPI.getAll();
       }
       if (response.success) {
         setCriteria(response.data);

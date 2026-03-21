@@ -102,8 +102,8 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
         setIsLoading(true);
         try {
             console.log('Fetching all criteria for EventID:', eventId);
-            const { requirementsAPI } = await import('../../utils/api');
-            const response = await requirementsAPI.getCriteriaByEvent(eventId);
+            const { criteriaAPI } = await import('../../utils/api');
+            const response = await criteriaAPI.getByEvent(eventId);
             if (response.success) {
                 setAllCriteria(response.data || []);
             } else {

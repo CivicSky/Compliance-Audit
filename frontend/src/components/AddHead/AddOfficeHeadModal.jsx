@@ -101,7 +101,7 @@ export default function AddOfficeHeadModal({ isOpen, onClose, onSuccess }) {
             if (response.success) {
                 // Show success message
                 const addedCount = response.data?.length || selectedUserIds.length;
-                alert(`Successfully added ${addedCount} office head(s)!`);
+                alert(`Successfully added ${addedCount} office personnel!`);
                 
                 // Show any errors that occurred
                 if (response.errors && response.errors.length > 0) {
@@ -114,7 +114,7 @@ export default function AddOfficeHeadModal({ isOpen, onClose, onSuccess }) {
                 }
                 onClose();
             } else {
-                setError(response.message || 'Failed to add office heads');
+                setError(response.message || 'Failed to add office personnel');
             }
         } catch (err) {
             console.error('Error adding office heads:', err);
@@ -132,8 +132,8 @@ export default function AddOfficeHeadModal({ isOpen, onClose, onSuccess }) {
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg">
                     <div>
-                        <h2 className="text-xl font-semibold">Add Office Heads</h2>
-                        <p className="text-sm text-blue-100">Select users to make them office heads</p>
+                        <h2 className="text-xl font-semibold">Add Office Personnel</h2>
+                        <p className="text-sm text-blue-100">Select users to make them office personnel</p>
                     </div>
                     <button
                         onClick={onClose}
@@ -206,7 +206,7 @@ export default function AddOfficeHeadModal({ isOpen, onClose, onSuccess }) {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                                 </svg>
                                 <p className="mt-2">No available users found</p>
-                                <p className="text-sm">All approved users are either already office heads or are admins</p>
+                                <p className="text-sm">All approved users are either already office personnel or are admins</p>
                             </div>
                         ) : (
                             <div className="space-y-2">
@@ -304,7 +304,7 @@ export default function AddOfficeHeadModal({ isOpen, onClose, onSuccess }) {
                                         <path fill="currentColor" className="opacity-75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                     </svg>
                                 )}
-                                {isSubmitting ? 'Adding...' : `Add ${selectedUserIds.length > 0 ? selectedUserIds.length : ''} Office Head${selectedUserIds.length !== 1 ? 's' : ''}`}
+                                {isSubmitting ? 'Adding...' : `Add ${selectedUserIds.length > 0 ? selectedUserIds.length : ''} Office Personnel`}
                             </button>
                         </div>
                     </div>

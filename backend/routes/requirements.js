@@ -54,10 +54,6 @@ const userReqUpload = multer({
     }
 });
 
-// Criteria routes
-router.get('/criteria', requirementsController.getAllCriteria);
-router.get('/criteria/event/:eventId', requirementsController.getCriteriaByEvent);
-
 // Requirements routes
 router.get('/all', requirementsController.getAllRequirements);
 router.get('/event/:eventId', requirementsController.getRequirementsByEvent);

@@ -62,6 +62,7 @@ export default function Events() {
     };
 
     const handleEventClick = (event) => {
+        // Allow clicking to view/edit event when not in delete mode
         if (!deleteMode) {
             setSelectedEvent(event);
             setIsEditModalOpen(true);
@@ -85,13 +86,19 @@ export default function Events() {
                 if (eventsPRef.current && eventsPRef.current.refresh) {
                     eventsPRef.current.refresh();
                 }
+                // Close modal and reset selected event after successful save
+                setIsEditModalOpen(false);
+                setSelectedEvent(null);
                 alert('Event updated successfully!');
+                return true; // Return success status
             } else {
                 alert(response.message || 'Failed to update event');
+                return false; // Return failure status
             }
         } catch (error) {
             console.error('Error updating event:', error);
             alert('An error occurred while updating the event');
+            return false; // Return failure status
         }
     };
 

@@ -220,3 +220,114 @@ html, body {
 .animate-shake {
   animation: shake 0.5s ease-in-out;
 }
+
+/* ========================
+   Compact Page Content Styles
+   Makes all page UI elements smaller
+   ======================== */
+
+/* Main content area - compact mode */
+.page-content {
+  font-size: 0.875rem; /* 14px base instead of 16px */
+}
+
+/* Reduce heading sizes in page content */
+.page-content h1 {
+  font-size: 1.5rem; /* 24px instead of 32px */
+}
+
+.page-content h2 {
+  font-size: 1.25rem; /* 20px instead of 24px */
+}
+
+.page-content h3 {
+  font-size: 1.125rem; /* 18px instead of 20px */
+}
+
+.page-content h4, .page-content h5, .page-content h6 {
+  font-size: 1rem; /* 16px */
+}
+
+/* Compact tables */
+.page-content table th,
+.page-content table td {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem; /* 13px */
+}
+
+/* Compact buttons */
+.page-content button {
+  font-size: 0.8125rem;
+}
+
+/* Compact inputs and form elements */
+.page-content input,
+.page-content select,
+.page-content textarea {
+  font-size: 0.8125rem;
+  padding: 0.375rem 0.625rem;
+}
+
+/* Reduce padding in cards and containers */
+.page-content .p-4 {
+  padding: 0.75rem;
+}
+
+.page-content .p-6 {
+  padding: 1rem;
+}
+
+.page-content .p-8 {
+  padding: 1.25rem;
+}
+
+/* Reduce gap/space utilities */
+.page-content .gap-4 {
+  gap: 0.75rem;
+}
+
+.page-content .gap-6 {
+  gap: 1rem;
+}
+
+.page-content .space-y-4 > * + * {
+  margin-top: 0.75rem;
+}
+
+.page-content .space-y-6 > * + * {
+  margin-top: 1rem;
+}
+
+/* Reduce margins */
+.page-content .mb-4 {
+  margin-bottom: 0.75rem;
+}
+
+.page-content .mb-6 {
+  margin-bottom: 1rem;
+}
+
+.page-content .mt-4 {
+  margin-top: 0.75rem;
+}
+
+.page-content .mt-6 {
+  margin-top: 1rem;
+}
+
+/* Compact text sizes */
+.page-content .text-lg {
+  font-size: 1rem;
+}
+
+.page-content .text-xl {
+  font-size: 1.125rem;
+}
+
+.page-content .text-2xl {
+  font-size: 1.25rem;
+}
+
+.page-content .text-3xl {
+  font-size: 1.5rem;
+}

@@ -15,27 +15,79 @@ const EditEventModal = ({ visible, onClose, event = {}, onSave, userRole = 'user
     }
   }, [event]);
 
+  // Handle Escape key to close modal
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape' && visible && !isSubmitting) {
+        onClose();
+      }
+    };
+    
+    if (visible) {
+      document.addEventListener('keydown', handleEscape);
+      // Prevent body scroll when modal is open
+      document.body.style.overflow = 'hidden';
+    }
+    
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'unset';
+    };
+  }, [visible, isSubmitting, onClose]);
+
   if (!visible) return null;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate required fields
+    if (!eventCode.trim() || !eventName.trim()) {
+      alert('Please fill in all required fields (Event Code and Event Name)');
+      return;
+    }
+
     setIsSubmitting(true);
 
     const updated = {
       EventID: event.EventID,
-      EventCode: eventCode,
-      EventName: eventName,
-      Description: description,
+      EventCode: eventCode.trim(),
+      EventName: eventName.trim(),
+      Description: description.trim(),
     };
 
-    onSave(updated);
-    setIsSubmitting(false);
-    onClose();
+    try {
+      // Call onSave and wait for it to complete
+      // onSave should return a boolean indicating success
+      const success = await onSave(updated);
+      
+      // Only close modal if save was successful
+      if (success) {
+        onClose();
+      }
+    } catch (error) {
+      console.error('Error saving event:', error);
+      alert('An error occurred while saving the event');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleBackdropClick = (e) => {
+    // Only close if clicking the backdrop itself, not the modal content
+    if (e.target === e.currentTarget && !isSubmitting) {
+      onClose();
+    }
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4">
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+      onClick={handleBackdropClick}
+    >
+      <div 
+        className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
           <h2 className="text-xl font-semibold text-gray-800">{isAdmin ? 'Edit Event' : 'View Event'}</h2>

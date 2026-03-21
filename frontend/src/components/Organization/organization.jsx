@@ -26,6 +26,7 @@ export default function Organization() {
     const [selectedEventType, setSelectedEventType] = useState(''); // will hold EventID
     const [events, setEvents] = useState([]);
     const [currentUser, setCurrentUser] = useState(null);
+    const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
 
     const officesPRef = useRef();
 
@@ -207,8 +208,8 @@ export default function Organization() {
             />
 
 
-            {/* Event Type Dropdown */}
-            <div className="mb-4 mt-6">
+            {/* Event Type Dropdown and View Toggle */}
+            <div className="mb-4 mt-6 flex items-center gap-4">
                 <div className="relative w-full max-w-xs">
                     <select
                         value={selectedEventType}
@@ -226,6 +227,36 @@ export default function Organization() {
                         <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                     </span>
                 </div>
+
+                {/* View Toggle Buttons */}
+                <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+                    <button
+                        onClick={() => setViewMode('grid')}
+                        className={`p-2 rounded-lg transition-colors ${
+                            viewMode === 'grid' 
+                                ? 'bg-white text-indigo-600 shadow-sm' 
+                                : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                        title="Grid View"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                        </svg>
+                    </button>
+                    <button
+                        onClick={() => setViewMode('list')}
+                        className={`p-2 rounded-lg transition-colors ${
+                            viewMode === 'list' 
+                                ? 'bg-white text-indigo-600 shadow-sm' 
+                                : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                        title="List View"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                        </svg>
+                    </button>
+                </div>
             </div>
 
             <div className="relative z-10">
@@ -241,7 +272,7 @@ export default function Organization() {
                     onSelectionChange={handleSelectionChange}
                     onOfficeClick={handleOfficeClick}
                     eventType={selectedEventType}
-
+                    viewMode={viewMode}
                     officeTypes={officeTypes}   
                     heads={heads}
                 />

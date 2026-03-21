@@ -3,6 +3,12 @@ const router = express.Router();
 const db = require('../db');
 const CriteriaController = require('../controllers/CriteriaController');
 
+// GET all criteria
+router.get('/', CriteriaController.getAllCriteria);
+
+// GET criteria by event
+router.get('/event/:eventId', CriteriaController.getCriteriaByEvent);
+
 // UPDATE criteria by ID
 router.put('/:id', async (req, res) => {
     try {

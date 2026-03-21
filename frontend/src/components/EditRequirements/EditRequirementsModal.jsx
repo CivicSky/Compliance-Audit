@@ -77,8 +77,8 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, use
   const fetchCriteriaByEvent = async (eventId) => {
     setIsLoading(true);
     try {
-      const { requirementsAPI } = await import('../../utils/api');
-      const response = await requirementsAPI.getCriteriaByEvent(eventId);
+      const { criteriaAPI } = await import('../../utils/api');
+      const response = await criteriaAPI.getByEvent(eventId);
       
       if (response.success) {
         setCriteriaList(response.data);

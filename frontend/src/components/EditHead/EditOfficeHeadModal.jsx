@@ -72,7 +72,7 @@ const EditOfficeHeadModal = ({ visible, onClose, head = {}, onSave }) => {
       <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 min-h-[70vh] max-h-[95vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-xl font-semibold text-gray-800">Edit Office Head</h2>
+          <h2 className="text-xl font-semibold text-gray-800">Edit Office Personnel</h2>
           <button
             onClick={onClose}
             disabled={isSubmitting}

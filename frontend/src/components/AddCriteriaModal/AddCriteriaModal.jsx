@@ -64,8 +64,8 @@ export default function AddCriteriaModal({ isOpen, onClose, onSuccess }) {
 
     const fetchCriteriaByEvent = async (eventId) => {
         try {
-            const { requirementsAPI } = await import('../../utils/api');
-            const response = await requirementsAPI.getCriteriaByEvent(eventId);
+            const { criteriaAPI } = await import('../../utils/api');
+            const response = await criteriaAPI.getByEvent(eventId);
             if (response.success) {
                 setCriteriaList(response.data || []);
             } else {

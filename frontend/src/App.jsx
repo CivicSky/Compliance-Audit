@@ -16,6 +16,7 @@ import Events from './components/Events/Events.jsx'
 import Criteria from './components/Criteria/Criteria.jsx'
 import AuditLogs from './components/AuditLogs/AuditLogs.jsx'
 import Area from './components/Area/Area.jsx'
+import ALL from './components/ALL/ALL.jsx'
 import ProtectedRoute from "./components/ProtectedRoute/ProtectedRoute.jsx";
 import PublicRoute from "./components/ProtectedRoute/PublicRoute.jsx";
 
@@ -56,6 +57,7 @@ export default function App() {
         { path: "audit-logs", element: <AuditLogs /> },
         { path: "profile", element: <Profile /> },
         { path: "area", element: <Area /> },
+        { path: "setup", element: <ALL /> },
       ],
     },
   

@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
+import { Eye, EyeOff } from "lucide-react";
 import logo from "../../assets/images/lccb_logo.png";
 import auditrackLogo from "../../assets/images/logo.png";
-import bg from "../../assets/images/homebg.jpg";
+import bg from "../../assets/images/bglogins.jpg";
 import { usersAPI } from "../../utils/api";
 
 export default function Login() {
@@ -11,6 +12,7 @@ export default function Login() {
     const [formData, setFormData] = useState({ email: "", password: "" });
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
 
     // 🔒 Redirect if already logged in
     useEffect(() => {
@@ -74,18 +76,34 @@ export default function Login() {
 
     return (
         <div className="flex h-screen overflow-hidden">
-            {/* Left side - Login form */}
-            <div className="w-1/2 flex items-center justify-center bg-white">
-                <div className="w-full max-w-md px-8">
-                    <div className="text-center mb-8">
-                        <img src={logo} alt="Logo" className="w-16 h-16 mx-auto mb-4" />
-                        <h1 className="text-2xl font-bold text-gray-900">Welcome back</h1>
-                        <p className="text-gray-600">Please enter your details</p>
+            {/* Left side - Background */}
+            <div
+                className="w-1/2 bg-cover bg-center transition-all duration-700 ease-in-out"
+                style={{ backgroundImage: `url(${bg})` }}
+            >
+                <div className="flex items-center justify-center h-full bg-blue-800 bg-opacity-60">
+                    <div className="text-white text-center animate-fade-in-left">
+                        <img src={auditrackLogo} className="w-32 mx-auto mb-4 transition-all duration-500 hover:scale-105 drop-shadow-2xl" />
+                        <h2 className="text-4xl font-bold animate-slide-up drop-shadow-lg">Auditrack</h2>
+                        <p className="mt-2 animate-fade-in-delayed drop-shadow-md">
+                            Streamline your compliance processes
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Right side - Login form */}
+            <div className="w-1/2 flex items-center justify-center bg-white transition-all duration-700 ease-in-out transform">
+                <div className="w-full max-w-md px-8 animate-fade-in-right">
+                    <div className="text-center mb-8 animate-slide-down">
+                        <img src={logo} alt="Logo" className="w-16 h-16 mx-auto mb-4 transition-transform duration-500 hover:scale-110" />
+                        <h1 className="text-2xl font-bold text-gray-900 transition-all duration-300">Welcome back</h1>
+                        <p className="text-gray-600 transition-opacity duration-500">Please enter your details</p>
                     </div>
 
-                    <form onSubmit={handleSubmit} className="space-y-6">
+                    <form onSubmit={handleSubmit} className="space-y-6 animate-fade-in-up">
                         {error && (
-                            <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
+                            <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm animate-shake">
                                 {error}
                             </div>
                         )}
@@ -100,20 +118,33 @@ export default function Login() {
                             className="w-full px-3 py-3 border rounded-md"
                         />
 
-                        <input
-                            type="password"
-                            name="password"
-                            required
-                            value={formData.password}
-                            onChange={handleChange}
-                            placeholder="Password"
-                            className="w-full px-3 py-3 border rounded-md"
-                        />
+                        <div className="relative">
+                            <input
+                                type={showPassword ? "text" : "password"}
+                                name="password"
+                                required
+                                value={formData.password}
+                                onChange={handleChange}
+                                placeholder="Password"
+                                className="w-full px-3 py-3 pr-10 border rounded-md"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 transition-colors"
+                            >
+                                {showPassword ? (
+                                    <EyeOff className="w-5 h-5" />
+                                ) : (
+                                    <Eye className="w-5 h-5" />
+                                )}
+                            </button>
+                        </div>
 
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full py-3 bg-blue-600 text-white rounded-md"
+                            className="w-full py-3 bg-blue-600 text-white rounded-md transition-colors"
                         >
                             {loading ? "Signing in..." : "Sign in"}
                         </button>
@@ -125,22 +156,6 @@ export default function Login() {
                             </Link>
                         </p>
                     </form>
-                </div>
-            </div>
-
-            {/* Right side */}
-            <div
-                className="w-1/2 bg-cover bg-center"
-                style={{ backgroundImage: `url(${bg})` }}
-            >
-                <div className="flex items-center justify-center h-full bg-blue-600 bg-opacity-20">
-                    <div className="text-white text-center">
-                        <img src={auditrackLogo} className="w-32 mx-auto mb-4" />
-                        <h2 className="text-4xl font-bold">Auditrack</h2>
-                        <p className="mt-2">
-                            Streamline your compliance processes
-                        </p>
-                    </div>
                 </div>
             </div>
         </div>

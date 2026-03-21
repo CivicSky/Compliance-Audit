@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { areasAPI, requirementsAPI } from '../../utils/api';
+import { areasAPI, criteriaAPI } from '../../utils/api';
 import axios from 'axios';
 
 const EditCriteriaModal = ({ visible, onClose, event = {}, onSave, userRole = 'user' }) => {
@@ -45,7 +45,7 @@ const EditCriteriaModal = ({ visible, onClose, event = {}, onSave, userRole = 'u
   useEffect(() => {
     async function fetchCriteria() {
       try {
-        const res = await requirementsAPI.getAllCriteria();
+        const res = await criteriaAPI.getAll();
         if (event && event.EventID && areaId) {
           setCriteriaList((res.data || []).filter(c => String(c.EventID) === String(event.EventID) && String(c.AreaID) === String(areaId)));
         } else if (event && event.EventID) {

@@ -11,6 +11,9 @@ const officesRoutes = require('./routes/offices');
 const officetypes = require('./routes/officetypes');
 const areasRoutes = require('./routes/areas');
 const criteriaRoutes = require('./routes/criteria');
+const notificationRoutes = require('./routes/notif');
+
+console.log('Backend started and logger active');
 
 app.use(cors({
   origin: ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'], // Add common dev server ports
@@ -27,6 +30,11 @@ const logsRoutes = require('./routes/logs');
 const headofofficeRoutes = require('./routes/headofoffice');
 const complinancestatusofficesRoutes = require('./routes/compliancestatusoffices');
 const complinancestatusRoutes = require('./routes/compliancestatus');*/
+// Global request logger for debugging
+app.use((req, res, next) => {
+  console.log('Incoming request:', req.method, req.url);
+  next();
+});
 
 app.get('/', (req, res) => {
   res.json({ ok: true, service: 'backend', time: new Date().toISOString() });
@@ -45,6 +53,7 @@ app.use('/api/offices', officesRoutes);
 app.use('/api/officestypes', officetypes);
 app.use('/api/areas', areasRoutes);
 app.use('/api/criteria', criteriaRoutes);
+app.use('/api/notifications', notificationRoutes);
 const complianceStatusOfficesRoutes = require('./routes/ComplianceStatusOffices');
 const officeDocumentsRoutes = require('./routes/officedocuments');
 app.use('/api/compliancestatusoffices', complianceStatusOfficesRoutes);

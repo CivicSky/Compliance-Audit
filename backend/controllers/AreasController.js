@@ -22,3 +22,23 @@ exports.addArea = async (req, res) => {
         res.status(500).json({ success: false, message: 'Failed to add area', error: error.message });
     }
 };
+
+// Soft delete multiple areas
+exports.deleteAreas = async (req, res) => {
+    try {
+        const { areaIds } = req.body;
+        if (!Array.isArray(areaIds) || areaIds.length === 0) {
+            return res.status(400).json({ success: false, message: 'No area IDs provided' });
+        }
+
+        await db.query(
+            `UPDATE areas SET IsActive = 0 WHERE AreaID IN (${areaIds.map(() => '?').join(',')})`,
+            areaIds
+        );
+
+        res.json({ success: true, message: 'Areas deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting areas:', error);
+        res.status(500).json({ success: false, message: 'Failed to delete areas', error: error.message });
+    }
+};

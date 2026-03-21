@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import bg from "../../assets/images/homebg.jpg"
+import bg from "../../assets/images/bglogins.jpg"
 import logo from "../../assets/images/lccb_logo.png"
 import auditrackLogo from "../../assets/images/logo.png"
 import axios from "axios";
@@ -108,7 +108,7 @@ export default function Register() {
                 }}
             >
                 {/* Subtle blue overlay */}
-                <div className="absolute inset-0 bg-blue-600 bg-opacity-20"></div>
+                <div className="absolute inset-0 bg-blue-800 bg-opacity-60"></div>
 
                 {/* Main illustration content */}
                 <div className="relative z-10 text-center text-white max-w-md animate-fade-in-left">
