@@ -63,12 +63,7 @@ function ALL() {
         fetchEvents();
     }, []);
 
-    // Auto-select the first event after events are loaded, if none is selected
-    useEffect(() => {
-        if (events.length > 0 && !selectedEvent) {
-            setSelectedEvent(events[0]);
-        }
-    }, [events]);
+    // Removed auto-selecting the first event to prevent modal from opening automatically
 
     // When event changes, fetch its areas
     useEffect(() => {
@@ -619,6 +614,34 @@ function ALL() {
                     onLoadRequirementsByCriteria={loadRequirementsByCriteria}
                     onEditArea={editArea}
                     onBulkDelete={bulkDeleteHierarchy}
+                />
+            )}
+            {/* Copy Event Popup */}
+            {copyPopup.open && (
+                <CopyEventPopup
+                    open={copyPopup.open}
+                    defaultName={copyPopup.event?.EventName ? copyPopup.event.EventName + ' (Copy)' : ''}
+                    defaultCode={copyPopup.event?.EventCode ? copyPopup.event.EventCode + '-COPY' : ''}
+                    defaultDescription={copyPopup.event?.Description || ''}
+                    onCancel={() => setCopyPopup({ open: false, event: null })}
+                    onConfirm={async ({ eventName, eventCode, description }) => {
+                        try {
+                            const token = localStorage.getItem('token');
+                            await axios.post('http://localhost:5000/api/events/copy', {
+                                sourceEventId: copyPopup.event.EventID,
+                                newEventName: eventName,
+                                newEventCode: eventCode,
+                                newDescription: description
+                            }, {
+                                headers: { Authorization: `Bearer ${token}` }
+                            });
+                            setCopyPopup({ open: false, event: null });
+                            await fetchEvents();
+                            alert('Event copied successfully!');
+                        } catch (err) {
+                            alert('Failed to copy event: ' + (err?.response?.data?.message || err.message));
+                        }
+                    }}
                 />
             )}
         </div>

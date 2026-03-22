@@ -47,11 +47,72 @@ const copyEvent = async (req, res) => {
       copyRecursive(srcFolder, destFolder);
     }
 
+    // --- BEGIN: Copy Areas, Criteria, Requirements ---
+    const newEventId = result.insertId;
+
+    // 1. Copy AREAS
+    const [areas] = await db.query('SELECT * FROM areas WHERE EventID = ?', [sourceEventId]);
+    const areaIdMap = {}; // oldAreaId -> newAreaId
+    for (const area of areas) {
+      const [areaResult] = await db.query(
+        'INSERT INTO areas (AreaCode, AreaName, EventID, Description, IsActive, SortOrder, CreatedAt, UpdatedAt) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())',
+        [area.AreaCode, area.AreaName, newEventId, area.Description, area.IsActive, area.SortOrder]
+      );
+      areaIdMap[area.AreaID] = areaResult.insertId;
+    }
+
+    // 2. Copy CRITERIA (including no-area criteria) with ParentCriteriaID remapping
+    const [criteria] = await db.query('SELECT * FROM criteria WHERE EventID = ?', [sourceEventId]);
+    const criteriaIdMap = {}; // oldCriteriaId -> newCriteriaId
+    // First pass: insert all criteria without ParentCriteriaID
+    for (const crit of criteria) {
+      const newAreaId = crit.AreaID ? areaIdMap[crit.AreaID] : null;
+      try {
+        const [critResult] = await db.query(
+          'INSERT INTO criteria (CriteriaCode, EventID, AreaID, ParentCriteriaID, CriteriaName, Description, CreatedAt, IsActive) VALUES (?, ?, ?, NULL, ?, ?, ?, ?)',
+          [crit.CriteriaCode, newEventId, newAreaId, crit.CriteriaName, crit.Description, crit.CreatedAt, crit.IsActive]
+        );
+        criteriaIdMap[crit.CriteriaID] = critResult.insertId;
+      } catch (err) {
+        console.error('Error inserting criteria:', err, crit);
+        throw err;
+      }
+    }
+    // Second pass: update ParentCriteriaID for those that had it
+    for (const crit of criteria) {
+      if (crit.ParentCriteriaID) {
+        const newCritId = criteriaIdMap[crit.CriteriaID];
+        const newParentId = criteriaIdMap[crit.ParentCriteriaID] || null;
+        try {
+          await db.query('UPDATE criteria SET ParentCriteriaID = ? WHERE CriteriaID = ?', [newParentId, newCritId]);
+        } catch (err) {
+          console.error('Error updating ParentCriteriaID:', err, crit);
+          throw err;
+        }
+      }
+    }
+
+    // 3. Copy REQUIREMENTS with ParentRequirementCode remapping
+    const [requirements] = await db.query('SELECT * FROM requirements WHERE CriteriaID IN (?)', [Object.keys(criteriaIdMap)]);
+    for (const req of requirements) {
+      const newCriteriaId = req.CriteriaID ? criteriaIdMap[req.CriteriaID] : null;
+      try {
+        await db.query(
+          'INSERT INTO requirements (RequirementCode, Description, CriteriaID, ParentRequirementCode) VALUES (?, ?, ?, ?)',
+          [req.RequirementCode, req.Description, newCriteriaId, req.ParentRequirementCode]
+        );
+      } catch (err) {
+        console.error('Error inserting requirement:', err, req);
+        throw err;
+      }
+    }
+    // --- END: Copy Areas, Criteria, Requirements ---
+
     res.json({
       success: true,
       message: 'Event copied successfully',
       data: {
-        EventID: result.insertId,
+        EventID: newEventId,
         EventName: newEventName,
         EventCode: newEventCode,
         Description: newDescription || sourceEvent.Description,

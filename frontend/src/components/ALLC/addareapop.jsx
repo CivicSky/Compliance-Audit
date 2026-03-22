@@ -226,193 +226,183 @@ export default function AddAreaPop({
 				)}
 
 				{/* Modal content - removed fixed minHeight to eliminate empty space */}
-				<div>
-					{/* Add forms */}
-					{mainMode === 'add' && mode === 'add-area' && (
-						<form onSubmit={handleAddArea} className="space-y-3">
-							<input
-								className="w-full border rounded px-3 py-2"
-								placeholder="Area Code"
-								value={areaForm.AreaCode}
-								onChange={(e) => setAreaForm(prev => ({ ...prev, AreaCode: e.target.value }))}
-							/>
-							<input
-								className="w-full border rounded px-3 py-2"
-								placeholder="Area Name"
-								value={areaForm.AreaName}
-								onChange={(e) => setAreaForm(prev => ({ ...prev, AreaName: e.target.value }))}
-							/>
-							<textarea
-								className="w-full border rounded px-3 py-2"
-								placeholder="Description (optional)"
-								value={areaForm.Description}
-								onChange={(e) => setAreaForm(prev => ({ ...prev, Description: e.target.value }))}
-							/>
-							<div className="flex gap-2 justify-end">
-								<button type="submit" disabled={saving} className="px-4 py-2 rounded bg-purple-600 text-white disabled:opacity-60">
-									{saving ? 'Saving...' : 'Save Area'}
-								</button>
-							</div>
-						</form>
-					)}
 
-					{/* Edit forms */}
-					{mainMode === 'edit' && editMode === 'edit-area' && (
-						<form onSubmit={handleEditArea} className="space-y-3">
-							<select
-								className="w-full border rounded px-3 py-2"
-								value={editAreaId}
-								onChange={(e) => handleSelectEditArea(e.target.value)}
-							>
-								<option value="">Select area</option>
-								{(areas || []).map(area => (
-									<option key={area.AreaID} value={area.AreaID}>{area.AreaName}</option>
-								))}
-							</select>
+				   {/* Only show the correct form for the selected tab/sub-tab */}
+				   {mainMode === 'add' && mode === 'add-area' && (
+					   <form onSubmit={handleAddArea} className="space-y-3">
+						   <input
+							   className="w-full border rounded px-3 py-2"
+							   placeholder="Area Code"
+							   value={areaForm.AreaCode}
+							   onChange={(e) => setAreaForm(prev => ({ ...prev, AreaCode: e.target.value }))}
+						   />
+						   <input
+							   className="w-full border rounded px-3 py-2"
+							   placeholder="Area Name"
+							   value={areaForm.AreaName}
+							   onChange={(e) => setAreaForm(prev => ({ ...prev, AreaName: e.target.value }))}
+						   />
+						   <textarea
+							   className="w-full border rounded px-3 py-2"
+							   placeholder="Description (optional)"
+							   value={areaForm.Description}
+							   onChange={(e) => setAreaForm(prev => ({ ...prev, Description: e.target.value }))}
+						   />
+						   <div className="flex gap-2 justify-end">
+							   <button type="submit" disabled={saving} className="px-4 py-2 rounded bg-purple-600 text-white disabled:opacity-60">
+								   {saving ? 'Saving...' : 'Save Area'}
+							   </button>
+						   </div>
+					   </form>
+				   )}
 
-							<input
-								className="w-full border rounded px-3 py-2"
-								placeholder="Area Code"
-								value={editAreaForm.AreaCode}
-								onChange={(e) => setEditAreaForm(prev => ({ ...prev, AreaCode: e.target.value }))}
-								disabled={!selectedArea}
-							/>
-							<input
-								className="w-full border rounded px-3 py-2"
-								placeholder="Area Name"
-								value={editAreaForm.AreaName}
-								onChange={(e) => setEditAreaForm(prev => ({ ...prev, AreaName: e.target.value }))}
-								disabled={!selectedArea}
-							/>
-							<textarea
-								className="w-full border rounded px-3 py-2"
-								placeholder="Description"
-								value={editAreaForm.Description}
-								onChange={(e) => setEditAreaForm(prev => ({ ...prev, Description: e.target.value }))}
-								disabled={!selectedArea}
-							/>
-							<div className="flex gap-2 justify-end">
-								<button type="submit" disabled={saving || !selectedArea} className="px-4 py-2 rounded bg-indigo-600 text-white disabled:opacity-60">
-									{saving ? 'Saving...' : 'Save Changes'}
-								</button>
-							</div>
-						</form>
-					)}
+				   {mainMode === 'add' && mode === 'add-criteria' && (
+					   <form onSubmit={handleAddCriteria} className="space-y-3">
+						   <select
+							   className="w-full border rounded px-3 py-2"
+							   value={criteriaForm.AreaID}
+							   onChange={(e) => setCriteriaForm(prev => ({ ...prev, AreaID: e.target.value }))}
+						   >
+							   <option value="">No Area (optional)</option>
+							   {(areas || []).map((area) => (
+								   <option key={area.AreaID} value={area.AreaID}>{area.AreaName}</option>
+							   ))}
+						   </select>
+						   <input
+							   className="w-full border rounded px-3 py-2"
+							   placeholder="Criteria Code"
+							   value={criteriaForm.CriteriaCode}
+							   onChange={(e) => setCriteriaForm(prev => ({ ...prev, CriteriaCode: e.target.value }))}
+						   />
+						   <input
+							   className="w-full border rounded px-3 py-2"
+							   placeholder="Criteria Name"
+							   value={criteriaForm.CriteriaName}
+							   onChange={(e) => setCriteriaForm(prev => ({ ...prev, CriteriaName: e.target.value }))}
+						   />
+						   <textarea
+							   className="w-full border rounded px-3 py-2"
+							   placeholder="Description"
+							   value={criteriaForm.Description}
+							   onChange={(e) => setCriteriaForm(prev => ({ ...prev, Description: e.target.value }))}
+						   />
+						   <div className="flex gap-2 justify-end">
+							   <button type="submit" disabled={saving} className="px-4 py-2 rounded bg-slate-700 text-white disabled:opacity-60">
+								   {saving ? 'Saving...' : 'Save Criteria'}
+							   </button>
+						   </div>
+					   </form>
+				   )}
 
-					{/* Placeholder for Edit Criteria and Edit Requirement */}
-					{mainMode === 'edit' && editMode === 'edit-criteria' && (
-						<div className="p-4 text-gray-500 border rounded">Edit Criteria form goes here.</div>
-					)}
-					{mainMode === 'edit' && editMode === 'edit-requirement' && (
-						<div className="p-4 text-gray-500 border rounded">Edit Requirement form goes here.</div>
-					)}
-				</div>
+				   {mainMode === 'add' && mode === 'add-requirement' && (
+					   <form onSubmit={handleAddRequirement} className="space-y-3">
+						   <select
+							   className="w-full border rounded px-3 py-2"
+							   value={requirementForm.AreaFilter}
+							   onChange={(e) => setRequirementForm(prev => ({ ...prev, AreaFilter: e.target.value, CriteriaID: '' }))}
+						   >
+							   <option value="">Select area</option>
+							   {(areas || []).map((area) => (
+								   <option key={area.AreaID} value={area.AreaID}>{area.AreaName}</option>
+							   ))}
+						   </select>
+						   <select
+							   className="w-full border rounded px-3 py-2"
+							   value={requirementForm.CriteriaID}
+							   onChange={(e) => handleRequirementCriteriaChange(e.target.value)}
+						   >
+							   <option value="">Select criteria</option>
+							   {filteredCriteriaOptions.map((crit) => (
+								   <option key={crit.CriteriaID} value={crit.CriteriaID}>
+									   {crit.CriteriaName} {crit.AreaName ? `- (${crit.AreaName})` : '- (No Area)'}
+								   </option>
+							   ))}
+						   </select>
+						   {requirementForm.AreaFilter && filteredCriteriaOptions.length === 0 && (
+							   <p className="text-xs text-gray-500">No criteria found for the selected area filter.</p>
+						   )}
+						   {!requirementForm.AreaFilter && (
+							   <p className="text-xs text-gray-500">Select an area first to load criteria.</p>
+						   )}
+						   <select
+							   className="w-full border rounded px-3 py-2"
+							   value={requirementForm.ParentRequirementCode}
+							   onChange={(e) => setRequirementForm(prev => ({ ...prev, ParentRequirementCode: e.target.value }))}
+							   disabled={!requirementForm.CriteriaID || loadingParents}
+						   >
+							   <option value="">No parent requirement (optional)</option>
+							   {parentRequirementOptions.map((req) => (
+								   <option key={req.RequirementID} value={req.RequirementCode}>
+									   {req.RequirementCode} - {req.Description}
+								   </option>
+							   ))}
+						   </select>
+						   {requirementForm.CriteriaID && loadingParents && (
+							   <p className="text-xs text-gray-500">Loading parent requirement options...</p>
+						   )}
+						   <input
+							   className="w-full border rounded px-3 py-2"
+							   placeholder="Requirement Code"
+							   value={requirementForm.RequirementCode}
+							   onChange={(e) => setRequirementForm(prev => ({ ...prev, RequirementCode: e.target.value }))}
+							   disabled={!requirementForm.CriteriaID}
+						   />
+						   <textarea
+							   className="w-full border rounded px-3 py-2"
+							   placeholder="Requirement Description"
+							   value={requirementForm.Description}
+							   onChange={(e) => setRequirementForm(prev => ({ ...prev, Description: e.target.value }))}
+							   disabled={!requirementForm.CriteriaID}
+						   />
+						   <div className="flex gap-2 justify-end">
+							   <button type="submit" disabled={saving || !requirementForm.CriteriaID} className="px-4 py-2 rounded bg-emerald-700 text-white disabled:opacity-60">
+								   {saving ? 'Saving...' : 'Save Requirement'}
+							   </button>
+						   </div>
+					   </form>
+				   )}
 
-				{mode === 'add-criteria' && (
-					<form onSubmit={handleAddCriteria} className="space-y-3">
-						<select
-							className="w-full border rounded px-3 py-2"
-							value={criteriaForm.AreaID}
-							onChange={(e) => setCriteriaForm(prev => ({ ...prev, AreaID: e.target.value }))}
-						>
-							<option value="">No Area (optional)</option>
-							{(areas || []).map((area) => (
-								<option key={area.AreaID} value={area.AreaID}>{area.AreaName}</option>
-							))}
-						</select>
-						<input
-							className="w-full border rounded px-3 py-2"
-							placeholder="Criteria Code"
-							value={criteriaForm.CriteriaCode}
-							onChange={(e) => setCriteriaForm(prev => ({ ...prev, CriteriaCode: e.target.value }))}
-						/>
-						<input
-							className="w-full border rounded px-3 py-2"
-							placeholder="Criteria Name"
-							value={criteriaForm.CriteriaName}
-							onChange={(e) => setCriteriaForm(prev => ({ ...prev, CriteriaName: e.target.value }))}
-						/>
-						<textarea
-							className="w-full border rounded px-3 py-2"
-							placeholder="Description"
-							value={criteriaForm.Description}
-							onChange={(e) => setCriteriaForm(prev => ({ ...prev, Description: e.target.value }))}
-						/>
-						<div className="flex gap-2 justify-end">
-							<button type="submit" disabled={saving} className="px-4 py-2 rounded bg-slate-700 text-white disabled:opacity-60">
-								{saving ? 'Saving...' : 'Save Criteria'}
-							</button>
-						</div>
-					</form>
-				)}
+				   {mainMode === 'edit' && editMode === 'edit-area' && (
+					   <form onSubmit={handleEditArea} className="space-y-3">
+						   <select
+							   className="w-full border rounded px-3 py-2"
+							   value={editAreaId}
+							   onChange={(e) => handleSelectEditArea(e.target.value)}
+						   >
+							   <option value="">Select area</option>
+							   {(areas || []).map(area => (
+								   <option key={area.AreaID} value={area.AreaID}>{area.AreaName}</option>
+							   ))}
+						   </select>
 
-				{mode === 'add-requirement' && (
-					<form onSubmit={handleAddRequirement} className="space-y-3">
-						<select
-							className="w-full border rounded px-3 py-2"
-							value={requirementForm.AreaFilter}
-							onChange={(e) => setRequirementForm(prev => ({ ...prev, AreaFilter: e.target.value, CriteriaID: '' }))}
-						>
-							<option value="">Select area</option>
-							{(areas || []).map((area) => (
-								<option key={area.AreaID} value={area.AreaID}>{area.AreaName}</option>
-							))}
-						</select>
-						<select
-							className="w-full border rounded px-3 py-2"
-							value={requirementForm.CriteriaID}
-							onChange={(e) => handleRequirementCriteriaChange(e.target.value)}
-						>
-							<option value="">Select criteria</option>
-							{filteredCriteriaOptions.map((crit) => (
-								<option key={crit.CriteriaID} value={crit.CriteriaID}>
-									{crit.CriteriaName} {crit.AreaName ? `- (${crit.AreaName})` : '- (No Area)'}
-								</option>
-							))}
-						</select>
-						{requirementForm.AreaFilter && filteredCriteriaOptions.length === 0 && (
-							<p className="text-xs text-gray-500">No criteria found for the selected area filter.</p>
-						)}
-						{!requirementForm.AreaFilter && (
-							<p className="text-xs text-gray-500">Select an area first to load criteria.</p>
-						)}
-						<select
-							className="w-full border rounded px-3 py-2"
-							value={requirementForm.ParentRequirementCode}
-							onChange={(e) => setRequirementForm(prev => ({ ...prev, ParentRequirementCode: e.target.value }))}
-							disabled={!requirementForm.CriteriaID || loadingParents}
-						>
-							<option value="">No parent requirement (optional)</option>
-							{parentRequirementOptions.map((req) => (
-								<option key={req.RequirementID} value={req.RequirementCode}>
-									{req.RequirementCode} - {req.Description}
-								</option>
-							))}
-						</select>
-						{requirementForm.CriteriaID && loadingParents && (
-							<p className="text-xs text-gray-500">Loading parent requirement options...</p>
-						)}
-						<input
-							className="w-full border rounded px-3 py-2"
-							placeholder="Requirement Code"
-							value={requirementForm.RequirementCode}
-							onChange={(e) => setRequirementForm(prev => ({ ...prev, RequirementCode: e.target.value }))}
-							disabled={!requirementForm.CriteriaID}
-						/>
-						<textarea
-							className="w-full border rounded px-3 py-2"
-							placeholder="Requirement Description"
-							value={requirementForm.Description}
-							onChange={(e) => setRequirementForm(prev => ({ ...prev, Description: e.target.value }))}
-							disabled={!requirementForm.CriteriaID}
-						/>
-						<div className="flex gap-2 justify-end">
-							<button type="submit" disabled={saving || !requirementForm.CriteriaID} className="px-4 py-2 rounded bg-emerald-700 text-white disabled:opacity-60">
-								{saving ? 'Saving...' : 'Save Requirement'}
-							</button>
-						</div>
-					</form>
-				)}
+						   <input
+							   className="w-full border rounded px-3 py-2"
+							   placeholder="Area Code"
+							   value={editAreaForm.AreaCode}
+							   onChange={(e) => setEditAreaForm(prev => ({ ...prev, AreaCode: e.target.value }))}
+							   disabled={!selectedArea}
+						   />
+						   <input
+							   className="w-full border rounded px-3 py-2"
+							   placeholder="Area Name"
+							   value={editAreaForm.AreaName}
+							   onChange={(e) => setEditAreaForm(prev => ({ ...prev, AreaName: e.target.value }))}
+							   disabled={!selectedArea}
+						   />
+						   <textarea
+							   className="w-full border rounded px-3 py-2"
+							   placeholder="Description"
+							   value={editAreaForm.Description}
+							   onChange={(e) => setEditAreaForm(prev => ({ ...prev, Description: e.target.value }))}
+							   disabled={!selectedArea}
+						   />
+						   <div className="flex gap-2 justify-end">
+							   <button type="submit" disabled={saving || !selectedArea} className="px-4 py-2 rounded bg-indigo-600 text-white disabled:opacity-60">
+								   {saving ? 'Saving...' : 'Save Changes'}
+							   </button>
+						   </div>
+					   </form>
+				   )}
 
 				{error && <p className="text-sm text-red-600 mt-3">{error}</p>}
 				{success && <p className="text-sm text-emerald-600 mt-3">{success}</p>}
