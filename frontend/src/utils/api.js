@@ -24,11 +24,9 @@ export const areasAPI = {
 };
 import axios from 'axios';
 
-// Backend base URL
-const API_BASE_URL = 'http://localhost:5000'; // remove /api to match backend
-
+// Use relative base URL so Vite proxy works in dev and prod
 const api = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: '',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -178,6 +176,9 @@ export const usersAPI = {
         throw error;
       }
     },
+    // Copy event API
+    copyEvent: async ({ sourceEventId, newEventName, newEventCode, newDescription }) =>
+      (await api.post('/api/events/copy', { sourceEventId, newEventName, newEventCode, newDescription })).data,
   };
 
   // ========================

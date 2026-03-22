@@ -1,3 +1,6 @@
+const db = require('../db');
+const { recordLog } = require('./logsController');
+
 // Delete criteria
 const deleteCriteria = async (req, res) => {
   try {
@@ -17,6 +20,8 @@ const deleteCriteria = async (req, res) => {
       criteriaIds
     );
 
+    await recordLog(req.user?.userId, 'Criteria deleted', `IDs: ${criteriaIds.join(', ')}`);
+
     res.json({
       success: true,
       message: `Successfully deleted ${result.affectedRows} criteria(s)` ,
@@ -30,7 +35,6 @@ const deleteCriteria = async (req, res) => {
     });
   }
 };
-const db = require('../db');
 
 // Get all criteria
 const getAllCriteria = async (req, res) => {

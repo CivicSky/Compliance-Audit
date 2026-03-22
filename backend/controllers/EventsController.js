@@ -1,3 +1,68 @@
+// Copy event (migrated from frontend)
+const copyEvent = async (req, res) => {
+  try {
+    const { sourceEventId, newEventName, newEventCode, newDescription } = req.body;
+    if (!sourceEventId || !newEventName || !newEventCode) {
+      return res.status(400).json({
+        success: false,
+        message: 'Source event ID, new event name, and new event code are required'
+      });
+    }
+
+    // Get source event
+    const [rows] = await db.query('SELECT * FROM Events WHERE EventID = ?', [sourceEventId]);
+    if (!rows.length) {
+      return res.status(404).json({ success: false, message: 'Source event not found' });
+    }
+    const sourceEvent = rows[0];
+
+    // Insert new event
+    const [result] = await db.query(
+      'INSERT INTO Events (EventName, EventCode, Description, CreatedAt) VALUES (?, ?, ?, NOW())',
+      [newEventName, newEventCode, newDescription || sourceEvent.Description || null]
+    );
+
+    // Copy event folder
+    const sanitize = sanitizeFolderName;
+    const srcFolder = path.join(__dirname, '..', 'uploads', 'events', sanitize(sourceEvent.EventName));
+    const destFolder = path.join(__dirname, '..', 'uploads', 'events', sanitize(newEventName));
+    if (fs.existsSync(srcFolder)) {
+      if (!fs.existsSync(destFolder)) {
+        fs.mkdirSync(destFolder, { recursive: true });
+      }
+      // Copy files and subfolders
+      const copyRecursive = (src, dest) => {
+        const entries = fs.readdirSync(src, { withFileTypes: true });
+        for (const entry of entries) {
+          const srcPath = path.join(src, entry.name);
+          const destPath = path.join(dest, entry.name);
+          if (entry.isDirectory()) {
+            if (!fs.existsSync(destPath)) fs.mkdirSync(destPath);
+            copyRecursive(srcPath, destPath);
+          } else {
+            fs.copyFileSync(srcPath, destPath);
+          }
+        }
+      };
+      copyRecursive(srcFolder, destFolder);
+    }
+
+    res.json({
+      success: true,
+      message: 'Event copied successfully',
+      data: {
+        EventID: result.insertId,
+        EventName: newEventName,
+        EventCode: newEventCode,
+        Description: newDescription || sourceEvent.Description,
+        FolderPath: sanitize(newEventName)
+      }
+    });
+  } catch (error) {
+    console.error('Error copying event:', error);
+    res.status(500).json({ success: false, message: 'Error copying event' });
+  }
+};
 const db = require('../db');
 const fs = require('fs');
 const path = require('path');
@@ -270,5 +335,6 @@ module.exports = {
   deleteEvents,
   updateEvent,
   getDownloadableFolders,
-  downloadEventZip
+  downloadEventZip,
+  copyEvent
 };

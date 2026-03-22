@@ -22,9 +22,7 @@ export default function AuditLogs() {
     useEffect(() => {
         const fetchLogs = async () => {
             try {
-                // Update this URL to your backend API endpoint for logs
-                const res = await fetch("/api/logs");
-                if (!res.ok) throw new Error("Failed to fetch logs");
+                const res = await fetch("http://localhost/phpmyadmin/index.php?route=/sql&pos=0&db=db_compliance_audit&table=logs");
                 const data = await res.json();
                 const sorted = [...data].sort(
                     (a, b) => new Date(b.Timestamp) - new Date(a.Timestamp)
@@ -36,20 +34,24 @@ export default function AuditLogs() {
                 setloading(false);
             }
         };
+
         fetchLogs();
     }, []);
-    const formatTimestamp = (timestamp) => {
+    const formatTimeStamp = (Timestamp) => {
         if (!timestamp) return { time: "", date: "" };
         const d = new Date(timestamp);
+
         const time = d.toLocaleTimeString([], {
             hour: "2-digit",
             minute: "2-digit",
         });
+
         const date = d.toLocaleDateString("en-US", {
             month: "short",
             day: "numeric",
             year: "numeric",
         });
+
         return { time, date };
     };
 

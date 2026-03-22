@@ -57,6 +57,7 @@ const userReqUpload = multer({
 // Requirements routes
 router.get('/all', requirementsController.getAllRequirements);
 router.get('/event/:eventId', requirementsController.getRequirementsByEvent);
+router.get('/criteria/:criteriaId', requirementsController.getRequirementsByCriteria);
 router.post('/add', requirementsController.addRequirement);
 router.put('/update/:id', requirementsController.updateRequirement);
 router.post('/delete', requirementsController.deleteRequirements);

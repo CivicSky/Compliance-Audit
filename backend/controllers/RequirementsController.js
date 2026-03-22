@@ -1,5 +1,57 @@
 const db = require('../db');
 
+const isUnknownColumnError = (error) =>
+  error?.code === 'ER_BAD_FIELD_ERROR' || error?.errno === 1054;
+
+const executeWithFallbacks = async (attempts) => {
+  let lastError;
+  for (const attempt of attempts) {
+    try {
+      return await db.query(attempt.sql, attempt.params);
+    } catch (error) {
+      lastError = error;
+      if (!isUnknownColumnError(error)) {
+        throw error;
+      }
+    }
+  }
+  throw lastError;
+};
+
+const resolveParentRequirement = async (parentValue) => {
+  if (!parentValue) {
+    return { parentCode: null, parentId: null };
+  }
+
+  const raw = String(parentValue).trim();
+  if (!raw) {
+    return { parentCode: null, parentId: null };
+  }
+
+  // Accept either parent code or parent requirement ID for compatibility.
+  if (/^\d+$/.test(raw)) {
+    const parentId = Number(raw);
+    const [rows] = await db.query(
+      'SELECT RequirementID, RequirementCode FROM requirements WHERE RequirementID = ? LIMIT 1',
+      [parentId]
+    );
+    if (rows.length === 0) {
+      throw new Error('Selected parent requirement was not found');
+    }
+    return { parentCode: rows[0].RequirementCode, parentId: rows[0].RequirementID };
+  }
+
+  const [rows] = await db.query(
+    'SELECT RequirementID, RequirementCode FROM requirements WHERE RequirementCode = ? LIMIT 1',
+    [raw]
+  );
+  if (rows.length === 0) {
+    throw new Error('Selected parent requirement was not found');
+  }
+
+  return { parentCode: rows[0].RequirementCode, parentId: rows[0].RequirementID };
+};
+
 // Get all requirements
 const getAllRequirements = async (req, res) => {
   try {
@@ -50,7 +102,7 @@ const getAllRequirements = async (req, res) => {
 // Add new requirement
 const addRequirement = async (req, res) => {
   try {
-    let { RequirementCode, Description, CriteriaID, ParentRequirementCode } = req.body;
+    let { RequirementCode, Description, CriteriaID, ParentRequirementCode, ParentRequirementID } = req.body;
 
     // Validate required fields
     if (!Description || !CriteriaID) {
@@ -60,26 +112,49 @@ const addRequirement = async (req, res) => {
       });
     }
 
+    CriteriaID = Number(CriteriaID);
+    if (!Number.isInteger(CriteriaID) || CriteriaID <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid criteria selected'
+      });
+    }
+
+    const [criteria] = await db.query(
+      'SELECT CriteriaCode FROM criteria WHERE CriteriaID = ?',
+      [CriteriaID]
+    );
+
+    if (criteria.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid criteria selected'
+      });
+    }
+
+    const criteriaCode = criteria[0].CriteriaCode;
+    const { parentCode, parentId } = await resolveParentRequirement(ParentRequirementCode || ParentRequirementID);
+
     // Auto-generate RequirementCode if parent is selected
-    if (ParentRequirementCode) {
+    if (parentCode) {
       if (!RequirementCode || RequirementCode.trim() === '') {
         // No code provided - auto-generate next number
         const [children] = await db.query(
-          'SELECT RequirementCode FROM requirements WHERE ParentRequirementCode = ? ORDER BY RequirementCode DESC LIMIT 1',
-          [ParentRequirementCode]
+          'SELECT RequirementCode FROM requirements WHERE RequirementCode LIKE ? ORDER BY LENGTH(RequirementCode) DESC, RequirementCode DESC LIMIT 1',
+          [`${parentCode}.%`]
         );
 
         if (children.length > 0) {
           const lastChild = children[0].RequirementCode;
           const parts = lastChild.split('.');
           const lastNumber = parseInt(parts[parts.length - 1]) || 0;
-          RequirementCode = `${ParentRequirementCode}.${lastNumber + 1}`;
+          RequirementCode = `${parentCode}.${lastNumber + 1}`;
         } else {
-          RequirementCode = `${ParentRequirementCode}.1`;
+          RequirementCode = `${parentCode}.1`;
         }
       } else if (!/\./.test(RequirementCode)) {
         // Code provided but it's just a number (no dot) - append to parent
-        RequirementCode = `${ParentRequirementCode}.${RequirementCode}`;
+        RequirementCode = `${parentCode}.${RequirementCode}`;
       }
       // If RequirementCode already has dots, use it as-is
     } else {
@@ -91,21 +166,6 @@ const addRequirement = async (req, res) => {
         });
       }
 
-      // Get the criteria code to join with
-      const [criteria] = await db.query(
-        'SELECT CriteriaCode FROM criteria WHERE CriteriaID = ?',
-        [CriteriaID]
-      );
-
-      if (criteria.length === 0) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid criteria selected'
-        });
-      }
-
-      const criteriaCode = criteria[0].CriteriaCode;
-
       // If user enters just a number, join with criteria code
       if (!/\./.test(RequirementCode)) {
         RequirementCode = `${criteriaCode}.${RequirementCode}`;
@@ -113,11 +173,34 @@ const addRequirement = async (req, res) => {
       // If RequirementCode already has dots, use it as-is
     }
 
-    // Insert new requirement
-    const [result] = await db.query(
-      'INSERT INTO requirements (RequirementCode, Description, CriteriaID, ParentRequirementCode) VALUES (?, ?, ?, ?)',
-      [RequirementCode, Description, CriteriaID, ParentRequirementCode || null]
-    );
+    const insertAttempts = [
+      {
+        sql: 'INSERT INTO requirements (RequirementCode, Description, CriteriaID, ParentRequirementCode, CreatedAt, UpdatedAt) VALUES (?, ?, ?, ?, NOW(), NOW())',
+        params: [RequirementCode, Description, CriteriaID, parentCode]
+      },
+      {
+        sql: 'INSERT INTO requirements (RequirementCode, Description, CriteriaID, ParentRequirementCode) VALUES (?, ?, ?, ?)',
+        params: [RequirementCode, Description, CriteriaID, parentCode]
+      },
+      {
+        sql: 'INSERT INTO requirements (RequirementCode, Description, CriteriaID, ParentRequirementID, CreatedAt, UpdatedAt) VALUES (?, ?, ?, ?, NOW(), NOW())',
+        params: [RequirementCode, Description, CriteriaID, parentId]
+      },
+      {
+        sql: 'INSERT INTO requirements (RequirementCode, Description, CriteriaID, ParentRequirementID) VALUES (?, ?, ?, ?)',
+        params: [RequirementCode, Description, CriteriaID, parentId]
+      },
+      {
+        sql: 'INSERT INTO requirements (RequirementCode, Description, CriteriaID, CreatedAt, UpdatedAt) VALUES (?, ?, ?, NOW(), NOW())',
+        params: [RequirementCode, Description, CriteriaID]
+      },
+      {
+        sql: 'INSERT INTO requirements (RequirementCode, Description, CriteriaID) VALUES (?, ?, ?)',
+        params: [RequirementCode, Description, CriteriaID]
+      }
+    ];
+
+    const [result] = await executeWithFallbacks(insertAttempts);
 
     res.json({
       success: true,
@@ -127,14 +210,31 @@ const addRequirement = async (req, res) => {
         RequirementCode,
         Description,
         CriteriaID,
-        ParentRequirementCode
+        ParentRequirementCode: parentCode,
+        ParentRequirementID: parentId
       }
     });
   } catch (error) {
     console.error('Error adding requirement:', error);
+
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({
+        success: false,
+        message: 'Requirement code already exists'
+      });
+    }
+
+    if (error.message === 'Selected parent requirement was not found') {
+      return res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
+
     res.status(500).json({
       success: false,
-      message: 'Error adding requirement'
+      message: 'Error adding requirement',
+      error: error.message
     });
   }
 };
@@ -167,6 +267,39 @@ const getRequirementsByEvent = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching requirements'
+    });
+  }
+};
+
+// Get requirements by criteria
+const getRequirementsByCriteria = async (req, res) => {
+  try {
+    const { criteriaId } = req.params;
+
+    const [requirements] = await db.query(`
+      SELECT 
+        r.*, 
+        c.CriteriaName, 
+        c.CriteriaCode,
+        c.EventID,
+        e.EventName,
+        e.EventCode
+      FROM requirements r
+      LEFT JOIN criteria c ON r.CriteriaID = c.CriteriaID
+      LEFT JOIN Events e ON c.EventID = e.EventID
+      WHERE r.CriteriaID = ?
+      ORDER BY r.RequirementCode ASC
+    `, [criteriaId]);
+
+    res.json({
+      success: true,
+      data: requirements
+    });
+  } catch (error) {
+    console.error('Error fetching requirements by criteria:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching requirements by criteria'
     });
   }
 };
@@ -309,7 +442,7 @@ const updateEvent = async (req, res) => {
 const updateRequirement = async (req, res) => {
   try {
     const { id } = req.params;
-    let { RequirementCode, Description, CriteriaID, ParentRequirementCode } = req.body;
+    let { RequirementCode, Description, CriteriaID, ParentRequirementCode, ParentRequirementID } = req.body;
 
     // Validate required fields
     if (!Description || !CriteriaID) {
@@ -319,26 +452,49 @@ const updateRequirement = async (req, res) => {
       });
     }
 
+    CriteriaID = Number(CriteriaID);
+    if (!Number.isInteger(CriteriaID) || CriteriaID <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid criteria selected'
+      });
+    }
+
+    const [criteria] = await db.query(
+      'SELECT CriteriaCode FROM criteria WHERE CriteriaID = ?',
+      [CriteriaID]
+    );
+
+    if (criteria.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid criteria selected'
+      });
+    }
+
+    const criteriaCode = criteria[0].CriteriaCode;
+    const { parentCode, parentId } = await resolveParentRequirement(ParentRequirementCode || ParentRequirementID);
+
     // Auto-generate RequirementCode if parent is selected (same logic as add)
-    if (ParentRequirementCode) {
+    if (parentCode) {
       if (!RequirementCode || RequirementCode.trim() === '') {
         // No code provided - auto-generate next number
         const [children] = await db.query(
-          'SELECT RequirementCode FROM requirements WHERE ParentRequirementCode = ? ORDER BY RequirementCode DESC LIMIT 1',
-          [ParentRequirementCode]
+          'SELECT RequirementCode FROM requirements WHERE RequirementCode LIKE ? AND RequirementID <> ? ORDER BY LENGTH(RequirementCode) DESC, RequirementCode DESC LIMIT 1',
+          [`${parentCode}.%`, id]
         );
 
         if (children.length > 0) {
           const lastChild = children[0].RequirementCode;
           const parts = lastChild.split('.');
           const lastNumber = parseInt(parts[parts.length - 1]) || 0;
-          RequirementCode = `${ParentRequirementCode}.${lastNumber + 1}`;
+          RequirementCode = `${parentCode}.${lastNumber + 1}`;
         } else {
-          RequirementCode = `${ParentRequirementCode}.1`;
+          RequirementCode = `${parentCode}.1`;
         }
       } else if (!/\./.test(RequirementCode)) {
         // Code provided but it's just a number (no dot) - append to parent
-        RequirementCode = `${ParentRequirementCode}.${RequirementCode}`;
+        RequirementCode = `${parentCode}.${RequirementCode}`;
       }
       // If RequirementCode already has dots, use it as-is
     } else {
@@ -350,21 +506,6 @@ const updateRequirement = async (req, res) => {
         });
       }
 
-      // Get the criteria code to join with
-      const [criteria] = await db.query(
-        'SELECT CriteriaCode FROM criteria WHERE CriteriaID = ?',
-        [CriteriaID]
-      );
-
-      if (criteria.length === 0) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid criteria selected'
-        });
-      }
-
-      const criteriaCode = criteria[0].CriteriaCode;
-
       // If user enters just a number, join with criteria code
       if (!/\./.test(RequirementCode)) {
         RequirementCode = `${criteriaCode}.${RequirementCode}`;
@@ -372,11 +513,34 @@ const updateRequirement = async (req, res) => {
       // If RequirementCode already has dots, use it as-is
     }
 
-    // Update requirement
-    const [result] = await db.query(
-      'UPDATE requirements SET RequirementCode = ?, Description = ?, CriteriaID = ?, ParentRequirementCode = ? WHERE RequirementID = ?',
-      [RequirementCode, Description, CriteriaID, ParentRequirementCode || null, id]
-    );
+    const updateAttempts = [
+      {
+        sql: 'UPDATE requirements SET RequirementCode = ?, Description = ?, CriteriaID = ?, ParentRequirementCode = ?, UpdatedAt = NOW() WHERE RequirementID = ?',
+        params: [RequirementCode, Description, CriteriaID, parentCode, id]
+      },
+      {
+        sql: 'UPDATE requirements SET RequirementCode = ?, Description = ?, CriteriaID = ?, ParentRequirementCode = ? WHERE RequirementID = ?',
+        params: [RequirementCode, Description, CriteriaID, parentCode, id]
+      },
+      {
+        sql: 'UPDATE requirements SET RequirementCode = ?, Description = ?, CriteriaID = ?, ParentRequirementID = ?, UpdatedAt = NOW() WHERE RequirementID = ?',
+        params: [RequirementCode, Description, CriteriaID, parentId, id]
+      },
+      {
+        sql: 'UPDATE requirements SET RequirementCode = ?, Description = ?, CriteriaID = ?, ParentRequirementID = ? WHERE RequirementID = ?',
+        params: [RequirementCode, Description, CriteriaID, parentId, id]
+      },
+      {
+        sql: 'UPDATE requirements SET RequirementCode = ?, Description = ?, CriteriaID = ?, UpdatedAt = NOW() WHERE RequirementID = ?',
+        params: [RequirementCode, Description, CriteriaID, id]
+      },
+      {
+        sql: 'UPDATE requirements SET RequirementCode = ?, Description = ?, CriteriaID = ? WHERE RequirementID = ?',
+        params: [RequirementCode, Description, CriteriaID, id]
+      }
+    ];
+
+    const [result] = await executeWithFallbacks(updateAttempts);
 
     if (result.affectedRows === 0) {
       return res.status(404).json({
@@ -393,14 +557,31 @@ const updateRequirement = async (req, res) => {
         RequirementCode,
         Description,
         CriteriaID,
-        ParentRequirementCode
+        ParentRequirementCode: parentCode,
+        ParentRequirementID: parentId
       }
     });
   } catch (error) {
     console.error('Error updating requirement:', error);
+
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({
+        success: false,
+        message: 'Requirement code already exists'
+      });
+    }
+
+    if (error.message === 'Selected parent requirement was not found') {
+      return res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
+
     res.status(500).json({
       success: false,
-      message: 'Error updating requirement'
+      message: 'Error updating requirement',
+      error: error.message
     });
   }
 };
@@ -757,6 +938,7 @@ const markUserAsUploaded = async (req, res) => {
 module.exports = {
   getAllRequirements,
   getRequirementsByEvent,
+  getRequirementsByCriteria,
   addRequirement,
   updateRequirement,
   deleteRequirements,

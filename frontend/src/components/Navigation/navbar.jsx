@@ -147,7 +147,7 @@ export default function Navbar() {
                         <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Management</span>
                     </div>
                     
-                    {/* Reordered: Events > Areas > Criteria > Requirements > Offices */}
+                    {/* Reordered: Events > ALLC > (Area, Criteria, Requirements commented) > Offices */}
                     <NavLink
                         to="/home/setup"
                         className={({ isActive }) =>
@@ -187,6 +187,24 @@ export default function Navbar() {
                     </NavLink>
 
              
+                    <NavLink
+                        to="/home/allc"
+                        className={({ isActive }) =>
+                            `flex items-center gap-2 py-2.5 px-3 rounded-lg transition-colors duration-200 text-white ${
+                                isActive ? 'bg-blue-600 shadow-inner' : 'hover:bg-gray-800'
+                            }`
+                        }
+                    >
+                        <span className="w-4 text-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h8M12 8v8" />
+                            </svg>
+                        </span>
+                        <span className="text-xs font-medium">ALLC</span>
+                    </NavLink>
+
+                    {/* Area — hidden from nav (restore by uncommenting)
                     <NavLink
                         to="/home/area"
                         className={({ isActive }) =>
@@ -247,9 +265,8 @@ export default function Navbar() {
                         </span>
                         <span className="text-xs font-medium">Requirements</span>
                     </NavLink>
-                    
-
-                    <NavLink
+                    */}
+                                        <NavLink
                         to="/home/organizations"
                         onClick={(e) => {
                             if (window.location.pathname === '/home/officehead') {

@@ -12,6 +12,7 @@ const officetypes = require('./routes/officetypes');
 const areasRoutes = require('./routes/areas');
 const criteriaRoutes = require('./routes/criteria');
 const notificationRoutes = require('./routes/notif');
+const logsRoutes = require('./routes/logs');
 
 console.log('Backend started and logger active');
 
@@ -54,6 +55,7 @@ app.use('/api/officestypes', officetypes);
 app.use('/api/areas', areasRoutes);
 app.use('/api/criteria', criteriaRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/logs', logsRoutes);
 const complianceStatusOfficesRoutes = require('./routes/ComplianceStatusOffices');
 const officeDocumentsRoutes = require('./routes/officedocuments');
 app.use('/api/compliancestatusoffices', complianceStatusOfficesRoutes);

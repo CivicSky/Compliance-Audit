@@ -20,4 +20,7 @@ router.get('/downloadable-folders', eventsController.getDownloadableFolders);
 // Download event folder as zip
 router.get('/download/:eventName', eventsController.downloadEventZip);
 
+// Copy event
+router.post('/copy', eventsController.copyEvent);
+
 module.exports = router;
