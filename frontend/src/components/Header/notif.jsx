@@ -114,8 +114,6 @@ export default function Header() {
           <div className="text-lg text-gray-600 font-mono">
             {formattedDate} {formattedTime}
           </div>
-
-          
           {/* Notification Bell */}
           <div className="relative">
             <button

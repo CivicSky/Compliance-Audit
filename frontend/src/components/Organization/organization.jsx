@@ -196,7 +196,6 @@ export default function Organization() {
         <div className="px-6 pb-6 pt-6 w-full">
             <Header
                 pageTitle="Offices"
-                onAddClick={() => setIsModalOpen(true)}
                 onSearchChange={setSearchTerm}
                 searchValue={searchTerm}
                 onDeleteModeToggle={setDeleteMode}
@@ -206,6 +205,16 @@ export default function Organization() {
                 hideSortButton={true}
                 userRole={currentUser?.RoleID}
             />
+
+            {/* Add Office Button (not in header) */}
+            <div className="mb-4 flex justify-end">
+                <button
+                    onClick={() => setIsModalOpen(true)}
+                    className="px-5 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition-colors font-semibold"
+                >
+                    + Add Office
+                </button>
+            </div>
 
 
             {/* Event Type Dropdown and View Toggle */}

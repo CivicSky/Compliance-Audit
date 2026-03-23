@@ -314,7 +314,7 @@ export default function Navbar() {
                     )}
                 </div>
 
-                {/* Notifications */}
+                {/* Notifications (hidden)
                 <div className="relative mb-3" ref={notificationRef}>
                     <button
                         onClick={() => setShowNotifications(!showNotifications)}
@@ -333,6 +333,7 @@ export default function Navbar() {
                         )}
                     </button>
                 </div>
+                */}
 
                 {/* Profile Menu */}
                 <div className="relative border-t border-gray-700 pt-2" ref={profileMenuRef}>
@@ -412,7 +413,7 @@ export default function Navbar() {
                         {/* ... same sections as desktop, just add `onClick={() => setIsMobileMenuOpen(false)}` to each NavLink */}
                     </div>
 
-                    {/* Mobile Notifications */}
+                    {/* Mobile Notifications (hidden)
                     <div className="mb-3">
                         <button
                             onClick={() => {
@@ -434,6 +435,7 @@ export default function Navbar() {
                             )}
                         </button>
                     </div>
+                    */}
 
                     {/* Mobile Profile Section */}
                     <div className="relative border-t border-gray-700 pt-3">
