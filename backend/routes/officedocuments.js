@@ -6,6 +6,7 @@ const router = express.Router();
 const OfficesController = require('../controllers/OfficesController');
 const { saveOfficeProofDocument } = require('../utils/officeProof');
 const db = require('../db');
+const auth = require('../middleware/auth');
 
 // Multer config for proof document uploads (matches requirements upload pattern)
 const tempProofUploadDir = path.join(__dirname, '../uploads/tmp-proof-uploads');
@@ -202,6 +203,38 @@ router.get('/:id/proof', async (req, res) => {
   } catch (err) {
     console.error('Error fetching proof document:', err);
     res.status(500).json({ success: false, message: 'Failed to fetch proof document', error: err.message });
+  }
+});
+
+// Delete latest proof document for an office (admin Unsubmit)
+router.delete('/:id/proof', auth, async (req, res) => {
+  try {
+    const officeId = req.params.id;
+    // Find latest proof document (requirement_id IS NULL)
+    const [rows] = await db.query(
+      'SELECT * FROM office_proof_documents WHERE office_id = ? AND requirement_id IS NULL ORDER BY uploaded_at DESC LIMIT 1',
+      [officeId]
+    );
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'No proof document found for this office' });
+    }
+    const doc = rows[0];
+    // Delete file from disk
+    try {
+      const filePath = path.join(__dirname, '..', doc.file_path.replace(/^\//, ''));
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    } catch (fsErr) {
+      console.warn('Failed to delete proof file from disk:', fsErr);
+    }
+    // Delete DB record (match by office_id and file_path/file_name)
+    await db.query(
+      'DELETE FROM office_proof_documents WHERE office_id = ? AND requirement_id IS NULL AND (file_path = ? OR file_name = ?) LIMIT 1',
+      [officeId, doc.file_path, doc.file_name]
+    );
+    res.json({ success: true, message: 'Proof document deleted' });
+  } catch (err) {
+    console.error('Error deleting proof document:', err);
+    res.status(500).json({ success: false, message: 'Failed to delete proof document', error: err.message });
   }
 });
 

@@ -36,7 +36,7 @@ const EditAreaModal = ({ visible, onClose, area = {}, onSave, userRole = 'user' 
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out bg-black bg-opacity-50 flex items-center justify-center z-[120]">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 min-h-[40vh] max-h-[95vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
@@ -150,3 +150,4 @@ const EditAreaModal = ({ visible, onClose, area = {}, onSave, userRole = 'user' 
 };
 
 export default EditAreaModal;
+

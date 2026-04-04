@@ -99,14 +99,7 @@ export default function Header() {
 
   return (
     <div className="fixed top-0 left-0 w-full bg-white shadow z-50" style={{margin:0, borderRadius:0, height:'72px'}}>
-      <div
-        className="flex items-center justify-between h-full px-8"
-        style={{
-          marginLeft: '260px', // sidebar width
-          maxWidth: '1100px',
-          marginRight: 'auto',
-        }}
-      >
+      <div className="flex items-center justify-between h-full px-8 w-full lg:w-[calc(100%-var(--sidebar-width))] lg:ml-[var(--sidebar-width)] transition-[margin-left,width] duration-200">
         <div className="text-2xl font-semibold text-gray-800">
           Hello{name ? `, ${name}` : ''}
         </div>

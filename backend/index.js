@@ -17,7 +17,13 @@ const logsRoutes = require('./routes/logs');
 console.log('Backend started and logger active');
 
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'], // Add common dev server ports
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'http://localhost:5175',
+    'http://localhost:8081', // Expo/React Native web dev server
+  ],
   credentials: true
 }));
 app.use(express.json());
@@ -34,6 +40,26 @@ const complinancestatusRoutes = require('./routes/compliancestatus');*/
 // Global request logger for debugging
 app.use((req, res, next) => {
   console.log('Incoming request:', req.method, req.url);
+  next();
+});
+
+// Audit logging middleware: record POST/PUT/PATCH/DELETE actions after response finishes
+const { recordLog } = require('./controllers/logsController');
+app.use((req, res, next) => {
+  res.on('finish', () => {
+    try {
+      if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+        const userId = req.user?.userId || null;
+        const action = `${req.method} ${req.originalUrl}`;
+        const details = JSON.stringify({ status: res.statusCode, body: req.body || null });
+        if (userId) {
+          recordLog(userId, action, details);
+        }
+      }
+    } catch (err) {
+      console.error('Audit log error:', err);
+    }
+  });
   next();
 });
 

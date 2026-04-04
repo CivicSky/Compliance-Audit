@@ -54,15 +54,18 @@ class NotificationController {
     static async createNotification(req, res) {
         try {
             const { userIds, adminId, title, message, type = 'info', relatedTable, relatedId } = req.body;
+            const senderId = Number(adminId || req.user?.userId);
+            const safeType = ['info', 'success', 'warning', 'error', 'announcement'].includes(type) ? type : 'info';
+            const normalizedUserIds = [...new Set((Array.isArray(userIds) ? userIds : []).map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0))];
             
-            if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+            if (normalizedUserIds.length === 0) {
                 return res.status(400).json({
                     success: false,
                     message: 'User IDs are required'
                 });
             }
             
-            if (!adminId || !title || !message) {
+            if (!senderId || !title || !message) {
                 return res.status(400).json({
                     success: false,
                     message: 'Admin ID, title, and message are required'
@@ -70,19 +73,19 @@ class NotificationController {
             }
             
             // Insert notifications for each user
-            const insertPromises = userIds.map(userId => {
+            const insertPromises = normalizedUserIds.map(userId => {
                 return db.query(`
                     INSERT INTO notifications 
                     (UserID, AdminID, Title, Message, Type, RelatedTable, RelatedID, CreatedAt)
                     VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
-                `, [userId, adminId, title, message, type, relatedTable, relatedId]);
+                `, [userId, senderId, title, message, safeType, relatedTable || null, relatedId || null]);
             });
             
             await Promise.all(insertPromises);
             
             res.json({
                 success: true,
-                message: `Notification sent to ${userIds.length} users`
+                message: `Notification sent to ${normalizedUserIds.length} users`
             });
         } catch (error) {
             console.error('Error creating notification:', error);

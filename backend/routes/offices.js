@@ -5,6 +5,7 @@ const optionalAuth = require("../middleware/optionalAuth");
 
 // Office Routes
 router.get("/", OfficesController.getAll);
+router.get("/:id/export", optionalAuth, OfficesController.exportOfficeExcel);
 router.get("/:id", OfficesController.getById);
 router.post("/", optionalAuth, OfficesController.create);
 router.put("/:id", optionalAuth, OfficesController.update);

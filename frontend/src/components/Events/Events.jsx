@@ -3,16 +3,13 @@ import Header from "../Header/header"
 // Use the EventsProfile implementation (exports EventsP) so the page shows the detailed events
 import EventsP from "../EventsProfile/EventsProfle";
 import AddEventModal from "../AddEvent/AddEventModal";
-import EditEventModal from "../EditEvents/EditeventsModal";
 import UnifiedSetupWizard from "../UnifiedSetupWizard/UnifiedSetupWizard";
 import { Wand2 } from "lucide-react";
 import { usersAPI } from "../../utils/api";
 
 export default function Events() {
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [showWizard, setShowWizard] = useState(false);
-    const [selectedEvent, setSelectedEvent] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [deleteMode, setDeleteMode] = useState(false);
     const [selectedCount, setSelectedCount] = useState(0);
@@ -61,13 +58,7 @@ export default function Events() {
         }
     };
 
-    const handleEventClick = (event) => {
-        // Allow clicking to view/edit event when not in delete mode
-        if (!deleteMode) {
-            setSelectedEvent(event);
-            setIsEditModalOpen(true);
-        }
-    };
+    // Removed handleEventClick for EditEventModal
 
     const handleEditSave = async (updatedEvent) => {
         try {
@@ -77,7 +68,8 @@ export default function Events() {
             const response = await eventsAPI.updateEvent(updatedEvent.EventID, {
                 EventCode: updatedEvent.EventCode,
                 EventName: updatedEvent.EventName,
-                Description: updatedEvent.Description
+                Description: updatedEvent.Description,
+                status: updatedEvent.status
             });
 
             if (response.success) {
@@ -87,8 +79,6 @@ export default function Events() {
                     eventsPRef.current.refresh();
                 }
                 // Close modal and reset selected event after successful save
-                setIsEditModalOpen(false);
-                setSelectedEvent(null);
                 alert('Event updated successfully!');
                 return true; // Return success status
             } else {
@@ -189,7 +179,7 @@ export default function Events() {
                     searchTerm={searchTerm}
                     deleteMode={deleteMode}
                     onSelectionChange={handleSelectionChange}
-                    onEventClick={handleEventClick}
+                    // onEventClick removed (EditEventModal)
                 />
             </div>
 
@@ -202,19 +192,7 @@ export default function Events() {
                 />
             )}
 
-            {/* Edit Modal */}
-            {isEditModalOpen && (
-                <EditEventModal 
-                    visible={isEditModalOpen}
-                    onClose={() => {
-                        setIsEditModalOpen(false);
-                        setSelectedEvent(null);
-                    }}
-                    event={selectedEvent}
-                    onSave={handleEditSave}
-                    userRole={currentUser?.RoleID}
-                />
-            )}
+            {/* Edit Modal removed */}
         </div>
     );
 };

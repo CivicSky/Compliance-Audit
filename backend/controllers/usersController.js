@@ -1,6 +1,8 @@
 const db = require('../db');
+const { recordLog } = require('./logsController');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
+const { createNotifications } = require('../utils/notificationService');
 
 // ===============================
 // LOGIN USER (WITH JWT TOKEN)
@@ -61,6 +63,11 @@ exports.loginUser = async (req, res) => {
       { expiresIn: "7d" }
     );
 
+    // Record successful login
+    if (user && user.UserID) {
+      try { recordLog(user.UserID, 'Login', `User ${user.Email} logged in`); } catch (e) {}
+    }
+
     res.json({
       success: true,
       message: "Login successful",
@@ -70,10 +77,25 @@ exports.loginUser = async (req, res) => {
 
   } catch (error) {
     console.error("Login error:", error);
+    // Do not log if no user ID is available
     res.status(500).json({
       success: false,
       message: "Login failed",
     });
+  }
+};
+
+// LOGOUT USER (records audit entry)
+exports.logoutUser = async (req, res) => {
+  try {
+    const userId = req.user?.userId || null;
+    if (userId) {
+      try { recordLog(userId, 'Logout', `User ${userId} logged out`); } catch (e) {}
+    }
+    res.json({ success: true, message: 'Logout successful' });
+  } catch (error) {
+    console.error('Logout error:', error);
+    res.status(500).json({ success: false, message: 'Logout failed' });
   }
 };
 
@@ -127,6 +149,10 @@ exports.registerUser = async (req, res) => {
       userId: result.insertId,
     });
 
+    if (result && result.insertId) {
+      try { recordLog(result.insertId, 'UserRegistered', `User registered: ${email}`); } catch (e) {}
+    }
+
   } catch (error) {
     console.error("Registration error:", error);
     res.status(500).json({
@@ -143,13 +169,51 @@ exports.registerUser = async (req, res) => {
 exports.getUsers = async (req, res) => {
   try {
     const [users] = await db.query(
-      "SELECT u.UserID, u.FirstName, u.MiddleInitial, u.LastName, u.Email, u.RoleID, u.ProfilePic, u.approval_status, r.RoleName FROM users u LEFT JOIN roles r ON u.RoleID = r.RoleID"
+      `SELECT
+         u.UserID,
+         u.FirstName,
+         u.MiddleInitial,
+         u.LastName,
+         u.Email,
+         u.RoleID,
+         u.ProfilePic,
+         u.approval_status,
+         r.RoleName,
+         reqOff.AssignedOffices AS RequirementAssignedOffices,
+         perOff.AssignedOffices AS PersonnelAssignedOffices
+       FROM users u
+       LEFT JOIN roles r ON u.RoleID = r.RoleID
+       LEFT JOIN (
+         SELECT
+           rua.UserID,
+           GROUP_CONCAT(DISTINCT o.OfficeName ORDER BY o.OfficeName SEPARATOR '||') AS AssignedOffices
+         FROM requirement_user_assignments rua
+         LEFT JOIN offices o ON o.OfficeID = rua.OfficeID
+         GROUP BY rua.UserID
+       ) reqOff ON reqOff.UserID = u.UserID
+       LEFT JOIN (
+         SELECT
+           h.UserID,
+           GROUP_CONCAT(DISTINCT o.OfficeName ORDER BY o.OfficeName SEPARATOR '||') AS AssignedOffices
+         FROM headofoffice h
+         LEFT JOIN office_head_assignments oha ON oha.HeadID = h.HeadID
+         LEFT JOIN offices o ON o.OfficeID = oha.OfficeID
+         GROUP BY h.UserID
+       ) perOff ON perOff.UserID = u.UserID`
     );
 
     const usersWithFullName = users.map((user) => ({
       ...user,
       FullName: `${user.FirstName}${user.MiddleInitial ? " " + user.MiddleInitial + "." : ""
         } ${user.LastName}`,
+      AssignedOffices: Array.from(
+        new Set(
+          [
+            ...String(user.RequirementAssignedOffices || '').split('||').filter(Boolean),
+            ...String(user.PersonnelAssignedOffices || '').split('||').filter(Boolean)
+          ]
+        )
+      ),
     }));
 
     res.json({
@@ -273,6 +337,7 @@ exports.updateUser = async (req, res) => {
     );
 
     res.json({ success: true, user: rows[0] });
+    try { recordLog(tokenUserId, 'UserUpdated', `User profile updated: ${tokenUserId}`); } catch (e) {}
   } catch (error) {
     console.error("Update user error:", error);
     res.status(500).json({ success: false, message: "Error updating user" });
@@ -314,6 +379,9 @@ exports.updateApprovalStatus = async (req, res) => {
       message: `User approval status updated to ${approval_status}`,
       user: rows[0] 
     });
+    if (req.user && req.user.userId) {
+      try { recordLog(req.user.userId, 'UserApprovalUpdated', `User ${userId} approval set to ${approval_status}`); } catch (e) {}
+    }
   } catch (error) {
     console.error("Update approval status error:", error);
     res.status(500).json({ success: false, message: "Error updating approval status" });
@@ -339,25 +407,60 @@ exports.updateUserRole = async (req, res) => {
       });
     }
 
+    const [[existingUser]] = await db.query(
+      `SELECT u.UserID, u.FirstName, u.LastName, u.RoleID, r.RoleName
+       FROM users u
+       LEFT JOIN roles r ON r.RoleID = u.RoleID
+       WHERE u.UserID = ?
+       LIMIT 1`,
+      [userId]
+    );
+
+    if (!existingUser) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
     const [result] = await db.query(
       "UPDATE users SET RoleID = ? WHERE UserID = ?",
       [roleId, userId]
     );
 
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
-
     const [rows] = await db.query(
-      "SELECT UserID, FirstName, MiddleInitial, LastName, Email, RoleID, ProfilePic, approval_status FROM users WHERE UserID = ?",
+      `SELECT u.UserID, u.FirstName, u.MiddleInitial, u.LastName, u.Email, u.RoleID, u.ProfilePic, u.approval_status, r.RoleName
+       FROM users u
+       LEFT JOIN roles r ON r.RoleID = u.RoleID
+       WHERE u.UserID = ?`,
       [userId]
     );
+
+    const updatedUser = rows[0];
+    const oldRoleLabel = existingUser.RoleName || (Number(existingUser.RoleID) === 1 ? 'Admin' : 'User');
+    const newRoleLabel = updatedUser?.RoleName || (Number(updatedUser?.RoleID) === 1 ? 'Admin' : 'User');
+
+    if (req.user && req.user.userId && Number(existingUser.RoleID) !== Number(roleId)) {
+      try {
+        await createNotifications({
+          userIds: [Number(userId)],
+          adminId: req.user.userId,
+          title: 'Role Updated',
+          message: `Your role was changed from ${oldRoleLabel} to ${newRoleLabel}.`,
+          type: 'announcement',
+          relatedTable: 'users_role',
+          relatedId: Number(userId),
+        });
+      } catch (notifError) {
+        console.error('Failed to create role change notification:', notifError);
+      }
+    }
 
     res.json({ 
       success: true, 
       message: `User role updated to ${roleId === 1 ? 'Admin' : 'User'}`,
-      user: rows[0] 
+      user: updatedUser 
     });
+    if (req.user && req.user.userId) {
+      try { recordLog(req.user.userId, 'UserRoleUpdated', `User ${userId} role set to ${roleId}`); } catch (e) {}
+    }
   } catch (error) {
     console.error("Update user role error:", error);
     res.status(500).json({ success: false, message: "Error updating user role" });

@@ -1,4 +1,6 @@
 const db = require('../db');
+const { recordLog } = require('./logsController');
+const { createNotifications } = require('../utils/notificationService');
 
 const isUnknownColumnError = (error) =>
   error?.code === 'ER_BAD_FIELD_ERROR' || error?.errno === 1054;
@@ -121,7 +123,11 @@ const addRequirement = async (req, res) => {
     }
 
     const [criteria] = await db.query(
-      'SELECT CriteriaCode FROM criteria WHERE CriteriaID = ?',
+      `SELECT c.CriteriaCode, c.CriteriaName, c.EventID, e.EventName
+       FROM criteria c
+       LEFT JOIN Events e ON c.EventID = e.EventID
+       WHERE c.CriteriaID = ?
+       LIMIT 1`,
       [CriteriaID]
     );
 
@@ -132,90 +138,157 @@ const addRequirement = async (req, res) => {
       });
     }
 
-    const criteriaCode = criteria[0].CriteriaCode;
+    const criteriaRow = criteria[0];
+    const criteriaCode = criteriaRow.CriteriaCode;
     const { parentCode, parentId } = await resolveParentRequirement(ParentRequirementCode || ParentRequirementID);
 
-    // Auto-generate RequirementCode if parent is selected
-    if (parentCode) {
-      if (!RequirementCode || RequirementCode.trim() === '') {
-        // No code provided - auto-generate next number
-        const [children] = await db.query(
-          'SELECT RequirementCode FROM requirements WHERE RequirementCode LIKE ? ORDER BY LENGTH(RequirementCode) DESC, RequirementCode DESC LIMIT 1',
-          [`${parentCode}.%`]
-        );
+    // Server-side generation with retry-on-duplicate to reduce race conditions.
+    const maxAttempts = 6;
+    let inserted = null;
 
-        if (children.length > 0) {
-          const lastChild = children[0].RequirementCode;
-          const parts = lastChild.split('.');
-          const lastNumber = parseInt(parts[parts.length - 1]) || 0;
-          RequirementCode = `${parentCode}.${lastNumber + 1}`;
+    // Use a dedicated connection so we can retry safely
+    const conn = await db.getConnection();
+    try {
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        let candidateCode = RequirementCode && String(RequirementCode).trim();
+
+        if (parentCode) {
+          // If no code provided or user provided a plain number, build from parent
+          if (!candidateCode) {
+            const [children] = await conn.query(
+              'SELECT RequirementCode FROM requirements WHERE CriteriaID = ? AND RequirementCode LIKE ? ORDER BY LENGTH(RequirementCode) DESC, RequirementCode DESC LIMIT 1',
+              [CriteriaID, `${parentCode}.%`]
+            );
+            if (children.length > 0) {
+              const lastChild = children[0].RequirementCode;
+              const parts = lastChild.split('.');
+              const lastNumber = parseInt(parts[parts.length - 1]) || 0;
+              candidateCode = `${parentCode}.${lastNumber + 1}`;
+            } else {
+              candidateCode = `${parentCode}.1`;
+            }
+          } else if (!/\./.test(candidateCode)) {
+            candidateCode = `${parentCode}.${candidateCode}`;
+          }
         } else {
-          RequirementCode = `${parentCode}.1`;
+          // top-level under criteria
+          if (!candidateCode) {
+            // compute next under criteriaCode
+            const [siblings] = await conn.query(
+              'SELECT RequirementCode FROM requirements WHERE CriteriaID = ? AND RequirementCode LIKE ? ORDER BY LENGTH(RequirementCode) DESC, RequirementCode DESC LIMIT 1',
+              [CriteriaID, `${criteriaCode}.%`]
+            );
+            if (siblings.length > 0) {
+              const last = siblings[0].RequirementCode;
+              const parts = last.split('.');
+              const lastNumber = parseInt(parts[parts.length - 1]) || 0;
+              candidateCode = `${criteriaCode}.${lastNumber + 1}`;
+            } else {
+              candidateCode = `${criteriaCode}.1`;
+            }
+          } else if (!/\./.test(candidateCode)) {
+            candidateCode = `${criteriaCode}.${candidateCode}`;
+          }
         }
-      } else if (!/\./.test(RequirementCode)) {
-        // Code provided but it's just a number (no dot) - append to parent
-        RequirementCode = `${parentCode}.${RequirementCode}`;
-      }
-      // If RequirementCode already has dots, use it as-is
-    } else {
-      // No parent requirement - join with criteria code
-      if (!RequirementCode || RequirementCode.trim() === '') {
-        return res.status(400).json({
-          success: false,
-          message: 'Requirement code is required'
-        });
-      }
 
-      // If user enters just a number, join with criteria code
-      if (!/\./.test(RequirementCode)) {
-        RequirementCode = `${criteriaCode}.${RequirementCode}`;
+        // Try insert
+        try {
+          // Try multiple INSERT variants to support older schemas that may
+          // not have the ParentRequirementID column. If the DB throws an
+          // unknown-column error, fall back to the next variant.
+          const insertAttempts = [
+            {
+              sql: 'INSERT INTO requirements (RequirementCode, Description, CriteriaID, ParentRequirementCode, ParentRequirementID, CreatedAt, UpdatedAt) VALUES (?, ?, ?, ?, ?, NOW(), NOW())',
+              params: [candidateCode, Description, CriteriaID, parentCode || null, parentId || null]
+            },
+            {
+              sql: 'INSERT INTO requirements (RequirementCode, Description, CriteriaID, ParentRequirementCode, CreatedAt, UpdatedAt) VALUES (?, ?, ?, ?, NOW(), NOW())',
+              params: [candidateCode, Description, CriteriaID, parentCode || null]
+            },
+            {
+              sql: 'INSERT INTO requirements (RequirementCode, Description, CriteriaID, CreatedAt, UpdatedAt) VALUES (?, ?, ?, NOW(), NOW())',
+              params: [candidateCode, Description, CriteriaID]
+            }
+          ];
+
+          let insertResult = null;
+          for (const attemptSql of insertAttempts) {
+            try {
+              const [result] = await conn.query(attemptSql.sql, attemptSql.params);
+              insertResult = result;
+              break;
+            } catch (err) {
+              // If the DB doesn't have the column, try the next variant
+              if (isUnknownColumnError(err)) {
+                continue;
+              }
+              // If duplicate key, let outer loop handle retry
+              if (err && err.code === 'ER_DUP_ENTRY') {
+                throw err; // will be handled by outer catch and retry
+              }
+              throw err;
+            }
+          }
+
+          if (!insertResult) {
+            // All insert attempts failed due to missing columns; throw a descriptive error
+            throw new Error('Failed to insert requirement: incompatible database schema (missing columns)');
+          }
+
+          inserted = {
+            RequirementID: insertResult.insertId,
+            RequirementCode: candidateCode,
+            Description,
+            CriteriaID,
+            ParentRequirementCode: parentCode,
+            ParentRequirementID: parentId
+          };
+          break;
+        } catch (err) {
+          // If duplicate key, retry (recompute next code)
+          if (err && err.code === 'ER_DUP_ENTRY') {
+            // continue to retry
+            if (attempt === maxAttempts - 1) {
+              throw err;
+            }
+            // small loop to retry
+            continue;
+          }
+          throw err;
+        }
       }
-      // If RequirementCode already has dots, use it as-is
+    } finally {
+      conn.release();
     }
 
-    const insertAttempts = [
-      {
-        sql: 'INSERT INTO requirements (RequirementCode, Description, CriteriaID, ParentRequirementCode, CreatedAt, UpdatedAt) VALUES (?, ?, ?, ?, NOW(), NOW())',
-        params: [RequirementCode, Description, CriteriaID, parentCode]
-      },
-      {
-        sql: 'INSERT INTO requirements (RequirementCode, Description, CriteriaID, ParentRequirementCode) VALUES (?, ?, ?, ?)',
-        params: [RequirementCode, Description, CriteriaID, parentCode]
-      },
-      {
-        sql: 'INSERT INTO requirements (RequirementCode, Description, CriteriaID, ParentRequirementID, CreatedAt, UpdatedAt) VALUES (?, ?, ?, ?, NOW(), NOW())',
-        params: [RequirementCode, Description, CriteriaID, parentId]
-      },
-      {
-        sql: 'INSERT INTO requirements (RequirementCode, Description, CriteriaID, ParentRequirementID) VALUES (?, ?, ?, ?)',
-        params: [RequirementCode, Description, CriteriaID, parentId]
-      },
-      {
-        sql: 'INSERT INTO requirements (RequirementCode, Description, CriteriaID, CreatedAt, UpdatedAt) VALUES (?, ?, ?, NOW(), NOW())',
-        params: [RequirementCode, Description, CriteriaID]
-      },
-      {
-        sql: 'INSERT INTO requirements (RequirementCode, Description, CriteriaID) VALUES (?, ?, ?)',
-        params: [RequirementCode, Description, CriteriaID]
-      }
-    ];
-
-    const [result] = await executeWithFallbacks(insertAttempts);
+    if (!inserted) {
+      return res.status(500).json({ success: false, message: 'Failed to add requirement after retries' });
+    }
 
     res.json({
       success: true,
       message: 'Requirement added successfully',
-      data: {
-        RequirementID: result.insertId,
-        RequirementCode,
-        Description,
-        CriteriaID,
-        ParentRequirementCode: parentCode,
-        ParentRequirementID: parentId
-      }
+      data: inserted
     });
+    if (req.user && req.user.userId) {
+      try {
+        recordLog(req.user.userId, 'RequirementAdded', {
+          RequirementID: inserted.RequirementID,
+          RequirementCode: inserted.RequirementCode,
+          CriteriaID: inserted.CriteriaID,
+          CriteriaCode: criteriaRow.CriteriaCode || null,
+          CriteriaName: criteriaRow.CriteriaName || null,
+          EventID: criteriaRow.EventID || null,
+          EventName: criteriaRow.EventName || null
+        });
+      } catch (e) {}
+    }
   } catch (error) {
     console.error('Error adding requirement:', error);
+    if (error.sql) {
+      console.error('SQL:', error.sql);
+      console.error('SQL Params:', error.parameters || error.values || 'N/A');
+    }
 
     if (error.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({
@@ -234,7 +307,9 @@ const addRequirement = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error adding requirement',
-      error: error.message
+      error: error.message,
+      sql: error.sql || undefined,
+      sqlParams: error.parameters || error.values || undefined
     });
   }
 };
@@ -444,6 +519,23 @@ const updateRequirement = async (req, res) => {
     const { id } = req.params;
     let { RequirementCode, Description, CriteriaID, ParentRequirementCode, ParentRequirementID } = req.body;
 
+    const [existingRows] = await db.query(
+      `SELECT RequirementID, RequirementCode, Description, CriteriaID, ParentRequirementCode, ParentRequirementID
+       FROM requirements
+       WHERE RequirementID = ?
+       LIMIT 1`,
+      [id]
+    );
+
+    if (existingRows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Requirement not found'
+      });
+    }
+
+    const existing = existingRows[0];
+
     // Validate required fields
     if (!Description || !CriteriaID) {
       return res.status(400).json({
@@ -461,7 +553,11 @@ const updateRequirement = async (req, res) => {
     }
 
     const [criteria] = await db.query(
-      'SELECT CriteriaCode FROM criteria WHERE CriteriaID = ?',
+      `SELECT c.CriteriaCode, c.CriteriaName, c.EventID, e.EventName
+       FROM criteria c
+       LEFT JOIN Events e ON c.EventID = e.EventID
+       WHERE c.CriteriaID = ?
+       LIMIT 1`,
       [CriteriaID]
     );
 
@@ -472,7 +568,8 @@ const updateRequirement = async (req, res) => {
       });
     }
 
-    const criteriaCode = criteria[0].CriteriaCode;
+    const criteriaRow = criteria[0];
+    const criteriaCode = criteriaRow.CriteriaCode;
     const { parentCode, parentId } = await resolveParentRequirement(ParentRequirementCode || ParentRequirementID);
 
     // Auto-generate RequirementCode if parent is selected (same logic as add)
@@ -561,6 +658,35 @@ const updateRequirement = async (req, res) => {
         ParentRequirementID: parentId
       }
     });
+    if (req.user && req.user.userId) {
+      const changes = {};
+      const addChange = (field, beforeValue, afterValue) => {
+        const beforeNorm = beforeValue === undefined ? null : beforeValue;
+        const afterNorm = afterValue === undefined ? null : afterValue;
+        if (String(beforeNorm ?? '') !== String(afterNorm ?? '')) {
+          changes[field] = { from: beforeNorm, to: afterNorm };
+        }
+      };
+
+      addChange('RequirementCode', existing.RequirementCode, RequirementCode);
+      addChange('Description', existing.Description, Description);
+      addChange('CriteriaID', existing.CriteriaID, CriteriaID);
+      addChange('ParentRequirementCode', existing.ParentRequirementCode, parentCode || null);
+      addChange('ParentRequirementID', existing.ParentRequirementID, parentId || null);
+
+      try {
+        recordLog(req.user.userId, 'RequirementUpdated', {
+          RequirementID: Number(id),
+          RequirementCode,
+          CriteriaID,
+          CriteriaCode: criteriaRow.CriteriaCode || null,
+          CriteriaName: criteriaRow.CriteriaName || null,
+          EventID: criteriaRow.EventID || null,
+          EventName: criteriaRow.EventName || null,
+          changes
+        });
+      } catch (e) {}
+    }
   } catch (error) {
     console.error('Error updating requirement:', error);
 
@@ -610,6 +736,9 @@ const deleteRequirements = async (req, res) => {
       message: `Successfully deleted ${result.affectedRows} requirement(s)`,
       deletedCount: result.affectedRows
     });
+    if (req.user && req.user.userId) {
+      try { recordLog(req.user.userId, 'RequirementDeleted', { requirementIds }); } catch (e) {}
+    }
   } catch (error) {
     console.error('Error deleting requirements:', error);
     res.status(500).json({
@@ -627,6 +756,7 @@ const deleteRequirements = async (req, res) => {
 const assignUsersToRequirement = async (req, res) => {
   try {
     const { requirementId, officeId, userIds, assignedBy } = req.body;
+    const actorUserId = req.user?.userId || Number(assignedBy) || null;
 
     if (!requirementId || !userIds || !Array.isArray(userIds)) {
       return res.status(400).json({
@@ -692,6 +822,42 @@ const assignUsersToRequirement = async (req, res) => {
       [insertValues]
     );
 
+    if (actorUserId) {
+      try {
+        const [[requirementRow]] = await db.query(
+          `SELECT
+             r.RequirementCode,
+             r.Description,
+             o.OfficeName,
+             e.EventName
+           FROM requirements r
+           LEFT JOIN criteria c ON c.CriteriaID = r.CriteriaID
+           LEFT JOIN events e ON e.EventID = c.EventID
+           LEFT JOIN offices o ON o.OfficeID = ?
+           WHERE r.RequirementID = ?
+           LIMIT 1`,
+          [officeId || null, requirementId]
+        );
+
+        const requirementCode = requirementRow?.RequirementCode || `Requirement #${requirementId}`;
+        const officeName = requirementRow?.OfficeName || 'your office';
+        const eventName = requirementRow?.EventName || 'an event';
+        const message = `You were assigned to ${requirementCode} for office ${officeName} in ${eventName}.`;
+
+        await createNotifications({
+          userIds: newUserIds,
+          adminId: actorUserId,
+          title: 'New Requirement Assignment',
+          message,
+          type: 'info',
+          relatedTable: 'requirements_assignment',
+          relatedId: Number(officeId || requirementId),
+        });
+      } catch (notifError) {
+        console.error('Failed to create requirement assignment notifications:', notifError);
+      }
+    }
+
     res.json({
       success: true,
       message: `Successfully assigned ${newUserIds.length} user(s) to the requirement in this office`,
@@ -748,6 +914,63 @@ const getAssignedUsers = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching assigned users'
+    });
+  }
+};
+
+// Get all requirement assignments for the logged-in user
+const getMyAssignments = async (req, res) => {
+  try {
+    const userId = Number(req.user?.userId);
+
+    if (!Number.isInteger(userId) || userId <= 0) {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized user context',
+      });
+    }
+
+    const [rows] = await db.query(
+      `SELECT
+         rua.AssignmentID,
+         rua.RequirementID,
+         rua.OfficeID,
+         rua.HasUploaded,
+         rua.AssignedAt,
+         r.RequirementCode,
+         r.Description,
+         o.OfficeName,
+         e.EventName,
+         e.EventID
+       FROM requirement_user_assignments rua
+       LEFT JOIN requirements r ON r.RequirementID = rua.RequirementID
+       LEFT JOIN criteria c ON c.CriteriaID = r.CriteriaID
+       LEFT JOIN events e ON e.EventID = c.EventID
+       LEFT JOIN offices o ON o.OfficeID = rua.OfficeID
+       WHERE rua.UserID = ?
+       ORDER BY rua.AssignedAt DESC`,
+      [userId]
+    );
+
+    const officeIds = Array.from(
+      new Set(rows.map((row) => row.OfficeID).filter((id) => id !== null && id !== undefined))
+    );
+
+    const requirementIds = Array.from(
+      new Set(rows.map((row) => row.RequirementID).filter((id) => id !== null && id !== undefined))
+    );
+
+    res.json({
+      success: true,
+      data: rows,
+      officeIds,
+      requirementIds,
+    });
+  } catch (error) {
+    console.error('Error fetching my assignments:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching my assignments',
     });
   }
 };
@@ -949,6 +1172,7 @@ module.exports = {
   // User assignment functions
   assignUsersToRequirement,
   getAssignedUsers,
+  getMyAssignments,
   removeUserAssignment,
   getUserAssignmentCount,
   getAvailableUsersForAssignment,

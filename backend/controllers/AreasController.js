@@ -1,4 +1,5 @@
 const db = require('../db');
+const { recordLog } = require('./logsController');
 
 // Add a new area
 exports.addArea = async (req, res) => {
@@ -32,6 +33,9 @@ exports.addArea = async (req, res) => {
             [result.insertId]
         );
         res.json({ success: true, data: areaRows[0] });
+                if (req.user && req.user.userId) {
+                    try { recordLog(req.user.userId, 'AreaAdded', { AreaID: areaRows[0].AreaID, AreaName: areaRows[0].AreaName, EventID: areaRows[0].EventID }); } catch (e) {}
+                }
     } catch (error) {
         console.error('Error adding area:', error);
         if (error && error.code === 'ER_DUP_ENTRY') {
@@ -49,12 +53,21 @@ exports.deleteAreas = async (req, res) => {
             return res.status(400).json({ success: false, message: 'No area IDs provided' });
         }
 
-        await db.query(
-            `UPDATE areas SET IsActive = 0 WHERE AreaID IN (${areaIds.map(() => '?').join(',')})`,
+        // Perform a hard delete so frontend deletions remove rows from the DB
+        const placeholders = areaIds.map(() => '?').join(',');
+        const [result] = await db.query(
+            `DELETE FROM areas WHERE AreaID IN (${placeholders})`,
             areaIds
         );
 
-        res.json({ success: true, message: 'Areas deleted successfully' });
+                if (req.user && req.user.userId) {
+                    try { recordLog(req.user.userId, 'AreaDeleted', { areaIds }); } catch (e) {}
+                }
+        return res.json({
+            success: true,
+            message: `Successfully deleted ${result.affectedRows} area(s)`,
+            deletedCount: result.affectedRows
+        });
     } catch (error) {
         console.error('Error deleting areas:', error);
         res.status(500).json({ success: false, message: 'Failed to delete areas', error: error.message });

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from "react";
 import Header from "../Header/header.jsx";
 import { eventsAPI } from "../../utils/api";
+import Pagination from "../Pagination/Pagination";
 
 const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionChange, onEventClick }, ref) => {
     const [events, setEvents] = useState([]);
@@ -9,13 +10,24 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
     const [error, setError] = useState(null);
     const [selectedEvents, setSelectedEvents] = useState(new Set());
     const [downloadableFolders, setDownloadableFolders] = useState([]);
+    const [currentPage, setCurrentPage] = useState(1);
+
+    // Helper to normalize folder/event names to a consistent form
+    const normalizeName = (s) => {
+        if (!s) return '';
+        return String(s)
+            .replace(/[^A-Za-z0-9.-]+/g, '_')
+            .replace(/_+/g, '_')
+            .replace(/^_+|_+$/g, '')
+            .trim();
+    };
 
     // Fetch events data from database
     useEffect(() => {
         fetchEvents();
         // Fetch downloadable folders on mount
         eventsAPI.getDownloadableFolders().then(res => {
-            if (res.success) setDownloadableFolders(res.folders);
+            if (res.success) setDownloadableFolders(res.folders || []);
         });
     }, []);
 
@@ -58,6 +70,18 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
             setSelectedEvents(new Set());
         }
     }, [deleteMode]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm]);
+
+    useEffect(() => {
+        const itemsPerPage = 8;
+        const pageCount = Math.max(1, Math.ceil(filteredEvents.length / itemsPerPage));
+        if (currentPage > pageCount) {
+            setCurrentPage(1);
+        }
+    }, [filteredEvents.length, currentPage]);
 
     const handleCheckboxChange = (eventId, isChecked) => {
         setSelectedEvents(prev => {
@@ -193,6 +217,11 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
         );
     }
 
+    const itemsPerPage = 8;
+    const totalPages = Math.max(1, Math.ceil(filteredEvents.length / itemsPerPage));
+    const startIdx = (currentPage - 1) * itemsPerPage;
+    const paginatedEvents = filteredEvents.slice(startIdx, startIdx + itemsPerPage);
+
     return (
         <div className="w-full space-y-2">
             {/* Search Results Counter */}
@@ -203,7 +232,7 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
             )}
             
             <div className="space-y-2">
-                {filteredEvents.map((event) => (
+                {paginatedEvents.map((event) => (
                     <div 
                         key={event.EventID}
                         onClick={() => !deleteMode && onEventClick && onEventClick(event)}
@@ -248,7 +277,7 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
                                             {event.EventName}
                                         </h3>
                                         <span className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full border ${getStatusStyle(event)}`}>
-                                            {event.CreatedAt ? 'Active' : 'Draft'}
+                                            {event.status === 'active' ? 'Active' : 'Inactive'}
                                         </span>
                                     </div>
                                     
@@ -266,7 +295,7 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
                                 </div>
 
                                 {/* Download Button - Only if folder exists */}
-                                {downloadableFolders.includes(event.EventName.replace(/[<>:"/\\|?*]/g, '_').trim()) && (
+                                {downloadableFolders.some(folder => normalizeName(folder) === normalizeName(event.EventName)) && (
                                     <button
                                         className="flex-shrink-0 px-2 py-1 bg-emerald-50 text-emerald-700 rounded-md text-xs font-medium hover:bg-emerald-100 transition-colors flex items-center gap-1 border border-emerald-200"
                                         onClick={async (e) => {
@@ -303,6 +332,16 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
                         </div>
                     </div>
                 ))}
+            </div>
+
+            <div className="pt-1">
+                <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={(page) => setCurrentPage(page)}
+                    fixed={true}
+                    showWhenSinglePage={true}
+                />
             </div>
         </div>
     );

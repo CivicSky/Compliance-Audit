@@ -2,16 +2,18 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const { recordLog } = require('../controllers/logsController');
 const AreasController = require('../controllers/AreasController');
+const auth = require('../middleware/auth');
 
 // POST add area
-router.post('/add', AreasController.addArea);
+router.post('/add', auth, AreasController.addArea);
 
 // DELETE multiple areas
-router.post('/delete', AreasController.deleteAreas);
+router.post('/delete', auth, AreasController.deleteAreas);
 
 // UPDATE area
-router.put('/:areaId', async (req, res) => {
+router.put('/:areaId', auth, async (req, res) => {
     try {
         const { areaId } = req.params;
         const { AreaCode, AreaName, Description } = req.body;
@@ -56,6 +58,9 @@ router.put('/:areaId', async (req, res) => {
             [areaId]
         );
 
+                if (req.user && req.user.userId) {
+                    try { recordLog(req.user.userId, 'AreaUpdated', { AreaID: areaId, AreaName }); } catch (e) {}
+                }
         return res.json({ success: true, data: rows[0] });
     } catch (error) {
         console.error('Error updating area:', error);

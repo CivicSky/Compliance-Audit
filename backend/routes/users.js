@@ -30,6 +30,7 @@ router.use(express.json());
 // User authentication routes
 router.post('/register', userController.registerUser);
 router.post('/login', userController.loginUser);
+router.post('/logout', auth, userController.logoutUser);
 
 // User data routes
 router.get('/', userController.getUsers);

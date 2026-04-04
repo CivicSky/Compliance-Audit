@@ -449,7 +449,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
     ];
 
     return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out bg-black/50 flex items-center justify-center z-[120] p-4">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
                 
                 {/* Header */}

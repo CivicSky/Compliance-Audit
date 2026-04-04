@@ -11,6 +11,16 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
     const [showHeadDropdown, setShowHeadDropdown] = useState(false);
     const isAdmin = userRole === 'admin' || userRole === 1;
 
+    const getHeadDisplayName = (head) => {
+        return `${head?.FirstName || ""} ${head?.MiddleInitial ? `${head.MiddleInitial}.` : ""} ${head?.LastName || ""}`
+            .replace(/\s+/g, " ")
+            .trim();
+    };
+
+    const getHeadPicUrl = (head) => {
+        return head?.ProfilePic ? `http://localhost:5000/uploads/profile-pics/${head.ProfilePic}` : null;
+    };
+
     useEffect(() => {
         if (!office) return;
         setOfficeName(office.office_name || "");
@@ -85,7 +95,7 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
     const safeHeads = Array.isArray(heads) ? heads : [];
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+        <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out z-[120] flex items-center justify-center bg-black/40">
             <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
                 <h2 className="text-lg font-bold mb-4">{isAdmin ? 'Edit Office' : 'View Office'}</h2>
                 <form onSubmit={handleSubmit} className="space-y-3">
@@ -145,10 +155,12 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
                                                 const isSelected = selectedHeadIDs.includes(head.HeadID);
                                                 // Check if head is assigned to a DIFFERENT office
                                                 const isAssignedElsewhere = head.OfficeID && head.OfficeID !== 0 && head.OfficeID !== office?.id;
+                                                const fullName = getHeadDisplayName(head);
+                                                const picUrl = getHeadPicUrl(head);
                                                 return (
                                                     <label
                                                         key={head.HeadID}
-                                                        className={`flex items-center px-3 py-2 cursor-pointer hover:bg-blue-50 ${isSelected ? 'bg-blue-100' : ''}`}
+                                                        className={`flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-blue-50 ${isSelected ? 'bg-blue-100' : ''}`}
                                                     >
                                                         <input
                                                             type="checkbox"
@@ -156,9 +168,21 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
                                                             onChange={() => toggleHeadSelection(head.HeadID)}
                                                             className="mr-2"
                                                         />
-                                                        <span className="flex-1">
-                                                            {head.FirstName} {head.MiddleInitial ? head.MiddleInitial + "." : ""}{" "}
-                                                            {head.LastName} - {head.Position || ''}
+                                                        {picUrl ? (
+                                                            <img
+                                                                src={picUrl}
+                                                                alt={fullName || `Head ${head.HeadID}`}
+                                                                className="h-10 w-10 rounded-full object-cover border border-gray-200"
+                                                            />
+                                                        ) : (
+                                                            <div className="h-10 w-10 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center border border-gray-200">
+                                                                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M15.75 7.5a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.5 19.5a7.5 7.5 0 0 1 15 0" />
+                                                                </svg>
+                                                            </div>
+                                                        )}
+                                                        <span className="flex-1 self-center">
+                                                            {fullName} - {head.Position || ''}
                                                             {isAssignedElsewhere && <span className="text-orange-500 text-xs ml-1">(Assigned Elsewhere)</span>}
                                                         </span>
                                                     </label>
@@ -208,3 +232,4 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
         </div>
     );
 }
+

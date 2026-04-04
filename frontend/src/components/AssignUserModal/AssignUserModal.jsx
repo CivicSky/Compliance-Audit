@@ -141,7 +141,7 @@ export default function AssignUserModal({ isOpen, onClose, requirement, officeId
     if (!isOpen || !requirement) return null;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out bg-black bg-opacity-50 flex items-center justify-center z-[120]" onClick={(e) => e.stopPropagation()}>
             <div className="bg-white rounded-lg shadow-xl w-full max-w-xl mx-4 max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-t-lg">
@@ -430,3 +430,4 @@ export default function AssignUserModal({ isOpen, onClose, requirement, officeId
         </div>
     );
 }
+

@@ -16,6 +16,9 @@ body {
   font-family: var(--app-font);
 }
 
+/* Page background fallback (slightly greyer) */
+
+
 /* Hide scrollbars but keep scrolling functionality */
 * {
   scrollbar-width: none; /* Firefox */

@@ -3,9 +3,16 @@ import { createPortal } from 'react-dom';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import { usersAPI, requirementsAPI } from '../../utils/api';
+
+// Helper: find assignmentId for current user and requirement
+function getUserAssignmentId(assignedUsersMap, requirementId, userId) {
+    if (!assignedUsersMap[requirementId]) return null;
+    const assignment = assignedUsersMap[requirementId].find(u => u.UserID === userId);
+    return assignment ? assignment.AssignmentID : null;
+}
 import AssignUserModal from '../AssignUserModal/AssignUserModal';
 
-export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffice, onAddRequirements }) {
+export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffice, onAddRequirements, onDeleteOffice }) {
     const [showMenu, setShowMenu] = useState(false);
     const [requirements, setRequirements] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -39,6 +46,8 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
     const [showNotifForm, setShowNotifForm] = useState(null); // { user, requirementId }
     const [notifTitle, setNotifTitle] = useState('');
     const [notifMessage, setNotifMessage] = useState('');
+    const [unsubmittingReqId, setUnsubmittingReqId] = useState(null);
+    const [unsubmittingProof, setUnsubmittingProof] = useState(false);
 
     const isAdmin = currentUser && currentUser.RoleID === 1;
 
@@ -171,7 +180,8 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                     ...prev,
                     overall_status: officeResponse.data.OverallStatus,
                     compliance_percent: officeResponse.data.CompliancePercent,
-                    total_requirements: officeResponse.data.TotalRequirements
+                    total_requirements: officeResponse.data.TotalRequirements,
+                    event_name: officeResponse.data.EventName || officeResponse.data.Event || prev.event_name || null
                 }));
             }
         } catch (error) {
@@ -179,6 +189,43 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
             setRequirements([]);
         } finally {
             setLoading(false);
+        }
+    };
+
+    // Unsubmit (delete) user-uploaded file for a requirement
+    const handleUnsubmitUserFile = async (requirementId) => {
+        if (!currentUser || !currentUser.UserID) {
+            alert('No user information available. Please reload and try again.');
+            return;
+        }
+        if (!window.confirm('Are you sure you want to unsubmit (delete) your uploaded file? This cannot be undone.')) return;
+        setUnsubmittingReqId(requirementId);
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`http://localhost:5000/api/requirements/${requirementId}/file/${currentUser.UserID}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'application/json'
+                },
+            });
+            let data = {};
+            try { data = await res.json(); } catch (e) { /* ignore JSON parse errors */ }
+            if (res.ok && data.success) {
+                alert('File deleted. You can now re-upload.');
+            } else if (res.status === 404) {
+                // No file found — still refresh UI so upload button becomes available
+                console.warn('Unsubmit: file not found on server');
+            } else {
+                console.warn('Unsubmit: server returned error', res.status, data);
+                alert(data.message || 'Failed to delete file.');
+            }
+        } catch (err) {
+            console.error('Unsubmit error:', err);
+            alert('Failed to delete file.');
+        } finally {
+            try { await fetchOfficeRequirements(); } catch (e) { console.error('Refresh after unsubmit failed', e); }
+            setUnsubmittingReqId(null);
         }
     };
 
@@ -203,7 +250,8 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                     ...prev,
                     overall_status: officeResponse.data.OverallStatus,
                     compliance_percent: officeResponse.data.CompliancePercent,
-                    total_requirements: officeResponse.data.TotalRequirements
+                    total_requirements: officeResponse.data.TotalRequirements,
+                    event_name: officeResponse.data.EventName || officeResponse.data.Event || prev.event_name || null
                 }));
             }
         } catch (error) {
@@ -387,7 +435,7 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                 adminId: currentUser.UserID,
                 title: notifTitle,
                 message: notifMessage,
-                type: 'reminder',
+                type: 'info',
                 relatedTable: 'requirements',
                 relatedId: requirementId
             }, {
@@ -432,9 +480,16 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
         );
     };
 
+    const assignedRequirementCount = requirements.filter((req) => isUserAssignedToRequirement(req.RequirementID)).length;
+    const isAssignedInCurrentOffice = assignedRequirementCount > 0;
+
     return (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl ml-64 max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div
+            className="fixed inset-y-0 right-0 z-[120] bg-black/50 flex items-center justify-center p-4"
+            style={{ left: 'var(--sidebar-width, 0px)', transition: 'left 200ms ease-in-out' }}
+            onClick={onClose}
+        >
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
                 
                 {/* Header - Compact */}
                 <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
@@ -447,6 +502,9 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                         <div>
                             <h2 className="text-base font-semibold text-gray-900">{officeData.office_name}</h2>
                             <p className="text-xs text-gray-500">{officeData.office_type_name}</p>
+                            {officeData.event_name && (
+                                <p className="text-xs text-gray-500">Event: {officeData.event_name}</p>
+                            )}
                         </div>
                     </div>
 
@@ -488,6 +546,18 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                                             </svg>
                                             <span>Add Requirements</span>
                                         </button>
+                                        <button
+                                            onClick={async () => {
+                                                setShowMenu(false);
+                                                await onDeleteOffice?.(office);
+                                            }}
+                                            className="w-full px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                        >
+                                            <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
+                                            </svg>
+                                            <span>Delete Office</span>
+                                        </button>
                                     </div>
                                 )}
                             </div>
@@ -525,8 +595,8 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                             } else if (officeHeads.length > 1) {
                                 return (
                                     <>
-                                        <div className="flex -space-x-2">
-                                            {officeHeads.slice(0, 3).map((head, index) => {
+                                        <div className="flex flex-wrap gap-1">
+                                            {officeHeads.map((head) => {
                                                 const headPicUrl = head.ProfilePic 
                                                     ? `http://localhost:5000/uploads/profile-pics/${head.ProfilePic}`
                                                     : '/src/assets/images/user.svg';
@@ -536,22 +606,13 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                                                         src={headPicUrl}
                                                         alt={head.full_name}
                                                         className="w-9 h-9 rounded-full object-cover border-2 border-white shadow-sm"
-                                                        style={{ zIndex: 10 - index }}
                                                         onError={(e) => { e.target.src = '/src/assets/images/user.svg'; }}
                                                     />
                                                 );
                                             })}
-                                            {officeHeads.length > 3 && (
-                                                <div className="w-9 h-9 rounded-full bg-gray-100 border-2 border-white flex items-center justify-center text-xs font-medium text-gray-600">
-                                                    +{officeHeads.length - 3}
-                                                </div>
-                                            )}
                                         </div>
                                         <div>
                                             <p className="text-xs text-gray-500">{officeHeads.length} Personnel</p>
-                                            <p className="text-sm font-medium text-gray-800 truncate max-w-[150px]" title={officeData.head_name}>
-                                                {officeData.head_name}
-                                            </p>
                                         </div>
                                     </>
                                 );
@@ -569,13 +630,19 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                                             onError={(e) => { e.target.src = '/src/assets/images/user.svg'; }}
                                         />
                                         <div>
-                                            <p className="text-xs text-gray-500">Personnel</p>
-                                            <p className="text-sm font-medium text-gray-800">{primaryHead?.full_name}</p>
+                                            <p className="text-xs text-gray-500">1 Personnel</p>
                                         </div>
                                     </>
                                 );
                             }
                         })()}
+
+                        {isAssignedInCurrentOffice && (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-cyan-200 bg-cyan-50 px-2 py-1 text-[11px] font-semibold text-cyan-700">
+                                <span className="h-1.5 w-1.5 rounded-full bg-cyan-500" />
+                                You are assigned here ({assignedRequirementCount})
+                            </span>
+                        )}
                     </div>
 
                     <div className="flex items-center gap-3">
@@ -645,7 +712,7 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                                 placeholder="Search..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-48 px-3 py-1.5 pl-8 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                                className="bg-gray-100 w-48 px-4 py-2 pl-8 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             />
                             <svg className="absolute left-2.5 top-2 w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -766,8 +833,14 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
 
                                                     {/* Requirements */}
                                                     <div className="divide-y divide-gray-100">
-                                                        {criteria.requirements.map((req, index) => (
-                                                            <div key={req.RequirementID} className="p-3 hover:bg-gray-50/50 transition-colors">
+                                                        {criteria.requirements.map((req, index) => {
+                                                            const isAssignedToMe = isUserAssignedToRequirement(req.RequirementID);
+
+                                                            return (
+                                                            <div
+                                                                key={req.RequirementID}
+                                                                className={`p-3 transition-colors ${isAssignedToMe ? 'bg-cyan-50/60 ring-1 ring-cyan-200' : 'hover:bg-gray-50/50'}`}
+                                                            >
                                                                 <div className="flex items-start gap-3">
                                                                     {/* Status */}
                                                                     <div className="min-w-[90px]">
@@ -800,7 +873,15 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
 
                                                                     {/* Requirement Details */}
                                                                     <div className="flex-1 min-w-0">
-                                                                        <h5 className="text-xs font-medium text-gray-900">{req.RequirementCode}</h5>
+                                                                        <div className="flex items-center gap-2">
+                                                                            <h5 className="text-xs font-medium text-gray-900">{req.RequirementCode}</h5>
+                                                                            {isAssignedToMe && (
+                                                                                <span className="inline-flex items-center gap-1 rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[10px] font-semibold text-cyan-700">
+                                                                                    <span className="h-1.5 w-1.5 rounded-full bg-cyan-500" />
+                                                                                    Active
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
                                                                         <p className="text-xs text-gray-600 mt-0.5 line-clamp-2">{req.Description}</p>
                                                                         
                                                                         {/* Comment */}
@@ -897,7 +978,7 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
 
                                                                         {/* Upload Button for non-admin */}
                                                                         {!isAdmin && isUserAssignedToRequirement(req.RequirementID) && (
-                                                                            <div>
+                                                                            <div className="flex flex-col gap-1 items-end">
                                                                                 <input
                                                                                     type="file"
                                                                                     ref={userReqFileInputRef}
@@ -906,12 +987,28 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                                                                                     accept=".pdf,.doc,.docx,.xlsx,.xls,.jpg,.jpeg,.png"
                                                                                 />
                                                                                 {hasUserUploadedForRequirement(req.RequirementID) ? (
-                                                                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 bg-emerald-50 rounded border border-emerald-200">
-                                                                                        <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                                                                        </svg>
-                                                                                        Done
-                                                                                    </span>
+                                                                                    <>
+                                                                                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 bg-emerald-50 rounded border border-emerald-200">
+                                                                                            <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                                                            </svg>
+                                                                                            Done
+                                                                                        </span>
+                                                                                        <button
+                                                                                            onClick={() => handleUnsubmitUserFile(req.RequirementID)}
+                                                                                            disabled={unsubmittingReqId === req.RequirementID}
+                                                                                            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium text-rose-600 bg-rose-50 rounded border border-rose-200 hover:bg-rose-100 disabled:opacity-50 mt-1"
+                                                                                        >
+                                                                                            {unsubmittingReqId === req.RequirementID ? (
+                                                                                                <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
+                                                                                            ) : (
+                                                                                                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                                                                </svg>
+                                                                                            )}
+                                                                                            Unsubmit
+                                                                                        </button>
+                                                                                    </>
                                                                                 ) : (
                                                                                     <button
                                                                                         onClick={() => userReqFileInputRef.current?.click()}
@@ -945,7 +1042,7 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                                                                     </div>
                                                                 </div>
                                                             </div>
-                                                        ))}
+                                                        )})}
                                                     </div>
                                                 </div>
                                             ))}
@@ -962,21 +1059,25 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                     {isAdmin && (
                         <div className="flex items-center gap-2">
                             <span className="text-xs text-gray-500">Proof:</span>
-                            <input
-                                type="file"
-                                ref={fileInputRef}
-                                style={{ display: 'none' }}
-                                onChange={handleProofFileChange}
-                                accept=".pdf,.doc,.docx,.xlsx,.xls,.jpg,.jpeg,.png"
-                                disabled={uploadingProof}
-                            />
-                            <button
-                                className="px-2 py-1 text-xs font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 border border-indigo-200 disabled:opacity-50"
-                                onClick={() => fileInputRef.current?.click()}
-                                disabled={uploadingProof}
-                            >
-                                {uploadingProof ? '...' : 'Upload'}
-                            </button>
+                            {!proofFileUrl && (
+                                <>
+                                    <input
+                                        type="file"
+                                        ref={fileInputRef}
+                                        style={{ display: 'none' }}
+                                        onChange={handleProofFileChange}
+                                        accept=".pdf,.doc,.docx,.xlsx,.xls,.jpg,.jpeg,.png"
+                                        disabled={uploadingProof}
+                                    />
+                                    <button
+                                        className="px-2 py-1 text-xs font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 border border-indigo-200 disabled:opacity-50"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        disabled={uploadingProof}
+                                    >
+                                        {uploadingProof ? '...' : 'Upload'}
+                                    </button>
+                                </>
+                            )}
                             {proofFileUrl && (
                                 <>
                                     <a
@@ -988,6 +1089,55 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                                     >
                                         Download
                                     </a>
+                                    <button
+                                        className="px-2 py-1 text-xs font-medium text-rose-600 bg-rose-50 rounded-lg hover:bg-rose-100 border border-rose-200"
+                                        onClick={async () => {
+                                            if (!window.confirm('Delete proof document? This cannot be undone.')) return;
+                                            setUnsubmittingProof(true);
+                                            try {
+                                                const token = localStorage.getItem('token');
+                                                const res = await fetch(`http://localhost:5000/api/officedocuments/${office.id}/proof`, {
+                                                    method: 'DELETE',
+                                                    headers: { 'Authorization': `Bearer ${token}` }
+                                                });
+                                                let data = {};
+                                                const text = await res.text();
+                                                try {
+                                                    data = text ? JSON.parse(text) : {};
+                                                } catch (e) {
+                                                    data = { __raw: text };
+                                                }
+                                                if (res.ok && data.success) {
+                                                    // Refresh proof state
+                                                    setPersistedProof(null);
+                                                    setProofFileName("");
+                                                    setProofFileUrl("");
+                                                    try { await fetchOfficeRequirements(); } catch (e) { /* ignore */ }
+                                                    try { await (async () => {
+                                                        const res2 = await axios.get(`http://localhost:5000/api/officedocuments/${office.id}/proof`);
+                                                        if (res2.data && res2.data.success) {
+                                                            setPersistedProof({ fileName: res2.data.file_name, url: `http://localhost:5000${res2.data.url}` });
+                                                            setProofFileName(res2.data.file_name);
+                                                            setProofFileUrl(`http://localhost:5000${res2.data.url}`);
+                                                        } else {
+                                                            setPersistedProof(null); setProofFileName(""); setProofFileUrl("");
+                                                        }
+                                                    })(); } catch (e) { /* ignore */ }
+                                                    alert('Proof deleted');
+                                                } else {
+                                                    alert(data.message || 'Failed to delete proof');
+                                                }
+                                            } catch (err) {
+                                                console.error('Delete proof error', err);
+                                                alert('Failed to delete proof');
+                                            } finally {
+                                                setUnsubmittingProof(false);
+                                            }
+                                        }}
+                                        disabled={unsubmittingProof}
+                                    >
+                                        {unsubmittingProof ? '...' : 'Unsubmit'}
+                                    </button>
                                     <button
                                         className="px-2 py-1 text-xs font-medium text-amber-600 bg-amber-50 rounded-lg hover:bg-amber-100 border border-amber-200"
                                         onClick={() => {
@@ -1015,7 +1165,10 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
 
             {/* Document Viewer Modal - Compact */}
             {proofFileUrl && showDocViewer && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60" onClick={() => {
+                <div
+                    className="fixed inset-y-0 right-0 z-[130] flex items-center justify-center bg-black/60"
+                    style={{ left: 'var(--sidebar-width, 0px)', transition: 'left 200ms ease-in-out' }}
+                    onClick={() => {
                     setShowDocViewer(false);
                     setExcelHtml(null);
                     setExcelPreviewError(null);
@@ -1118,7 +1271,10 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
 
             {/* User File Preview Modal - Compact */}
             {showUserFileViewer && selectedUserFile && (
-                <div className="fixed inset-0 z-[101] flex items-center justify-center bg-black/60" onClick={() => {
+                <div
+                    className="fixed inset-y-0 right-0 z-[131] flex items-center justify-center bg-black/60"
+                    style={{ left: 'var(--sidebar-width, 0px)', transition: 'left 200ms ease-in-out' }}
+                    onClick={() => {
                     setShowUserFileViewer(false);
                     setExcelHtml(null);
                     setExcelPreviewError(null);
@@ -1253,7 +1409,11 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
 
             {/* Send Notification Form Modal */}
             {showNotifForm && createPortal(
-                <div className="fixed inset-0 z-[10000] bg-black/40 flex items-center justify-center p-4" onClick={() => { setShowNotifForm(null); setNotifTitle(''); setNotifMessage(''); }}>
+                <div
+                    className="fixed inset-y-0 right-0 z-[140] bg-black/40 flex items-center justify-center p-4"
+                    style={{ left: 'var(--sidebar-width, 0px)', transition: 'left 200ms ease-in-out' }}
+                    onClick={() => { setShowNotifForm(null); setNotifTitle(''); setNotifMessage(''); }}
+                >
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
                         {/* Header */}
                         <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">

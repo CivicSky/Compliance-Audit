@@ -1,15 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { areasAPI, criteriaAPI } from '../../utils/api';
-import axios from 'axios';
+import { criteriaAPI } from '../../utils/api';
 
 const EditCriteriaModal = ({ visible, onClose, event = {}, onSave, userRole = 'user' }) => {
   const [criteriaCode, setCriteriaCode] = useState('');
   const [criteriaName, setCriteriaName] = useState('');
   const [description, setDescription] = useState('');
-  const [areaId, setAreaId] = useState('');
   const [parentCriteriaId, setParentCriteriaId] = useState('');
   const [eventId, setEventId] = useState('');
-  const [areasList, setAreasList] = useState([]);
   const [criteriaList, setCriteriaList] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
@@ -20,35 +17,16 @@ const EditCriteriaModal = ({ visible, onClose, event = {}, onSave, userRole = 'u
       setCriteriaCode(event.CriteriaCode || '');
       setCriteriaName(event.CriteriaName || '');
       setDescription(event.Description || '');
-      setAreaId(event.AreaID ? String(event.AreaID) : '');
       setParentCriteriaId(event.ParentCriteriaID ? String(event.ParentCriteriaID) : '');
       setEventId(event.EventID || '');
     }
   }, [event, visible]);
 
   useEffect(() => {
-    async function fetchAreas() {
-      try {
-        const res = await areasAPI.getAll();
-        if (event && event.EventID) {
-          setAreasList((res.data || []).filter(a => String(a.EventID) === String(event.EventID)));
-        } else {
-          setAreasList(res.data || []);
-        }
-      } catch {
-        setAreasList([]);
-      }
-    }
-    fetchAreas();
-  }, [event]);
-
-  useEffect(() => {
     async function fetchCriteria() {
       try {
         const res = await criteriaAPI.getAll();
-        if (event && event.EventID && areaId) {
-          setCriteriaList((res.data || []).filter(c => String(c.EventID) === String(event.EventID) && String(c.AreaID) === String(areaId)));
-        } else if (event && event.EventID) {
+        if (event && event.EventID) {
           setCriteriaList((res.data || []).filter(c => String(c.EventID) === String(event.EventID)));
         } else {
           setCriteriaList(res.data || []);
@@ -58,7 +36,7 @@ const EditCriteriaModal = ({ visible, onClose, event = {}, onSave, userRole = 'u
       }
     }
     fetchCriteria();
-  }, [event, areaId]);
+  }, [event]);
 
   if (!visible) return null;
 
@@ -77,7 +55,6 @@ const EditCriteriaModal = ({ visible, onClose, event = {}, onSave, userRole = 'u
     if (name === 'CriteriaCode') setCriteriaCode(value);
     else if (name === 'CriteriaName') setCriteriaName(value);
     else if (name === 'Description') setDescription(value);
-    else if (name === 'AreaID') setAreaId(value);
     else if (name === 'ParentCriteriaID') setParentCriteriaId(value);
     if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
   };
@@ -91,29 +68,25 @@ const EditCriteriaModal = ({ visible, onClose, event = {}, onSave, userRole = 'u
       CriteriaCode: criteriaCode,
       CriteriaName: criteriaName,
       Description: description,
-      AreaID: areaId === '' ? null : areaId,
+      AreaID: event.AreaID === undefined ? null : event.AreaID,
       ParentCriteriaID: parentCriteriaId === '' ? null : parentCriteriaId,
       EventID: eventId
     };
-    try {
-      await axios.put(`/api/criteria/${event.CriteriaID}`, updated);
-      alert('Successfully updated criteria.');
-      if (onSave) onSave(updated);
-      onClose();
-    } catch (err) {
-      console.log('Update criteria error:', err);
-      let msg = 'Failed to update criteria.';
-      if (err.response && err.response.data && err.response.data.message) {
-        msg += '\n' + err.response.data.message;
+      try {
+        if (onSave) await onSave(updated);
+        onClose();
+      } catch (err) {
+        console.log('Update criteria error (parent):', err);
+        let msg = 'Failed to update criteria.';
+        if (err?.message) msg += '\n' + err.message;
+        alert(msg);
+      } finally {
+        setIsSubmitting(false);
       }
-      alert(msg);
-    } finally {
-      setIsSubmitting(false);
-    }
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out bg-black bg-opacity-50 flex items-center justify-center z-[120]">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 min-h-[70vh] max-h-[95vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-8" style={{ minHeight: '72px', borderBottom: '1px solid #e5e7eb' }}>
@@ -133,31 +106,7 @@ const EditCriteriaModal = ({ visible, onClose, event = {}, onSave, userRole = 'u
 
         {/* Form - Scrollable */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-8 pt-6 pb-8">
-          {/* Area Dropdown */}
-          <div className="mb-6">
-            <label htmlFor="AreaID" className="block text-sm font-medium text-gray-700 mb-2">
-              Area (Optional)
-            </label>
-            <select
-              id="AreaID"
-              name="AreaID"
-              value={areaId}
-              onChange={handleInputChange}
-              className={`w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.AreaID ? 'border-red-500' : 'border-gray-300'}`}
-              disabled={isSubmitting || !isAdmin}
-            >
-              <option value="">No Area (Top-level)</option>
-              {[...areasList.reduce((map, area) => {
-                if (!map.has(area.AreaID)) map.set(area.AreaID, area);
-                return map;
-              }, new Map()).values()].map((area) => (
-                  <option key={area.AreaID} value={area.AreaID}>
-                    {area.AreaCode} - {area.AreaName}
-                  </option>
-              ))}
-            </select>
-            {/* Area is now optional, so no error message */}
-          </div>
+          
 
 
 
@@ -216,11 +165,7 @@ const EditCriteriaModal = ({ visible, onClose, event = {}, onSave, userRole = 'u
             >
               <option value="">None (Top-level criteria)</option>
               {criteriaList
-                .filter(c => {
-                  if (String(c.CriteriaID) === String(event.CriteriaID)) return false;
-                  if (!areaId) return !c.AreaID;
-                  return String(c.AreaID) === String(areaId);
-                })
+                .filter(c => String(c.CriteriaID) !== String(event.CriteriaID))
                 .map(c => (
                   <option key={c.CriteriaID} value={c.CriteriaID}>
                     {c.CriteriaCode} - {c.CriteriaName}
@@ -291,3 +236,4 @@ const EditCriteriaModal = ({ visible, onClose, event = {}, onSave, userRole = 'u
 };
 
 export default EditCriteriaModal;
+

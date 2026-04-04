@@ -8,6 +8,7 @@ export default function AreaSection({
     showCheckbox,
     isChecked,
     onToggleSelect,
+    onMenuClick,
     children
 }) {
     return (
@@ -20,6 +21,7 @@ export default function AreaSection({
                 showCheckbox={showCheckbox}
                 isChecked={isChecked}
                 onToggleSelect={onToggleSelect}
+                onMenuClick={onMenuClick}
             />
             {isExpanded && children}
         </div>

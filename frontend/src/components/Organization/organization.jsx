@@ -1,12 +1,15 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import Header from "../Header/header";
+import Sortoffice from "./sortoffice";
 import { officesAPI, officeHeadsAPI, officetypesAPI, eventsAPI, usersAPI } from "../../utils/api";
 import OfficesP from "../../components/OfficesP/OfficesP";
+import EventTabs from "./EventTabs";
 import AddOfficeModal from "../../components/AddOffice/AddOfficeModal";
 import EditOfficeModal from "../../components/EditOffice/EditOfficeModal";
 import ViewReqPasscuModal from "../../components/ViewReqPasscuModal/ViewReqPasscuModal";
-import ViewReqPASSCUModal from "../../components/ViewReqPASSCUModal/ViewReqPASSCUModal";
+import ViewReqPASSCUModal from "../../components/ViewReqPasscuModal/ViewReqPasscuModal";
 import AddReqOffModal from "../../components/AddReqOffModal/AddReqOffModal";
+import { useLocation, useNavigate } from "react-router-dom";
 
 export default function Organization() {
     const [officeTypes, setOfficeTypes] = useState([]);
@@ -29,6 +32,11 @@ export default function Organization() {
     const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
 
     const officesPRef = useRef();
+    const [sortStatus, setSortStatus] = useState('all');
+    const location = useLocation();
+    const navigate = useNavigate();
+    const [notifOfficeId, setNotifOfficeId] = useState(null);
+    const isAdmin = currentUser?.RoleName === 'admin' || currentUser?.RoleID === 1;
 
     // Fetch office types and events safely
     useEffect(() => {
@@ -93,6 +101,72 @@ export default function Organization() {
         setSelectedIds([]);
     }, []);
 
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const officeIdFromQuery = params.get('officeId');
+
+        if (!officeIdFromQuery) return;
+
+        setSearchTerm('');
+        setNotifOfficeId(String(officeIdFromQuery));
+    }, [location.search]);
+
+    useEffect(() => {
+        if (!notifOfficeId) return;
+
+        let cancelled = false;
+
+        const syncEventForTargetOffice = async () => {
+            try {
+                const offices = await officesAPI.getAll();
+                const targetOffice = (Array.isArray(offices) ? offices : []).find(
+                    (office) => String(office?.id ?? office?.OfficeID ?? '') === String(notifOfficeId)
+                );
+
+                if (!targetOffice || cancelled) return;
+
+                const targetEventId = String(targetOffice?.event_id ?? targetOffice?.EventID ?? '');
+                if (targetEventId && String(selectedEventType || '') !== targetEventId) {
+                    setSelectedEventType(targetEventId);
+                }
+            } catch (error) {
+                console.error('Failed to resolve notification office event:', error);
+            }
+        };
+
+        syncEventForTargetOffice();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [notifOfficeId, selectedEventType]);
+
+    useEffect(() => {
+        if (!notifOfficeId || !officesPRef.current?.openOfficeById) return;
+
+        const timer = setTimeout(() => {
+            const opened = officesPRef.current.openOfficeById(notifOfficeId, { openModal: true });
+            if (!opened) return;
+
+            setNotifOfficeId(null);
+
+            const params = new URLSearchParams(location.search);
+            params.delete('officeId');
+            params.delete('fromNotif');
+            const nextSearch = params.toString();
+
+            navigate(
+                {
+                    pathname: location.pathname,
+                    search: nextSearch ? `?${nextSearch}` : ''
+                },
+                { replace: true }
+            );
+        }, 120);
+
+        return () => clearTimeout(timer);
+    }, [notifOfficeId, location.pathname, location.search, navigate, selectedEventType]);
+
     const handleSuccess = () => {
         if (officesPRef.current?.refresh) {
             officesPRef.current.refresh();
@@ -124,6 +198,38 @@ export default function Organization() {
         setIsViewReqModalOpen(false);
         setSelectedOffice(office);
         setIsAddReqModalOpen(true);
+    };
+
+    const handleDeleteOffice = async (office) => {
+        const officeId = office?.id || office?.OfficeID;
+        if (!officeId) return;
+
+        const confirmed = window.confirm(`Delete office "${office?.office_name || office?.OfficeName || officeId}"? This cannot be undone.`);
+        if (!confirmed) return;
+
+        try {
+            const response = await officesAPI.deleteOffice(officeId);
+            if (response?.success === false) {
+                alert(response?.message || 'Failed to delete office.');
+                return;
+            }
+
+            if ((selectedOffice?.id || selectedOffice?.OfficeID) === officeId) {
+                setIsViewReqModalOpen(false);
+                setIsEditModalOpen(false);
+                setIsAddReqModalOpen(false);
+                setSelectedOffice(null);
+            }
+
+            if (officesPRef.current?.refresh) {
+                await officesPRef.current.refresh();
+            }
+
+            alert('Office deleted successfully.');
+        } catch (err) {
+            console.error('Delete office error:', err);
+            alert(err?.response?.data?.message || err?.message || 'Failed to delete office.');
+        }
     };
 
     const handleRequirementsSaved = () => {
@@ -192,87 +298,170 @@ export default function Organization() {
         }
     }, [deleteMode]);
 
+    useEffect(() => {
+        if (!isAdmin && deleteMode) {
+            setDeleteMode(false);
+            setSelectedCount(0);
+            setSelectedIds([]);
+        }
+    }, [isAdmin, deleteMode]);
+
+    // Disable body scrolling while on this page and restore on unmount
+    useEffect(() => {
+        const prevOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => { document.body.style.overflow = prevOverflow; };
+    }, []);
+
     return (
-        <div className="px-6 pb-6 pt-6 w-full">
-            <Header
-                pageTitle="Offices"
-                onSearchChange={setSearchTerm}
-                searchValue={searchTerm}
-                onDeleteModeToggle={setDeleteMode}
-                deleteMode={deleteMode}
-                selectedCount={selectedCount}
-                onDeleteSelected={handleDeleteSelected}  // Pass handleDeleteSelected to Header
-                hideSortButton={true}
-                userRole={currentUser?.RoleID}
-            />
+        <div className="h-screen w-full flex flex-col overflow-hidden">
+            <Header />
 
-            {/* Add Office Button (not in header) */}
-            <div className="mb-4 flex justify-end">
-                <button
-                    onClick={() => setIsModalOpen(true)}
-                    className="px-5 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition-colors font-semibold"
-                >
-                    + Add Office
-                </button>
-            </div>
+            <div className="flex-1 overflow-hidden px-4 pb-6 pt-6">
 
+                <div className="mb-4 flex flex-col gap-2 relative">
+                <div className="flex items-start justify-between gap-2">
+                    <div>
+                        <h1 className="text-2xl font-bold text-gray-800 mb-1">Office Operations</h1>
+                        <p className="text-xs text-gray-600 ">{deleteMode ? '\u00A0' : 'Monitor office compliance, assignments, and requirement progress.'}</p>
+                    </div>
 
-            {/* Event Type Dropdown and View Toggle */}
-            <div className="mb-4 mt-6 flex items-center gap-4">
-                <div className="relative w-full max-w-xs">
-                    <select
-                        value={selectedEventType}
-                        onChange={e => setSelectedEventType(e.target.value)}
-                        className="w-full appearance-none px-5 py-3 border-2 border-blue-400 rounded-xl bg-white text-gray-800 font-semibold shadow focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 hover:border-blue-600 hover:shadow-lg"
-                    >
-                        <option value="" className="text-base">All Offices</option>
-                        {events.map(event => (
-                            <option key={event.EventID} value={event.EventID} className="text-base">
-                                {event.EventName || event.eventType}
-                            </option>
-                        ))}
-                    </select>
-                    <span className="pointer-events-none absolute right-4 top-1/2 transform -translate-y-1/2 text-blue-500">
-                        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                    </span>
+                    {isAdmin && (
+                    <div className="flex items-center gap-1 pt-0.5">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (deleteMode) {
+                                    setDeleteMode(false);
+                                    setSelectedCount(0);
+                                    setSelectedIds([]);
+                                    return;
+                                }
+                                setDeleteMode(true);
+                                setSelectedCount(0);
+                                setSelectedIds([]);
+                            }}
+                            className={`inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-red-400 ${
+                                deleteMode
+                                    ? 'border-red-300 bg-red-100 text-red-700 hover:bg-red-200'
+                                    : 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100'
+                            }`}
+                        >
+                            {deleteMode ? 'Cancel Delete' : 'Delete'}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setIsModalOpen(true)}
+                            className="inline-flex h-8 items-center gap-1 rounded-lg bg-emerald-600 px-3 text-[11px] font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        >
+                            <span className="text-sm leading-none">+</span>
+                            Add
+                        </button>
+                    </div>
+                    )}
                 </div>
 
-                {/* View Toggle Buttons */}
-                <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
-                    <button
-                        onClick={() => setViewMode('grid')}
-                        className={`p-2 rounded-lg transition-colors ${
-                            viewMode === 'grid' 
-                                ? 'bg-white text-indigo-600 shadow-sm' 
-                                : 'text-gray-500 hover:text-gray-700'
-                        }`}
-                        title="Grid View"
-                    >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                        </svg>
-                    </button>
-                    <button
-                        onClick={() => setViewMode('list')}
-                        className={`p-2 rounded-lg transition-colors ${
-                            viewMode === 'list' 
-                                ? 'bg-white text-indigo-600 shadow-sm' 
-                                : 'text-gray-500 hover:text-gray-700'
-                        }`}
-                        title="List View"
-                    >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                        </svg>
-                    </button>
-                </div>
-            </div>
+                <div className="flex w-full items-center justify-between gap-1">
+                    <div className="relative w-full max-w-sm">
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
+                            >
+                                <circle cx="11" cy="11" r="7" />
+                                <path d="m20 20-3.5-3.5" />
+                            </svg>
+                            <input
+                                type="text"
+                                placeholder="Search offices, personnel, or office types..."
+                                className="h-9 w-full rounded-lg border border-slate-200 bg-white pl-8 pr-3 text-[9px] text-slate-700 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                value={searchTerm}
+                                onChange={e => setSearchTerm(e.target.value)}
+                            />
+                    </div>
 
-            <div className="relative z-10">
+                    <div className="flex items-center gap-1">
+                        <div className="relative inline-block">
+                            <Sortoffice value={sortStatus} onChange={setSortStatus} />
+                        </div>
+
+                        <div className="flex h-9 items-center justify-end gap-1">
+                            <div className="flex h-7 items-center gap-0.5 rounded-md border border-slate-200 bg-slate-100 p-0.5">
+                                <button
+                                    onClick={() => setViewMode('grid')}
+                                    className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
+                                        viewMode === 'grid'
+                                            ? 'bg-white text-indigo-600'
+                                            : 'text-gray-500 hover:text-gray-700'
+                                    }`}
+                                    title="Grid View"
+                                >
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                                    </svg>
+                                </button>
+                                <button
+                                    onClick={() => setViewMode('list')}
+                                    className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
+                                        viewMode === 'list'
+                                            ? 'bg-white text-indigo-600'
+                                            : 'text-gray-500 hover:text-gray-700'
+                                    }`}
+                                    title="List View"
+                                >
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {isAdmin && deleteMode && (
+                    <div style={{ position: 'absolute', left: -9, bottom: -9 }} className="flex items-center gap-2 rounded px-3 py-2">
+                        <button
+                            onClick={() => { setDeleteMode(false); }}
+                            className="px-3 py-2 rounded border-2 border-gray-200 text-gray-700 hover:bg-gray-100"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={async () => {
+                                const confirmed = window.confirm(`Delete ${selectedCount} selected office record(s)? This cannot be undone.`);
+                                if (!confirmed) return;
+                                try {
+                                    await handleDeleteSelected();
+                                } catch (err) {
+                                    console.error(err);
+                                }
+                            }}
+                            className={`px-3 py-2 rounded bg-red-600 text-white hover:bg-red-700 ${selectedCount === 0 ? 'opacity-60 cursor-not-allowed' : ''}`}
+                            disabled={selectedCount === 0}
+                        >
+                            Delete Offices ({selectedCount})
+                        </button>
+                    </div>
+                )}
+                </div>
+
+            {/* Add Office button removed per request */}
+
+
+            {/* Event area: grey background with tabs only (content-width) */}
+                <div className="mb-3 flex justify-start relative z-20">
+                    <EventTabs selectedEventId={selectedEventType} onChange={(id) => setSelectedEventType(id)} />
+                </div>
+
+                <div className="relative z-10">
                 {/* Debug logs to verify data passed to OfficesP */}
                 {console.log('Selected Event Type:', selectedEventType)}
                 {console.log('Office Types:', officeTypes)}
                 {console.log('Heads:', heads)}
+                {console.log('Sort Status:', sortStatus)}
 
                 <OfficesP
                     ref={officesPRef}
@@ -280,10 +469,15 @@ export default function Organization() {
                     deleteMode={deleteMode}
                     onSelectionChange={handleSelectionChange}
                     onOfficeClick={handleOfficeClick}
+                    onEditOffice={handleEditOffice}
+                    onAddRequirements={handleAddRequirements}
+                    onDeleteOffice={handleDeleteOffice}
                     eventType={selectedEventType}
                     viewMode={viewMode}
-                    officeTypes={officeTypes}   
+                    sortStatus={sortStatus}
+                    officeTypes={officeTypes}
                     heads={heads}
+                    highlightOfficeId={notifOfficeId}
                 />
             </div>
 
@@ -306,6 +500,7 @@ export default function Organization() {
                     office={selectedOffice}
                     onEditOffice={handleEditOffice}
                     onAddRequirements={handleAddRequirements}
+                    onDeleteOffice={handleDeleteOffice}
                 />
             )}
 
@@ -316,6 +511,7 @@ export default function Organization() {
                     office={selectedOffice}
                     onEditOffice={handleEditOffice}
                     onAddRequirements={handleAddRequirements}
+                    onDeleteOffice={handleDeleteOffice}
                 />
             )}
 
@@ -352,6 +548,8 @@ export default function Organization() {
                     onSave={handleRequirementsSaved}
                 />
             )}
-        </div>
+                </div>
+
+            </div>
     );
 }

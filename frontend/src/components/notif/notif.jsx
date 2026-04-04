@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
 
 export default function NotificationPopup({ onClose }) {
     const [notifications, setNotifications] = useState([]);
@@ -7,6 +8,7 @@ export default function NotificationPopup({ onClose }) {
     const [loading, setLoading] = useState(false);
     const [currentUser, setCurrentUser] = useState(null);
     const [notificationCounts, setNotificationCounts] = useState({ total: 0, unread: 0, read: 0 });
+    const navigate = useNavigate();
 
     useEffect(() => {
         // Get current user from localStorage
@@ -164,6 +166,43 @@ export default function NotificationPopup({ onClose }) {
         }
     };
 
+    const getRedirectPath = (notification) => {
+        const table = String(notification?.RelatedTable || '').toLowerCase();
+        const relatedId = notification?.RelatedID;
+
+        if (table === 'requirements_assignment' || table === 'requirements') {
+            return `/home/organizations${relatedId ? `?officeId=${relatedId}&fromNotif=1` : ''}`;
+        }
+
+        if (table === 'office_personnel') {
+            return `/home/organizations${relatedId ? `?officeId=${relatedId}&fromNotif=1` : ''}`;
+        }
+
+        if (table === 'office_head') {
+            return '/home/officeheads';
+        }
+
+        if (table === 'users_role') {
+            return '/home/profile';
+        }
+
+        return null;
+    };
+
+    const handleNotificationClick = async (notification) => {
+        if (!notification) return;
+
+        if (!notification.IsRead) {
+            await markAsRead(notification.NotificationID);
+        }
+
+        const redirectPath = getRedirectPath(notification);
+        if (redirectPath) {
+            onClose?.();
+            navigate(redirectPath);
+        }
+    };
+
     return (
         <div className="h-full flex flex-col bg-white">
             {/* Header with filters */}
@@ -223,7 +262,7 @@ export default function NotificationPopup({ onClose }) {
                             <div
                                 key={notification.NotificationID}
                                 className={getNotificationStyle(notification.Type, notification.IsRead)}
-                                onClick={() => !notification.IsRead && markAsRead(notification.NotificationID)}
+                                onClick={() => handleNotificationClick(notification)}
                             >
                                 <div className="flex items-start gap-4">
                                     <span className="text-2xl flex-shrink-0 mt-1">

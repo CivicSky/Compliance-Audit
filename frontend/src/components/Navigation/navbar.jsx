@@ -4,14 +4,23 @@ import { useState, useEffect, useRef } from "react";
 import auditrackLogo from "../../assets/images/logo.png";
 import { usersAPI } from "../../utils/api";
 import { useNavigate } from "react-router-dom";
-import NotificationPopup from "../notif/notif";
+// import NotificationPopup from "../notif/notif"; // commented out to hide notification component from navbar
 
 export default function Navbar() {
+    const getInitialSidebarExpanded = () => {
+        if (typeof window === 'undefined') return false;
+        const stored = window.localStorage.getItem('sidebarExpanded');
+        const expanded = stored === null ? false : stored === 'true';
+        document.documentElement.style.setProperty('--sidebar-width', expanded ? '16rem' : '5rem');
+        return expanded;
+    };
+
     const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
     const [currentUser, setCurrentUser] = useState(null);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [showNotifications, setShowNotifications] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
+    const [isSidebarExpanded, setIsSidebarExpanded] = useState(getInitialSidebarExpanded);
     const profileMenuRef = useRef(null);
     const mobileMenuRef = useRef(null);
     const notificationRef = useRef(null);
@@ -89,6 +98,13 @@ export default function Navbar() {
         }
     };
 
+    // Keep global desktop layout offset in sync with sidebar width.
+    useEffect(() => {
+        const sidebarWidth = isSidebarExpanded ? '16rem' : '5rem';
+        document.documentElement.style.setProperty('--sidebar-width', sidebarWidth);
+        localStorage.setItem('sidebarExpanded', String(isSidebarExpanded));
+    }, [isSidebarExpanded]);
+
     // Close menus on outside click
     useEffect(() => {
         function handleClickOutside(event) {
@@ -111,47 +127,74 @@ export default function Navbar() {
 
     // NavLink style function
     const navLinkClass = ({ isActive }) =>
-        `flex items-center gap-2 py-2.5 px-3 rounded-lg transition-colors duration-200 text-white text-xs font-medium ${isActive ? 'bg-blue-600 shadow-inner' : 'hover:bg-gray-800'}`;
+        `flex items-center py-2.5 rounded-lg transition-colors duration-200 text-slate-100 text-xs font-medium ${isSidebarExpanded ? 'gap-2 px-3 justify-start' : 'h-10 w-10 mx-auto px-0 justify-center'} ${isActive ? 'bg-cyan-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]' : 'hover:bg-slate-800/90'}`;
+
+    const renderSharedPeopleIcon = () => (
+        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2a5 5 0 00-10 0v2m10 0H7m6-13a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+    );
 
     return (
         <>
             {/* Desktop Sidebar */}
-            <nav className="hidden lg:flex fixed top-0 left-0 h-screen w-64 bg-gray-900 shadow-xl z-50 flex-col justify-between p-4">
+            <nav className={`hidden lg:flex fixed top-0 left-0 h-screen bg-gradient-to-b from-slate-950 to-slate-900 border-r border-slate-800 shadow-xl z-50 flex-col justify-between p-4 overflow-hidden transition-[width] duration-200 ${isSidebarExpanded ? 'w-64' : 'w-20'}`}>
                 <div className="flex flex-col space-y-2">
                     {/* Logo */}
                     <div className="mb-2 flex items-center gap-2">
+                        <button
+                            onClick={() => setIsSidebarExpanded((prev) => !prev)}
+                            className="p-1.5 rounded-md border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors duration-200"
+                            aria-label={isSidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
+                            title={isSidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                {isSidebarExpanded ? (
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                ) : (
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                )}
+                            </svg>
+                        </button>
+                        <div className="flex items-center gap-2 min-w-0">
                         <img src={auditrackLogo} alt="Auditrack Logo" className="w-8 h-8 object-contain" />
-                        <span className="font-bold text-white text-base">Auditrack</span>
+                        {isSidebarExpanded && <span className="font-bold text-white text-base truncate">Auditrack</span>}
+                        </div>
                     </div>
 
                     {/* Sections */}
                     {currentUser && currentUser.RoleID === 1 && (
                         <div className="space-y-1">
-                            <div className="flex items-center gap-2 px-3 py-0.5">
-                                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Analyze</span>
-                            </div>
+                            {isSidebarExpanded && (
+                                <div className="flex items-center gap-2 px-3 py-0.5">
+                                    <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Analyze</span>
+                                </div>
+                            )}
                             <NavLink to="/home" className={navLinkClass}>
                                 <span className="w-4 text-center">
                                     <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9.75L12 4l9 5.75V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1V9.75z" />
                                     </svg>
                                 </span>
-                                <span className="text-xs font-medium">Dashboard</span>
+                                {isSidebarExpanded && <span className="text-xs font-medium">Dashboard</span>}
                             </NavLink>
                         </div>
                     )}
 
                 {/* Management Section */}
                 <div className="space-y-1">
-                    <div className="flex items-center gap-2 px-3 py-0.5">
-                        <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Management</span>
-                    </div>
+                    {isSidebarExpanded && (
+                        <div className="flex items-center gap-2 px-3 py-0.5">
+                            <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Management</span>
+                        </div>
+                    )}
                     
                     {/* Reordered: Events > ALLC > (Area, Criteria, Requirements commented) > Offices */}
+                    {/* Setup link hidden per request
                     <NavLink
                         to="/home/setup"
                         className={({ isActive }) =>
-                            `flex items-center gap-2 py-2.5 px-3 rounded-lg transition-colors duration-200 text-white ${
+                            `flex items-center py-2.5 rounded-lg transition-colors duration-200 text-white ${isSidebarExpanded ? 'gap-2 px-3 justify-start' : 'px-2 justify-center'} ${
                                 isActive ? 'bg-blue-600 shadow-inner' : 'hover:bg-gray-800'
                             }`
                         }
@@ -163,6 +206,7 @@ export default function Navbar() {
                         </span>
                         <span className="text-xs font-medium">Setup</span>
                     </NavLink>
+                    */}
 
                     <NavLink
                         to="/home/events"
@@ -173,7 +217,7 @@ export default function Navbar() {
                             }
                         }}
                         className={({ isActive }) =>
-                            `flex items-center gap-2 py-2.5 px-3 rounded-lg transition-colors duration-200 text-white ${
+                            `flex items-center py-2.5 rounded-lg transition-colors duration-200 text-white ${isSidebarExpanded ? 'gap-2 px-3 justify-start' : 'h-10 w-10 mx-auto px-0 justify-center'} ${
                                 isActive ? 'bg-blue-600 shadow-inner' : 'hover:bg-gray-800'
                             }`
                         }
@@ -183,32 +227,33 @@ export default function Navbar() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
                         </span>
-                        <span className="text-xs font-medium">Events</span>
+                        {isSidebarExpanded && <span className="text-xs font-medium">Events</span>}
                     </NavLink>
 
              
                     <NavLink
                         to="/home/allc"
                         className={({ isActive }) =>
-                            `flex items-center gap-2 py-2.5 px-3 rounded-lg transition-colors duration-200 text-white ${
+                            `flex items-center py-2.5 rounded-lg transition-colors duration-200 text-white ${isSidebarExpanded ? 'gap-2 px-3 justify-start' : 'h-10 w-10 mx-auto px-0 justify-center'} ${
                                 isActive ? 'bg-blue-600 shadow-inner' : 'hover:bg-gray-800'
                             }`
                         }
                     >
                         <span className="w-4 text-center">
                             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h8M12 8v8" />
+                                <rect x="6" y="5" width="12" height="16" rx="2" strokeWidth="2" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3h6a1 1 0 011 1v2H8V4a1 1 0 011-1z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 10h6M9 14h6M9 18h4" />
                             </svg>
                         </span>
-                        <span className="text-xs font-medium">ALLC</span>
+                        {isSidebarExpanded && <span className="text-xs font-medium">Standards</span>}
                     </NavLink>
 
                     {/* Area — hidden from nav (restore by uncommenting)
                     <NavLink
                         to="/home/area"
                         className={({ isActive }) =>
-                            `flex items-center gap-2 py-2.5 px-3 rounded-lg transition-colors duration-200 text-white ${
+                            `flex items-center py-2.5 rounded-lg transition-colors duration-200 text-white ${isSidebarExpanded ? 'gap-2 px-3 justify-start' : 'px-2 justify-center'} ${
                                 isActive ? 'bg-blue-600 shadow-inner' : 'hover:bg-gray-800'
                             }`
                         }
@@ -275,7 +320,7 @@ export default function Navbar() {
                             }
                         }}
                         className={({ isActive }) =>
-                            `flex items-center gap-2 py-2.5 px-3 rounded-lg transition-colors duration-200 text-white ${
+                            `flex items-center py-2.5 rounded-lg transition-colors duration-200 text-white ${isSidebarExpanded ? 'gap-2 px-3 justify-start' : 'h-10 w-10 mx-auto px-0 justify-center'} ${
                                 isActive ? 'bg-blue-600 shadow-inner' : 'hover:bg-gray-800'
                             }`
                         }
@@ -286,30 +331,51 @@ export default function Navbar() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 10h.01M15 10h.01M9 14h.01M15 14h.01" />
                             </svg>
                         </span>
-                        <span className="text-xs font-medium">Offices</span>
+                        {isSidebarExpanded && <span className="text-xs font-medium">Offices</span>}
                     </NavLink>
                 </div>
 
                     {/* Users */}
                     <div className="space-y-1">
-                        <div className="flex items-center gap-2 px-3 py-0.5">
-                            <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Users</span>
-                        </div>
-                        {currentUser && currentUser.RoleID === 1 && (
-                            <NavLink to="/home/officehead" className={navLinkClass}>Office Personnel</NavLink>
+                        {isSidebarExpanded && (
+                            <div className="flex items-center gap-2 px-3 py-0.5">
+                                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Users</span>
+                            </div>
                         )}
                         {currentUser && currentUser.RoleID === 1 && (
-                            <NavLink to="/home/users" className={navLinkClass}>Users</NavLink>
+                            <NavLink to="/home/officehead" className={navLinkClass}>
+                                <span className="w-4 text-center">
+                                    {renderSharedPeopleIcon()}
+                                </span>
+                                {isSidebarExpanded && <span className="text-xs font-medium">Office Personnel</span>}
+                            </NavLink>
+                        )}
+                        {currentUser && currentUser.RoleID === 1 && (
+                            <NavLink to="/home/users" className={navLinkClass}>
+                                <span className="w-4 text-center">
+                                    {renderSharedPeopleIcon()}
+                                </span>
+                                {isSidebarExpanded && <span className="text-xs font-medium">Users</span>}
+                            </NavLink>
                         )}
                     </div>
 
                     {/* Logs */}
                     {currentUser && currentUser.RoleID === 1 && (
                         <div className="space-y-1">
-                            <div className="flex items-center gap-2 px-3 py-0.5">
-                                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Logs</span>
-                            </div>
-                            <NavLink to="/home/audit-logs" className={navLinkClass}>Audit Logs</NavLink>
+                            {isSidebarExpanded && (
+                                <div className="flex items-center gap-2 px-3 py-0.5">
+                                    <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Logs</span>
+                                </div>
+                            )}
+                            <NavLink to="/home/audit-logs" className={navLinkClass}>
+                                <span className="w-4 text-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                    </svg>
+                                </span>
+                                {isSidebarExpanded && <span className="text-xs font-medium">Audit Logs</span>}
+                            </NavLink>
                         </div>
                     )}
                 </div>
@@ -337,8 +403,8 @@ export default function Navbar() {
 
                 {/* Profile Menu */}
                 <div className="relative border-t border-gray-700 pt-2" ref={profileMenuRef}>
-                    <div className="flex items-center justify-between p-1.5 hover:bg-gray-800 rounded-lg transition-colors duration-200">
-                        <NavLink to="/home/Profile" className="flex items-center gap-3 flex-1">
+                    <div className={`flex items-center p-1.5 hover:bg-gray-800 rounded-lg transition-colors duration-200 ${isSidebarExpanded ? 'justify-between' : 'justify-center'}`}>
+                        <NavLink to="/home/Profile" className={`flex items-center ${isSidebarExpanded ? 'gap-3 flex-1' : 'justify-center'}`}>
                             <div className="w-7 h-7 bg-blue-600 rounded-full flex items-center justify-center overflow-hidden">
                                 {currentUser && currentUser.ProfilePic ? (
                                     <img
@@ -353,17 +419,19 @@ export default function Navbar() {
                                     </svg>
                                 )}
                             </div>
-                            <div className="flex flex-col">
-                                <span className="text-[11px] font-medium text-white">
-                                    {currentUser
-                                        ? `${currentUser.FirstName}${currentUser.MiddleInitial ? ' ' + currentUser.MiddleInitial + '.' : ''} ${currentUser.LastName}`
-                                        : 'Loading...'}
-                                </span>
-                                <span className="text-[9px] text-gray-400">View Profile</span>
-                            </div>
+                            {isSidebarExpanded && (
+                                <div className="flex flex-col">
+                                    <span className="text-[11px] font-medium text-white">
+                                        {currentUser
+                                            ? `${currentUser.FirstName}${currentUser.MiddleInitial ? ' ' + currentUser.MiddleInitial + '.' : ''} ${currentUser.LastName}`
+                                            : 'Loading...'}
+                                    </span>
+                                    <span className="text-[9px] text-gray-400">View Profile</span>
+                                </div>
+                            )}
                         </NavLink>
 
-                        <button onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)} className="p-1 rounded-md hover:bg-gray-700 transition-colors duration-200">
+                        <button onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)} className={`p-1 rounded-md hover:bg-gray-700 transition-colors duration-200 ${isSidebarExpanded ? '' : 'ml-1'}`}>
                             <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
                             </svg>
@@ -461,7 +529,7 @@ export default function Navbar() {
                 </div>
             </div>
 
-            {/* Notification Overlay */}
+            {/* Notification Overlay (hidden) - removed from render to hide component
             {showNotifications && (
                 <div 
                     ref={notificationPopupRef}
@@ -470,8 +538,9 @@ export default function Navbar() {
                     <NotificationPopup onClose={() => setShowNotifications(false)} />
                 </div>
             )}
+            */}
 
-            {/* Mobile Notification Popup Modal */}
+            {/* Mobile Notification Popup Modal (hidden)
             {showNotifications && (
                 <div className="fixed inset-0 z-50 lg:hidden">
                     <div className="fixed inset-0 bg-black/50" onClick={() => setShowNotifications(false)}></div>
@@ -480,6 +549,7 @@ export default function Navbar() {
                     </div>
                 </div>
             )}
+            */}
         </>
     );
 };

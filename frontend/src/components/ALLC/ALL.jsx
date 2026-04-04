@@ -1,19 +1,27 @@
 import CopyEventPopup from './CopyEventPopup';
 import { useState, useEffect, useRef } from 'react';
+import Pagination from '../Pagination/Pagination';
 import Header from '../Header/header';
 import axios from 'axios';
+import SortEvents from './sortevents';
 
 import EventCard from './EventCard';
 import EventPopup from './EventPopup';
 
 import EditEventPopup from './EditEventPopup';
-import { eventsAPI } from '../../utils/api';
+import { eventsAPI, usersAPI } from '../../utils/api';
+import AddEventModal from '../AddEvent/AddEventModal';
 
 
 function ALL() {
+    const [sortStatus, setSortStatus] = useState('active');
     const [events, setEvents] = useState([]);
     const [copyPopup, setCopyPopup] = useState({ open: false, event: null });
     const [editPopup, setEditPopup] = useState({ open: false, event: null });
+    const [currentUser, setCurrentUser] = useState(null);
+    const [deleteMode, setDeleteMode] = useState(false);
+    const [selectedEventIdsForDelete, setSelectedEventIdsForDelete] = useState(new Set());
+    const [isAddEventOpen, setIsAddEventOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
         // Search helpers
         const matchesSearch = (text, searchLower) => {
@@ -26,16 +34,22 @@ function ALL() {
                    matchesSearch(event.Description, searchLower);
         };
 
-        // Only event-level search for now (can expand to areas/criteria if needed)
-        const filteredEvents = events.filter(event => {
-            if (!searchTerm.trim()) return true;
-            const searchLower = searchTerm.toLowerCase();
-            return eventMatchesSearch(event, searchLower);
-        });
 
-        const handleSearchChange = (e) => {
-            setSearchTerm(e.target.value);
-        };
+    // Filter by search and status
+    const filteredEvents = events.filter(event => {
+        // Status filter (normalize backend field variants)
+        const eventStatus = String(event.status || event.Status || '').toLowerCase().trim();
+        if (sortStatus === 'active' && eventStatus !== 'active') return false;
+        if (sortStatus === 'inactive' && eventStatus !== 'inactive') return false;
+        // Search filter
+        if (!searchTerm.trim()) return true;
+        const searchLower = searchTerm.toLowerCase();
+        return eventMatchesSearch(event, searchLower);
+    });
+
+    const handleSearchChange = (e) => {
+        setSearchTerm(e.target.value);
+    };
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
@@ -52,6 +66,8 @@ function ALL() {
     const [loadingCriteria, setLoadingCriteria] = useState(new Set());
     const [loadingRequirements, setLoadingRequirements] = useState(new Set());
     const [loadingNoAreaCriteria, setLoadingNoAreaCriteria] = useState(new Set());
+
+    const isAdmin = currentUser?.RoleName === 'admin' || currentUser?.RoleID === 1;
     
     // Track abort controllers to cancel stale requests
     const abortControllersRef = useRef({});
@@ -62,6 +78,25 @@ function ALL() {
     useEffect(() => {
         fetchEvents();
     }, []);
+
+    useEffect(() => {
+        const fetchCurrentUser = async () => {
+            try {
+                const response = await usersAPI.getLoggedInUser();
+                if (response?.success) setCurrentUser(response.user);
+            } catch (error) {
+                console.error('Error fetching current user:', error);
+            }
+        };
+        fetchCurrentUser();
+    }, []);
+
+    useEffect(() => {
+        if (!isAdmin && deleteMode) {
+            setDeleteMode(false);
+            setSelectedEventIdsForDelete(new Set());
+        }
+    }, [isAdmin, deleteMode]);
 
     // Removed auto-selecting the first event to prevent modal from opening automatically
 
@@ -341,6 +376,35 @@ function ALL() {
         }
     };
 
+    const editCriteria = async (criteriaId, data) => {
+        const token = localStorage.getItem('token');
+        try {
+            await axios.put(`http://localhost:5000/api/criteria/${criteriaId}`, {
+                CriteriaCode: data.CriteriaCode,
+                CriteriaName: data.CriteriaName,
+                Description: data.Description || null,
+                AreaID: data.AreaID ?? null,
+                ParentCriteriaID: data.ParentCriteriaID ?? null,
+                EventID: data.EventID
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            // Refresh criteria lists for event
+            if (selectedEvent?.EventID) {
+                await fetchCriteriaOptionsForEvent(selectedEvent.EventID);
+                if (data.AreaID) {
+                    await fetchCriteriaForArea(Number(data.AreaID), true);
+                } else {
+                    await fetchNoAreaCriteriaForEvent(selectedEvent.EventID);
+                }
+            }
+        } catch (err) {
+            const apiMessage = err?.response?.data?.message || err?.response?.data?.error;
+            throw new Error(apiMessage || 'Failed to edit criteria.');
+        }
+    };
+
     const addNoAreaCriteria = async (eventId, data) => {
         return addCriteria(eventId, { ...data, AreaID: null });
     };
@@ -391,13 +455,17 @@ function ALL() {
             const response = await axios.get(`http://localhost:5000/api/requirements/criteria/${criteriaId}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            return Array.isArray(response.data?.data) ? response.data.data : [];
+            const list = Array.isArray(response.data?.data) ? response.data.data : [];
+            setRequirementsData(prev => ({ ...prev, [Number(criteriaId)]: list }));
+            return list;
         } catch {
             const fallback = await axios.get('http://localhost:5000/api/requirements/all', {
                 headers: { Authorization: `Bearer ${token}` }
             });
             const all = Array.isArray(fallback.data?.data) ? fallback.data.data : [];
-            return all.filter(req => Number(req.CriteriaID) === Number(criteriaId));
+            const list = all.filter(req => Number(req.CriteriaID) === Number(criteriaId));
+            setRequirementsData(prev => ({ ...prev, [Number(criteriaId)]: list }));
+            return list;
         }
     };
 
@@ -464,6 +532,21 @@ function ALL() {
         await fetchAreasForEventSafe(eventId);
         await fetchNoAreaCriteriaForEvent(eventId);
         await fetchCriteriaOptionsForEvent(eventId);
+        // Clear cached requirements so UI won't show stale data
+        setRequirementsData({});
+        setNoAreaCriteriaData({});
+        // Refresh criteria for any expanded areas (so criteria lists are repopulated)
+        try {
+            await Promise.all(Array.from(expandedAreas || []).map(id => fetchCriteriaForArea(id, true)));
+        } catch (err) {
+            console.error('Failed to refresh criteria after delete', err);
+        }
+        // Refresh requirements for any currently-expanded criteria so the UI reflects deletions immediately
+        try {
+            await Promise.all(Array.from(expandedCriteria || []).map(id => fetchRequirementsForCriteria(id, true)));
+        } catch (err) {
+            console.error('Failed to refresh requirements after delete', err);
+        }
     };
 
     const closeModal = () => {
@@ -478,13 +561,12 @@ function ALL() {
         setCriteriaOptionsData({});
     };
 
-    if (loading) return <div className="text-center py-8 text-lg">Loading events...</div>;
+    if (loading) return <div className="text-center py-8 text-lg">Loading standards...</div>;
 
-    if (error) return <div className="text-center py-8 text-red-600 text-lg">Error: {error}</div>;
+    if (error) return <div className="text-center py-8 text-red-600 text-lg">Unable to load standards: {error}</div>;
 
-    if (!events || events.length === 0) {
-        return <div className="text-center py-8 text-gray-600 text-lg">No events found. Please add an event in the system.</div>;
-    }
+    // Always render the header and controls even when there are no events.
+    // The empty-state message will be shown in the events grid area below.
 
     // Pagination
     const totalPages = Math.ceil(events.length / itemsPerPage);
@@ -492,21 +574,119 @@ function ALL() {
     const paginatedEvents = events.slice(startIdx, startIdx + itemsPerPage);
 
     return (
-        <div className="bg-gray-50 h-[calc(100vh-6rem)] lg:h-[calc(100vh-4rem)] p-6 overflow-hidden pt-24">
+        <div className="px-4 pb-6 pt-6 w-full overflow-hidden">
             <Header />
-            <div className="mb-8 flex items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-4xl font-bold text-gray-800 mb-2">Standards Management</h1>
-                    <p className="text-gray-600">Compliance Audit System - Click event to view details</p>
+            <div className="mb-4 flex flex-col gap-2 relative">
+                <div className="flex items-start justify-between gap-2">
+                    <div>
+                        <h1 className="text-2xl font-bold text-gray-800 mb-1">Compliance Standards</h1>
+                        <p className="text-xs text-gray-600 ">{deleteMode ? '\u00A0' : 'Manage event structures, criteria, and requirement flows.'}</p>
+                    </div>
+
+                    {isAdmin && (
+                    <div className="flex items-center gap-1 pt-0.5">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (deleteMode) {
+                                    setDeleteMode(false);
+                                    setSelectedEventIdsForDelete(new Set());
+                                    return;
+                                }
+                                setDeleteMode(true);
+                                setSelectedEventIdsForDelete(new Set());
+                            }}
+                            className={`inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-red-400 ${
+                                deleteMode
+                                    ? 'border-red-300 bg-red-100 text-red-700 hover:bg-red-200'
+                                    : 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100'
+                            }`}
+                        >
+                            {deleteMode ? 'Cancel Delete' : 'Delete'}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setIsAddEventOpen(true)}
+                            className="inline-flex h-8 items-center gap-1 rounded-lg bg-emerald-600 px-3 text-[11px] font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        >
+                            <span className="text-sm leading-none">+</span>
+                            Add
+                        </button>
+                    </div>
+                    )}
                 </div>
-                <input
-                    type="text"
-                    placeholder="Search standards..."
-                    className="border border-gray-300 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                    style={{ minWidth: 220 }}
-                    value={searchTerm}
-                    onChange={handleSearchChange}
-                />
+
+                <div className="flex w-full items-center justify-between gap-1">
+                    <div className="relative w-full max-w-sm">
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
+                            >
+                                <circle cx="11" cy="11" r="7" />
+                                <path d="m20 20-3.5-3.5" />
+                            </svg>
+                            <input
+                                type="text"
+                                placeholder="Search events, codes, or descriptions..."
+                                className="h-9 w-full rounded-lg border border-slate-200 bg-white pl-8 pr-3 text-[9px] text-slate-700 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                value={searchTerm}
+                                onChange={handleSearchChange}
+                            />
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                        <div className="flex h-9 items-center justify-end gap-1">
+                        <div className="relative inline-block">
+                            <SortEvents value={sortStatus} onChange={setSortStatus} />
+                        </div>
+                        </div>
+                    </div>
+                </div>
+                {isAdmin && deleteMode && (
+                    <div style={{ position: 'absolute', left: -9, bottom: -9 }} className="flex items-center gap-2 rounded px-3 py-2">
+                        <button
+                            onClick={() => { setDeleteMode(false); setSelectedEventIdsForDelete(new Set()); }}
+                            className="px-3 py-2 rounded border-2 border-gray-200 text-gray-700 hover:bg-gray-100"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={async () => {
+                                const ids = Array.from(selectedEventIdsForDelete).map(Number).filter(Boolean);
+                                if (ids.length === 0) {
+                                    alert('Select at least one standard to delete.');
+                                    return;
+                                }
+                                const confirmed = window.confirm(`Delete ${ids.length} selected standard(s)? This cannot be undone.`);
+                                if (!confirmed) return;
+                                try {
+                                    const { eventsAPI } = await import('../../utils/api');
+                                    const resp = await eventsAPI.deleteEvents(ids);
+                                    if (resp && resp.success) {
+                                        alert(resp.message || 'Selected standards deleted.');
+                                        await fetchEvents();
+                                    } else {
+                                        alert(resp?.message || 'Failed to delete selected standards.');
+                                    }
+                                } catch (err) {
+                                    console.error('Delete events error', err);
+                                    alert(err?.message || 'Error deleting selected standards.');
+                                } finally {
+                                    setDeleteMode(false);
+                                    setSelectedEventIdsForDelete(new Set());
+                                }
+                            }}
+                            className={`px-3 py-2 rounded bg-red-600 text-white hover:bg-red-700 ${selectedEventIdsForDelete.size === 0 ? 'opacity-60 cursor-not-allowed' : ''}`}
+                            disabled={selectedEventIdsForDelete.size === 0}
+                        >
+                            Delete Selected ({selectedEventIdsForDelete.size})
+                        </button>
+                    </div>
+                )}
             </div>
 
             {/* Events Grid 2x2 */}
@@ -515,12 +695,58 @@ function ALL() {
                     <EventCard
                         key={event.EventID}
                         event={event}
-                        onClick={() => openEventModal(event)}
+                        onClick={() => {
+                            if (deleteMode) {
+                                // toggle selection when clicking card in delete mode
+                                setSelectedEventIdsForDelete(prev => {
+                                    const next = new Set(prev);
+                                    const id = Number(event.EventID);
+                                    if (next.has(id)) next.delete(id);
+                                    else next.add(id);
+                                    return next;
+                                });
+                                return;
+                            }
+                            openEventModal(event);
+                        }}
                         onCopy={(originalEvent) => {
                             setCopyPopup({ open: true, event: originalEvent });
                         }}
                         onEdit={(originalEvent) => {
                             setEditPopup({ open: true, event: originalEvent });
+                        }}
+                        onDelete={async (targetEvent) => {
+                            const eventId = Number(targetEvent?.EventID);
+                            if (!eventId) return;
+
+                            const confirmed = window.confirm(`Delete event "${targetEvent?.EventName || eventId}"? This cannot be undone.`);
+                            if (!confirmed) return;
+
+                            try {
+                                const resp = await eventsAPI.deleteEvents([eventId]);
+                                if (resp?.success) {
+                                    await fetchEvents();
+                                    if (selectedEvent?.EventID === eventId) {
+                                        setSelectedEvent(null);
+                                    }
+                                } else {
+                                    alert(resp?.message || 'Failed to delete event.');
+                                }
+                            } catch (err) {
+                                console.error('Delete event error', err);
+                                alert(err?.message || 'Error deleting event.');
+                            }
+                        }}
+                        showCheckbox={deleteMode}
+                        isAdmin={isAdmin}
+                        isChecked={selectedEventIdsForDelete.has(Number(event.EventID))}
+                        onToggleSelect={(evt, checked) => {
+                            setSelectedEventIdsForDelete(prev => {
+                                const next = new Set(prev);
+                                const id = Number(evt.EventID);
+                                if (checked) next.add(id); else next.delete(id);
+                                return next;
+                            });
                         }}
                     />
                 ))}
@@ -532,13 +758,15 @@ function ALL() {
                         setEditPopup({ open: false, event: null });
                         setSelectedEvent(null);
                     }}
-                    onConfirm={async ({ eventName, eventCode, description }) => {
-                        if (!editPopup.event) return;
+                    onConfirm={async ({ EventName, EventCode, Description, status, EventID }) => {
+                        const eventId = EventID || editPopup.event?.EventID;
+                        if (!eventId) return;
                         try {
-                            await eventsAPI.updateEvent(editPopup.event.EventID, {
-                                EventName: eventName,
-                                EventCode: eventCode,
-                                Description: description
+                            await eventsAPI.updateEvent(eventId, {
+                                EventName,
+                                EventCode,
+                                Description,
+                                status
                             });
                             await fetchEvents();
                             setEditPopup({ open: false, event: null });
@@ -551,39 +779,30 @@ function ALL() {
                 />
             </div>
 
-            {/* Pagination */}
-            {filteredEvents.length > itemsPerPage && (
-                <div className="flex justify-center gap-2 mb-8">
-                    <button
-                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                        disabled={currentPage === 1}
-                        className="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-700"
-                    >
-                        Previous
-                    </button>
-                    <div className="flex items-center gap-2">
-                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                            <button
-                                key={page}
-                                onClick={() => setCurrentPage(page)}
-                                className={`px-3 py-2 rounded ${
-                                    currentPage === page
-                                        ? 'bg-blue-600 text-white'
-                                        : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-                                }`}
-                            >
-                                {page}
-                            </button>
-                        ))}
-                    </div>
-                    <button
-                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                        disabled={currentPage === totalPages}
-                        className="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-700"
-                    >
-                        Next
-                    </button>
-                </div>
+            <div className="w-full flex justify-center mt-1 -mt-5 mb-">
+                <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={page => setCurrentPage(page)}
+                    fixed={true}
+                    showWhenSinglePage={true}
+                />
+            </div>
+
+            {/* Add Event Modal triggered from Actions menu */}
+            {isAddEventOpen && (
+                <AddEventModal
+                    isOpen={isAddEventOpen}
+                    onClose={() => setIsAddEventOpen(false)}
+                    onSuccess={async (data) => {
+                        setIsAddEventOpen(false);
+                        try {
+                            await fetchEvents();
+                        } catch (err) {
+                            console.error('Failed to refresh events after add', err);
+                        }
+                    }}
+                />
             )}
 
             {/* Modal */}
@@ -613,6 +832,7 @@ function ALL() {
                     onAddRequirement={addRequirement}
                     onLoadRequirementsByCriteria={loadRequirementsByCriteria}
                     onEditArea={editArea}
+                    onEditCriteria={editCriteria}
                     onBulkDelete={bulkDeleteHierarchy}
                 />
             )}

@@ -54,7 +54,7 @@ export default function UserEditApproval({ selectedUser, onClose, onSuccess }) {
     if (!selectedUser) return null;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out bg-black bg-opacity-50 flex items-center justify-center z-[120]">
             <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
                 <h2 className="text-2xl font-bold mb-4">Update Approval Status</h2>
                 
@@ -112,3 +112,4 @@ export default function UserEditApproval({ selectedUser, onClose, onSuccess }) {
         </div>
     );
 }
+

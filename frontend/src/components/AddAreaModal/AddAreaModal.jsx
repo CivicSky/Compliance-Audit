@@ -94,7 +94,7 @@ export default function AddAreaModal({ isOpen, onClose, onSuccess }) {
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out bg-black bg-opacity-50 flex items-center justify-center z-[120]">
             <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4">
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b">

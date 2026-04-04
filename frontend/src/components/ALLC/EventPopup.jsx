@@ -3,6 +3,11 @@ import AreaSection from './AreaSection';
 import CriteriaSection from './CriteriaSection';
 import RequirementsSection from './RequirementsSection';
 import AddAreaPop from './addareapop';
+import EditAreaModal from '../EditArea/EditArea';
+import EditCriteriaModal from '../EditCriteria/EditCriteriaModal';
+import EditRequirementsModal from '../EditRequirements/EditRequirementsModal';
+import { usersAPI } from '../../utils/api';
+import { useEffect } from 'react';
 
 export default function EventPopup({
     selectedEvent,
@@ -28,6 +33,7 @@ export default function EventPopup({
     onAddRequirement,
     onLoadRequirementsByCriteria,
     onEditArea,
+    onEditCriteria,
     onBulkDelete
 }) {
     const [isActionOpen, setIsActionOpen] = useState(false);
@@ -39,6 +45,27 @@ export default function EventPopup({
     const [selectedAreaIds, setSelectedAreaIds] = useState(new Set());
     const [selectedCriteriaIds, setSelectedCriteriaIds] = useState(new Set());
     const [selectedRequirementIds, setSelectedRequirementIds] = useState(new Set());
+    const [isEditAreaOpen, setIsEditAreaOpen] = useState(false);
+    const [editAreaData, setEditAreaData] = useState(null);
+    const [isEditCriteriaOpen, setIsEditCriteriaOpen] = useState(false);
+    const [editCriteriaData, setEditCriteriaData] = useState(null);
+    const [currentUser, setCurrentUser] = useState(null);
+    const [isEditRequirementOpen, setIsEditRequirementOpen] = useState(false);
+    const [editRequirementData, setEditRequirementData] = useState(null);
+
+    useEffect(() => {
+        let mounted = true;
+        const fetchCurrentUser = async () => {
+            try {
+                const res = await usersAPI.getLoggedInUser();
+                if (mounted && res) setCurrentUser(res.user || res);
+            } catch (err) {
+                // ignore
+            }
+        };
+        fetchCurrentUser();
+        return () => { mounted = false; };
+    }, []);
     if (!selectedEvent) return null;
 
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -192,13 +219,13 @@ export default function EventPopup({
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 left-60">
-            <div className="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
-                <div className="p-8 pb-5 border-b border-gray-200 bg-white">
+        <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out bg-black bg-opacity-50 flex items-center justify-center z-[120]">
+            <div className="bg-white rounded-lg w-full max-w-4xl h-[86vh] max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
+                <div className="px-6 py-5 border-b border-slate-200 bg-white">
                     <div className="flex justify-between items-start gap-4">
                         <div>
-                            <h2 className="text-3xl font-bold text-gray-800">{selectedEvent.EventName}</h2>
-                            <p className="text-gray-600 mt-1">{selectedEvent.EventCode}</p>
+                            <h2 className="text-4xl font-bold tracking-tight text-slate-900">{selectedEvent.EventName}</h2>
+                            <p className="text-slate-600 mt-1">{selectedEvent.EventCode}</p>
                         </div>
                         <div className="relative flex items-center gap-2 ml-4">
                             <input
@@ -206,23 +233,28 @@ export default function EventPopup({
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 placeholder="Search..."
-                                className="w-64 border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400"
+                                className="h-10 w-64 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-cyan-500"
                             />
                             <button
                                 onClick={() => setIsActionMenuOpen(prev => !prev)}
-                                className="text-gray-500 hover:text-gray-700 text-2xl font-bold px-2"
+                                className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
                                 title="More actions"
+                                aria-label="More actions"
                             >
-                                ⋯
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                                    <circle cx="12" cy="5" r="1.5" fill="currentColor" stroke="none" />
+                                    <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+                                    <circle cx="12" cy="19" r="1.5" fill="currentColor" stroke="none" />
+                                </svg>
                             </button>
                             {isActionMenuOpen && (
-                                <div className="absolute right-12 top-10 z-20 bg-white border border-gray-200 rounded-md shadow-lg min-w-[170px] py-1">
+                                <div className="absolute right-12 top-11 z-20 bg-white border border-slate-200 rounded-xl shadow-lg min-w-[190px] py-1">
                                     <button
                                         onClick={() => {
                                             setIsActionOpen(true);
                                             setIsActionMenuOpen(false);
                                         }}
-                                        className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                        className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-100"
                                     >
                                         Manage Structure
                                     </button>
@@ -236,9 +268,12 @@ export default function EventPopup({
                             )}
                             <button
                                 onClick={onClose}
-                                className="text-gray-500 hover:text-gray-700 text-2xl font-bold flex-shrink-0"
+                                className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
+                                aria-label="Close"
                             >
-                                ✕
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
                             </button>
                         </div>
                     </div>
@@ -273,7 +308,7 @@ export default function EventPopup({
                 )}
 
                 {/* Hierarchy inside modal */}
-                <div className="overflow-y-auto px-8 pb-8">
+                <div className="flex-1 min-h-0 overflow-y-auto px-8 pb-8">
                 <div className="mt-6">
                     {loadingAreas.has(selectedEvent.EventID) ? (
                         <div className="text-center text-gray-500">Loading areas...</div>
@@ -295,6 +330,7 @@ export default function EventPopup({
                                     showCheckbox={deleteMode}
                                     isChecked={selectedAreaIds.has(Number(area.AreaID))}
                                     onToggleSelect={(checked) => toggleAreaSelect(area, checked)}
+                                    onMenuClick={(item) => { setEditAreaData(item); setIsEditAreaOpen(true); }}
                                 >
                                     {loadingCriteria.has(area.AreaID) ? (
                                         <p className="text-xs text-gray-500 ml-4 mt-2">Loading criteria...</p>
@@ -316,6 +352,7 @@ export default function EventPopup({
                                                         showCheckbox={deleteMode}
                                                         isChecked={selectedCriteriaIds.has(Number(crit.CriteriaID))}
                                                         onToggleSelect={(checked) => toggleCriteriaSelect(crit, checked)}
+                                                        onMenuClick={(c) => { setEditCriteriaData(c); setIsEditCriteriaOpen(true); }}
                                                     >
                                                         <RequirementsSection
                                                             requirements={getFilteredRequirementsForCriteria(crit.CriteriaID)}
@@ -323,6 +360,7 @@ export default function EventPopup({
                                                             showCheckbox={deleteMode}
                                                             selectedRequirementIds={selectedRequirementIds}
                                                             onToggleRequirement={toggleRequirementSelect}
+                                                            onMenuClick={(req) => { setEditRequirementData(req); setIsEditRequirementOpen(true); }}
                                                         />
                                                     </CriteriaSection>
                                                 ))}
@@ -377,6 +415,7 @@ export default function EventPopup({
                                                         showCheckbox={deleteMode}
                                                         selectedRequirementIds={selectedRequirementIds}
                                                         onToggleRequirement={toggleRequirementSelect}
+                                                        onMenuClick={(req) => { setEditRequirementData(req); setIsEditRequirementOpen(true); }}
                                                     />
                                                 </CriteriaSection>
                                             ))}
@@ -403,6 +442,73 @@ export default function EventPopup({
                 onLoadRequirementsByCriteria={onLoadRequirementsByCriteria}
                 onEditArea={onEditArea}
             />
+
+            {isEditAreaOpen && (
+                <EditAreaModal
+                    visible={isEditAreaOpen}
+                    onClose={() => setIsEditAreaOpen(false)}
+                    area={editAreaData}
+                    userRole={currentUser?.RoleID}
+                    onSave={async (updated) => {
+                        try {
+                            if (onEditArea) await onEditArea(updated.AreaID, updated);
+                        } catch (err) {
+                            console.error('Edit area save error', err);
+                        } finally {
+                            setIsEditAreaOpen(false);
+                        }
+                    }}
+                />
+            )}
+
+            {isEditCriteriaOpen && editCriteriaData && (
+                <EditCriteriaModal
+                    visible={isEditCriteriaOpen}
+                    onClose={() => setIsEditCriteriaOpen(false)}
+                    event={editCriteriaData}
+                    userRole={currentUser?.RoleID}
+                    onSave={async (updated) => {
+                        try {
+                            if (typeof onEditCriteria === 'function') {
+                                await onEditCriteria(updated.CriteriaID || editCriteriaData.CriteriaID, updated);
+                            }
+                        } catch (err) {
+                            console.error('Failed to save edited criteria', err);
+                        } finally {
+                            setIsEditCriteriaOpen(false);
+                        }
+                    }}
+                />
+            )}
+            {isEditRequirementOpen && editRequirementData && (
+                <EditRequirementsModal
+                    visible={isEditRequirementOpen}
+                    onClose={() => setIsEditRequirementOpen(false)}
+                    requirement={editRequirementData}
+                    userRole={currentUser?.RoleID}
+                    onSave={async (updated) => {
+                        try {
+                            const { requirementsAPI } = await import('../../utils/api');
+                            const response = await requirementsAPI.updateRequirement(updated.RequirementID, updated);
+                            if (response && response.success) {
+                                // Refresh requirements for the affected criteria (use provided prop if available)
+                                const criteriaId = updated.CriteriaID || editRequirementData.CriteriaID;
+                                if (typeof onLoadRequirementsByCriteria === 'function' && criteriaId) {
+                                    await onLoadRequirementsByCriteria(Number(criteriaId));
+                                }
+                            } else {
+                                alert(response?.message || 'Failed to save requirement');
+                            }
+                        } catch (err) {
+                            console.error('Failed saving requirement', err);
+                            alert(err?.message || 'An error occurred while saving requirement');
+                        } finally {
+                            setIsEditRequirementOpen(false);
+                        }
+                    }}
+                />
+            )}
         </div>
     );
 }
+

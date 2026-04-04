@@ -98,6 +98,12 @@ export const officeHeadsAPI = {
     }
   },
   getHeadById: async (id) => (await api.get(`/api/officeheads/${id}`)).data,
+  updateHead: async (id, formData) => {
+    const response = await api.put(`/api/officeheads/${id}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
   deleteHeads: async (headIds) => {
     try {
       return (await api.delete('/api/officeheads/delete', { data: { headIds } })).data;
@@ -197,6 +203,7 @@ export const usersAPI = {
       const params = officeId ? `?officeId=${officeId}` : '';
       return (await api.get(`/api/requirements/assigned-users/${requirementId}${params}`)).data;
     },
+    getMyAssignments: async () => (await api.get('/api/requirements/my-assignments')).data,
     removeUserAssignment: async (assignmentId) => 
       (await api.delete(`/api/requirements/assignment/${assignmentId}`)).data,
     getUserAssignmentCount: async (userId) => 
@@ -224,6 +231,27 @@ export const usersAPI = {
     createOffice: async (data) => (await api.post('/api/offices', data)).data,
     updateOffice: async (id, data) => (await api.put(`/api/offices/${id}`, data)).data,
     deleteOffice: async (id) => (await api.delete(`/api/offices/${id}`)).data,
+    getOfficeRequirements: async (officeId) => (await api.get(`/api/offices/${officeId}/requirements`)).data,
+    addOfficeRequirements: async (officeId, requirementIds) =>
+      (await api.post(`/api/offices/${officeId}/requirements`, { requirementIds })).data,
+    exportOfficeExcel: async (officeId, officeName = 'office') => {
+      const response = await api.get(`/api/offices/${officeId}/export`, {
+        responseType: 'blob'
+      });
+
+      const blobUrl = window.URL.createObjectURL(response.data);
+      const disposition = response.headers?.['content-disposition'] || '';
+      const matched = disposition.match(/filename="?([^";]+)"?/i);
+      const safeOfficeName = String(officeName || 'office')
+        .replace(/[\\/:*?"<>|]+/g, '_')
+        .replace(/\s+/g, '_')
+        .trim();
+
+      return {
+        url: blobUrl,
+        fileName: matched?.[1] || `${safeOfficeName || 'office'}_requirements.xlsx`
+      };
+    },
   };
 
   // ========================

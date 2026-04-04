@@ -1,6 +1,6 @@
 import { useRef, useEffect } from "react";
 
-export default function EventOptionsPopup({ onEdit, onCopy, onClose, anchorRef }) {
+export default function EventOptionsPopup({ onEdit, onCopy, onDelete, onClose, anchorRef }) {
     // Close popup if clicked outside
     const popupRef = useRef(null);
     useEffect(() => {
@@ -26,6 +26,12 @@ export default function EventOptionsPopup({ onEdit, onCopy, onClose, anchorRef }
                 onClick={() => { onCopy(); onClose(); }}
             >
                 Copy
+            </button>
+            <button
+                className="w-full text-left px-4 py-2 hover:bg-red-50 text-sm text-red-600"
+                onClick={() => { onDelete?.(); onClose(); }}
+            >
+                Delete
             </button>
         </div>
     );

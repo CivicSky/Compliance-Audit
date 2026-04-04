@@ -143,8 +143,8 @@ export default function AddCriteriaModal({ isOpen, onClose, onSuccess }) {
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl mx-4 my-8 min-h-[60vh] max-h-[85vh] overflow-y-auto ml-64">
+        <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out bg-black bg-opacity-50 flex items-center justify-center z-[120]">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl mx-4 my-8 min-h-[60vh] max-h-[85vh] overflow-y-auto">
                 <div className="flex items-center justify-between p-6 border-b sticky top-0 bg-white z-10">
                     <h2 className="text-xl font-semibold text-gray-800">Add New Criteria</h2>
                     <button

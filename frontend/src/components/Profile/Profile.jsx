@@ -12,7 +12,6 @@ export default function Profile() {
         const loadUser = async () => {
             try {
                 setLoading(true);
-                const response = await usersAPI.getLoggedInUser();
                 if (response.success) {
                     setUser(response.user);
                 }
@@ -41,7 +40,7 @@ export default function Profile() {
 
     if (loading) {
         return (
-            <div className="px-6 py-6 w-full bg-gray-50 min-h-screen">
+            <div className="px-6 pb-6 pt-6 w-full">
                 <Header pageTitle="Profile" showSearch={false} />
                 <div className="flex items-center justify-center min-h-[60vh]">
                     <div className="text-center">
@@ -55,7 +54,7 @@ export default function Profile() {
 
     if (!user) {
         return (
-            <div className="px-6 py-6 w-full bg-gray-50 min-h-screen">
+            <div className="px-6 pb-6 pt-6 w-full">
                 <Header pageTitle="Profile" showSearch={false} />
                 <div className="flex items-center justify-center min-h-[60vh]">
                     <div className="text-center">
@@ -96,10 +95,10 @@ export default function Profile() {
     };
 
     return (
-        <div className="px-6 py-6 w-full bg-gray-50 min-h-screen">
+        <div className="px-6 pb-6 pt-6 w-full">
             <Header pageTitle="Profile" showSearch={false} />
 
-            <div className="max-w-4xl mx-auto mt-6">
+            <div className="max-w-4xl mx-auto mt-6 px-8">
                 {/* Profile Header with Edit Button */}
                 <div className="flex justify-end mb-4">
                     <button
@@ -114,7 +113,7 @@ export default function Profile() {
                 </div>
 
                 {/* Profile Card */}
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="bg-white rounded-2xl shadow-sm border-4 border-gray-100 overflow-hidden">
                     {/* Cover Photo */}
                     <div className="h-32 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 relative">
                         {/* Profile Picture - Positioned to overlap cover and card */}

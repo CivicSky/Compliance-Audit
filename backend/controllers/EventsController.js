@@ -22,30 +22,8 @@ const copyEvent = async (req, res) => {
       [newEventName, newEventCode, newDescription || sourceEvent.Description || null]
     );
 
-    // Copy event folder
+    // Skipping creation of any folder for the copied event (no filesystem side-effects)
     const sanitize = sanitizeFolderName;
-    const srcFolder = path.join(__dirname, '..', 'uploads', 'events', sanitize(sourceEvent.EventName));
-    const destFolder = path.join(__dirname, '..', 'uploads', 'events', sanitize(newEventName));
-    if (fs.existsSync(srcFolder)) {
-      if (!fs.existsSync(destFolder)) {
-        fs.mkdirSync(destFolder, { recursive: true });
-      }
-      // Copy files and subfolders
-      const copyRecursive = (src, dest) => {
-        const entries = fs.readdirSync(src, { withFileTypes: true });
-        for (const entry of entries) {
-          const srcPath = path.join(src, entry.name);
-          const destPath = path.join(dest, entry.name);
-          if (entry.isDirectory()) {
-            if (!fs.existsSync(destPath)) fs.mkdirSync(destPath);
-            copyRecursive(srcPath, destPath);
-          } else {
-            fs.copyFileSync(srcPath, destPath);
-          }
-        }
-      };
-      copyRecursive(srcFolder, destFolder);
-    }
 
     // --- BEGIN: Copy Areas, Criteria, Requirements ---
     const newEventId = result.insertId;
@@ -93,17 +71,20 @@ const copyEvent = async (req, res) => {
     }
 
     // 3. Copy REQUIREMENTS with ParentRequirementCode remapping
-    const [requirements] = await db.query('SELECT * FROM requirements WHERE CriteriaID IN (?)', [Object.keys(criteriaIdMap)]);
-    for (const req of requirements) {
-      const newCriteriaId = req.CriteriaID ? criteriaIdMap[req.CriteriaID] : null;
-      try {
-        await db.query(
-          'INSERT INTO requirements (RequirementCode, Description, CriteriaID, ParentRequirementCode) VALUES (?, ?, ?, ?)',
-          [req.RequirementCode, req.Description, newCriteriaId, req.ParentRequirementCode]
-        );
-      } catch (err) {
-        console.error('Error inserting requirement:', err, req);
-        throw err;
+    const criteriaIds = Object.keys(criteriaIdMap);
+    if (criteriaIds.length > 0) {
+      const [requirements] = await db.query('SELECT * FROM requirements WHERE CriteriaID IN (?)', [criteriaIds]);
+      for (const req of requirements) {
+        const newCriteriaId = req.CriteriaID ? criteriaIdMap[req.CriteriaID] : null;
+        try {
+          await db.query(
+            'INSERT INTO requirements (RequirementCode, Description, CriteriaID, ParentRequirementCode) VALUES (?, ?, ?, ?)',
+            [req.RequirementCode, req.Description, newCriteriaId, req.ParentRequirementCode]
+          );
+        } catch (err) {
+          console.error('Error inserting requirement:', err, req);
+          throw err;
+        }
       }
     }
     // --- END: Copy Areas, Criteria, Requirements ---
@@ -119,6 +100,17 @@ const copyEvent = async (req, res) => {
         FolderPath: sanitize(newEventName)
       }
     });
+    if (req.user && req.user.userId) {
+      try {
+        recordLog(req.user.userId, 'EventCopied', {
+          sourceEventId: sourceEvent.EventID,
+          sourceEventName: sourceEvent.EventName,
+          newEventId,
+          newEventName,
+          newEventCode
+        });
+      } catch (e) {}
+    }
   } catch (error) {
     console.error('Error copying event:', error);
     res.status(500).json({ success: false, message: 'Error copying event' });
@@ -128,6 +120,7 @@ const db = require('../db');
 const fs = require('fs');
 const path = require('path');
 const archiver = require('archiver');
+const { recordLog } = require('./logsController');
 
 // Get all events
 const getAllEvents = async (req, res) => {
@@ -148,7 +141,13 @@ const getAllEvents = async (req, res) => {
 
 // Helper function to sanitize folder name (remove invalid characters)
 const sanitizeFolderName = (name) => {
-  return name.replace(/[<>:"/\\|?*]/g, '_').trim();
+  if (!name) return '';
+  // Replace any non-alphanumeric character with underscore, collapse multiple underscores, trim edges
+  return name
+    .replace(/[^A-Za-z0-9.-]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .trim();
 };
 
 // Add new event
@@ -197,6 +196,11 @@ const addEvent = async (req, res) => {
         FolderPath: sanitizedName
       }
     });
+    if (req.user && req.user.userId) {
+      try {
+        recordLog(req.user.userId, 'EventAdded', { EventID: result.insertId, EventName, EventCode });
+      } catch (e) {}
+    }
   } catch (error) {
     console.error('Error adding event:', error);
     res.status(500).json({
@@ -219,17 +223,24 @@ const deleteEvents = async (req, res) => {
     }
 
     // Delete events
-    const placeholders = eventIds.map(() => '?').join(',');
-    const [result] = await db.query(
-      `DELETE FROM Events WHERE EventID IN (${placeholders})`,
-      eventIds
-    );
+      const placeholders = eventIds.map(() => '?').join(',');
+      // Fetch names for logging before deletion
+      const [toDeleteRows] = await db.query(`SELECT EventID, EventName FROM Events WHERE EventID IN (${placeholders})`, eventIds);
+      const deletedNames = toDeleteRows.map(r => r.EventName);
+
+      const [result] = await db.query(
+        `DELETE FROM Events WHERE EventID IN (${placeholders})`,
+        eventIds
+      );
 
     res.json({
       success: true,
       message: `${result.affectedRows} event(s) deleted successfully`,
       deletedCount: result.affectedRows
     });
+    if (req.user && req.user.userId) {
+      try { recordLog(req.user.userId, 'EventDeleted', { eventIds, deletedNames }); } catch (e) {}
+    }
   } catch (error) {
     console.error('Error deleting events:', error);
     res.status(500).json({
@@ -243,7 +254,10 @@ const deleteEvents = async (req, res) => {
 const updateEvent = async (req, res) => {
   try {
     const { id } = req.params;
-    const { EventName, EventCode, Description } = req.body;
+    const { EventName, EventCode, Description, status } = req.body;
+
+    // Debug logging
+    console.log('updateEvent called with:', { id, EventName, EventCode, Description });
 
     // Validate required fields
     if (!EventName || !EventCode) {
@@ -253,19 +267,72 @@ const updateEvent = async (req, res) => {
       });
     }
 
-    // Update event
+    // Fetch existing event to determine if folder rename is needed
+    let existingEventName = null;
+    try {
+      const [existingRows] = await db.query('SELECT EventName FROM Events WHERE EventID = ?', [id]);
+      if (existingRows && existingRows.length > 0) {
+        existingEventName = existingRows[0].EventName;
+      }
+    } catch (err) {
+      console.warn('Could not fetch existing event name for folder rename check:', err.message || err);
+    }
+
+    // Update event, including status (do not touch CreatedAt)
     const [result] = await db.query(
-      'UPDATE Events SET EventName = ?, EventCode = ?, Description = ? WHERE EventID = ?',
-      [EventName, EventCode, Description || null, id]
+      'UPDATE Events SET EventName = ?, EventCode = ?, Description = ?, status = ? WHERE EventID = ?',
+      [EventName, EventCode, Description || null, status, id]
     );
 
     if (result.affectedRows === 0) {
+      console.log('No event found with id:', id);
       return res.status(404).json({
         success: false,
         message: 'Event not found'
       });
     }
 
+    console.log('Event updated successfully for id:', id);
+    if (req.user && req.user.userId) {
+      try { recordLog(req.user.userId, 'EventUpdated', { EventID: id, EventName, EventCode }); } catch (e) {}
+    }
+    // If the event name changed, attempt to rename its uploads folder to match new sanitized name
+    try {
+      if (existingEventName && existingEventName !== EventName) {
+        const eventsBasePath = path.join(__dirname, '..', 'uploads', 'events');
+        const oldSan = sanitizeFolderName(existingEventName);
+        const newSan = sanitizeFolderName(EventName);
+
+        // Locate actual old folder: try exact, then match by sanitized entry names
+        let oldFolderPath = path.join(eventsBasePath, oldSan);
+        if (!fs.existsSync(oldFolderPath)) {
+          try {
+            const entries = fs.readdirSync(eventsBasePath, { withFileTypes: true });
+            const matched = entries.find(entry => entry.isDirectory() && sanitizeFolderName(entry.name) === oldSan);
+            if (matched) oldFolderPath = path.join(eventsBasePath, matched.name);
+          } catch (err) {
+            // ignore
+          }
+        }
+
+        const newFolderPath = path.join(eventsBasePath, newSan);
+
+        if (fs.existsSync(oldFolderPath) && fs.statSync(oldFolderPath).isDirectory()) {
+          if (!fs.existsSync(newFolderPath)) {
+            try {
+              fs.renameSync(oldFolderPath, newFolderPath);
+              console.log(`Renamed event folder: ${oldFolderPath} -> ${newFolderPath}`);
+            } catch (err) {
+              console.warn('Failed to rename event folder:', err.message || err);
+            }
+          } else {
+            console.warn('Destination folder already exists, skipping rename:', newFolderPath);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Error while attempting to rename event folder:', err.message || err);
+    }
     res.json({
       success: true,
       message: 'Event updated successfully',
@@ -273,7 +340,8 @@ const updateEvent = async (req, res) => {
         EventID: parseInt(id),
         EventName,
         EventCode,
-        Description
+        Description,
+        status
       }
     });
   } catch (error) {
@@ -331,9 +399,25 @@ const downloadEventZip = async (req, res) => {
 
     // Sanitize the event name to match folder name
     const sanitizedName = sanitizeFolderName(eventName);
-    const eventFolderPath = path.join(__dirname, '..', 'uploads', 'events', sanitizedName);
+    const eventsBasePath = path.join(__dirname, '..', 'uploads', 'events');
 
-    // Check if folder exists
+    // First try exact sanitized folder name
+    let eventFolderPath = path.join(eventsBasePath, sanitizedName);
+
+    // If exact folder doesn't exist, try to find a folder whose sanitized form matches
+    if (!fs.existsSync(eventFolderPath)) {
+      try {
+        const entries = fs.readdirSync(eventsBasePath, { withFileTypes: true });
+        const matched = entries.find(entry => entry.isDirectory() && sanitizeFolderName(entry.name) === sanitizedName);
+        if (matched) {
+          eventFolderPath = path.join(eventsBasePath, matched.name);
+        }
+      } catch (err) {
+        // ignore and proceed to not-found below
+      }
+    }
+
+    // Check if folder exists after matching attempt
     if (!fs.existsSync(eventFolderPath)) {
       return res.status(404).json({
         success: false,

@@ -126,20 +126,12 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, use
 
   const validateForm = () => {
     const newErrors = {};
-    
-    if (!formData.EventID) {
-      newErrors.EventID = 'Event is required';
-    }
     if (!formData.RequirementCode.trim()) {
       newErrors.RequirementCode = 'Requirement code is required';
     }
     if (!formData.Description.trim()) {
       newErrors.Description = 'Description is required';
     }
-    if (!formData.CriteriaID) {
-      newErrors.CriteriaID = 'Criteria is required';
-    }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -176,7 +168,7 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, use
   if (!visible) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out bg-black bg-opacity-50 flex items-center justify-center z-[120]">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 min-h-[70vh] max-h-[95vh] flex flex-col">
         {/* Header - Sticky */}
         <div className="flex items-center justify-between p-6 border-b sticky top-0 bg-white z-10 rounded-t-lg">
@@ -195,64 +187,7 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, use
         {/* Form - Scrollable */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
           <div className="p-6">
-            {/* Event Dropdown */}
-            <div className="mb-4">
-              <label htmlFor="EventID" className="block text-sm font-medium text-gray-700 mb-1">
-                Event *
-              </label>
-              <select
-                id="EventID"
-                name="EventID"
-                value={formData.EventID}
-                onChange={handleInputChange}
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  errors.EventID ? 'border-red-500' : 'border-gray-300'
-                }`}
-                disabled={isSubmitting || !isAdmin}
-              >
-                <option value="">Select an event</option>
-                {eventsList.map((event) => (
-                  <option key={event.EventID} value={event.EventID}>
-                    {event.EventCode} - {event.EventName}
-                  </option>
-                ))}
-              </select>
-              {errors.EventID && (
-                <p className="text-red-500 text-sm mt-1">{errors.EventID}</p>
-              )}
-            </div>
 
-            {/* Criteria Dropdown */}
-            <div className="mb-4">
-              <label htmlFor="CriteriaID" className="block text-sm font-medium text-gray-700 mb-1">
-                Criteria *
-              </label>
-              <select
-                id="CriteriaID"
-                name="CriteriaID"
-                value={formData.CriteriaID}
-                onChange={handleInputChange}
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  errors.CriteriaID ? 'border-red-500' : 'border-gray-300'
-                }`}
-                disabled={isSubmitting || isLoading || !formData.EventID || !isAdmin}
-              >
-                <option value="">
-                  {!formData.EventID ? 'Select an event first' : 'Select a criteria'}
-                </option>
-                {criteriaList.map((criteria) => (
-                  <option key={criteria.CriteriaID} value={criteria.CriteriaID}>
-                    {criteria.CriteriaCode} - {criteria.CriteriaName}
-                  </option>
-                ))}
-              </select>
-              {errors.CriteriaID && (
-                <p className="text-red-500 text-sm mt-1">{errors.CriteriaID}</p>
-              )}
-              {isLoading && (
-                <p className="text-gray-500 text-sm mt-1">Loading criteria...</p>
-              )}
-            </div>
 
             {/* Parent Requirement Dropdown */}
             <div className="mb-4">
@@ -386,3 +321,4 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, use
 };
 
 export default EditRequirementsModal;
+

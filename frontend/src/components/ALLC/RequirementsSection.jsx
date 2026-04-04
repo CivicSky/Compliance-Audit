@@ -5,7 +5,8 @@ export default function RequirementsSection({
     isLoading = false,
     showCheckbox = false,
     selectedRequirementIds = new Set(),
-    onToggleRequirement
+    onToggleRequirement,
+    onMenuClick
 }) {
     if (isLoading) {
         return <p className="text-gray-500 text-sm ml-4 my-2">Loading requirements...</p>;
@@ -27,6 +28,7 @@ export default function RequirementsSection({
                             showCheckbox={showCheckbox}
                             isChecked={selectedRequirementIds.has(Number(req.RequirementID))}
                             onToggleSelect={(checked) => onToggleRequirement?.(req, checked)}
+                            onMenuClick={onMenuClick}
                         />
                     </div>
                 ))}

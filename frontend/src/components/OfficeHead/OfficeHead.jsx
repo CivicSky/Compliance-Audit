@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import Header from "../Header/header"
 import OfficeHeadP from "../OfficeHeadP/OfficeHeadP";
 import AddOfficeHeadModal from "../AddHead/AddOfficeHeadModal";
+import Sortoffice from "./sorthead";
 import { usersAPI } from "../../utils/api";
 
 export default function Home() {
@@ -13,6 +14,7 @@ export default function Home() {
     const [selectedIds, setSelectedIds] = useState([]);
     const [currentUser, setCurrentUser] = useState(null);
     const officePRef = useRef();
+    const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
 
     // Fetch current user on mount
     useEffect(() => {
@@ -40,6 +42,16 @@ export default function Home() {
             setSelectedCount(0);
             setSelectedIds([]);
             setIsModalOpen(false);
+        };
+    }, []);
+
+    // Keep page chrome fixed; list scrolling happens inside the content panel.
+    useEffect(() => {
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+
+        return () => {
+            document.body.style.overflow = previousOverflow;
         };
     }, []);
 
@@ -109,29 +121,145 @@ export default function Home() {
     };
 
     return (
-        <div className="px-6 pb-6 pt-6 w-full">
-            <Header 
-                pageTitle="Office Personnel" 
-                onAddClick={() => setIsModalOpen(true)}
-                onSearchChange={handleSearchChange}
-                searchValue={searchTerm}
-                onSortChange={handleSortChange}
-                sortValue={sortType}
-                onDeleteModeToggle={handleDeleteModeToggle}
-                deleteMode={deleteMode}
-                selectedCount={selectedCount}
-                onDeleteSelected={handleDeleteSelected}
-                userRole={currentUser?.RoleID}
-            />
+        <div className="h-screen w-full flex flex-col overflow-hidden">
+            <Header />
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden px-4 pb-6 pt-6">
+            <div className="mb-4 flex flex-col gap-2 relative">
+                <div className="flex items-start justify-between gap-2">
+                    <div>
+                        <h1 className="text-2xl font-bold text-gray-800 mb-1">Office Personnel & Compliance</h1>
+                        <p className="text-xs text-gray-600 ">{deleteMode ? '\u00A0' : 'Manage personnel assignments.'}</p>
+                    </div>
 
-            <div className="relative z-10">
+                    <div className="flex items-center gap-1 pt-0.5">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (deleteMode) {
+                                    setDeleteMode(false);
+                                    setSelectedCount(0);
+                                    setSelectedIds([]);
+                                    return;
+                                }
+                                setDeleteMode(true);
+                                setSelectedCount(0);
+                                setSelectedIds([]);
+                            }}
+                            className={`inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-red-400 ${
+                                deleteMode
+                                    ? 'border-red-300 bg-red-100 text-red-700 hover:bg-red-200'
+                                    : 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100'
+                            }`}
+                        >
+                            {deleteMode ? 'Cancel Delete' : 'Delete'}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setIsModalOpen(true)}
+                            className="inline-flex h-8 items-center gap-1 rounded-lg bg-emerald-600 px-3 text-[11px] font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        >
+                            <span className="text-sm leading-none">+</span>
+                            Add
+                        </button>
+                    </div>
+                </div>
+
+                <div className="flex w-full items-center justify-between gap-1">
+                    <div className="relative w-full max-w-sm">
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
+                            >
+                                <circle cx="11" cy="11" r="7" />
+                                <path d="m20 20-3.5-3.5" />
+                            </svg>
+                            <input
+                                type="text"
+                                placeholder="Search personnel, office, or email..."
+                                className="h-9 w-full rounded-lg border border-slate-200 bg-white pl-8 pr-3 text-[9px] text-slate-700 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                value={searchTerm}
+                                onChange={e => setSearchTerm(e.target.value)}
+                            />
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                        <div className="relative inline-block">
+                            <Sortoffice value={sortType} onChange={setSortType} />
+                        </div>
+
+                        <div className="flex h-9 items-center justify-end gap-1">
+                            <div className="flex h-7 items-center gap-0.5 rounded-md border border-slate-200 bg-slate-100 p-0.5">
+                                <button
+                                    onClick={() => setViewMode('grid')}
+                                    className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
+                                        viewMode === 'grid'
+                                            ? 'bg-white text-indigo-600'
+                                            : 'text-gray-500 hover:text-gray-700'
+                                    }`}
+                                    title="Grid View"
+                                >
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                                    </svg>
+                                </button>
+                                <button
+                                    onClick={() => setViewMode('list')}
+                                    className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
+                                        viewMode === 'list'
+                                            ? 'bg-white text-indigo-600'
+                                            : 'text-gray-500 hover:text-gray-700'
+                                    }`}
+                                    title="List View"
+                                >
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {deleteMode && (
+                    <div style={{ position: 'absolute', left: -9, bottom: -9 }} className="flex items-center gap-2 rounded px-3 py-2">
+                        <button
+                            onClick={() => { setDeleteMode(false); }}
+                            className="px-3 py-2 rounded border-2 border-gray-200 text-gray-700 hover:bg-gray-100"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={async () => {
+                                const confirmed = window.confirm(`Delete ${selectedCount} selected item(s)? This cannot be undone.`);
+                                if (!confirmed) return;
+                                try {
+                                    await handleDeleteSelected();
+                                } catch (err) {
+                                    console.error(err);
+                                }
+                            }}
+                            className={`px-3 py-2 rounded bg-red-600 text-white hover:bg-red-700 ${selectedCount === 0 ? 'opacity-60 cursor-not-allowed' : ''}`}
+                            disabled={selectedCount === 0}
+                        >
+                            Delete Selected ({selectedCount})
+                        </button>
+                    </div>
+                )}
+            </div>
+
+            <div className={`relative z-10 flex-1 min-h-0 ${viewMode === 'list' ? 'overflow-y-auto pr-1' : 'overflow-hidden'}`}>
                 <OfficeHeadP 
                     ref={officePRef} 
                     searchTerm={searchTerm} 
                     sortType={sortType}
                     deleteMode={deleteMode}
+                    viewMode={viewMode}
                     onSelectionChange={handleSelectionChange}
                 />
+            </div>
             </div>
 
             {/* Modal */}

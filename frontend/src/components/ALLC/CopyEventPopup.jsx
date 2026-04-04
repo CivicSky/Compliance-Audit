@@ -15,7 +15,7 @@ export default function CopyEventPopup({
 	if (!open) return null;
 
 	return (
-		<div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+		<div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out z-[120] flex items-center justify-center bg-black bg-opacity-40">
 			<div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
 				<h2 className="text-xl font-bold mb-4">Copy Event</h2>
 				<div className="mb-3">
@@ -63,3 +63,4 @@ export default function CopyEventPopup({
 		</div>
 	);
 }
+

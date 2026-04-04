@@ -20,7 +20,9 @@ const deleteCriteria = async (req, res) => {
       criteriaIds
     );
 
-    await recordLog(req.user?.userId, 'Criteria deleted', `IDs: ${criteriaIds.join(', ')}`);
+    if (req.user && req.user.userId) {
+        try { recordLog(req.user.userId, 'Criteria deleted', { criteriaIds }); } catch (e) {}
+    }
 
     res.json({
       success: true,
