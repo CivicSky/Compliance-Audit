@@ -323,11 +323,29 @@ export default function Organization() {
                 <div className="flex items-start justify-between gap-2">
                     <div>
                         <h1 className="text-2xl font-bold text-gray-800 mb-1">Office Operations</h1>
-                        <p className="text-xs text-gray-600 ">{deleteMode ? '\u00A0' : 'Monitor office compliance, assignments, and requirement progress.'}</p>
+                        <p className="text-xs text-gray-600 ">Monitor office compliance, assignments, and requirement progress.</p>
                     </div>
 
                     {isAdmin && (
                     <div className="flex items-center gap-1 pt-0.5">
+                        {deleteMode && (
+                            <button
+                                onClick={async () => {
+                                    const confirmed = window.confirm(`Delete ${selectedCount} selected office record(s)? This cannot be undone.`);
+                                    if (!confirmed) return;
+                                    try {
+                                        await handleDeleteSelected();
+                                    } catch (err) {
+                                        console.error(err);
+                                    }
+                                }}
+                                className={`ml-2 inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-red-400 bg-red-600 text-white hover:bg-red-700 ${selectedCount === 0 ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                disabled={selectedCount === 0}
+                            >
+                                Delete Offices ({selectedCount})
+                            </button>
+                        )}
+
                         <button
                             type="button"
                             onClick={() => {
@@ -349,6 +367,7 @@ export default function Organization() {
                         >
                             {deleteMode ? 'Cancel Delete' : 'Delete'}
                         </button>
+
                         <button
                             type="button"
                             onClick={() => setIsModalOpen(true)}
@@ -421,31 +440,7 @@ export default function Organization() {
                     </div>
                 </div>
 
-                {isAdmin && deleteMode && (
-                    <div style={{ position: 'absolute', left: -9, bottom: -9 }} className="flex items-center gap-2 rounded px-3 py-2">
-                        <button
-                            onClick={() => { setDeleteMode(false); }}
-                            className="px-3 py-2 rounded border-2 border-gray-200 text-gray-700 hover:bg-gray-100"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={async () => {
-                                const confirmed = window.confirm(`Delete ${selectedCount} selected office record(s)? This cannot be undone.`);
-                                if (!confirmed) return;
-                                try {
-                                    await handleDeleteSelected();
-                                } catch (err) {
-                                    console.error(err);
-                                }
-                            }}
-                            className={`px-3 py-2 rounded bg-red-600 text-white hover:bg-red-700 ${selectedCount === 0 ? 'opacity-60 cursor-not-allowed' : ''}`}
-                            disabled={selectedCount === 0}
-                        >
-                            Delete Offices ({selectedCount})
-                        </button>
-                    </div>
-                )}
+                
                 </div>
 
             {/* Add Office button removed per request */}

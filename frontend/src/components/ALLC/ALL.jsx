@@ -580,11 +580,42 @@ function ALL() {
                 <div className="flex items-start justify-between gap-2">
                     <div>
                         <h1 className="text-2xl font-bold text-gray-800 mb-1">Compliance Standards</h1>
-                        <p className="text-xs text-gray-600 ">{deleteMode ? '\u00A0' : 'Manage event structures, criteria, and requirement flows.'}</p>
+                        <p className="text-xs text-gray-600 ">Manage event structures, criteria, and requirement flows.</p>
                     </div>
 
                     {isAdmin && (
                     <div className="flex items-center gap-1 pt-0.5">
+                        {deleteMode && (
+                            <button
+                                onClick={async () => {
+                                    const ids = Array.from(selectedEventIdsForDelete).map(Number).filter(Boolean);
+                                    if (ids.length === 0) return alert('Select at least one standard to delete.');
+                                    const confirmed = window.confirm(`Delete ${ids.length} selected standard(s)? This cannot be undone.`);
+                                    if (!confirmed) return;
+                                    try {
+                                        const { eventsAPI } = await import('../../utils/api');
+                                        const resp = await eventsAPI.deleteEvents(ids);
+                                        if (resp && resp.success) {
+                                            alert(resp.message || 'Selected standards deleted.');
+                                            await fetchEvents();
+                                        } else {
+                                            alert(resp?.message || 'Failed to delete selected standards.');
+                                        }
+                                    } catch (err) {
+                                        console.error('Delete events error', err);
+                                        alert(err?.message || 'Error deleting selected standards.');
+                                    } finally {
+                                        setDeleteMode(false);
+                                        setSelectedEventIdsForDelete(new Set());
+                                    }
+                                }}
+                                className={`ml-2 inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-red-400 bg-red-600 text-white hover:bg-red-700 ${selectedEventIdsForDelete.size === 0 ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                disabled={selectedEventIdsForDelete.size === 0}
+                            >
+                                Delete Selected ({selectedEventIdsForDelete.size})
+                            </button>
+                        )}
+
                         <button
                             type="button"
                             onClick={() => {
@@ -604,6 +635,7 @@ function ALL() {
                         >
                             {deleteMode ? 'Cancel Delete' : 'Delete'}
                         </button>
+
                         <button
                             type="button"
                             onClick={() => setIsAddEventOpen(true)}
@@ -646,47 +678,7 @@ function ALL() {
                         </div>
                     </div>
                 </div>
-                {isAdmin && deleteMode && (
-                    <div style={{ position: 'absolute', left: -9, bottom: -9 }} className="flex items-center gap-2 rounded px-3 py-2">
-                        <button
-                            onClick={() => { setDeleteMode(false); setSelectedEventIdsForDelete(new Set()); }}
-                            className="px-3 py-2 rounded border-2 border-gray-200 text-gray-700 hover:bg-gray-100"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={async () => {
-                                const ids = Array.from(selectedEventIdsForDelete).map(Number).filter(Boolean);
-                                if (ids.length === 0) {
-                                    alert('Select at least one standard to delete.');
-                                    return;
-                                }
-                                const confirmed = window.confirm(`Delete ${ids.length} selected standard(s)? This cannot be undone.`);
-                                if (!confirmed) return;
-                                try {
-                                    const { eventsAPI } = await import('../../utils/api');
-                                    const resp = await eventsAPI.deleteEvents(ids);
-                                    if (resp && resp.success) {
-                                        alert(resp.message || 'Selected standards deleted.');
-                                        await fetchEvents();
-                                    } else {
-                                        alert(resp?.message || 'Failed to delete selected standards.');
-                                    }
-                                } catch (err) {
-                                    console.error('Delete events error', err);
-                                    alert(err?.message || 'Error deleting selected standards.');
-                                } finally {
-                                    setDeleteMode(false);
-                                    setSelectedEventIdsForDelete(new Set());
-                                }
-                            }}
-                            className={`px-3 py-2 rounded bg-red-600 text-white hover:bg-red-700 ${selectedEventIdsForDelete.size === 0 ? 'opacity-60 cursor-not-allowed' : ''}`}
-                            disabled={selectedEventIdsForDelete.size === 0}
-                        >
-                            Delete Selected ({selectedEventIdsForDelete.size})
-                        </button>
-                    </div>
-                )}
+                
             </div>
 
             {/* Events Grid 2x2 */}

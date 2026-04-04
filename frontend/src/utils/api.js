@@ -235,13 +235,10 @@ export const usersAPI = {
     addOfficeRequirements: async (officeId, requirementIds) =>
       (await api.post(`/api/offices/${officeId}/requirements`, { requirementIds })).data,
     exportOfficeExcel: async (officeId, officeName = 'office') => {
-      const response = await api.get(`/api/offices/${officeId}/export`, {
-        responseType: 'blob'
-      });
-
+      const response = await api.get(`/api/offices/${officeId}/export`, { responseType: 'blob' });
       const blobUrl = window.URL.createObjectURL(response.data);
       const disposition = response.headers?.['content-disposition'] || '';
-      const matched = disposition.match(/filename="?([^";]+)"?/i);
+      const nameMatch = disposition.match(/filename="?([^";]+)"?/i);
       const safeOfficeName = String(officeName || 'office')
         .replace(/[\\/:*?"<>|]+/g, '_')
         .replace(/\s+/g, '_')
@@ -249,7 +246,7 @@ export const usersAPI = {
 
       return {
         url: blobUrl,
-        fileName: matched?.[1] || `${safeOfficeName || 'office'}_requirements.xlsx`
+        fileName: nameMatch?.[1] || `${safeOfficeName || 'office'}_export.xlsx`
       };
     },
   };

@@ -128,10 +128,29 @@ export default function Home() {
                 <div className="flex items-start justify-between gap-2">
                     <div>
                         <h1 className="text-2xl font-bold text-gray-800 mb-1">Office Personnel & Compliance</h1>
-                        <p className="text-xs text-gray-600 ">{deleteMode ? '\u00A0' : 'Manage personnel assignments.'}</p>
+                        <p className="text-xs text-gray-600 ">Manage personnel assignments.</p>
                     </div>
 
                     <div className="flex items-center gap-1 pt-0.5">
+                        {deleteMode && (
+                            <button
+                                onClick={async () => {
+                                    if (selectedCount === 0) return;
+                                    const confirmed = window.confirm(`Delete ${selectedCount} selected item(s)? This cannot be undone.`);
+                                    if (!confirmed) return;
+                                    try {
+                                        await handleDeleteSelected();
+                                    } catch (err) {
+                                        console.error(err);
+                                    }
+                                }}
+                                className={`ml-2 inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-red-400 bg-red-600 text-white hover:bg-red-700 ${selectedCount === 0 ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                disabled={selectedCount === 0}
+                            >
+                                Delete Selected ({selectedCount})
+                            </button>
+                        )}
+
                         <button
                             type="button"
                             onClick={() => {
@@ -223,31 +242,7 @@ export default function Home() {
                         </div>
                     </div>
                 </div>
-                {deleteMode && (
-                    <div style={{ position: 'absolute', left: -9, bottom: -9 }} className="flex items-center gap-2 rounded px-3 py-2">
-                        <button
-                            onClick={() => { setDeleteMode(false); }}
-                            className="px-3 py-2 rounded border-2 border-gray-200 text-gray-700 hover:bg-gray-100"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={async () => {
-                                const confirmed = window.confirm(`Delete ${selectedCount} selected item(s)? This cannot be undone.`);
-                                if (!confirmed) return;
-                                try {
-                                    await handleDeleteSelected();
-                                } catch (err) {
-                                    console.error(err);
-                                }
-                            }}
-                            className={`px-3 py-2 rounded bg-red-600 text-white hover:bg-red-700 ${selectedCount === 0 ? 'opacity-60 cursor-not-allowed' : ''}`}
-                            disabled={selectedCount === 0}
-                        >
-                            Delete Selected ({selectedCount})
-                        </button>
-                    </div>
-                )}
+                
             </div>
 
             <div className={`relative z-10 flex-1 min-h-0 ${viewMode === 'list' ? 'overflow-y-auto pr-1' : 'overflow-hidden'}`}>

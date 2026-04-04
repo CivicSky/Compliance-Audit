@@ -4,16 +4,17 @@ const { recordLog } = require('./logsController');
 const { createNotifications } = require('../utils/notificationService');
 const MAX_HEADS_PER_OFFICE = 4;
 
-const normalizeStatusName = (statusId, statusName) => {
-  const normalizedName = String(statusName || '').trim().toLowerCase();
-  if (normalizedName.includes('partial')) return 'Partially Compiled';
-  if (normalizedName.includes('not')) return 'Not Compiled';
-  if (normalizedName.includes('compil') || normalizedName.includes('compli')) return 'Compiled';
-  const value = Number(statusId);
-  if (value === 5) return 'Compiled';
-  if (value === 4) return 'Partially Compiled';
-  if (value === 3) return 'Not Compiled';
-  return 'Unknown';
+const normalizeComplianceStatus = (statusId, statusName) => {
+  const id = Number(statusId);
+  if (id === 5) return 'Compiled';
+  if (id === 4) return 'Partially Compiled';
+  if (id === 3) return 'Not Compiled';
+
+  const normalized = String(statusName || '').trim().toLowerCase();
+  if (normalized.includes('partial')) return 'Partially Compiled';
+  if (normalized.includes('not')) return 'Not Compiled';
+  if (normalized.includes('comp')) return 'Compiled';
+  return 'Not Compiled';
 };
 
 const normalizeHeadIds = (headIds, headId) => {
@@ -670,7 +671,7 @@ const OfficesController = {
   },
 
   // ================================
-  // EXPORT OFFICE REQUIREMENTS TO EXCEL
+  // EXPORT OFFICE REQUIREMENTS (EXCEL TABLE FORMAT)
   // ================================
   exportOfficeExcel: async (req, res) => {
     const officeId = Number(req.params.id);
@@ -681,10 +682,8 @@ const OfficesController = {
 
     try {
       const [officeRows] = await db.query(
-        `SELECT o.OfficeID, o.OfficeName, e.EventName, e.EventCode, ot.TypeName AS OfficeTypeName
+        `SELECT o.OfficeID, o.OfficeName
          FROM offices o
-         LEFT JOIN events e ON o.EventID = e.EventID
-         LEFT JOIN officetypes ot ON o.OfficeTypeID = ot.OfficeTypeID
          WHERE o.OfficeID = ?
          LIMIT 1`,
         [officeId]
@@ -694,32 +693,33 @@ const OfficesController = {
         return res.status(404).json({ success: false, message: 'Office not found' });
       }
 
-      const office = officeRows[0];
+      const officeName = officeRows[0].OfficeName || `Office ${officeId}`;
 
-      const [rows] = await db.query(
+      const [requirementsRows] = await db.query(
         `SELECT
-           r.RequirementID,
-           r.RequirementCode,
-           r.Description,
-           c.CriteriaID,
-           c.CriteriaCode,
-           c.CriteriaName,
-           a.AreaID,
-           a.AreaCode,
-           a.AreaName,
-           cso.Status AS ComplianceStatusID,
-           cst.StatusName AS ComplianceStatusName
-         FROM compliancestatusoffices cso
-         INNER JOIN requirements r ON cso.RequirementID = r.RequirementID
-         LEFT JOIN criteria c ON r.CriteriaID = c.CriteriaID
-         LEFT JOIN areas a ON c.AreaID = a.AreaID
-         LEFT JOIN compliancestatustypes cst ON cso.Status = cst.StatusID
-         WHERE cso.OfficeID = ?
-         ORDER BY
-           COALESCE(a.AreaCode, 'ZZZ') ASC,
-           COALESCE(c.CriteriaCode, 'ZZZ') ASC,
-           COALESCE(r.RequirementCode, 'ZZZ') ASC,
-           r.RequirementID ASC`,
+          r.RequirementID,
+          r.RequirementCode,
+          r.Description,
+          c.CriteriaID,
+          c.CriteriaCode,
+          c.CriteriaName,
+          a.AreaID,
+          a.AreaCode,
+          a.AreaName,
+          cso.Status AS ComplianceStatusID,
+          cst.StatusName AS ComplianceStatusName
+        FROM compliancestatusoffices cso
+        INNER JOIN requirements r ON cso.RequirementID = r.RequirementID
+        LEFT JOIN criteria c ON r.CriteriaID = c.CriteriaID
+        LEFT JOIN areas a ON c.AreaID = a.AreaID
+        LEFT JOIN compliancestatustypes cst ON cso.Status = cst.StatusID
+        WHERE cso.OfficeID = ?
+        ORDER BY
+          COALESCE(a.AreaCode, 'ZZZ') ASC,
+          COALESCE(a.AreaName, 'ZZZ') ASC,
+          COALESCE(c.CriteriaCode, 'ZZZ') ASC,
+          COALESCE(r.RequirementCode, 'ZZZ') ASC,
+          r.RequirementID ASC`,
         [officeId]
       );
 
@@ -729,108 +729,146 @@ const OfficesController = {
 
       const sheet = workbook.addWorksheet('Office Export');
       sheet.columns = [
-        { key: 'A', width: 24 },
-        { key: 'B', width: 72 },
+        { key: 'status', width: 24 },
+        { key: 'requirement', width: 72 },
       ];
 
-      const setCellBorder = (cell, border = {}) => {
-        const thin = { style: 'thin', color: { argb: 'FF000000' } };
-        cell.border = {
-          top: border.top || thin,
-          left: border.left || thin,
-          right: border.right || thin,
-          bottom: border.bottom || thin,
-        };
+      const thinBorder = {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' },
       };
 
-      const setMergedRowBorder = (rowNumber) => {
-        setCellBorder(sheet.getCell(`A${rowNumber}`));
+      const areaHeaderStyle = {
+        font: { bold: true, size: 13 },
+        alignment: { horizontal: 'center', vertical: 'middle' },
       };
 
-      const setDataRowBorder = (rowNumber) => {
-        setCellBorder(sheet.getCell(`A${rowNumber}`));
-        setCellBorder(sheet.getCell(`B${rowNumber}`));
+      const criteriaHeaderStyle = {
+        font: { bold: true, size: 12 },
+        alignment: { horizontal: 'left', vertical: 'middle' },
       };
 
       let rowIndex = 1;
+
+      // Header: OFFICE NAME (merged and bordered)
       sheet.mergeCells(`A${rowIndex}:B${rowIndex}`);
-      sheet.getCell(`A${rowIndex}`).value = `${office.OfficeName || 'OFFICE NAME'}`;
-      sheet.getCell(`A${rowIndex}`).font = { bold: true, size: 16 };
-      sheet.getCell(`A${rowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' };
-      sheet.getRow(rowIndex).height = 24;
-      setMergedRowBorder(rowIndex);
+      const officeCell = sheet.getCell(`A${rowIndex}`);
+      officeCell.value = String(officeName).toUpperCase();
+      officeCell.font = { bold: true, size: 14 };
+      officeCell.alignment = { horizontal: 'center', vertical: 'middle' };
+      officeCell.border = thinBorder;
+      sheet.getCell(`B${rowIndex}`).border = thinBorder;
       rowIndex += 1;
 
-      rowIndex += 1;
-
-      if (!rows.length) {
+      if (!requirementsRows.length) {
         sheet.mergeCells(`A${rowIndex}:B${rowIndex}`);
-        sheet.getCell(`A${rowIndex}`).value = 'No requirements assigned to this office.';
-        sheet.getCell(`A${rowIndex}`).font = { italic: true, color: { argb: 'FF64748B' } };
-        sheet.getCell(`A${rowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' };
-        setMergedRowBorder(rowIndex);
+        const emptyCell = sheet.getCell(`A${rowIndex}`);
+        emptyCell.value = 'No requirements assigned to this office.';
+        emptyCell.alignment = { horizontal: 'center', vertical: 'middle' };
+        emptyCell.border = thinBorder;
+        sheet.getCell(`B${rowIndex}`).border = thinBorder;
       } else {
-        const grouped = new Map();
+        const areasMap = new Map();
 
-        rows.forEach((item) => {
-          const areaId = item.AreaID != null ? Number(item.AreaID) : 0;
-          const areaKey = `area-${areaId}`;
-          if (!grouped.has(areaKey)) {
-            grouped.set(areaKey, {
-              areaCode: item.AreaCode || 'No Area',
-              areaName: item.AreaName || 'No Area Assigned',
+        requirementsRows.forEach((row) => {
+          const areaCode = row.AreaCode || 'N/A';
+          const areaName = row.AreaName || 'No Area';
+          const areaKey = `${areaCode}__${areaName}`;
+
+          if (!areasMap.has(areaKey)) {
+            areasMap.set(areaKey, {
+              areaCode,
+              areaName,
+              criteria: new Map(),
+            });
+          }
+
+          const areaEntry = areasMap.get(areaKey);
+          const criteriaCode = row.CriteriaCode || 'N/A';
+          const criteriaName = row.CriteriaName || 'No Criteria';
+          const criteriaKey = `${criteriaCode}__${criteriaName}`;
+
+          if (!areaEntry.criteria.has(criteriaKey)) {
+            areaEntry.criteria.set(criteriaKey, {
+              criteriaCode,
+              criteriaName,
               requirements: [],
             });
           }
 
-          grouped.get(areaKey).requirements.push({
-            code: item.RequirementCode || 'No Code',
-            description: item.Description || '',
-            compliance: normalizeStatusName(item.ComplianceStatusID, item.ComplianceStatusName),
+          areaEntry.criteria.get(criteriaKey).requirements.push({
+            status: normalizeComplianceStatus(row.ComplianceStatusID, row.ComplianceStatusName),
+            requirementCode: row.RequirementCode || 'N/A',
+            description: row.Description || '',
           });
         });
 
-        for (const area of grouped.values()) {
+        for (const area of areasMap.values()) {
+          // Area title row merged across both columns
           sheet.mergeCells(`A${rowIndex}:B${rowIndex}`);
-          sheet.getCell(`A${rowIndex}`).value = `Area: ${area.areaCode} - ${area.areaName}`;
-          sheet.getCell(`A${rowIndex}`).font = { bold: true, size: 12 };
-          sheet.getCell(`A${rowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' };
-          sheet.getRow(rowIndex).height = 22;
-          setMergedRowBorder(rowIndex);
+          const areaTitleCell = sheet.getCell(`A${rowIndex}`);
+          areaTitleCell.value = `${area.areaCode} - ${area.areaName}`;
+          areaTitleCell.font = areaHeaderStyle.font;
+          areaTitleCell.alignment = areaHeaderStyle.alignment;
+          areaTitleCell.border = thinBorder;
+          sheet.getCell(`B${rowIndex}`).border = thinBorder;
           rowIndex += 1;
 
-          area.requirements.forEach((req) => {
-            sheet.getCell(`A${rowIndex}`).value = req.compliance;
-            sheet.getCell(`A${rowIndex}`).font = { size: 11 };
-            sheet.getCell(`A${rowIndex}`).alignment = { horizontal: 'left', vertical: 'middle' };
+          for (const criteria of area.criteria.values()) {
+            // Criteria row aligned with requirement text column
+            const criteriaCode = String(criteria.criteriaCode || '').trim().replace(/\.+$/, '').toUpperCase();
+            const criteriaLabel = criteriaCode
+              ? `${criteriaCode}. ${criteria.criteriaName}`
+              : String(criteria.criteriaName || 'No Criteria');
 
-            sheet.getCell(`B${rowIndex}`).value = `${req.code} . ${req.description}`;
-            sheet.getCell(`B${rowIndex}`).font = { size: 11 };
-            sheet.getCell(`B${rowIndex}`).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+            const criteriaLeftCell = sheet.getCell(`A${rowIndex}`);
+            const criteriaTitleCell = sheet.getCell(`B${rowIndex}`);
 
-            setDataRowBorder(rowIndex);
+            criteriaLeftCell.value = '';
+            criteriaLeftCell.border = thinBorder;
+
+            criteriaTitleCell.value = criteriaLabel;
+            criteriaTitleCell.font = criteriaHeaderStyle.font;
+            criteriaTitleCell.alignment = criteriaHeaderStyle.alignment;
+            criteriaTitleCell.border = thinBorder;
             rowIndex += 1;
-          });
 
-          // keep sections contiguous to match requested sample layout
+            // Requirement rows (2-column table)
+            criteria.requirements.forEach((req) => {
+              const statusCell = sheet.getCell(`A${rowIndex}`);
+              const requirementCell = sheet.getCell(`B${rowIndex}`);
+
+              statusCell.value = req.status;
+              requirementCell.value = `${req.requirementCode} - ${req.description}`;
+
+              statusCell.alignment = { horizontal: 'left', vertical: 'middle' };
+              requirementCell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+
+              statusCell.border = thinBorder;
+              requirementCell.border = thinBorder;
+              rowIndex += 1;
+            });
+          }
         }
       }
 
-      const safeOfficeName = String(office.OfficeName || `office-${officeId}`)
+      const safeName = String(officeName)
         .replace(/[\\/:*?"<>|]+/g, '_')
         .replace(/\s+/g, '_')
         .trim();
 
-      const fileName = `${safeOfficeName}_requirements.xlsx`;
+      const fileName = `${safeName || `office_${officeId}`}_export.xlsx`;
 
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
 
       await workbook.xlsx.write(res);
-      res.end();
+      return res.end();
     } catch (err) {
-      console.error('Error exporting office requirements:', err);
-      res.status(500).json({ success: false, message: 'Failed to export office requirements', details: err.message });
+      console.error('Error exporting office excel:', err);
+      return res.status(500).json({ success: false, message: 'Failed to export office excel', details: err.message });
     }
   },
 
