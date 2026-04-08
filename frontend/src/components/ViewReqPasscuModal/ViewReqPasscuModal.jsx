@@ -48,6 +48,7 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
     const [notifMessage, setNotifMessage] = useState('');
     const [unsubmittingReqId, setUnsubmittingReqId] = useState(null);
     const [unsubmittingProof, setUnsubmittingProof] = useState(false);
+    const [removingReqId, setRemovingReqId] = useState(null);
 
     const isAdmin = currentUser && currentUser.RoleID === 1;
 
@@ -337,6 +338,24 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
         }
     };
 
+    // Remove a requirement from this office (admin action)
+    const handleRemoveRequirement = async (requirementId) => {
+        if (!window.confirm('Remove this requirement from the office? This cannot be undone.')) return;
+        try {
+            setRemovingReqId(requirementId);
+            const token = localStorage.getItem('token');
+            await axios.delete(`http://localhost:5000/api/offices/${office.id}/requirements/${requirementId}`, {
+                headers: token ? { Authorization: `Bearer ${token}` } : {}
+            });
+            await fetchOfficeRequirements();
+        } catch (err) {
+            console.error('Failed to remove requirement from office', err);
+            alert(err?.response?.data?.message || 'Failed to remove requirement from office');
+        } finally {
+            setRemovingReqId(null);
+        }
+    };
+
     const isUserAssignedToRequirement = (requirementId) => {
         if (!currentUser || !assignedUsersMap[requirementId]) return false;
         return assignedUsersMap[requirementId].some(u => u.UserID === currentUser.UserID);
@@ -503,7 +522,7 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                             <h2 className="text-base font-semibold text-gray-900">{officeData.office_name}</h2>
                             <p className="text-xs text-gray-500">{officeData.office_type_name}</p>
                             {officeData.event_name && (
-                                <p className="text-xs text-gray-500">Event: {officeData.event_name}</p>
+                                <p className="text-xs text-gray-500">Event: {officeData.event_code || officeData.EventCode || officeData.event?.code || officeData.Event?.code || ''}</p>
                             )}
                         </div>
                     </div>
@@ -595,24 +614,31 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                             } else if (officeHeads.length > 1) {
                                 return (
                                     <>
-                                        <div className="flex flex-wrap gap-1">
-                                            {officeHeads.map((head) => {
-                                                const headPicUrl = head.ProfilePic 
-                                                    ? `http://localhost:5000/uploads/profile-pics/${head.ProfilePic}`
-                                                    : '/src/assets/images/user.svg';
-                                                return (
-                                                    <img
-                                                        key={head.HeadID}
-                                                        src={headPicUrl}
-                                                        alt={head.full_name}
-                                                        className="w-9 h-9 rounded-full object-cover border-2 border-white shadow-sm"
-                                                        onError={(e) => { e.target.src = '/src/assets/images/user.svg'; }}
-                                                    />
-                                                );
-                                            })}
-                                        </div>
-                                        <div>
-                                            <p className="text-xs text-gray-500">{officeHeads.length} Personnel</p>
+                                        <div className="flex items-center gap-3 w-full">
+                                            <div className="flex gap-4">
+                                                {officeHeads.map((head) => {
+                                                    const headPicUrl = head.ProfilePic
+                                                        ? `http://localhost:5000/uploads/profile-pics/${head.ProfilePic}`
+                                                        : '/src/assets/images/user.svg';
+                                                    const displayName = head.FirstName || head.full_name || head.HeadName
+                                                        ? `${head.FirstName ? head.FirstName + (head.LastName ? ' ' + head.LastName : '') : (head.full_name || head.HeadName)}`
+                                                        : '';
+                                                    return (
+                                                        <div key={head.HeadID} className="w-24 flex flex-col items-center text-center">
+                                                            <img
+                                                                src={headPicUrl}
+                                                                alt={displayName}
+                                                                className="w-9 h-9 rounded-full object-cover border-2 border-white shadow-sm"
+                                                                onError={(e) => { e.target.src = '/src/assets/images/user.svg'; }}
+                                                            />
+                                                            <p className="text-xs text-gray-900 mt-1 w-full truncate">{displayName}</p>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                            <div className="ml-auto">
+                                                <p className="text-xs text-gray-500">{officeHeads.length} Personnel</p>
+                                            </div>
                                         </div>
                                     </>
                                 );
@@ -739,68 +765,183 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                     ) : (
                         <div className="space-y-4">
                             {(() => {
+                                // Build areas with criteria nodes (includes ParentCriteriaID provided by backend)
                                 const groupedByArea = requirements.reduce((areaGroups, req) => {
-                                    const areaKey = req.AreaCode || 'No Area';
+                                    const areaKey = req.AreaCode || `Area_${req.AreaID || 'NoArea'}`;
                                     if (!areaGroups[areaKey]) {
                                         areaGroups[areaKey] = {
-                                            name: req.AreaName || (req.AreaCode ? 'Uncategorized' : 'No Area'),
-                                            code: req.AreaCode || 'No Area',
-                                            criteriaGroups: {}
+                                            name: req.AreaName || 'No Area',
+                                            code: req.AreaCode || areaKey,
+                                            criteriaMap: {}
                                         };
                                     }
-                                    const criteriaKey = req.CriteriaCode || 'No Criteria';
-                                    if (!areaGroups[areaKey].criteriaGroups[criteriaKey]) {
-                                        areaGroups[areaKey].criteriaGroups[criteriaKey] = {
-                                            name: req.CriteriaName || 'Uncategorized',
-                                            code: req.CriteriaCode,
-                                            requirements: []
+
+                                    const critId = req.CriteriaID ?? `crit_${req.CriteriaCode || req.RequirementID}`;
+                                    const map = areaGroups[areaKey].criteriaMap;
+
+                                    if (!map[critId]) {
+                                        map[critId] = {
+                                            id: critId,
+                                            code: req.CriteriaCode || '',
+                                            name: req.CriteriaName || '',
+                                            parentId: req.ParentCriteriaID || null,
+                                            requirements: [],
+                                            children: []
                                         };
                                     }
-                                    areaGroups[areaKey].criteriaGroups[criteriaKey].requirements.push(req);
+
+                                    // If parent exists in row but is not yet present in map, synthesize a parent node
+                                    if (req.ParentCriteriaID && !map[req.ParentCriteriaID]) {
+                                        map[req.ParentCriteriaID] = {
+                                            id: req.ParentCriteriaID,
+                                            code: req.ParentCriteriaCode || '',
+                                            name: req.ParentCriteriaName || '',
+                                            parentId: null,
+                                            requirements: [],
+                                            children: []
+                                        };
+                                    }
+
+                                    map[critId].requirements.push(req);
                                     return areaGroups;
                                 }, {});
 
-                                const filteredGroupedByArea = Object.entries(groupedByArea).reduce((acc, [areaKey, area]) => {
-                                    const filteredCriteriaGroups = Object.entries(area.criteriaGroups).reduce((criteriaAcc, [criteriaKey, criteria]) => {
-                                        const filteredReqs = criteria.requirements.filter(req => {
-                                            const searchLower = searchTerm.toLowerCase();
-                                            const matchesSearch = !searchTerm || (
-                                                req.RequirementCode.toLowerCase().includes(searchLower) ||
-                                                req.Description.toLowerCase().includes(searchLower) ||
-                                                req.AreaCode.toLowerCase().includes(searchLower) ||
-                                                req.AreaName.toLowerCase().includes(searchLower) ||
-                                                req.CriteriaCode.toLowerCase().includes(searchLower) ||
-                                                req.CriteriaName.toLowerCase().includes(searchLower) ||
-                                                (req.comments && req.comments.toLowerCase().includes(searchLower))
-                                            );
-
-                                            let matchesStatus = true;
-                                            if (statusFilter !== 'all') {
-                                                if (statusFilter === 'complied') {
-                                                    matchesStatus = req.ComplianceStatusID === 5;
-                                                } else if (statusFilter === 'partially') {
-                                                    matchesStatus = req.ComplianceStatusID === 4;
-                                                } else if (statusFilter === 'not-complied') {
-                                                    matchesStatus = req.ComplianceStatusID === 3 || !req.ComplianceStatusID;
-                                                }
-                                            }
-
-                                            return matchesSearch && matchesStatus;
-                                        });
-                                        
-                                        if (filteredReqs.length > 0) {
-                                            criteriaAcc[criteriaKey] = { ...criteria, requirements: filteredReqs };
+                                // Link children to parents within each area
+                                Object.values(groupedByArea).forEach(area => {
+                                    const map = area.criteriaMap;
+                                    Object.values(map).forEach(node => {
+                                        if (node.parentId && map[node.parentId]) {
+                                            map[node.parentId].children.push(node);
                                         }
-                                        return criteriaAcc;
-                                    }, {});
+                                    });
+                                });
 
-                                    if (Object.keys(filteredCriteriaGroups).length > 0) {
-                                        acc[areaKey] = { ...area, criteriaGroups: filteredCriteriaGroups };
-                                    }
-                                    return acc;
-                                }, {});
+                                const matchesReq = (req) => {
+                                    const searchLower = searchTerm.toLowerCase();
+                                    const matchesSearch = !searchTerm || (
+                                        (req.RequirementCode || '').toLowerCase().includes(searchLower) ||
+                                        (req.Description || '').toLowerCase().includes(searchLower) ||
+                                        (req.AreaCode || '').toLowerCase().includes(searchLower) ||
+                                        (req.AreaName || '').toLowerCase().includes(searchLower) ||
+                                        (req.CriteriaCode || '').toLowerCase().includes(searchLower) ||
+                                        (req.CriteriaName || '').toLowerCase().includes(searchLower) ||
+                                        ((req.comments || '').toLowerCase().includes(searchLower))
+                                    );
 
-                                if ((searchTerm || statusFilter !== 'all') && Object.keys(filteredGroupedByArea).length === 0) {
+                                    if (!matchesSearch) return false;
+
+                                    if (statusFilter === 'all') return true;
+                                    if (statusFilter === 'complied') return req.ComplianceStatusID === 5;
+                                    if (statusFilter === 'partially') return req.ComplianceStatusID === 4;
+                                    return (req.ComplianceStatusID === 3 || !req.ComplianceStatusID);
+                                };
+
+                                // helper: check if node or any descendant has matching requirements
+                                const nodeHasMatches = (node) => {
+                                    if ((node.requirements || []).some(r => matchesReq(r))) return true;
+                                    return (node.children || []).some(child => nodeHasMatches(child));
+                                };
+
+                                const renderNode = (node, depth = 0) => {
+                                    if (!nodeHasMatches(node)) return null;
+
+                                    return (
+                                        <div key={`criteria-${node.id}`} className="border border-gray-200 rounded-lg overflow-hidden">
+                                            <div className={`px-3 py-2 border-b ${depth === 0 ? 'bg-blue-800 border-blue-900' : 'bg-blue-700/80 border-blue-800'}`}>
+                                                <h4 className="text-xs font-medium text-white">{node.code}</h4>
+                                                <p className="text-xs text-white/90 mt-0.5">{node.name}</p>
+                                            </div>
+
+                                            <div className="divide-y divide-gray-100">
+                                                {(node.requirements || []).filter(r => matchesReq(r)).map(req => {
+                                                    const isAssignedToMe = isUserAssignedToRequirement(req.RequirementID);
+                                                    return (
+                                                        <div
+                                                            key={req.RequirementID}
+                                                            className={`p-3 transition-colors ${isAssignedToMe ? 'bg-cyan-50/60 ring-1 ring-cyan-200' : 'hover:bg-gray-50/50'}`}
+                                                        >
+                                                            {/* Reuse existing requirement rendering block by inlining the minimal structure */}
+                                                            <div className="flex items-start gap-3">
+                                                                <div className="min-w-[90px]">
+                                                                    {isAdmin ? (
+                                                                        <div className="space-y-1.5">
+                                                                            {[{ id: 5, label: 'Complied', color: 'emerald' }, { id: 4, label: 'Partially Complied', color: 'amber' }, { id: 3, label: 'Not Complied', color: 'rose' }].map(option => (
+                                                                                <label key={option.id} className="flex items-center gap-1.5 text-xs cursor-pointer" title={option.label}>
+                                                                                    <input
+                                                                                        type="radio"
+                                                                                        name={`status-${req.RequirementID}`}
+                                                                                        checked={req.ComplianceStatusID === option.id}
+                                                                                        onChange={() => handleStatusChange(req.RequirementID, option.id)}
+                                                                                        className={`w-3 h-3 text-${option.color}-600 border-${option.color}-300 focus:ring-${option.color}-500 focus:ring-2`}
+                                                                                    />
+                                                                                    <span className={`font-medium ${option.color === 'emerald' ? 'text-emerald-700' : option.color === 'amber' ? 'text-amber-700' : 'text-rose-700'}`}>{option.label}</span>
+                                                                                </label>
+                                                                            ))}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <StatusBadge statusId={req.ComplianceStatusID} />
+                                                                    )}
+                                                                </div>
+
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <h5 className="text-xs font-medium text-gray-900">{req.RequirementCode}</h5>
+                                                                        {isAssignedToMe && (
+                                                                            <span className="inline-flex items-center gap-1 rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[10px] font-semibold text-cyan-700">
+                                                                                <span className="h-1.5 w-1.5 rounded-full bg-cyan-500" />
+                                                                                Active
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <p className="text-xs text-gray-600 mt-0.5 line-clamp-2">{req.Description}</p>
+                                                                </div>
+
+                                                                <div className="flex flex-col items-end gap-1.5">
+                                                                    {assignedUsersMap[req.RequirementID]?.length > 0 && (
+                                                                        <div className="flex space-x-1">
+                                                                            {assignedUsersMap[req.RequirementID].slice(0,4).map(user => (
+                                                                                <div key={user.UserID} className="w-6 h-6 rounded-full border-2 border-gray-300 bg-white" />
+                                                                            ))}
+                                                                        </div>
+                                                                    )}
+
+                                                                    {isAdmin && (
+                                                                        <>
+                                                                            <button
+                                                                                onClick={() => { setSelectedRequirement(req); setShowAssignModal(true); }}
+                                                                                className="inline-flex items-center justify-center w-24 gap-0.5 px-1.5 py-0.5 text-[10px] font-medium text-indigo-600 bg-indigo-50 rounded border border-indigo-200 hover:bg-indigo-100"
+                                                                            >Assign</button>
+                                                                            <button
+                                                                                onClick={() => handleRemoveRequirement(req.RequirementID)}
+                                                                                disabled={removingReqId === req.RequirementID}
+                                                                                className="inline-flex items-center justify-center w-24 gap-0.5 px-1.5 py-0.5 text-[10px] font-medium text-rose-600 bg-rose-50 rounded border border-rose-200 hover:bg-rose-100"
+                                                                            >Remove</button>
+                                                                        </>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+
+                                                {/* Render children nodes */}
+                                                {(node.children || []).map(child => (
+                                                    <div key={`child-${child.id}`} className="pl-4">
+                                                        {renderNode(child, depth + 1)}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                };
+
+                                const areasToRender = Object.entries(groupedByArea).filter(([, area]) => {
+                                    // If filters/search are active, ensure at least one matching node exists
+                                    if (!searchTerm && statusFilter === 'all') return true;
+                                    return Object.values(area.criteriaMap).some(node => nodeHasMatches(node));
+                                });
+
+                                if (areasToRender.length === 0) {
                                     return (
                                         <div className="text-center py-8">
                                             <div className="w-10 h-10 mx-auto mb-2 bg-gray-100 rounded-full flex items-center justify-center">
@@ -813,242 +954,28 @@ export default function ViewReqPASSCUModal({ isOpen, onClose, office, onEditOffi
                                     );
                                 }
 
-                                return Object.entries(filteredGroupedByArea).map(([areaKey, area]) => (
-                                    <div key={areaKey} className="space-y-3">
-                                        {/* Area Header - Compact */}
-                                        <div className="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-lg">
-                                            <h3 className="text-sm font-semibold text-white">{area.code}</h3>
-                                            <p className="text-xs text-indigo-100 mt-0.5">{area.name}</p>
-                                        </div>
+                                return areasToRender.map(([areaKey, area]) => {
+                                    // Find root criteria nodes (no parent or parent not in same map)
+                                    const allNodes = Object.values(area.criteriaMap || {});
+                                    const roots = allNodes.filter(n => !n.parentId || !area.criteriaMap[n.parentId]);
 
-                                        {/* Criteria Groups */}
-                                        <div className="space-y-3 pl-3">
-                                            {Object.entries(area.criteriaGroups).map(([criteriaKey, criteria]) => (
-                                                <div key={criteriaKey} className="border border-gray-200 rounded-lg overflow-hidden">
-                                                    {/* Criteria Header - Compact */}
-                                                    <div className="px-3 py-2 bg-gray-50 border-b border-gray-200">
-                                                        <h4 className="text-xs font-medium text-gray-900">{criteria.code}</h4>
-                                                        <p className="text-xs text-gray-500 mt-0.5">{criteria.name}</p>
+                                    return (
+                                        <div key={areaKey} className="space-y-3">
+                                            <div className="px-4 py-2.5 bg-gradient-to-r from-purple-600 to-purple-700 rounded-lg">
+                                                <h3 className="text-sm font-semibold text-white">{area.code}</h3>
+                                                <p className="text-xs text-purple-100 mt-0.5">{area.name}</p>
+                                            </div>
+
+                                            <div className="space-y-3 pl-3">
+                                                {roots.map(root => (
+                                                    <div key={`root-${root.id}`}>
+                                                        {renderNode(root)}
                                                     </div>
-
-                                                    {/* Requirements */}
-                                                    <div className="divide-y divide-gray-100">
-                                                        {criteria.requirements.map((req, index) => {
-                                                            const isAssignedToMe = isUserAssignedToRequirement(req.RequirementID);
-
-                                                            return (
-                                                            <div
-                                                                key={req.RequirementID}
-                                                                className={`p-3 transition-colors ${isAssignedToMe ? 'bg-cyan-50/60 ring-1 ring-cyan-200' : 'hover:bg-gray-50/50'}`}
-                                                            >
-                                                                <div className="flex items-start gap-3">
-                                                                    {/* Status */}
-                                                                    <div className="min-w-[90px]">
-                                                                        {isAdmin ? (
-                                                                            <div className="space-y-1.5">
-                                                                                {[
-                                                                                    { id: 5, label: 'Complied', color: 'emerald', title: 'Fully Complied' },
-                                                                                    { id: 4, label: 'Partially Complied', color: 'amber', title: 'Partially Complied' },
-                                                                                    { id: 3, label: 'Not Complied', color: 'rose', title: 'Not Complied' }
-                                                                                ].map(option => (
-                                                                                    <label key={option.id} className="flex items-center gap-1.5 text-xs cursor-pointer" title={option.title}>
-                                                                                        <input
-                                                                                            type="radio"
-                                                                                            name={`status-${req.RequirementID}`}
-                                                                                            checked={req.ComplianceStatusID === option.id}
-                                                                                            onChange={() => handleStatusChange(req.RequirementID, option.id)}
-                                                                                            className={`w-3 h-3 text-${option.color}-600 border-${option.color}-300 focus:ring-${option.color}-500 focus:ring-2`}
-                                                                                        />
-                                                                                        <span className={`font-medium ${
-                                                                                            option.color === 'emerald' ? 'text-emerald-700' :
-                                                                                            option.color === 'amber' ? 'text-amber-700' : 'text-rose-700'
-                                                                                        }`}>{option.label}</span>
-                                                                                    </label>
-                                                                                ))}
-                                                                            </div>
-                                                                        ) : (
-                                                                            <StatusBadge statusId={req.ComplianceStatusID} />
-                                                                        )}
-                                                                    </div>
-
-                                                                    {/* Requirement Details */}
-                                                                    <div className="flex-1 min-w-0">
-                                                                        <div className="flex items-center gap-2">
-                                                                            <h5 className="text-xs font-medium text-gray-900">{req.RequirementCode}</h5>
-                                                                            {isAssignedToMe && (
-                                                                                <span className="inline-flex items-center gap-1 rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[10px] font-semibold text-cyan-700">
-                                                                                    <span className="h-1.5 w-1.5 rounded-full bg-cyan-500" />
-                                                                                    Active
-                                                                                </span>
-                                                                            )}
-                                                                        </div>
-                                                                        <p className="text-xs text-gray-600 mt-0.5 line-clamp-2">{req.Description}</p>
-                                                                        
-                                                                        {/* Comment */}
-                                                                        {editingCommentId === req.RequirementID ? (
-                                                                            <div className="mt-2">
-                                                                                <textarea
-                                                                                    className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                                                                                    value={commentInput}
-                                                                                    onChange={handleCommentInputChange}
-                                                                                    autoFocus
-                                                                                    rows={2}
-                                                                                    placeholder="Add comment..."
-                                                                                    onKeyDown={e => {
-                                                                                        if (e.key === 'Enter' && !e.shiftKey) {
-                                                                                            e.preventDefault();
-                                                                                            handleCommentSave(req);
-                                                                                        }
-                                                                                        if (e.key === 'Escape') handleCommentCancel();
-                                                                                    }}
-                                                                                />
-                                                                                <div className="flex gap-1.5 mt-1.5">
-                                                                                    <button
-                                                                                        className="px-2 py-1 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-                                                                                        onClick={() => handleCommentSave(req)}
-                                                                                        disabled={savingComment}
-                                                                                    >
-                                                                                        {savingComment ? '...' : 'Save'}
-                                                                                    </button>
-                                                                                    <button
-                                                                                        className="px-2 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200"
-                                                                                        onClick={handleCommentCancel}
-                                                                                    >
-                                                                                        Cancel
-                                                                                    </button>
-                                                                                </div>
-                                                                            </div>
-                                                                        ) : (
-                                                                            <div
-                                                                                className={`mt-2 px-2 py-1.5 text-xs rounded-lg cursor-pointer flex items-start gap-1 ${
-                                                                                    req.comments 
-                                                                                        ? 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100' 
-                                                                                        : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
-                                                                                }`}
-                                                                                onClick={() => isAdmin && handleCommentClick(req)}
-                                                                            >
-                                                                                <span className="line-clamp-1">{req.comments || 'Add comment...'}</span>
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-
-                                                                    {/* Actions */}
-                                                                    <div className="flex flex-col items-end gap-1.5">
-                                                                        {/* Assigned Users */}
-                                                                        {assignedUsersMap[req.RequirementID]?.length > 0 && (
-                                                                            <div className="flex space-x-1">
-                                                                                {assignedUsersMap[req.RequirementID].slice(0, 4).map((user) => {
-                                                                                    const hasUploaded = user.HasUploaded === 1 || user.HasUploaded === true;
-                                                                                    const initials = `${user.FirstName?.[0] || ''}${user.LastName?.[0] || ''}`.toUpperCase();
-                                                                                    
-                                                                                    return (
-                                                                                        <div
-                                                                                            key={user.UserID}
-                                                                                            className="relative group avatar-popup-menu"
-                                                                                            onClick={(e) => handleUserAvatarClick(e, user, req.RequirementID)}
-                                                                                            style={{ cursor: isAdmin ? 'pointer' : 'default' }}
-                                                                                        >
-                                                                                            <div className={`w-6 h-6 rounded-full border-2 ${hasUploaded ? 'border-emerald-500' : 'border-gray-300'} bg-white flex items-center justify-center overflow-hidden shadow-sm hover:scale-110 transition-transform`}>
-                                                                                                {user.ProfilePic ? (
-                                                                                                    <img
-                                                                                                        src={`http://localhost:5000/uploads/profile-pics/${user.ProfilePic}`}
-                                                                                                        alt={`${user.FirstName} ${user.LastName}`}
-                                                                                                        className="w-full h-full object-cover"
-                                                                                                    />
-                                                                                                ) : (
-                                                                                                    <span className="text-[10px] font-medium text-gray-600">{initials}</span>
-                                                                                                )}
-                                                                                            </div>
-                                                                                            
-                                                                                            {/* Tooltip (only show when popup is not open) */}
-                                                                                            {!(avatarPopup && avatarPopup.user.UserID === user.UserID && avatarPopup.requirementId === req.RequirementID) && (
-                                                                                                <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-gray-900 text-white text-[10px] rounded shadow-lg whitespace-nowrap invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-200 z-50">
-                                                                                                    <p>{user.FirstName} {user.LastName}</p>
-                                                                                                    <p className={hasUploaded ? 'text-emerald-400' : 'text-rose-400'}>
-                                                                                                        {hasUploaded ? '✓ Uploaded' : '✗ Not uploaded'}
-                                                                                                    </p>
-                                                                                                </div>
-                                                                                            )}
-
-                                                                                        </div>
-                                                                                    );
-                                                                                })}
-                                                                            </div>
-                                                                        )}
-
-                                                                        {/* Upload Button for non-admin */}
-                                                                        {!isAdmin && isUserAssignedToRequirement(req.RequirementID) && (
-                                                                            <div className="flex flex-col gap-1 items-end">
-                                                                                <input
-                                                                                    type="file"
-                                                                                    ref={userReqFileInputRef}
-                                                                                    style={{ display: 'none' }}
-                                                                                    onChange={(e) => handleUserReqFileUpload(e, req.RequirementID)}
-                                                                                    accept=".pdf,.doc,.docx,.xlsx,.xls,.jpg,.jpeg,.png"
-                                                                                />
-                                                                                {hasUserUploadedForRequirement(req.RequirementID) ? (
-                                                                                    <>
-                                                                                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 bg-emerald-50 rounded border border-emerald-200">
-                                                                                            <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                                                                            </svg>
-                                                                                            Done
-                                                                                        </span>
-                                                                                        <button
-                                                                                            onClick={() => handleUnsubmitUserFile(req.RequirementID)}
-                                                                                            disabled={unsubmittingReqId === req.RequirementID}
-                                                                                            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium text-rose-600 bg-rose-50 rounded border border-rose-200 hover:bg-rose-100 disabled:opacity-50 mt-1"
-                                                                                        >
-                                                                                            {unsubmittingReqId === req.RequirementID ? (
-                                                                                                <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
-                                                                                            ) : (
-                                                                                                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                                                                                </svg>
-                                                                                            )}
-                                                                                            Unsubmit
-                                                                                        </button>
-                                                                                    </>
-                                                                                ) : (
-                                                                                    <button
-                                                                                        onClick={() => userReqFileInputRef.current?.click()}
-                                                                                        disabled={userUploadingReqId === req.RequirementID}
-                                                                                        className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium text-indigo-600 bg-indigo-50 rounded border border-indigo-200 hover:bg-indigo-100 disabled:opacity-50"
-                                                                                    >
-                                                                                        <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                                                                                        </svg>
-                                                                                        Upload
-                                                                                    </button>
-                                                                                )}
-                                                                            </div>
-                                                                        )}
-
-                                                                        {/* Assign Button for admin */}
-                                                                        {isAdmin && (
-                                                                            <button
-                                                                                onClick={() => {
-                                                                                    setSelectedRequirement(req);
-                                                                                    setShowAssignModal(true);
-                                                                                }}
-                                                                                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium text-indigo-600 bg-indigo-50 rounded border border-indigo-200 hover:bg-indigo-100"
-                                                                            >
-                                                                                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                                                                                </svg>
-                                                                                Assign
-                                                                            </button>
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        )})}
-                                                    </div>
-                                                </div>
-                                            ))}
+                                                ))}
+                                            </div>
                                         </div>
-                                    </div>
-                                ));
+                                    );
+                                });
                             })()}
                         </div>
                     )}

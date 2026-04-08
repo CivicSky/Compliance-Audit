@@ -636,8 +636,11 @@ const OfficesController = {
           r.RequirementCode,
           r.Description,
           r.CriteriaID,
+          c.ParentCriteriaID,
           c.CriteriaName,
           c.CriteriaCode,
+          pc.CriteriaName AS ParentCriteriaName,
+          pc.CriteriaCode AS ParentCriteriaCode,
           c.AreaID,
           a.AreaCode,
           a.AreaName,
@@ -647,10 +650,11 @@ const OfficesController = {
         FROM compliancestatusoffices cso
         INNER JOIN requirements r ON cso.RequirementID = r.RequirementID
         LEFT JOIN criteria c ON r.CriteriaID = c.CriteriaID
+        LEFT JOIN criteria pc ON c.ParentCriteriaID = pc.CriteriaID
         LEFT JOIN areas a ON c.AreaID = a.AreaID
         LEFT JOIN compliancestatustypes cst ON cso.Status = cst.StatusID
         WHERE cso.OfficeID = ?
-        ORDER BY a.SortOrder ASC, c.CriteriaCode ASC, r.RequirementCode ASC
+        ORDER BY a.SortOrder ASC, COALESCE(pc.CriteriaCode, c.CriteriaCode) ASC, c.CriteriaCode ASC, r.RequirementCode ASC
       `;
 
         const [results] = await db.query(query, [id]);

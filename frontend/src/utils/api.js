@@ -1,27 +1,3 @@
-// ========================
-// Compliance Status Offices API
-// ========================
-export const complianceStatusOfficesAPI = {
-  getAll: async () => (await api.get('/api/compliancestatusoffices')).data,
-};
-// ========================
-// Criteria API
-// ========================
-export const criteriaAPI = {
-  getAll: async () => (await api.get('/api/criteria')).data,
-  getByEvent: async (eventId) => (await api.get(`/api/criteria/event/${eventId}`)).data,
-  deleteCriteria: async (ids) => (await api.delete('/api/criteria/delete', { data: { criteriaIds: ids } })).data,
-  addCriteria: async (data) => (await api.post('/api/criteria/add', data)).data,
-};
-// ========================
-// Areas API
-// ========================
-export const areasAPI = {
-  getAll: async () => (await api.get('/api/areas')).data,
-  getByEvent: async (eventId) => (await api.get(`/api/areas/event/${eventId}`)).data,
-  addArea: async (areaData) => (await api.post('/api/areas/add', areaData)).data,
-  deleteAreas: async (areaIds) => (await api.post('/api/areas/delete', { areaIds })).data,
-};
 import axios from 'axios';
 
 // Use relative base URL so Vite proxy works in dev and prod
@@ -62,6 +38,31 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// ========================
+// Compliance Status Offices API
+// ========================
+export const complianceStatusOfficesAPI = {
+  getAll: async () => (await api.get('/api/compliancestatusoffices')).data,
+};
+// ========================
+// Criteria API
+// ========================
+export const criteriaAPI = {
+  getAll: async () => (await api.get('/api/criteria')).data,
+  getByEvent: async (eventId) => (await api.get(`/api/criteria/event/${eventId}`)).data,
+  deleteCriteria: async (ids) => (await api.delete('/api/criteria/delete', { data: { criteriaIds: ids } })).data,
+  addCriteria: async (data) => (await api.post('/api/criteria/add', data)).data,
+};
+// ========================
+// Areas API
+// ========================
+export const areasAPI = {
+  getAll: async () => (await api.get('/api/areas')).data,
+  getByEvent: async (eventId) => (await api.get(`/api/areas/event/${eventId}`)).data,
+  addArea: async (areaData) => (await api.post('/api/areas/add', areaData)).data,
+  deleteAreas: async (areaIds) => (await api.post('/api/areas/delete', { areaIds })).data,
+};
 
 // ========================
 // Office Heads API
@@ -155,111 +156,110 @@ export const usersAPI = {
 };
 
 
-
-  // ========================
-  // Events API
-  // ========================
-  export const eventsAPI = {
-    getAllEvents: async () => (await api.get('/api/events')).data,
-    addEvent: async (eventData) => (await api.post('/api/events/add', eventData)).data,
-    updateEvent: async (eventId, eventData) => (await api.put(`/api/events/update/${eventId}`, eventData)).data,
-    deleteEvents: async (eventIds) => (await api.post('/api/events/delete', { eventIds })).data,
-    getDownloadableFolders: async () => (await api.get('/api/events/downloadable-folders')).data,
-    downloadEventZip: async (eventName) => {
-      try {
-        const response = await api.get(`/api/events/download/${encodeURIComponent(eventName)}`, {
-          responseType: 'blob'
-        });
-        // response.data is already a Blob when responseType is 'blob'
-        return window.URL.createObjectURL(response.data);
-      } catch (error) {
-        console.error('Download error:', error);
-        // If error response has a blob (error message), try to extract it
-        if (error.response && error.response.data instanceof Blob) {
-          const errorText = await error.response.data.text();
-          throw new Error(errorText || 'Download failed');
-        }
-        throw error;
+// ========================
+// Events API
+// ========================
+export const eventsAPI = {
+  getAllEvents: async () => (await api.get('/api/events')).data,
+  addEvent: async (eventData) => (await api.post('/api/events/add', eventData)).data,
+  updateEvent: async (eventId, eventData) => (await api.put(`/api/events/update/${eventId}`, eventData)).data,
+  deleteEvents: async (eventIds) => (await api.post('/api/events/delete', { eventIds })).data,
+  getDownloadableFolders: async () => (await api.get('/api/events/downloadable-folders')).data,
+  downloadEventZip: async (eventName) => {
+    try {
+      const response = await api.get(`/api/events/download/${encodeURIComponent(eventName)}`, {
+        responseType: 'blob'
+      });
+      // response.data is already a Blob when responseType is 'blob'
+      return window.URL.createObjectURL(response.data);
+    } catch (error) {
+      console.error('Download error:', error);
+      // If error response has a blob (error message), try to extract it
+      if (error.response && error.response.data instanceof Blob) {
+        const errorText = await error.response.data.text();
+        throw new Error(errorText || 'Download failed');
       }
-    },
-    // Copy event API
-    copyEvent: async ({ sourceEventId, newEventName, newEventCode, newDescription }) =>
-      (await api.post('/api/events/copy', { sourceEventId, newEventName, newEventCode, newDescription })).data,
-  };
+      throw error;
+    }
+  },
+  // Copy event API
+  copyEvent: async ({ sourceEventId, newEventName, newEventCode, newDescription }) =>
+    (await api.post('/api/events/copy', { sourceEventId, newEventName, newEventCode, newDescription })).data,
+};
 
-  // ========================
-  // Requirements API
-  // ========================
-  export const requirementsAPI = {
-    getAllRequirements: async () => (await api.get('/api/requirements/all')).data,
-    getRequirementsByEvent: async (eventId) => (await api.get(`/api/requirements/event/${eventId}`)).data,
-    addRequirement: async (data) => (await api.post('/api/requirements/add', data)).data,
-    updateRequirement: async (id, data) => (await api.put(`/api/requirements/update/${id}`, data)).data,
-    deleteRequirements: async (ids) => (await api.post('/api/requirements/delete', { requirementIds: ids })).data,
-    // User assignment functions
-    assignUsersToRequirement: async (requirementId, officeId, userIds, assignedBy) => 
-      (await api.post('/api/requirements/assign-users', { requirementId, officeId, userIds, assignedBy })).data,
-    getAssignedUsers: async (requirementId, officeId) => {
-      const params = officeId ? `?officeId=${officeId}` : '';
-      return (await api.get(`/api/requirements/assigned-users/${requirementId}${params}`)).data;
-    },
-    getMyAssignments: async () => (await api.get('/api/requirements/my-assignments')).data,
-    removeUserAssignment: async (assignmentId) => 
-      (await api.delete(`/api/requirements/assignment/${assignmentId}`)).data,
-    getUserAssignmentCount: async (userId) => 
-      (await api.get(`/api/requirements/user-assignment-count/${userId}`)).data,
-    getAvailableUsersForAssignment: async (requirementId, officeId) => {
-      const params = new URLSearchParams();
-      if (requirementId) params.append('requirementId', requirementId);
-      if (officeId) params.append('officeId', officeId);
-      return (await api.get(`/api/requirements/available-users?${params.toString()}`)).data;
-    },
-    updateUserUploadStatus: async (assignmentId, hasUploaded) => 
-      (await api.put(`/api/requirements/assignment/${assignmentId}/upload-status`, { hasUploaded })).data,
-    markUserAsUploaded: async (requirementId, userId) => 
-      (await api.post('/api/requirements/mark-uploaded', { requirementId, userId })).data,
-  };
+// ========================
+// Requirements API
+// ========================
+export const requirementsAPI = {
+  getAllRequirements: async () => (await api.get('/api/requirements/all')).data,
+  getRequirementsByEvent: async (eventId) => (await api.get(`/api/requirements/event/${eventId}`)).data,
+  addRequirement: async (data) => (await api.post('/api/requirements/add', data)).data,
+  updateRequirement: async (id, data) => (await api.put(`/api/requirements/update/${id}`, data)).data,
+  deleteRequirements: async (ids) => (await api.post('/api/requirements/delete', { requirementIds: ids })).data,
+  // User assignment functions
+  assignUsersToRequirement: async (requirementId, officeId, userIds, assignedBy) => 
+    (await api.post('/api/requirements/assign-users', { requirementId, officeId, userIds, assignedBy })).data,
+  getAssignedUsers: async (requirementId, officeId) => {
+    const params = officeId ? `?officeId=${officeId}` : '';
+    return (await api.get(`/api/requirements/assigned-users/${requirementId}${params}`)).data;
+  },
+  getMyAssignments: async () => (await api.get('/api/requirements/my-assignments')).data,
+  removeUserAssignment: async (assignmentId) => 
+    (await api.delete(`/api/requirements/assignment/${assignmentId}`)).data,
+  getUserAssignmentCount: async (userId) => 
+    (await api.get(`/api/requirements/user-assignment-count/${userId}`)).data,
+  getAvailableUsersForAssignment: async (requirementId, officeId) => {
+    const params = new URLSearchParams();
+    if (requirementId) params.append('requirementId', requirementId);
+    if (officeId) params.append('officeId', officeId);
+    return (await api.get(`/api/requirements/available-users?${params.toString()}`)).data;
+  },
+  updateUserUploadStatus: async (assignmentId, hasUploaded) => 
+    (await api.put(`/api/requirements/assignment/${assignmentId}/upload-status`, { hasUploaded })).data,
+  markUserAsUploaded: async (requirementId, userId) => 
+    (await api.post('/api/requirements/mark-uploaded', { requirementId, userId })).data,
+};
 
-  // ========================
-  // Offices API
-  // ========================
-  export const officesAPI = {
-    getAll: async () => {
-      const response = await api.get('/api/offices');
-      return response.data.data || response.data; // Handle both { data: [...] } and [...]
-    },
-    createOffice: async (data) => (await api.post('/api/offices', data)).data,
-    updateOffice: async (id, data) => (await api.put(`/api/offices/${id}`, data)).data,
-    deleteOffice: async (id) => (await api.delete(`/api/offices/${id}`)).data,
-    getOfficeRequirements: async (officeId) => (await api.get(`/api/offices/${officeId}/requirements`)).data,
-    addOfficeRequirements: async (officeId, requirementIds) =>
-      (await api.post(`/api/offices/${officeId}/requirements`, { requirementIds })).data,
-    exportOfficeExcel: async (officeId, officeName = 'office') => {
-      const response = await api.get(`/api/offices/${officeId}/export`, { responseType: 'blob' });
-      const blobUrl = window.URL.createObjectURL(response.data);
-      const disposition = response.headers?.['content-disposition'] || '';
-      const nameMatch = disposition.match(/filename="?([^";]+)"?/i);
-      const safeOfficeName = String(officeName || 'office')
-        .replace(/[\\/:*?"<>|]+/g, '_')
-        .replace(/\s+/g, '_')
-        .trim();
+// ========================
+// Offices API
+// ========================
+export const officesAPI = {
+  getAll: async () => {
+    const response = await api.get('/api/offices');
+    return response.data.data || response.data; // Handle both { data: [...] } and [...]
+  },
+  createOffice: async (data) => (await api.post('/api/offices', data)).data,
+  updateOffice: async (id, data) => (await api.put(`/api/offices/${id}`, data)).data,
+  deleteOffice: async (id) => (await api.delete(`/api/offices/${id}`)).data,
+  getOfficeRequirements: async (officeId) => (await api.get(`/api/offices/${officeId}/requirements`)).data,
+  addOfficeRequirements: async (officeId, requirementIds) =>
+    (await api.post(`/api/offices/${officeId}/requirements`, { requirementIds })).data,
+  exportOfficeExcel: async (officeId, officeName = 'office') => {
+    const response = await api.get(`/api/offices/${officeId}/export`, { responseType: 'blob' });
+    const blobUrl = window.URL.createObjectURL(response.data);
+    const disposition = response.headers?.['content-disposition'] || '';
+    const nameMatch = disposition.match(/filename="?([^";]+)"?/i);
+    const safeOfficeName = String(officeName || 'office')
+      .replace(/[\\/:*?"<>|]+/g, '_')
+      .replace(/\s+/g, '_')
+      .trim();
 
-      return {
-        url: blobUrl,
-        fileName: nameMatch?.[1] || `${safeOfficeName || 'office'}_export.xlsx`
-      };
-    },
-  };
+    return {
+      url: blobUrl,
+      fileName: nameMatch?.[1] || `${safeOfficeName || 'office'}_export.xlsx`
+    };
+  },
+};
 
-  // ========================
-  // Office Types API
-  // ========================
-  export const officetypesAPI = {
-    getAll: async () => (await api.get('/api/officestypes')).data,
-    getById: async (id) => (await api.get(`/api/officestypes/${id}`)).data,
-    create: async (data) => (await api.post('/api/officestypes', data)).data,
-    update: async (id, data) => (await api.put(`/api/officestypes/${id}`, data)).data,
-    delete: async (id) => (await api.delete(`/api/officestypes/${id}`)).data,
-  };
+// ========================
+// Office Types API
+// ========================
+export const officetypesAPI = {
+  getAll: async () => (await api.get('/api/officestypes')).data,
+  getById: async (id) => (await api.get(`/api/officestypes/${id}`)).data,
+  create: async (data) => (await api.post('/api/officestypes', data)).data,
+  update: async (id, data) => (await api.put(`/api/officestypes/${id}`, data)).data,
+  delete: async (id) => (await api.delete(`/api/officestypes/${id}`)).data,
+};
 
-  export default api;
+export default api;

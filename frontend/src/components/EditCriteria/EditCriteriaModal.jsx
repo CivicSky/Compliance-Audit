@@ -4,8 +4,9 @@ import { criteriaAPI } from '../../utils/api';
 const EditCriteriaModal = ({ visible, onClose, event = {}, onSave, userRole = 'user' }) => {
   const [criteriaCode, setCriteriaCode] = useState('');
   const [criteriaName, setCriteriaName] = useState('');
-  const [description, setDescription] = useState('');
+  // Description removed from form; will send null when saving
   const [parentCriteriaId, setParentCriteriaId] = useState('');
+  const [isChild, setIsChild] = useState(false);
   const [eventId, setEventId] = useState('');
   const [criteriaList, setCriteriaList] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -14,10 +15,11 @@ const EditCriteriaModal = ({ visible, onClose, event = {}, onSave, userRole = 'u
 
   useEffect(() => {
     if (event && visible) {
-      setCriteriaCode(event.CriteriaCode || '');
+      setCriteriaCode((event.CriteriaCode || '').toUpperCase());
       setCriteriaName(event.CriteriaName || '');
-      setDescription(event.Description || '');
+      // description intentionally ignored (send null)
       setParentCriteriaId(event.ParentCriteriaID ? String(event.ParentCriteriaID) : '');
+      setIsChild(Boolean(event.ParentCriteriaID));
       setEventId(event.EventID || '');
     }
   }, [event, visible]);
@@ -42,19 +44,23 @@ const EditCriteriaModal = ({ visible, onClose, event = {}, onSave, userRole = 'u
 
   const validateForm = () => {
     const newErrors = {};
-    if (!criteriaCode.trim()) newErrors.CriteriaCode = 'Criteria code is required';
+    if (!criteriaCode.trim() && !isChild) newErrors.CriteriaCode = 'Criteria code is required';
     if (!criteriaName.trim()) newErrors.CriteriaName = 'Criteria name is required';
-    if (!description.trim()) newErrors.Description = 'Description is required';
-    // Area is now optional, so no error for areaId
+    // ensure uniqueness of CriteriaCode within the same event (case-insensitive)
+    const code = String(criteriaCode || '').trim().toLowerCase();
+    if (code) {
+      const duplicate = (criteriaList || []).find(c => String(c.CriteriaCode || '').trim().toLowerCase() === code && Number(c.CriteriaID) !== Number(event.CriteriaID));
+      if (duplicate) newErrors.CriteriaCode = 'A criteria with this code already exists for this event.';
+    }
+    // Description is optional/removed
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    if (name === 'CriteriaCode') setCriteriaCode(value);
+    if (name === 'CriteriaCode') setCriteriaCode((value || '').toUpperCase());
     else if (name === 'CriteriaName') setCriteriaName(value);
-    else if (name === 'Description') setDescription(value);
     else if (name === 'ParentCriteriaID') setParentCriteriaId(value);
     if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
   };
@@ -65,9 +71,9 @@ const EditCriteriaModal = ({ visible, onClose, event = {}, onSave, userRole = 'u
     setIsSubmitting(true);
     const updated = {
       CriteriaID: event.CriteriaID,
-      CriteriaCode: criteriaCode,
+      CriteriaCode: isChild ? null : criteriaCode,
       CriteriaName: criteriaName,
-      Description: description,
+      Description: null,
       AreaID: event.AreaID === undefined ? null : event.AreaID,
       ParentCriteriaID: parentCriteriaId === '' ? null : parentCriteriaId,
       EventID: eventId
@@ -125,8 +131,8 @@ const EditCriteriaModal = ({ visible, onClose, event = {}, onSave, userRole = 'u
               onChange={handleInputChange}
               className={`w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.CriteriaCode ? 'border-red-500' : 'border-gray-300'}`}
               placeholder="e.g., CUR.4.1"
-              disabled={isSubmitting || !isAdmin}
-              required
+              disabled={isSubmitting || !isAdmin || isChild}
+              required={!isChild}
             />
             {errors.CriteriaCode && <p className="text-red-500 text-sm mt-1">{errors.CriteriaCode}</p>}
           </div>
@@ -161,7 +167,7 @@ const EditCriteriaModal = ({ visible, onClose, event = {}, onSave, userRole = 'u
               value={parentCriteriaId}
               onChange={handleInputChange}
               className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              disabled={isSubmitting || !isAdmin}
+              disabled={isSubmitting || !isAdmin || isChild}
             >
               <option value="">None (Top-level criteria)</option>
               {criteriaList
@@ -174,23 +180,7 @@ const EditCriteriaModal = ({ visible, onClose, event = {}, onSave, userRole = 'u
             </select>
           </div>
 
-          {/* Description */}
-          <div className="mb-6">
-            <label htmlFor="Description" className="block text-sm font-medium text-gray-700 mb-2">
-              Description
-            </label>
-            <textarea
-              id="Description"
-              name="Description"
-              value={description}
-              onChange={handleInputChange}
-              rows="3"
-              className={`w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none ${errors.Description ? 'border-red-500' : 'border-gray-300'}`}
-              placeholder="Enter a detailed description of this criteria"
-              disabled={isSubmitting || !isAdmin}
-            />
-            {errors.Description && <p className="text-red-500 text-sm mt-1">{errors.Description}</p>}
-          </div>
+          {/* Description removed - backend accepts null */}
 
       {/* Form Actions */}
         <div className="flex justify-end space-x-3 pt-4 border-t">

@@ -21,7 +21,7 @@ export default function RequirementsSection({
             <span className="absolute left-0 top-0 bottom-0 w-1 bg-blue-400 rounded-full" />
             <div className="space-y-2">
                 {requirements.map((req) => (
-                    <div key={req.RequirementID} className="relative">
+                    <div key={`${req.RequirementID}-${req.RequirementCode || ''}-${req.Type || req.SuggestedEvidence || ''}`} className="relative">
                         <span className="absolute -left-6 top-6 w-5 h-1 bg-blue-400 rounded-r-full" />
                         <RequirementItem
                             requirement={req}

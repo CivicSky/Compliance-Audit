@@ -26,7 +26,11 @@ export default function CriteriaItem({
             <span className="text-lg">{isExpanded ? '▼' : '▶'}</span>
             <div className="flex-1 min-w-0">
                 <span className="font-semibold text-lg truncate block">
-                    {`${String(criteria.CriteriaCode || '').replace(/\.$/, '')}. ${criteria.CriteriaName || ''}`}
+                    {(() => {
+                        const code = String(criteria.CriteriaCode || '').trim().replace(/\.$/, '');
+                        const name = criteria.CriteriaName || '';
+                        return code ? `${code}. ${name}` : name;
+                    })()}
                 </span>
             </div>
             {loading && <span className="text-xs opacity-75">⏳</span>}

@@ -418,7 +418,7 @@ function ALL() {
                 CriteriaCode: data.CriteriaCode,
                 CriteriaName: data.CriteriaName,
                 Description: data.Description,
-                ParentCriteriaID: null
+                ParentCriteriaID: data.ParentCriteriaID ?? null
             }, {
                 headers: { Authorization: `Bearer ${token}` }
             });

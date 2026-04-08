@@ -17,6 +17,7 @@ router.put('/:id', auth, async (req, res) => {
         const { id } = req.params;
         let { CriteriaCode, CriteriaName, Description, AreaID, ParentCriteriaID, EventID } = req.body;
 
+
         const [existingRows] = await db.query(
             `SELECT c.CriteriaID, c.CriteriaCode, c.CriteriaName, c.Description, c.AreaID, c.ParentCriteriaID, c.EventID, e.EventName
              FROM criteria c
@@ -35,16 +36,34 @@ router.put('/:id', auth, async (req, res) => {
 
         const existing = existingRows[0];
 
-        if (!CriteriaCode || !CriteriaName || !Description) {
-            return res.status(400).json({
-                success: false,
-                message: 'Criteria code, name, and description are required.'
-            });
+        // normalize CriteriaCode to uppercase and trim
+        if (CriteriaCode !== undefined && CriteriaCode !== null) {
+            CriteriaCode = String(CriteriaCode).trim().toUpperCase();
         }
-        // Ensure AreaID and ParentCriteriaID are null if empty string or 'null' string
+        // Ensure AreaID, ParentCriteriaID, and Description are normalized
         if (AreaID === '' || AreaID === 'null' || AreaID === undefined) AreaID = null;
         if (ParentCriteriaID === '' || ParentCriteriaID === 'null' || ParentCriteriaID === undefined) ParentCriteriaID = null;
         if (EventID === '' || EventID === 'null' || EventID === undefined) EventID = existing.EventID;
+        if (Description === '' || Description === 'null' || Description === undefined) Description = null;
+
+        // Validate required fields: CriteriaName always required; CriteriaCode required only for top-level criteria
+        if (!CriteriaName || (ParentCriteriaID == null && !CriteriaCode)) {
+            return res.status(400).json({
+                success: false,
+                message: ParentCriteriaID == null ? 'Criteria code and name are required.' : 'Criteria name is required.'
+            });
+        }
+
+        // Enforce uniqueness of CriteriaCode within the same Event (case-insensitive) only if CriteriaCode provided
+        if (CriteriaCode) {
+            const [dupRows] = await db.query(
+                `SELECT CriteriaID FROM criteria WHERE EventID = ? AND LOWER(CriteriaCode) = LOWER(?) AND CriteriaID != ? LIMIT 1`,
+                [EventID || existing.EventID, CriteriaCode, id]
+            );
+            if (dupRows.length > 0) {
+                return res.status(400).json({ success: false, message: 'A criteria with this code already exists for the selected event.' });
+            }
+        }
 
         const [result] = await db.query(
             `UPDATE criteria SET CriteriaCode = ?, CriteriaName = ?, Description = ?, AreaID = ?, ParentCriteriaID = ?, EventID = ? WHERE CriteriaID = ?`,
@@ -146,18 +165,35 @@ router.get('/area/:areaId', async (req, res) => {
 // POST add new criteria (AreaID optional)
 router.post('/add', auth, async (req, res) => {
     try {
-        const { EventID, AreaID, CriteriaCode, CriteriaName, Description, ParentCriteriaID } = req.body;
-        // Validate required fields
-        if (!EventID || !CriteriaCode || !CriteriaName || !Description) {
+        let { EventID, AreaID, CriteriaCode, CriteriaName, Description, ParentCriteriaID } = req.body;
+        // normalize CriteriaCode to uppercase and trim
+        if (CriteriaCode !== undefined && CriteriaCode !== null) {
+            CriteriaCode = String(CriteriaCode).trim().toUpperCase();
+        }
+        // Normalize ParentCriteriaID
+        if (ParentCriteriaID === '' || ParentCriteriaID === 'null' || ParentCriteriaID === undefined) ParentCriteriaID = null;
+        // Validate required fields: EventID and CriteriaName required; CriteriaCode required only if no ParentCriteriaID
+        if (!EventID || !CriteriaName || (ParentCriteriaID == null && !CriteriaCode)) {
             return res.status(400).json({
                 success: false,
-                message: 'Event, Criteria Code, Name, and Description are required.'
+                message: ParentCriteriaID == null ? 'Event, Criteria Code, and Name are required.' : 'Event and Criteria Name are required.'
             });
         }
-        // Insert criteria, AreaID and ParentCriteriaID can be null
+        // Insert criteria, AreaID, ParentCriteriaID, and Description can be null
+        const safeDescription = Description && String(Description).trim() !== '' ? Description : null;
+        // Enforce uniqueness of CriteriaCode within the same Event (case-insensitive) only if CriteriaCode provided
+        if (CriteriaCode) {
+            const [existingDup] = await db.query(
+                `SELECT CriteriaID FROM criteria WHERE EventID = ? AND LOWER(CriteriaCode) = LOWER(?) LIMIT 1`,
+                [EventID, CriteriaCode]
+            );
+            if (existingDup.length > 0) {
+                return res.status(400).json({ success: false, message: 'A criteria with this code already exists for the selected event.' });
+            }
+        }
         const [result] = await db.query(
             `INSERT INTO criteria (EventID, AreaID, CriteriaCode, CriteriaName, Description, ParentCriteriaID, IsActive) VALUES (?, ?, ?, ?, ?, ?, 1)`,
-            [EventID, AreaID || null, CriteriaCode, CriteriaName, Description, ParentCriteriaID || null]
+            [EventID, AreaID || null, CriteriaCode, CriteriaName, safeDescription, ParentCriteriaID || null]
         );
 
         let eventName = null;

@@ -53,7 +53,7 @@ export default function EventTabs({ selectedEventId, onChange }) {
         {events.map(ev => {
           const id = ev.EventID || ev.id || ev.EventCode || '';
           const isActive = String(id) === String(selectedEventId);
-          const fullName = ev.EventName || ev.name || ev.EventCode || '';
+          const fullName = ev.EventCode || ev.EventName || ev.name || '';
           return (
             <button
               key={id || JSON.stringify(ev)}

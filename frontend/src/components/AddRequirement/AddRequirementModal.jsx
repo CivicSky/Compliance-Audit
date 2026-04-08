@@ -6,7 +6,8 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
         RequirementCode: '',
         Description: '',
         CriteriaID: '',
-        ParentRequirementCode: ''
+        ParentRequirementCode: '',
+        ChildCriteriaID: ''
     });
 
     const [eventsList, setEventsList] = useState([]);
@@ -39,7 +40,32 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
         } else {
             setRequirementsList([]);
         }
+        // clear selected child when criteria changes
+        setFormData(prev => ({ ...prev, ChildCriteriaID: '' }));
     }, [formData.CriteriaID]);
+
+    // When child selection changes, load requirements for that child (to populate parent options)
+    useEffect(() => {
+        if (formData.ChildCriteriaID) {
+            fetchRequirementsByCriteria(formData.ChildCriteriaID);
+        } else if (formData.CriteriaID) {
+            fetchRequirementsByCriteria(formData.CriteriaID);
+        } else {
+            setRequirementsList([]);
+        }
+        // also auto-generate requirement code based on parent criteria code
+        generateRequirementCode();
+    }, [formData.ChildCriteriaID]);
+
+    // Also regenerate when criteria list or criteria selection changes
+    useEffect(() => {
+        generateRequirementCode();
+    }, [criteriaList, formData.CriteriaID]);
+
+    // Regenerate when parent selection, child selection, or available requirements change
+    useEffect(() => {
+        generateRequirementCode();
+    }, [formData.ParentRequirementCode, formData.ChildCriteriaID, requirementsList]);
 
     const fetchEvents = async () => {
         try {
@@ -110,6 +136,49 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
         }
     };
 
+    // compute child criteria for selected criteria
+    const childCriteriaOptions = (criteriaList || []).filter(c => String(c.ParentCriteriaID || '') === String(formData.CriteriaID));
+
+    // top-level criteria (exclude children) for the main Criteria dropdown
+    const topLevelCriteria = (criteriaList || []).filter(c => c.ParentCriteriaID === null || c.ParentCriteriaID === undefined || String(c.ParentCriteriaID) === '');
+
+    const getBaseCriteriaCode = (criteriaId) => {
+        if (!criteriaId) return '';
+        const list = criteriaList || [];
+        const crit = list.find(c => String(c.CriteriaID) === String(criteriaId) || Number(c.CriteriaID) === Number(criteriaId));
+        if (!crit) return '';
+        const code = crit.CriteriaCode ?? crit.criteria_code ?? '';
+        if (code) return code;
+        const parentId = crit.ParentCriteriaID ?? crit.parent_criteria_id ?? null;
+        if (parentId) {
+            const parent = list.find(c => String(c.CriteriaID) === String(parentId) || Number(c.CriteriaID) === Number(parentId));
+            return parent?.CriteriaCode ?? parent?.criteria_code ?? '';
+        }
+        return '';
+    };
+
+    const generateRequirementCode = () => {
+        // Base code should always come from the parent criteria (children are grouping only)
+        const baseCriteriaId = formData.CriteriaID;
+        const baseCode = getBaseCriteriaCode(baseCriteriaId);
+        if (!baseCode) {
+            setFormData(prev => ({ ...prev, RequirementCode: '' }));
+            return;
+        }
+
+        // Determine list of existing requirements to compute next index
+        const targetCriteriaId = formData.ChildCriteriaID || formData.CriteriaID;
+        const list = (requirementsList || []).filter(r => String(r.CriteriaID) === String(targetCriteriaId));
+        const escapedBase = baseCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const nums = list.map(o => {
+            const rc = String(o.RequirementCode || '');
+            const m = rc.match(new RegExp(`^${escapedBase}\\.(\\d+)$`));
+            return m ? Number(m[1]) : null;
+        }).filter(n => n !== null);
+        const next = nums.length ? Math.max(...nums) + 1 : 1;
+        setFormData(prev => ({ ...prev, RequirementCode: `${baseCode}.${next}` }));
+    };
+
     const validateForm = () => {
         const newErrors = {};
         
@@ -144,10 +213,11 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
             const { requirementsAPI } = await import('../../utils/api');
             
             // Add requirement to database
+            const targetCriteriaId = formData.ChildCriteriaID ? formData.ChildCriteriaID : formData.CriteriaID;
             const response = await requirementsAPI.addRequirement({
                 RequirementCode: formData.RequirementCode,
                 Description: formData.Description,
-                CriteriaID: formData.CriteriaID,
+                CriteriaID: targetCriteriaId,
                 ParentRequirementCode: formData.ParentRequirementCode || null
             });
 
@@ -266,7 +336,7 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                             <option value="">
                                 {!formData.EventID ? 'Select an event first' : 'Select a criteria'}
                             </option>
-                            {criteriaList.map((criteria) => (
+                            {topLevelCriteria.map((criteria) => (
                                 <option key={criteria.CriteriaID} value={criteria.CriteriaID}>
                                     {criteria.CriteriaCode} - {criteria.CriteriaName}
                                 </option>
@@ -278,11 +348,11 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                         {isLoading && (
                             <p className="text-gray-500 text-sm mt-1">Loading criteria...</p>
                         )}
-                        {!isLoading && formData.EventID && criteriaList.length === 0 && (
-                            <p className="text-yellow-600 text-sm mt-1">No criteria found for this event.</p>
+                        {!isLoading && formData.EventID && topLevelCriteria.length === 0 && (
+                            <p className="text-yellow-600 text-sm mt-1">No top-level criteria found for this event.</p>
                         )}
-                        {!isLoading && criteriaList.length > 0 && (
-                            <p className="text-green-600 text-sm mt-1">Loaded {criteriaList.length} criteria for this event</p>
+                        {!isLoading && topLevelCriteria.length > 0 && (
+                            <p className="text-green-600 text-sm mt-1">Loaded {topLevelCriteria.length} top-level criteria for this event</p>
                         )}
                     </div>
 
@@ -323,6 +393,31 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                             </p>
                         )}
                     </div>
+
+                    {/* Child Criteria Dropdown (optional) */}
+                    {childCriteriaOptions.length > 0 && (
+                        <div className="mb-4">
+                            <label htmlFor="ChildCriteriaID" className="block text-sm font-medium text-gray-700 mb-1">
+                                Place under Child Criteria (Optional)
+                            </label>
+                            <select
+                                id="ChildCriteriaID"
+                                name="ChildCriteriaID"
+                                value={formData.ChildCriteriaID}
+                                onChange={handleInputChange}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                disabled={isSubmitting || !formData.CriteriaID}
+                            >
+                                <option value="">No child selected (use selected criteria)</option>
+                                {childCriteriaOptions.map(cc => (
+                                    <option key={cc.CriteriaID} value={cc.CriteriaID}>
+                                        {cc.CriteriaCode ? `${cc.CriteriaCode} - ${cc.CriteriaName}` : cc.CriteriaName}
+                                    </option>
+                                ))}
+                            </select>
+                            <p className="text-xs text-gray-500 mt-1">Choose a child criteria to save this requirement under that child.</p>
+                        </div>
+                    )}
 
                     {/* Requirement Code */}
                     <div className="mb-4">

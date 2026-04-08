@@ -78,10 +78,23 @@ export default function AddCriteriaModal({ isOpen, onClose, onSuccess }) {
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: value
-        }));
+        // if AreaID is cleared, also clear ParentCriteriaID to prevent selecting a parent without an area
+        if (name === 'AreaID' && value === '') {
+            setFormData(prev => ({
+                ...prev,
+                AreaID: value,
+                ParentCriteriaID: ''
+            }));
+        } else if (name === 'CriteriaCode') {
+            // remove any leading dots and normalize to uppercase
+            const sanitized = (value || '').replace(/^\.+/, '').toUpperCase();
+            setFormData(prev => ({ ...prev, CriteriaCode: sanitized }));
+        } else {
+            setFormData(prev => ({
+                ...prev,
+                [name]: value
+            }));
+        }
         if (errors[name]) {
             setErrors(prev => ({
                 ...prev,
@@ -97,7 +110,8 @@ export default function AddCriteriaModal({ isOpen, onClose, onSuccess }) {
         // If ParentCriteriaID is not set, AreaID is optional
         // If ParentCriteriaID is set, AreaID is also optional (criteria can be nested without area)
         // So, AreaID is always optional
-        if (!formData.CriteriaCode.trim()) newErrors.CriteriaCode = 'Criteria code is required';
+        // If creating a child (ParentCriteriaID set), CriteriaCode is not required and will be null
+        if (!formData.ParentCriteriaID && !formData.CriteriaCode.trim()) newErrors.CriteriaCode = 'Criteria code is required';
         if (!formData.CriteriaName.trim()) newErrors.CriteriaName = 'Criteria name is required';
         if (!formData.Description.trim()) newErrors.Description = 'Description is required';
         setErrors(newErrors);
@@ -109,10 +123,14 @@ export default function AddCriteriaModal({ isOpen, onClose, onSuccess }) {
         if (!validateForm()) return;
         setIsSubmitting(true);
         try {
+            const payload = {
+                ...formData,
+                CriteriaCode: formData.ParentCriteriaID ? null : (formData.CriteriaCode ? String(formData.CriteriaCode).replace(/^\.+/, '') : formData.CriteriaCode)
+            };
             const response = await fetch('http://localhost:5000/api/criteria/add', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData)
+                body: JSON.stringify(payload)
             });
             const data = await response.json();
             if (data.success) {
@@ -211,7 +229,8 @@ export default function AddCriteriaModal({ isOpen, onClose, onSuccess }) {
                                     value={formData.ParentCriteriaID}
                                     onChange={handleInputChange}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    disabled={isSubmitting || !formData.EventID || criteriaList.length === 0}
+                                    disabled={isSubmitting || !formData.EventID || criteriaList.length === 0 || !formData.AreaID}
+                                    title={!formData.AreaID ? 'Select an area first to choose a parent criteria' : ''}
                                 >
                                     <option value="">None (Top-level criteria)</option>
                                     {/* Only show criteria from the selected area, except the one being created */}
@@ -242,8 +261,8 @@ export default function AddCriteriaModal({ isOpen, onClose, onSuccess }) {
                                     value={formData.CriteriaCode}
                                     onChange={handleInputChange}
                                     className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.CriteriaCode ? 'border-red-500' : 'border-gray-300'}`}
-                                    placeholder="e.g., A.1, B.2.1"
-                                    disabled={isSubmitting}
+                                    placeholder={formData.ParentCriteriaID ? 'No code required for child criteria' : 'e.g., A.1, B.2.1'}
+                                    disabled={isSubmitting || !!formData.ParentCriteriaID}
                                 />
                                 {errors.CriteriaCode && <p className="text-red-500 text-xs mt-1">{errors.CriteriaCode}</p>}
                             </div>
@@ -345,7 +364,7 @@ export default function AddCriteriaModal({ isOpen, onClose, onSuccess }) {
                                                     <h3 className="font-semibold text-white text-base">
                                                         {(() => {
                                                             const parentCode = criteriaList.find(c => c.CriteriaID == formData.ParentCriteriaID)?.CriteriaCode || '';
-                                                            const code = formData.CriteriaCode || '';
+                                                            const code = (formData.CriteriaCode || '').replace(/^\.+/, '');
                                                             if (parentCode && code) {
                                                                 return `${parentCode}.${code}`;
                                                             }

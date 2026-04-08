@@ -6,7 +6,7 @@ import AddAreaPop from './addareapop';
 import EditAreaModal from '../EditArea/EditArea';
 import EditCriteriaModal from '../EditCriteria/EditCriteriaModal';
 import EditRequirementsModal from '../EditRequirements/EditRequirementsModal';
-import { usersAPI } from '../../utils/api';
+import { usersAPI, officesAPI } from '../../utils/api';
 import { useEffect } from 'react';
 
 export default function EventPopup({
@@ -52,6 +52,10 @@ export default function EventPopup({
     const [currentUser, setCurrentUser] = useState(null);
     const [isEditRequirementOpen, setIsEditRequirementOpen] = useState(false);
     const [editRequirementData, setEditRequirementData] = useState(null);
+    const [offices, setOffices] = useState([]);
+    const [loadingOffices, setLoadingOffices] = useState(false);
+    const [officeSearch, setOfficeSearch] = useState('');
+    const [selectedOfficeIdsLocal, setSelectedOfficeIdsLocal] = useState(new Set());
 
     useEffect(() => {
         let mounted = true;
@@ -66,6 +70,27 @@ export default function EventPopup({
         fetchCurrentUser();
         return () => { mounted = false; };
     }, []);
+    // load offices for the selected event
+    useEffect(() => {
+        let mounted = true;
+        const load = async () => {
+            if (!selectedEvent) return;
+            try {
+                setLoadingOffices(true);
+                const all = await officesAPI.getAll();
+                if (!mounted) return;
+                const forEvent = (all || []).filter(o => Number(o.event_id) === Number(selectedEvent.EventID) || Number(o.EventID) === Number(selectedEvent.EventID));
+                setOffices(forEvent);
+            } catch (err) {
+                console.error('Failed to load offices', err);
+                if (mounted) setOffices([]);
+            } finally {
+                if (mounted) setLoadingOffices(false);
+            }
+        };
+        load();
+        return () => { mounted = false; };
+    }, [selectedEvent]);
     if (!selectedEvent) return null;
 
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -95,7 +120,11 @@ export default function EventPopup({
         });
     };
 
-    const allAreasForEvent = areasData[selectedEvent.EventID] || [];
+    const allAreasForEvent = (areasData[selectedEvent.EventID] || []).slice().sort((a, b) => {
+        const aCode = String(a.AreaCode || a.AreaName || '').trim();
+        const bCode = String(b.AreaCode || b.AreaName || '').trim();
+        return aCode.localeCompare(bCode, undefined, { numeric: true, sensitivity: 'base' });
+    });
     const visibleAreas = allAreasForEvent.filter(area => {
         if (!hasSearch) return true;
         const matchingCriteria = getFilteredCriteria(criteriaData[area.AreaID] || []);
@@ -194,6 +223,16 @@ export default function EventPopup({
         });
     };
 
+    const toggleOfficeSelect = (office, checked) => {
+        const id = Number(office.id || office.OfficeID || office.office_id || office.OfficeID);
+        setSelectedOfficeIdsLocal(prev => {
+            const next = new Set(prev);
+            if (checked) next.add(id);
+            else next.delete(id);
+            return next;
+        });
+    };
+
     const deleteCount = selectedAreaIds.size + selectedCriteriaIds.size + selectedRequirementIds.size;
 
     const handleBulkDelete = async () => {
@@ -224,17 +263,10 @@ export default function EventPopup({
                 <div className="px-6 py-5 border-b border-slate-200 bg-white">
                     <div className="flex justify-between items-start gap-4">
                         <div>
-                            <h2 className="text-4xl font-bold tracking-tight text-slate-900">{selectedEvent.EventName}</h2>
-                            <p className="text-slate-600 mt-1">{selectedEvent.EventCode}</p>
+                            <h2 className="text-4xl font-bold tracking-tight text-slate-900">{selectedEvent.EventCode || selectedEvent.EventName}</h2>
+                            <p className="text-slate-600 mt-1">{selectedEvent.EventName || selectedEvent.EventCode}</p>
                         </div>
                         <div className="relative flex items-center gap-2 ml-4">
-                            <input
-                                type="text"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                placeholder="Search..."
-                                className="h-10 w-64 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                            />
                             <button
                                 onClick={() => setIsActionMenuOpen(prev => !prev)}
                                 className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
@@ -307,125 +339,224 @@ export default function EventPopup({
                     </div>
                 )}
 
-                {/* Hierarchy inside modal */}
-                <div className="flex-1 min-h-0 overflow-y-auto px-8 pb-8">
-                <div className="mt-6">
-                    {loadingAreas.has(selectedEvent.EventID) ? (
-                        <div className="text-center text-gray-500">Loading areas...</div>
-                    ) : allAreasForEvent.length === 0 ? (
-                        <div className="text-center text-gray-500">No areas found for this event</div>
-                    ) : hasSearch && !hasAnyVisibleResults ? (
-                        <div className="text-center text-gray-500">No matching results</div>
-                    ) : (
-                        <div className="space-y-3">
-                            {visibleAreas.map((area) => {
-                                const areaCriteria = getFilteredCriteria(criteriaData[area.AreaID] || []);
-                                return (
-                                <AreaSection
-                                    key={area.AreaID}
-                                    area={area}
-                                    isExpanded={expandedAreas.has(area.AreaID)}
-                                    onToggle={() => onToggleArea(area.AreaID)}
-                                    loading={loadingCriteria.has(area.AreaID)}
-                                    showCheckbox={deleteMode}
-                                    isChecked={selectedAreaIds.has(Number(area.AreaID))}
-                                    onToggleSelect={(checked) => toggleAreaSelect(area, checked)}
-                                    onMenuClick={(item) => { setEditAreaData(item); setIsEditAreaOpen(true); }}
-                                >
-                                    {loadingCriteria.has(area.AreaID) ? (
-                                        <p className="text-xs text-gray-500 ml-4 mt-2">Loading criteria...</p>
-                                    ) : areaCriteria.length === 0 ? (
-                                        <p className="text-xs text-gray-500 ml-4 mt-2">
-                                            {hasSearch ? 'No matching criteria' : 'No criteria'}
-                                        </p>
-                                    ) : (
-                                        <div className="relative mt-3 ml-6 pl-5">
-                                            <span className="absolute left-0 top-0 bottom-0 w-1 bg-purple-300 rounded-full" />
-                                            <div className="space-y-2">
-                                                {areaCriteria.map((crit) => (
-                                                    <CriteriaSection
-                                                        key={crit.CriteriaID}
-                                                        criteria={crit}
-                                                        isExpanded={expandedCriteria.has(crit.CriteriaID)}
-                                                        onToggle={() => onToggleCriteria(crit.CriteriaID)}
-                                                        loading={loadingRequirements.has(crit.CriteriaID)}
-                                                        showCheckbox={deleteMode}
-                                                        isChecked={selectedCriteriaIds.has(Number(crit.CriteriaID))}
-                                                        onToggleSelect={(checked) => toggleCriteriaSelect(crit, checked)}
-                                                        onMenuClick={(c) => { setEditCriteriaData(c); setIsEditCriteriaOpen(true); }}
-                                                    >
-                                                        <RequirementsSection
-                                                            requirements={getFilteredRequirementsForCriteria(crit.CriteriaID)}
-                                                            isLoading={loadingRequirements.has(crit.CriteriaID)}
-                                                            showCheckbox={deleteMode}
-                                                            selectedRequirementIds={selectedRequirementIds}
-                                                            onToggleRequirement={toggleRequirementSelect}
-                                                            onMenuClick={(req) => { setEditRequirementData(req); setIsEditRequirementOpen(true); }}
-                                                        />
-                                                    </CriteriaSection>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </AreaSection>
-                                );
-                            })}
-
-                            <div className="mt-6">
-                                <div
-                                    className="bg-slate-600 text-white p-4 rounded-lg flex items-center justify-between cursor-pointer hover:bg-slate-700 transition"
-                                    onClick={onToggleNoArea}
-                                >
-                                    <div>
-                                        <h3 className="font-semibold flex items-center gap-2">
-                                            <span>{expandedNoArea.has(selectedEvent.EventID) ? '▼' : '▶'}</span>
-                                            <span>No Area Assigned</span>
-                                        </h3>
-                                        <p className="text-xs text-slate-200 mt-1">Criteria without area assignment</p>
-                                    </div>
-                                    <span className="text-xs px-2 py-1 rounded bg-slate-500 text-slate-100">
-                                        {visibleNoAreaCriteria.length} criteria
-                                    </span>
+                {/* Hierarchy + Offices sidebar inside modal */}
+                <div className="flex-1 min-h-0 overflow-hidden px-6 pb-6">
+                    <div className="flex gap-6 h-full min-h-[300px]">
+                        <div className="w-1/3 border-r border-slate-200 pr-4 overflow-y-auto">
+                            <div className="py-2">
+                                <div className="sticky top-0 z-10 bg-white pt-2 pb-2">
+                                    <h4 className="text-sm font-semibold text-slate-700 mb-2">Offices</h4>
+                                    <input
+                                        type="text"
+                                        value={officeSearch}
+                                        onChange={(e) => setOfficeSearch(e.target.value)}
+                                        placeholder="Search offices..."
+                                        className="h-9 w-full rounded-md border border-slate-200 px-2 text-sm text-slate-700 shadow-sm focus:outline-none"
+                                    />
                                 </div>
 
-                                {expandedNoArea.has(selectedEvent.EventID) && loadingNoAreaCriteria.has(selectedEvent.EventID) ? (
-                                    <p className="text-xs text-gray-500 ml-4 mt-2">Loading no-area criteria...</p>
-                                ) : expandedNoArea.has(selectedEvent.EventID) && visibleNoAreaCriteria.length === 0 ? (
-                                    <p className="text-xs text-gray-500 ml-4 mt-2">
-                                        {hasSearch ? 'No matching criteria without area' : 'No criteria without area'}
-                                    </p>
-                                ) : expandedNoArea.has(selectedEvent.EventID) ? (
-                                    <div className="relative mt-3 ml-6 pl-5">
-                                        <span className="absolute left-0 top-0 bottom-0 w-1 bg-purple-300 rounded-full" />
-                                        <div className="space-y-2">
-                                            {visibleNoAreaCriteria.map((crit) => (
-                                                <CriteriaSection
-                                                    key={crit.CriteriaID}
-                                                    criteria={crit}
-                                                    isExpanded={expandedCriteria.has(crit.CriteriaID)}
-                                                    onToggle={() => onToggleCriteria(crit.CriteriaID)}
-                                                    loading={loadingRequirements.has(crit.CriteriaID)}
-                                                    showCheckbox={deleteMode}
-                                                    isChecked={selectedCriteriaIds.has(Number(crit.CriteriaID))}
-                                                    onToggleSelect={(checked) => toggleCriteriaSelect(crit, checked)}
-                                                >
-                                                    <RequirementsSection
-                                                        requirements={getFilteredRequirementsForCriteria(crit.CriteriaID)}
-                                                        isLoading={loadingRequirements.has(crit.CriteriaID)}
-                                                        showCheckbox={deleteMode}
-                                                        selectedRequirementIds={selectedRequirementIds}
-                                                        onToggleRequirement={toggleRequirementSelect}
-                                                        onMenuClick={(req) => { setEditRequirementData(req); setIsEditRequirementOpen(true); }}
-                                                    />
-                                                </CriteriaSection>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ) : null}
+                                <div className="mt-3 space-y-2 pt-2">
+                                    {loadingOffices ? (
+                                        <div className="text-sm text-gray-500">Loading offices...</div>
+                                    ) : offices.length === 0 ? (
+                                        <div className="text-sm text-gray-500">No offices for this event</div>
+                                    ) : (
+                                        (offices || []).filter(o => String(o.office_name || o.OfficeName || o.office_name || '').toLowerCase().includes(officeSearch.trim().toLowerCase())).map((office) => (
+                                            <div
+                                                key={office.id || office.OfficeID || office.office_id}
+                                                className="flex items-center gap-2 rounded-lg border px-2.5 py-2 text-sm transition border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                                            >
+                                                <span className="truncate">{office.office_name || office.OfficeName || office.office_name}</span>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
                             </div>
                         </div>
-                    )}
-                </div>
+
+                        <div className="flex-1 overflow-y-auto pl-4">
+                            <div className="sticky top-0 z-10 bg-white pt-3 pb-2">
+                                <h4 className="text-sm font-semibold text-slate-700 mb-2">Areas</h4>
+                                <input
+                                    type="text"
+                                    className="h-9 w-full rounded-md border border-slate-200 px-2 text-sm text-slate-700 shadow-sm focus:outline-none"
+                                    placeholder="Search areas, criteria, or requirements..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
+                            </div>
+                            <div className="mt-2 pt-2">
+                                {loadingAreas.has(selectedEvent.EventID) ? (
+                                    <div className="text-center text-gray-500">Loading areas...</div>
+                                ) : allAreasForEvent.length === 0 ? (
+                                    <div className="text-center text-gray-500">No areas found for this event</div>
+                                ) : hasSearch && !hasAnyVisibleResults ? (
+                                    <div className="text-center text-gray-500">No matching results</div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {visibleAreas.map((area) => {
+                                            const areaCriteria = getFilteredCriteria(criteriaData[area.AreaID] || []);
+                                            return (
+                                                <AreaSection
+                                                    key={area.AreaID}
+                                                    area={area}
+                                                    isExpanded={expandedAreas.has(area.AreaID)}
+                                                    onToggle={() => onToggleArea(area.AreaID)}
+                                                    loading={loadingCriteria.has(area.AreaID)}
+                                                    showCheckbox={deleteMode}
+                                                    isChecked={selectedAreaIds.has(Number(area.AreaID))}
+                                                    onToggleSelect={(checked) => toggleAreaSelect(area, checked)}
+                                                    onMenuClick={(item) => { setEditAreaData(item); setIsEditAreaOpen(true); }}
+                                                >
+                                                    {loadingCriteria.has(area.AreaID) ? (
+                                                        <p className="text-xs text-gray-500 ml-4 mt-2">Loading criteria...</p>
+                                                    ) : areaCriteria.length === 0 ? (
+                                                        <p className="text-xs text-gray-500 ml-4 mt-2">
+                                                            {hasSearch ? 'No matching criteria' : 'No criteria'}
+                                                        </p>
+                                                    ) : (
+                                                        <div className="relative mt-3 ml-6 pl-5">
+                                                            <span className="absolute left-0 top-0 bottom-0 w-1 bg-purple-300 rounded-full" />
+                                                            <div className="space-y-2">
+                                                                {(() => {
+                                                                    // Build a tree of criteria by ParentCriteriaID
+                                                                    const list = areaCriteria || [];
+                                                                    const map = new Map();
+                                                                    const roots = [];
+                                                                    for (const c of list) {
+                                                                        const id = String(c.CriteriaID);
+                                                                        map.set(id, { ...c, children: [] });
+                                                                    }
+                                                                    for (const c of list) {
+                                                                        const parentId = c.ParentCriteriaID ?? c.ParentCriteriaID;
+                                                                        const id = String(c.CriteriaID);
+                                                                        if (parentId === null || parentId === undefined || String(parentId) === '' ) {
+                                                                            roots.push(map.get(id));
+                                                                        } else {
+                                                                            const p = map.get(String(parentId));
+                                                                            if (p) p.children.push(map.get(id));
+                                                                            else roots.push(map.get(id));
+                                                                        }
+                                                                    }
+
+                                                                    const renderNode = (node, depth = 0) => (
+                                                                        <CriteriaSection
+                                                                            key={node.CriteriaID}
+                                                                            criteria={node}
+                                                                            isExpanded={expandedCriteria.has(node.CriteriaID)}
+                                                                            onToggle={() => onToggleCriteria(node.CriteriaID)}
+                                                                            loading={loadingRequirements.has(node.CriteriaID)}
+                                                                            showCheckbox={deleteMode}
+                                                                            isChecked={selectedCriteriaIds.has(Number(node.CriteriaID))}
+                                                                            onToggleSelect={(checked) => toggleCriteriaSelect(node, checked)}
+                                                                            onMenuClick={(c) => { setEditCriteriaData(c); setIsEditCriteriaOpen(true); }}
+                                                                        >
+                                                                            <div className="ml-6 space-y-2">
+                                                                                {node.children && node.children.map(child => renderNode(child, depth + 1))}
+                                                                                <RequirementsSection
+                                                                                    requirements={getFilteredRequirementsForCriteria(node.CriteriaID)}
+                                                                                    isLoading={loadingRequirements.has(node.CriteriaID)}
+                                                                                    showCheckbox={deleteMode}
+                                                                                    selectedRequirementIds={selectedRequirementIds}
+                                                                                    onToggleRequirement={toggleRequirementSelect}
+                                                                                    onMenuClick={(req) => { setEditRequirementData(req); setIsEditRequirementOpen(true); }}
+                                                                                />
+                                                                            </div>
+                                                                        </CriteriaSection>
+                                                                    );
+
+                                                                    return roots.map(r => renderNode(r));
+                                                                })()}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </AreaSection>
+                                            );
+                                        })}
+
+                                        <div className="mt-6">
+                                            <div
+                                                className="bg-slate-600 text-white p-4 rounded-lg flex items-center justify-between cursor-pointer hover:bg-slate-700 transition"
+                                                onClick={onToggleNoArea}
+                                            >
+                                                <div>
+                                                    <h3 className="font-semibold flex items-center gap-2">
+                                                        <span>{expandedNoArea.has(selectedEvent.EventID) ? '▼' : '▶'}</span>
+                                                        <span>No Area Assigned</span>
+                                                    </h3>
+                                                    <p className="text-xs text-slate-200 mt-1">Criteria without area assignment</p>
+                                                </div>
+                                                <span className="text-xs px-2 py-1 rounded bg-slate-500 text-slate-100">
+                                                    {visibleNoAreaCriteria.length} criteria
+                                                </span>
+                                            </div>
+
+                                            {expandedNoArea.has(selectedEvent.EventID) && loadingNoAreaCriteria.has(selectedEvent.EventID) ? (
+                                                <p className="text-xs text-gray-500 ml-4 mt-2">Loading no-area criteria...</p>
+                                            ) : expandedNoArea.has(selectedEvent.EventID) && visibleNoAreaCriteria.length === 0 ? (
+                                                <p className="text-xs text-gray-500 ml-4 mt-2">
+                                                    {hasSearch ? 'No matching criteria without area' : 'No criteria without area'}
+                                                </p>
+                                            ) : expandedNoArea.has(selectedEvent.EventID) ? (
+                                                <div className="relative mt-3 ml-6 pl-5">
+                                                    <span className="absolute left-0 top-0 bottom-0 w-1 bg-purple-300 rounded-full" />
+                                                    <div className="space-y-2">
+                                                        {(() => {
+                                                            const list = visibleNoAreaCriteria || [];
+                                                            const map = new Map();
+                                                            const roots = [];
+                                                            for (const c of list) {
+                                                                const id = String(c.CriteriaID);
+                                                                map.set(id, { ...c, children: [] });
+                                                            }
+                                                            for (const c of list) {
+                                                                const parentId = c.ParentCriteriaID ?? c.ParentCriteriaID;
+                                                                const id = String(c.CriteriaID);
+                                                                if (parentId === null || parentId === undefined || String(parentId) === '' ) {
+                                                                    roots.push(map.get(id));
+                                                                } else {
+                                                                    const p = map.get(String(parentId));
+                                                                    if (p) p.children.push(map.get(id));
+                                                                    else roots.push(map.get(id));
+                                                                }
+                                                            }
+
+                                                            const renderNode = (node) => (
+                                                                <CriteriaSection
+                                                                    key={node.CriteriaID}
+                                                                    criteria={node}
+                                                                    isExpanded={expandedCriteria.has(node.CriteriaID)}
+                                                                    onToggle={() => onToggleCriteria(node.CriteriaID)}
+                                                                    loading={loadingRequirements.has(node.CriteriaID)}
+                                                                    showCheckbox={deleteMode}
+                                                                    isChecked={selectedCriteriaIds.has(Number(node.CriteriaID))}
+                                                                    onToggleSelect={(checked) => toggleCriteriaSelect(node, checked)}
+                                                                >
+                                                                    <div className="ml-6 space-y-2">
+                                                                        {node.children && node.children.map(child => renderNode(child))}
+                                                                        <RequirementsSection
+                                                                            requirements={getFilteredRequirementsForCriteria(node.CriteriaID)}
+                                                                            isLoading={loadingRequirements.has(node.CriteriaID)}
+                                                                            showCheckbox={deleteMode}
+                                                                            selectedRequirementIds={selectedRequirementIds}
+                                                                            onToggleRequirement={toggleRequirementSelect}
+                                                                            onMenuClick={(req) => { setEditRequirementData(req); setIsEditRequirementOpen(true); }}
+                                                                        />
+                                                                    </div>
+                                                                </CriteriaSection>
+                                                            );
+
+                                                            return roots.map(r => renderNode(r));
+                                                        })()}
+                                                    </div>
+                                                </div>
+                                            ) : null}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
