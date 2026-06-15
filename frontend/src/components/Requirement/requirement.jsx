@@ -6,6 +6,7 @@ import EditRequirementsModal from "../EditRequirements/EditRequirementsModal";
 import RequirementsP from "../RequirementsProfile/RequirementsProfile";
 import UnifiedSetupWizard from "../UnifiedSetupWizard/UnifiedSetupWizard";
 import { eventsAPI, usersAPI } from "../../utils/api";
+import { useModal } from "../UI/ModalProvider";
 import { Wand2 } from "lucide-react";
 
 export default function RequirementBars() {
@@ -25,9 +26,10 @@ export default function RequirementBars() {
     });
     const [events, setEvents] = useState([]);
     const requirementsPRef = useRef();
+    const { showAlert, showConfirm } = useModal();
 
     // Default to admin (show features) until we confirm otherwise
-    const isAdmin = !currentUser || currentUser.RoleName === 'admin' || currentUser.RoleID === 1;
+    const isAdmin = !!(currentUser && (currentUser.RoleName === 'admin' || currentUser.RoleID === 1));
 
     // Fetch current user on mount
     useEffect(() => {
@@ -145,10 +147,7 @@ export default function RequirementBars() {
         if (selectedIds.length === 0 || !requirementsPRef.current) return;
         
         // Confirm deletion
-        const confirmed = window.confirm(
-            `Are you sure you want to delete ${selectedIds.length} requirement(s)? This action cannot be undone.`
-        );
-        
+        const confirmed = await showConfirm(`Are you sure you want to delete ${selectedIds.length} requirement(s)? This action cannot be undone.`);
         if (!confirmed) return;
         
         try {
@@ -160,15 +159,15 @@ export default function RequirementBars() {
                 setDeleteMode(false);
                 // Show success message
                 console.log('Successfully deleted selected requirements');
-                alert(`Successfully deleted ${selectedIds.length} requirement(s)`);
+                await showAlert(`Successfully deleted ${selectedIds.length} requirement(s)`);
             } else {
                 // Show error message
                 console.error('Failed to delete requirements:', result.message);
-                alert(result.message || 'Failed to delete requirements');
+                await showAlert(result.message || 'Failed to delete requirements');
             }
         } catch (error) {
             console.error('Error deleting requirements:', error);
-            alert('An error occurred while deleting requirements');
+            await showAlert('An error occurred while deleting requirements');
         }
     };
 

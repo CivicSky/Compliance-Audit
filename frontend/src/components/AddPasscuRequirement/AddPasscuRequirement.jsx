@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { useModal } from "../UI/ModalProvider";
+import { API_BASE_URL } from '../../utils/apiBase';
 
 export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
     const [formData, setFormData] = useState({
@@ -18,6 +20,7 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
     const [errors, setErrors] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const { showAlert } = useModal();
 
     // Fetch events when modal opens and auto-load PASSCU areas and criteria
     useEffect(() => {
@@ -80,7 +83,7 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
     const fetchAreasByEvent = async (eventId) => {
         setIsLoading(true);
         try {
-            const response = await fetch(`http://localhost:5000/api/areas/event/${eventId}`);
+            const response = await fetch(`${API_BASE_URL}/api/areas/event/${eventId}`);
             const data = await response.json();
             console.log('Areas response:', data);
             
@@ -212,14 +215,14 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                 }
                 
                 onClose();
-                alert('Requirement added successfully!');
+                await showAlert('Requirement added successfully!');
             } else {
-                alert(response.message || 'Failed to add requirement');
+                await showAlert(response.message || 'Failed to add requirement');
             }
             
         } catch (error) {
             console.error('Error submitting form:', error);
-            alert('An error occurred while adding the requirement. Please try again.');
+            await showAlert('An error occurred while adding the requirement. Please try again.');
         } finally {
             setIsSubmitting(false);
         }

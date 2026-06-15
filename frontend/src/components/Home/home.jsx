@@ -70,7 +70,7 @@ export default function Home() {
     const [currentUser, setCurrentUser] = useState(null);
 
     // Default to admin (show features) until we confirm otherwise
-    const isAdmin = !currentUser || currentUser.RoleName === 'admin' || currentUser.RoleID === 1;
+    const isAdmin = !!(currentUser && (currentUser.RoleName === 'admin' || currentUser.RoleID === 1));
 
     useEffect(() => {
         const fetchCurrentUser = async () => {
@@ -363,9 +363,11 @@ export default function Home() {
             }
 
             const totalOfficesForEvent = eventOfficeIds.length;
-            const completionPercent = totalOfficesForEvent > 0
-                ? Math.round((compiledOfficeCount / totalOfficesForEvent) * 100)
+            const totalRequirementRows = rowsForEvent.length;
+            const rawCompletionPercent = totalRequirementRows > 0
+                ? Math.round((compiledRequirements / totalRequirementRows) * 100)
                 : 0;
+            const completionPercent = Math.min(100, Math.max(0, rawCompletionPercent));
 
             return {
                 id: eventId,

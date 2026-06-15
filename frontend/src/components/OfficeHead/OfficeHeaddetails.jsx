@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import user from "../../assets/images/user.svg";
 import { eventsAPI } from "../../utils/api";
+import { API_BASE_URL } from '../../utils/apiBase';
 
 export default function OfficeHeaddetails({ visible, onClose, head, offices = [] }) {
 	const [eventNameById, setEventNameById] = useState({});
@@ -15,10 +16,8 @@ export default function OfficeHeaddetails({ visible, onClose, head, offices = []
 	const missingEventIds = useMemo(() => {
 		const ids = new Set();
 		offices.forEach((office) => {
-			const directEventName = office.EventName || office.event_name || office.eventName;
-			if (directEventName) return;
-
 			const eventId = getEventId(office);
+			// Always attempt to fetch event metadata (codes) when we have an EventID
 			if (eventId && !eventNameById[eventId]) {
 				ids.add(eventId);
 			}
@@ -39,9 +38,12 @@ export default function OfficeHeaddetails({ visible, onClose, head, offices = []
 				const fetchedMap = {};
 				events.forEach((event) => {
 					const eventId = Number(event.EventID ?? event.event_id ?? event.id);
-					const eventName = event.EventName || event.event_name || event.eventName;
-					if (Number.isInteger(eventId) && eventName) {
-						fetchedMap[eventId] = eventName;
+					// Prefer EventCode to keep labels short; fallback to EventName
+					const eventCode = event.EventCode || event.event_code || event.code || null;
+					const eventName = event.EventName || event.event_name || event.eventName || null;
+					const label = eventCode || eventName;
+					if (Number.isInteger(eventId) && label) {
+						fetchedMap[eventId] = label;
 					}
 				});
 
@@ -61,13 +63,19 @@ export default function OfficeHeaddetails({ visible, onClose, head, offices = []
 	}, [visible, missingEventIds]);
 
 	const getEventLabel = (office = {}) => {
-		const eventName = office.EventName || office.event_name || office.eventName;
-		if (eventName) return eventName;
+		// Prefer explicit EventCode if present on the office record
+		const eventCode = office.EventCode || office.event_code || office.code || null;
+		if (eventCode) return eventCode;
 
+		// If we have an EventID and fetched mapping (which stores code when available), prefer that next
 		const eventId = getEventId(office);
 		if (eventId && eventNameById[eventId]) {
 			return eventNameById[eventId];
 		}
+
+		// Otherwise use EventName if present on the office record
+		const eventName = office.EventName || office.event_name || office.eventName;
+		if (eventName) return eventName;
 
 		return 'Unknown event';
 	};
@@ -103,10 +111,9 @@ export default function OfficeHeaddetails({ visible, onClose, head, offices = []
 	const profilePicUrl = safeHead.TempPreview
 		? safeHead.TempPreview
 		: safeHead.ProfilePic
-			? `http://localhost:5000/uploads/profile-pics/${safeHead.ProfilePic}`
+			? `${API_BASE_URL}/uploads/profile-pics/${safeHead.ProfilePic}`
 			: user;
 
-	const employeeCode = `#EMP${String(safeHead.HeadID || '').padStart(3, '0')}`;
 
 	return (
 		<div
@@ -117,24 +124,23 @@ export default function OfficeHeaddetails({ visible, onClose, head, offices = []
 			<div className="w-full max-w-4xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.28)]" onClick={(e) => e.stopPropagation()}>
 				<div className="flex items-start justify-between border-b border-slate-200 bg-gradient-to-r from-slate-50 via-white to-cyan-50 px-6 py-5">
 					<div className="flex min-w-0 items-center gap-4">
-						<div className="h-16 w-16 rounded-full bg-[#d6f0ec] p-0.5 ring-2 ring-white shadow-sm flex-shrink-0">
-							<img
-								src={profilePicUrl}
-								alt={fullName}
-								className="h-full w-full rounded-full border border-white object-cover"
-								onError={(e) => {
-									e.target.src = user;
-								}}
-							/>
-						</div>
-						<div className="min-w-0">
-							<h3 className="truncate text-2xl font-semibold tracking-tight text-slate-900">{fullName}</h3>
-							<div className="mt-1 flex flex-wrap items-center gap-2">
-								<span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-700">{safeHead.Position || 'Office Personnel'}</span>
-								<span className="rounded-full bg-cyan-100 px-3 py-1 text-sm font-semibold text-cyan-800">{employeeCode}</span>
+							<div className="h-24 w-24 rounded-full bg-[#d6f0ec] p-0.5 ring-2 ring-white shadow-sm flex-shrink-0">
+								<img
+									src={profilePicUrl}
+									alt={fullName}
+									className="h-full w-full rounded-full border border-white object-cover"
+									onError={(e) => {
+										e.target.src = user;
+									}}
+								/>
+							</div>
+							<div className="min-w-0">
+								<h3 className="truncate text-3xl font-semibold tracking-tight text-slate-900">{fullName}</h3>
+								<div className="mt-1 flex flex-wrap items-center gap-2">
+									<span className="rounded-full bg-slate-100 px-4 py-1 text-base font-medium text-slate-700">{safeHead.Position || 'Office Personnel'}</span>
+								</div>
 							</div>
 						</div>
-					</div>
 					<button
 						onClick={onClose}
 						className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"

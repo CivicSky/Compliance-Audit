@@ -1,9 +1,12 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from "react";
+import { createPortal } from 'react-dom';
 import user from "../../assets/images/user.svg";
 import { officeHeadsAPI, officesAPI, usersAPI } from "../../utils/api";
+import { useModal } from "../UI/ModalProvider";
 import EditOfficeHeadModal from '../EditHead/EditOfficeHeadModal.jsx';
 import Pagination from "../Pagination/Pagination";
 import OfficeHeaddetails from "../OfficeHead/OfficeHeaddetails.jsx";
+import { API_BASE_URL } from '../../utils/apiBase';
 
 const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode = false, onSelectionChange, viewMode = 'grid' }, ref) => {
     const [officeHeads, setOfficeHeads] = useState([]);
@@ -163,7 +166,7 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
     const deleteSelectedHeads = async (headIds) => {
         try {
             console.log('Attempting to delete heads:', headIds);
-            console.log('API Base URL:', 'http://localhost:5000/api/officeheads/delete');
+            console.log('API Base URL:', `${API_BASE_URL}/api/officeheads/delete`);
             
             // Make API call to delete heads
             const response = await officeHeadsAPI.deleteHeads(headIds);
@@ -235,6 +238,8 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
     const [selectedHead, setSelectedHead] = useState(null);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [actionMenuHeadId, setActionMenuHeadId] = useState(null);
+    const [actionMenuAnchorRect, setActionMenuAnchorRect] = useState(null);
+    const { showConfirm, showAlert } = useModal();
 
     const openEdit = (person) => {
         setSelectedHead(person);
@@ -249,14 +254,14 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
     const handleDeleteHead = async (person) => {
         if (!person?.HeadID) return;
 
-        const confirmed = window.confirm(`Delete office personnel "${person.FirstName || ''} ${person.LastName || ''}"? This cannot be undone.`);
+        const confirmed = await showConfirm(`Delete office personnel "${person.FirstName || ''} ${person.LastName || ''}"? This cannot be undone.`);
         if (!confirmed) return;
 
         const result = await deleteSelectedHeads([person.HeadID]);
         if (result?.success) {
-            alert('Office personnel deleted successfully.');
+            await showAlert('Office personnel deleted successfully.');
         } else {
-            alert(result?.message || 'Failed to delete office personnel.');
+            await showAlert(result?.message || 'Failed to delete office personnel.');
         }
     };
 
@@ -273,10 +278,27 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
             }
 
             setActionMenuHeadId(null);
+            setActionMenuAnchorRect(null);
         };
 
         document.addEventListener('mousedown', closeOnOutsideClick);
         return () => document.removeEventListener('mousedown', closeOnOutsideClick);
+    }, [actionMenuHeadId]);
+
+    useEffect(() => {
+        if (!actionMenuHeadId) return;
+
+        const closeOnScrollOrResize = () => {
+            setActionMenuHeadId(null);
+            setActionMenuAnchorRect(null);
+        };
+
+        window.addEventListener('resize', closeOnScrollOrResize);
+        window.addEventListener('scroll', closeOnScrollOrResize, true);
+        return () => {
+            window.removeEventListener('resize', closeOnScrollOrResize);
+            window.removeEventListener('scroll', closeOnScrollOrResize, true);
+        };
     }, [actionMenuHeadId]);
 
     const handleSave = async (updated) => {
@@ -294,17 +316,17 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
 
             const response = await officeHeadsAPI.updateHead(updated.HeadID, formData);
             if (!response?.success) {
-                alert(response?.message || 'Failed to update office personnel.');
+                await showAlert(response?.message || 'Failed to update office personnel.');
                 return false;
             }
 
             await fetchOfficeHeads();
             await fetchOffices();
-            alert('Office personnel updated successfully.');
+            await showAlert('Office personnel updated successfully.');
             return true;
         } catch (error) {
             console.error('Error updating office personnel:', error);
-            alert(error?.response?.data?.message || error?.message || 'Failed to update office personnel.');
+            await showAlert(error?.response?.data?.message || error?.message || 'Failed to update office personnel.');
             return false;
         }
     };
@@ -364,11 +386,12 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
         return false;
     };
 
-    const itemsPerPage = 8; // 4 columns x 2 rows on desktop
+    const itemsPerPage = 30; // limit to 30 per page
     const totalPages = Math.max(1, Math.ceil(filteredOfficeHeads.length / itemsPerPage));
     const startIdx = (currentPage - 1) * itemsPerPage;
     const paginatedOfficeHeads = filteredOfficeHeads.slice(startIdx, startIdx + itemsPerPage);
-    const visibleOfficeHeads = viewMode === 'list' ? filteredOfficeHeads : paginatedOfficeHeads;
+    // Use pagination for both list and grid views so the UI is consistent
+    const visibleOfficeHeads = paginatedOfficeHeads;
 
     useEffect(() => {
         if (currentPage > totalPages) {
@@ -463,7 +486,7 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                     const profilePicUrl = person.TempPreview
                         ? person.TempPreview
                         : person.ProfilePic
-                            ? `http://localhost:5000/uploads/profile-pics/${person.ProfilePic}`
+                            ? `${API_BASE_URL}/uploads/profile-pics/${person.ProfilePic}`
                             : user;
                     const assignedOffices = offices.filter((office) => officeHasHead(office, person.HeadID));
                     const isAssigned = assignedOffices.length > 0;
@@ -485,123 +508,89 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                         return (
                             <div
                                 key={person.HeadID}
-                                className={`relative overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all duration-200 ${
-                                    selectedHeads.has(person.HeadID) ? 'ring-2 ring-blue-500' : ''
-                                } ${deleteMode ? 'cursor-pointer hover:border-gray-300' : 'hover:border-indigo-200 hover:shadow-md'}`}
                                 onClick={() => {
                                     if (deleteMode) toggleHeadSelection(person.HeadID);
+                                    else openDetails(person, assignedOffices);
                                 }}
+                                className={`relative overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all duration-150 ${
+                                    selectedHeads.has(person.HeadID) ? 'ring-2 ring-blue-500' : ''
+                                } ${deleteMode ? 'cursor-pointer hover:border-gray-300' : 'hover:border-indigo-200 hover:shadow-md'}`}
                             >
-                                <div className="flex items-center gap-3 px-3 py-2">
-                                    {deleteMode && (
-                                        <div className="flex-shrink-0">
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedHeads.has(person.HeadID)}
-                                                onChange={(e) => handleCheckboxChange(person.HeadID, e.target.checked)}
-                                                onClick={(e) => e.stopPropagation()}
-                                                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                <div className="grid grid-cols-8 items-center gap-2 px-4 py-3">
+                                    {/* Name column (col-span-4) */}
+                                    <div className="col-span-4 flex items-center gap-3 min-w-0">
+                                        {deleteMode && (
+                                            <div className="flex-shrink-0">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedHeads.has(person.HeadID)}
+                                                    onChange={(e) => handleCheckboxChange(person.HeadID, e.target.checked)}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                />
+                                            </div>
+                                        )}
+
+                                        <div className="h-14 w-14 flex-shrink-0 rounded-full p-0.5 overflow-hidden">
+                                            <img
+                                                src={profilePicUrl}
+                                                alt={fullName}
+                                                className="h-14 w-14 rounded-full object-cover border border-white"
+                                                onError={(e) => { e.target.src = user; }}
                                             />
                                         </div>
-                                    )}
 
-                                    <div className="h-9 w-9 flex-shrink-0 rounded-full bg-[#d6f0ec] p-0.5">
-                                        <img
-                                            src={profilePicUrl}
-                                            alt={fullName}
-                                            className="h-full w-full rounded-full border border-white object-cover"
-                                            onError={(e) => {
-                                                e.target.src = user;
-                                            }}
-                                        />
-                                    </div>
-
-                                    <div className="min-w-0 flex-1">
-                                        <div className="flex items-center gap-2">
-                                            <h3 className="truncate text-[13px] font-semibold text-gray-900">{fullName}</h3>
-                                            <span
-                                                className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${statusClass}`}
-                                                style={{
-                                                    transition: 'transform 180ms ease',
-                                                    transform: deleteMode ? 'translateX(20px)' : 'translateX(0)'
-                                                }}
-                                            >
-                                                {isAssigned ? 'Assigned' : 'Unassigned'}
-                                            </span>
-                                        </div>
-
-                                        {!isExpanded ? (
-                                            <div className="mt-0.5 flex items-center gap-2 text-[11px] text-gray-600">
-                                                {/* Removed employeeCode per user request */}
-                                                <span className="text-gray-300">|</span>
-                                                <span className="truncate">{email}</span>
+                                        <div className="min-w-0">
+                                            <div className="flex items-center gap-2">
+                                                <h3 className="truncate text-[13px] font-semibold text-gray-900">{fullName}</h3>
                                             </div>
-                                        ) : (
-                                            <p className="mt-0.5 truncate text-[11px] text-gray-600">
-                                                <span className="font-semibold text-gray-700">Assigned offices:</span>{' '}
-                                                {assignedOfficeNames || 'Not assigned to any office'}
-                                            </p>
-                                        )}
-                                        <p className="mt-0.5 truncate text-[10px] text-slate-500" title={assignedOfficeNames || 'Not assigned to any office'}>
-                                            Office: {assignedOfficeSummary}
-                                        </p>
+                                            <div className="mt-0.5 text-[11px] text-gray-600 truncate">{email}</div>
+                                        </div>
                                     </div>
 
-                                        <div className="ml-auto flex items-center gap-2">
-                                        <div className="flex flex-col items-end leading-tight">
-                                            <p className="whitespace-nowrap text-[10px] text-gray-500">Join {joinDate}</p>
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    openDetails(person, assignedOffices);
-                                                }}
-                                                className="mt-1 text-[11px] font-semibold text-gray-700 transition hover:text-blue-600"
-                                            >
-                                                View details
-                                            </button>
-                                        </div>
-                                        {isAdmin && (
-                                            <div className="relative">
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setActionMenuHeadId((prev) => (prev === person.HeadID ? null : person.HeadID));
-                                                }}
-                                                className="office-head-actions-button inline-flex h-6 w-6 items-center justify-center rounded-full text-gray-950 transition hover:bg-gray-100 hover:text-black"
-                                                aria-label="Open office personnel actions"
-                                                title="Actions"
-                                            >
-                                                <svg className="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 6h.01M12 12h.01M12 18h.01" />
-                                                </svg>
-                                            </button>
+                                    {/* Role column (col-span-2) */}
+                                    <div className="col-span-2 flex items-center justify-center">
+                                        <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold bg-indigo-50 text-indigo-700 border-indigo-200">
+                                            {person.RoleName || person.role || 'Personnel'}
+                                        </span>
+                                    </div>
 
-                                            {actionMenuHeadId === person.HeadID && (
-                                                <div className="office-head-actions-menu absolute right-0 top-7 z-30 w-32 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
+                                    {/* Status column (col-span-1) */}
+                                    <div className="col-span-1 flex items-center justify-center">
+                                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${statusClass}`}>
+                                            {isAssigned ? 'Assigned' : 'Unassigned'}
+                                        </span>
+                                    </div>
+
+                                    {/* Actions column (col-span-1) */}
+                                    <div className="col-span-1 flex items-center justify-end">
+                                            <div className="flex items-center gap-2">
+                                            {isAdmin && (
+                                                <div className="relative">
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            setActionMenuHeadId(null);
-                                                            openEdit(person);
+                                                            const rect = e.currentTarget.getBoundingClientRect();
+                                                            const isOpen = actionMenuHeadId === person.HeadID;
+                                                            if (isOpen) {
+                                                                setActionMenuHeadId(null);
+                                                                setActionMenuAnchorRect(null);
+                                                            } else {
+                                                                setActionMenuHeadId(person.HeadID);
+                                                                setActionMenuAnchorRect(rect);
+                                                            }
                                                         }}
-                                                        className="w-full px-3 py-2 text-left text-xs text-slate-700 transition hover:bg-slate-50"
+                                                            className="office-head-actions-button inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-100"
+                                                        aria-label="Open office personnel actions"
+                                                        title="Actions"
                                                     >
-                                                        Edit
-                                                    </button>
-                                                    <button
-                                                        onClick={async (e) => {
-                                                            e.stopPropagation();
-                                                            setActionMenuHeadId(null);
-                                                            await handleDeleteHead(person);
-                                                        }}
-                                                        className="w-full px-3 py-2 text-left text-xs text-red-600 transition hover:bg-red-50"
-                                                    >
-                                                        Delete
+                                                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6h.01M12 12h.01M12 18h.01" />
+                                                        </svg>
                                                     </button>
                                                 </div>
                                             )}
-                                            </div>
-                                        )}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -616,6 +605,7 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                             } ${deleteMode ? 'cursor-pointer hover:-translate-y-0.5 hover:shadow-[0_10px_18px_rgba(15,23,42,0.12)]' : 'hover:border-cyan-200 hover:shadow-[0_14px_28px_rgba(15,23,42,0.12)]'} min-h-[240px]`}
                             onClick={() => {
                                 if (deleteMode) toggleHeadSelection(person.HeadID);
+                                else openDetails(person, assignedOffices);
                             }}
                         >
                             <input
@@ -660,87 +650,58 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        setActionMenuHeadId((prev) => (prev === person.HeadID ? null : person.HeadID));
+                                                        const rect = e.currentTarget.getBoundingClientRect();
+                                                        const isOpen = actionMenuHeadId === person.HeadID;
+                                                        if (isOpen) {
+                                                            setActionMenuHeadId(null);
+                                                            setActionMenuAnchorRect(null);
+                                                        } else {
+                                                            setActionMenuHeadId(person.HeadID);
+                                                            setActionMenuAnchorRect(rect);
+                                                        }
                                                     }}
-                                                    className="office-head-actions-button inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-100 hover:text-black"
+                                                    className="office-head-actions-button inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-100"
                                                     aria-label="Open office personnel actions"
                                                     title="Actions"
                                                 >
-                                                    <svg className="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 6h.01M12 12h.01M12 18h.01" />
+                                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6h.01M12 12h.01M12 18h.01" />
                                                     </svg>
                                                 </button>
-
-                                                {actionMenuHeadId === person.HeadID && (
-                                                    <div className="office-head-actions-menu absolute right-0 top-8 z-30 w-32 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setActionMenuHeadId(null);
-                                                                openEdit(person);
-                                                            }}
-                                                            className="w-full px-3 py-2 text-left text-xs text-slate-700 transition hover:bg-slate-50"
-                                                        >
-                                                            Edit
-                                                        </button>
-                                                        <button
-                                                            onClick={async (e) => {
-                                                                e.stopPropagation();
-                                                                setActionMenuHeadId(null);
-                                                                await handleDeleteHead(person);
-                                                            }}
-                                                            className="w-full px-3 py-2 text-left text-xs text-red-600 transition hover:bg-red-50"
-                                                        >
-                                                            Delete
-                                                        </button>
-                                                    </div>
-                                                )}
                                                 </div>
                                             )}
                                         </div>
 
                                         <div className="mt-1 flex justify-center">
-                                            <div className="h-[42px] w-[42px] rounded-full bg-cyan-100 p-1">
+                                            <div className="h-[72px] w-[72px] rounded-full p-0 overflow-hidden">
                                                 <img
                                                     src={profilePicUrl}
                                                     alt={fullName}
-                                                    className="h-full w-full rounded-full border border-white object-cover"
-                                                    onError={(e) => {
-                                                        e.target.src = user;
-                                                    }}
+                                                    className="h-[72px] w-[72px] rounded-full object-cover border border-white"
+                                                    onError={(e) => { e.target.src = user; }}
                                                 />
                                             </div>
                                         </div>
 
                                         <div className="mt-0.5 text-center">
-                                            <h3 className="text-[14px] font-semibold text-slate-900 truncate">{fullName}</h3>
-                                            <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500 truncate">{person.Position || 'Office Personnel'}</p>
+                                            <h3 className="text-[18px] font-semibold text-slate-900 truncate">{fullName}</h3>
+                                            <p className="text-[12px] font-medium uppercase tracking-wide text-slate-500 truncate">{person.Position || 'Office Personnel'}</p>
                                         </div>
 
-                                        <div className="mt-1 space-y-1 rounded-xl border border-slate-200 bg-white/80 p-2 text-[12px] text-slate-700">
-                                            {/* Removed employeeCode per user request */}
-                                            <div className="flex items-center gap-1.5">
-                                                <svg className="h-3 w-3 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12H8m8 0a4 4 0 100-8 4 4 0 000 8zM8 12a4 4 0 100-8 4 4 0 000 8zm0 0v8m8-8v8" />
+                                        <div className="mt-1 space-y-1 p-0 text-[12px] text-slate-700 flex flex-col items-center text-center">
+                                            {/* Contact (centered) - minimal, no outline */}
+                                            <div className="flex items-center gap-2">
+                                                <svg className="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.5 5L18 8" />
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 8v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8" />
                                                 </svg>
-                                                <span className="truncate">{email}</span>
+                                                <span className="truncate max-w-[160px]">{email}</span>
                                             </div>
-                                            <p className="truncate text-[11px] text-slate-500" title={assignedOfficeNames || 'Not assigned to any office'}>
-                                                Office: {assignedOfficeSummary}
-                                            </p>
                                         </div>
 
-                                        <div className="mt-1 flex items-center justify-between border-t border-slate-200 pt-1">
-                                            <p className="text-[11px] text-slate-500 truncate">Join at {joinDate}</p>
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    openDetails(person, assignedOffices);
-                                                }}
-                                                className="text-[12px] font-semibold text-slate-700 transition hover:text-blue-600"
-                                            >
-                                                View details
-                                            </button>
+                                        <div className="mt-1 flex items-center justify-between pt-1">
+                                            {/* Join date removed as requested */}
+                                            {/* View details button removed — clicking the card opens details now */}
                                         </div>
                                     </>
                                 ) : (
@@ -782,6 +743,17 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                 })}
             </div>
 
+            {viewMode === 'list' && (
+                <div className="pt-1">
+                    <Pagination
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        onPageChange={(p) => setCurrentPage(p)}
+                        fixed={false}
+                        showWhenSinglePage={true}
+                    />
+                </div>
+            )}
             {viewMode !== 'list' && (
                 <div className="pt-1">
                     <Pagination
@@ -793,6 +765,62 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                     />
                 </div>
             )}
+
+            {/* Portal actions menu to avoid clipping inside list/card containers */}
+            {isAdmin && actionMenuHeadId && actionMenuAnchorRect && typeof document !== 'undefined' && (() => {
+                const menuPerson = officeHeads.find((h) => String(h.HeadID) === String(actionMenuHeadId))
+                    || filteredOfficeHeads.find((h) => String(h.HeadID) === String(actionMenuHeadId));
+
+                if (!menuPerson) return null;
+
+                const menuWidth = 220;
+                const viewportRight = window.scrollX + window.innerWidth - 12;
+                const left = Math.min((actionMenuAnchorRect.right || 0) + window.scrollX - menuWidth, viewportRight - menuWidth);
+                const top = (actionMenuAnchorRect.bottom || 0) + window.scrollY + 8;
+
+                return createPortal(
+                    <div
+                        className="office-head-actions-menu"
+                        style={{ position: 'absolute', left, top, width: menuWidth, zIndex: 9999 }}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="overflow-hidden rounded-lg border border-gray-100 bg-white py-1 shadow-lg">
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActionMenuHeadId(null);
+                                    setActionMenuAnchorRect(null);
+                                    openEdit(menuPerson);
+                                }}
+                                className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-xs text-slate-700 transition hover:bg-indigo-50 whitespace-nowrap"
+                            >
+                                <svg className="h-4 w-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                                <span>Edit</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={async (e) => {
+                                    e.stopPropagation();
+                                    setActionMenuHeadId(null);
+                                    setActionMenuAnchorRect(null);
+                                    await handleDeleteHead(menuPerson);
+                                }}
+                                className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-xs text-red-600 transition hover:bg-red-50 whitespace-nowrap"
+                            >
+                                <svg className="h-4 w-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
+                                </svg>
+                                <span>Delete</span>
+                            </button>
+                        </div>
+                    </div>,
+                    document.body
+                );
+            })()}
 
             <OfficeHeaddetails
                 visible={isDetailsOpen}

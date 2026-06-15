@@ -1,3 +1,20 @@
+const fs = require('fs');
+const path = require('path');
+
+const envPath = path.join(__dirname, '.env');
+if (fs.existsSync(envPath)) {
+  const envText = fs.readFileSync(envPath, 'utf8');
+  envText.split(/\r?\n/).forEach((line) => {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) return;
+    const separatorIndex = trimmed.indexOf('=');
+    if (separatorIndex === -1) return;
+    const key = trimmed.slice(0, separatorIndex).trim();
+    const value = trimmed.slice(separatorIndex + 1).trim().replace(/^["']|["']$/g, '');
+    if (key && process.env[key] === undefined) process.env[key] = value;
+  });
+}
+
 const express = require('express');
 const app = express();
 const port = 5000;
@@ -13,6 +30,8 @@ const areasRoutes = require('./routes/areas');
 const criteriaRoutes = require('./routes/criteria');
 const notificationRoutes = require('./routes/notif');
 const logsRoutes = require('./routes/logs');
+const departmentsRoutes = require('./routes/departments');
+const programTypesRoutes = require('./routes/program_types');
 
 console.log('Backend started and logger active');
 
@@ -82,6 +101,23 @@ app.use('/api/areas', areasRoutes);
 app.use('/api/criteria', criteriaRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/logs', logsRoutes);
+app.use('/api/departments', departmentsRoutes);
+app.use('/api/program_types', programTypesRoutes);
+// Ensure basic roles exist on startup (Admin, User, Personnel)
+const db = require('./db');
+async function ensureRoles() {
+  try {
+    const [rows] = await db.query("SELECT RoleName FROM roles WHERE RoleName IN ('Admin','User','Personnel')");
+    const existing = rows.map(r => r.RoleName);
+    if (!existing.includes('Personnel')) {
+      await db.query("INSERT INTO roles (RoleName, Description) VALUES (?, ?)", ['Personnel', 'Personnel role']);
+      console.log('Inserted missing role: Personnel');
+    }
+  } catch (err) {
+    console.warn('Could not ensure roles (DB might not be initialized):', err.message || err);
+  }
+}
+ensureRoles();
 const complianceStatusOfficesRoutes = require('./routes/ComplianceStatusOffices');
 const officeDocumentsRoutes = require('./routes/officedocuments');
 app.use('/api/compliancestatusoffices', complianceStatusOfficesRoutes);
@@ -96,6 +132,29 @@ app.use('/compliancestatusoffices', complinancestatusofficesRoutes);
 app.use('/compliancestatus', complinancestatusRoutes);*/
 
 // Catch-all error handler (always return JSON)
+
+async function relaxLogUserLink() {
+  try {
+    const [rows] = await db.query(`
+      SELECT CONSTRAINT_NAME
+      FROM information_schema.KEY_COLUMN_USAGE
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'logs'
+        AND COLUMN_NAME = 'UserID'
+        AND REFERENCED_TABLE_NAME = 'users'
+      LIMIT 1
+    `);
+
+    const constraintName = rows[0]?.CONSTRAINT_NAME;
+    if (constraintName) {
+      await db.query(`ALTER TABLE logs DROP FOREIGN KEY ${constraintName}`);
+      console.log(`Dropped logs foreign key: ${constraintName}`);
+    }
+  } catch (err) {
+    console.warn('Could not relax logs-user link:', err.message || err);
+  }
+}
+relaxLogUserLink();
 app.use((err, req, res, next) => {
   console.error('GLOBAL ERROR:', err);
   res.status(err.status || 500).json({

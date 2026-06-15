@@ -4,12 +4,14 @@ import Pagination from '../Pagination/Pagination';
 import Header from '../Header/header';
 import axios from 'axios';
 import SortEvents from './sortevents';
+import { API_BASE_URL } from '../../utils/apiBase';
 
 import EventCard from './EventCard';
 import EventPopup from './EventPopup';
 
 import EditEventPopup from './EditEventPopup';
 import { eventsAPI, usersAPI } from '../../utils/api';
+import { useModal } from "../UI/ModalProvider";
 import AddEventModal from '../AddEvent/AddEventModal';
 
 
@@ -23,6 +25,7 @@ function ALL() {
     const [selectedEventIdsForDelete, setSelectedEventIdsForDelete] = useState(new Set());
     const [isAddEventOpen, setIsAddEventOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
+    const { showAlert, showConfirm } = useModal();
         // Search helpers
         const matchesSearch = (text, searchLower) => {
             return (text?.toLowerCase() || '').includes(searchLower);
@@ -72,7 +75,11 @@ function ALL() {
     // Track abort controllers to cancel stale requests
     const abortControllersRef = useRef({});
     
-    const itemsPerPage = 4; // 2x2 grid
+    const itemsPerPage = 30; // limit to 30 per page
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [sortStatus, searchTerm]);
 
 
     useEffect(() => {
@@ -104,15 +111,13 @@ function ALL() {
     useEffect(() => {
         if (selectedEvent) {
             fetchAreasForEventSafe(selectedEvent.EventID);
-            fetchNoAreaCriteriaForEvent(selectedEvent.EventID);
-            fetchCriteriaOptionsForEvent(selectedEvent.EventID);
         }
     }, [selectedEvent?.EventID]);
 
     const fetchCriteriaOptionsForEvent = async (eventId) => {
         try {
             const token = localStorage.getItem('token');
-            const response = await axios.get(`http://localhost:5000/api/criteria/event/${eventId}`, {
+            const response = await axios.get(`${API_BASE_URL}/api/criteria/event/${eventId}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setCriteriaOptionsData(prev => ({ ...prev, [eventId]: response.data.data || [] }));
@@ -126,7 +131,7 @@ function ALL() {
         try {
             setLoadingNoAreaCriteria(prev => new Set([...prev, eventId]));
             const token = localStorage.getItem('token');
-            const response = await axios.get(`http://localhost:5000/api/criteria/event/${eventId}`, {
+            const response = await axios.get(`${API_BASE_URL}/api/criteria/event/${eventId}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
@@ -152,7 +157,7 @@ function ALL() {
         try {
             setLoading(true);
             const token = localStorage.getItem('token');
-            const response = await axios.get('http://localhost:5000/api/events', {
+            const response = await axios.get(`${API_BASE_URL}/api/events`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setEvents(response.data.data || []);
@@ -172,7 +177,7 @@ function ALL() {
         try {
             setLoadingAreas(prev => new Set([...prev, eventId]));
             const token = localStorage.getItem('token');
-            const response = await axios.get(`http://localhost:5000/api/areas/event/${eventId}`, {
+            const response = await axios.get(`${API_BASE_URL}/api/areas/event/${eventId}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setAreasData(prev => ({ ...prev, [eventId]: response.data.data || [] }));
@@ -200,7 +205,7 @@ function ALL() {
         try {
             setLoadingAreas(prev => new Set([...prev, eventId]));
             const token = localStorage.getItem('token');
-            const response = await axios.get(`http://localhost:5000/api/areas/event/${eventId}`, {
+            const response = await axios.get(`${API_BASE_URL}/api/areas/event/${eventId}`, {
                 headers: { Authorization: `Bearer ${token}` },
                 signal: controller.signal
             });
@@ -243,7 +248,7 @@ function ALL() {
         try {
             setLoadingCriteria(prev => new Set([...prev, areaId]));
             const token = localStorage.getItem('token');
-            const response = await axios.get(`http://localhost:5000/api/criteria/area/${areaId}`, {
+            const response = await axios.get(`${API_BASE_URL}/api/criteria/area/${areaId}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setCriteriaData(prev => ({ ...prev, [areaId]: response.data.data || [] }));
@@ -265,24 +270,10 @@ function ALL() {
         try {
             setLoadingRequirements(prev => new Set([...prev, criteriaId]));
             const token = localStorage.getItem('token');
-            let requirements = [];
-
-            try {
-                const response = await axios.get(`http://localhost:5000/api/requirements/criteria/${criteriaId}`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-                requirements = Array.isArray(response.data?.data) ? response.data.data : [];
-            } catch {
-                // Fallback for older backend instances where /criteria/:id is unavailable
-            }
-
-            if (requirements.length === 0) {
-                const fallbackResponse = await axios.get('http://localhost:5000/api/requirements/all', {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-                const allRequirements = Array.isArray(fallbackResponse.data?.data) ? fallbackResponse.data.data : [];
-                requirements = allRequirements.filter(req => Number(req.CriteriaID) === Number(criteriaId));
-            }
+            const response = await axios.get(`${API_BASE_URL}/api/requirements/criteria/${criteriaId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const requirements = Array.isArray(response.data?.data) ? response.data.data : [];
 
             setRequirementsData(prev => ({ ...prev, [criteriaId]: requirements }));
         } catch (err) {
@@ -332,6 +323,9 @@ function ALL() {
                 next.delete(eventId);
             } else {
                 next.add(eventId);
+                if (!noAreaCriteriaData[eventId]) {
+                    fetchNoAreaCriteriaForEvent(eventId);
+                }
             }
             return next;
         });
@@ -340,7 +334,7 @@ function ALL() {
     const addArea = async (eventId, data) => {
         const token = localStorage.getItem('token');
         try {
-            await axios.post('http://localhost:5000/api/areas/add', {
+            await axios.post(`${API_BASE_URL}/api/areas/add`, {
                 EventChildID: eventId,
                 EventID: eventId,
                 AreaCode: data.AreaCode,
@@ -359,7 +353,7 @@ function ALL() {
     const editArea = async (areaId, data) => {
         const token = localStorage.getItem('token');
         try {
-            await axios.put(`http://localhost:5000/api/areas/${areaId}`, {
+            await axios.put(`${API_BASE_URL}/api/areas/${areaId}`, {
                 AreaCode: data.AreaCode,
                 AreaName: data.AreaName,
                 Description: data.Description || null
@@ -379,7 +373,7 @@ function ALL() {
     const editCriteria = async (criteriaId, data) => {
         const token = localStorage.getItem('token');
         try {
-            await axios.put(`http://localhost:5000/api/criteria/${criteriaId}`, {
+            await axios.put(`${API_BASE_URL}/api/criteria/${criteriaId}`, {
                 CriteriaCode: data.CriteriaCode,
                 CriteriaName: data.CriteriaName,
                 Description: data.Description || null,
@@ -412,7 +406,7 @@ function ALL() {
     const addCriteria = async (eventId, data) => {
         const token = localStorage.getItem('token');
         try {
-            await axios.post('http://localhost:5000/api/criteria/add', {
+            await axios.post(`${API_BASE_URL}/api/criteria/add`, {
                 EventID: eventId,
                 AreaID: data.AreaID ?? null,
                 CriteriaCode: data.CriteriaCode,
@@ -439,7 +433,7 @@ function ALL() {
     const addRequirement = async (payload) => {
         const token = localStorage.getItem('token');
         try {
-            await axios.post('http://localhost:5000/api/requirements/add', payload, {
+            await axios.post(`${API_BASE_URL}/api/requirements/add`, payload, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             await fetchRequirementsForCriteria(payload.CriteriaID, true);
@@ -452,20 +446,16 @@ function ALL() {
     const loadRequirementsByCriteria = async (criteriaId) => {
         const token = localStorage.getItem('token');
         try {
-            const response = await axios.get(`http://localhost:5000/api/requirements/criteria/${criteriaId}`, {
+            const response = await axios.get(`${API_BASE_URL}/api/requirements/criteria/${criteriaId}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             const list = Array.isArray(response.data?.data) ? response.data.data : [];
             setRequirementsData(prev => ({ ...prev, [Number(criteriaId)]: list }));
             return list;
-        } catch {
-            const fallback = await axios.get('http://localhost:5000/api/requirements/all', {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            const all = Array.isArray(fallback.data?.data) ? fallback.data.data : [];
-            const list = all.filter(req => Number(req.CriteriaID) === Number(criteriaId));
-            setRequirementsData(prev => ({ ...prev, [Number(criteriaId)]: list }));
-            return list;
+        } catch (err) {
+            console.error('Error loading requirements by criteria:', err);
+            setRequirementsData(prev => ({ ...prev, [Number(criteriaId)]: [] }));
+            return [];
         }
     };
 
@@ -479,7 +469,7 @@ function ALL() {
         let criteriaIdsToDelete = [...uniqueCriteriaIds];
 
         if (uniqueAreaIds.length > 0) {
-            const criteriaResponse = await axios.get(`http://localhost:5000/api/criteria/event/${eventId}`, {
+            const criteriaResponse = await axios.get(`${API_BASE_URL}/api/criteria/event/${eventId}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             const eventCriteria = Array.isArray(criteriaResponse.data?.data) ? criteriaResponse.data.data : [];
@@ -491,7 +481,7 @@ function ALL() {
 
         let requirementIdsToDelete = [...uniqueRequirementIds];
         if (criteriaIdsToDelete.length > 0) {
-            const requirementsResponse = await axios.get('http://localhost:5000/api/requirements/all', {
+            const requirementsResponse = await axios.get(`${API_BASE_URL}/api/requirements/all`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             const allRequirements = Array.isArray(requirementsResponse.data?.data) ? requirementsResponse.data.data : [];
@@ -504,14 +494,14 @@ function ALL() {
         try {
             if (requirementIdsToDelete.length > 0) {
                 await axios.post(
-                    'http://localhost:5000/api/requirements/delete',
+                    `${API_BASE_URL}/api/requirements/delete`,
                     { requirementIds: requirementIdsToDelete },
                     { headers: { Authorization: `Bearer ${token}` } }
                 );
             }
 
             if (criteriaIdsToDelete.length > 0) {
-                await axios.delete('http://localhost:5000/api/criteria/delete', {
+                await axios.delete(`${API_BASE_URL}/api/criteria/delete`, {
                     data: { criteriaIds: criteriaIdsToDelete },
                     headers: { Authorization: `Bearer ${token}` }
                 });
@@ -519,7 +509,7 @@ function ALL() {
 
             if (uniqueAreaIds.length > 0) {
                 await axios.post(
-                    'http://localhost:5000/api/areas/delete',
+                    `${API_BASE_URL}/api/areas/delete`,
                     { areaIds: uniqueAreaIds },
                     { headers: { Authorization: `Bearer ${token}` } }
                 );
@@ -568,10 +558,10 @@ function ALL() {
     // Always render the header and controls even when there are no events.
     // The empty-state message will be shown in the events grid area below.
 
-    // Pagination
-    const totalPages = Math.ceil(events.length / itemsPerPage);
+    // Pagination (based on filtered events)
+    const totalPages = Math.max(1, Math.ceil(filteredEvents.length / itemsPerPage));
     const startIdx = (currentPage - 1) * itemsPerPage;
-    const paginatedEvents = events.slice(startIdx, startIdx + itemsPerPage);
+    const visibleEvents = filteredEvents.slice(startIdx, startIdx + itemsPerPage);
 
     return (
         <div className="px-4 pb-6 pt-6 w-full overflow-hidden">
@@ -589,21 +579,21 @@ function ALL() {
                             <button
                                 onClick={async () => {
                                     const ids = Array.from(selectedEventIdsForDelete).map(Number).filter(Boolean);
-                                    if (ids.length === 0) return alert('Select at least one standard to delete.');
-                                    const confirmed = window.confirm(`Delete ${ids.length} selected standard(s)? This cannot be undone.`);
+                                    if (ids.length === 0) return await showAlert('Select at least one standard to delete.');
+                                    const confirmed = await showConfirm(`Delete ${ids.length} selected standard(s)? This cannot be undone.`);
                                     if (!confirmed) return;
                                     try {
                                         const { eventsAPI } = await import('../../utils/api');
                                         const resp = await eventsAPI.deleteEvents(ids);
                                         if (resp && resp.success) {
-                                            alert(resp.message || 'Selected standards deleted.');
+                                            await showAlert(resp.message || 'Selected standards deleted.');
                                             await fetchEvents();
                                         } else {
-                                            alert(resp?.message || 'Failed to delete selected standards.');
+                                            await showAlert(resp?.message || 'Failed to delete selected standards.');
                                         }
                                     } catch (err) {
                                         console.error('Delete events error', err);
-                                        alert(err?.message || 'Error deleting selected standards.');
+                                        await showAlert(err?.message || 'Error deleting selected standards.');
                                     } finally {
                                         setDeleteMode(false);
                                         setSelectedEventIdsForDelete(new Set());
@@ -683,7 +673,7 @@ function ALL() {
 
             {/* Events Grid 2x2 */}
             <div className="grid grid-cols-2 gap-6 mb-8">
-                {filteredEvents.slice(startIdx, startIdx + itemsPerPage).map((event) => (
+                {visibleEvents.map((event) => (
                     <EventCard
                         key={event.EventID}
                         event={event}
@@ -711,7 +701,7 @@ function ALL() {
                             const eventId = Number(targetEvent?.EventID);
                             if (!eventId) return;
 
-                            const confirmed = window.confirm(`Delete event "${targetEvent?.EventName || eventId}"? This cannot be undone.`);
+                            const confirmed = await showConfirm(`Delete event "${targetEvent?.EventName || eventId}"? This cannot be undone.`);
                             if (!confirmed) return;
 
                             try {
@@ -722,11 +712,11 @@ function ALL() {
                                         setSelectedEvent(null);
                                     }
                                 } else {
-                                    alert(resp?.message || 'Failed to delete event.');
+                                    await showAlert(resp?.message || 'Failed to delete event.');
                                 }
                             } catch (err) {
                                 console.error('Delete event error', err);
-                                alert(err?.message || 'Error deleting event.');
+                                await showAlert(err?.message || 'Error deleting event.');
                             }
                         }}
                         showCheckbox={deleteMode}
@@ -823,6 +813,11 @@ function ALL() {
                     onAddCriteria={addCriteria}
                     onAddRequirement={addRequirement}
                     onLoadRequirementsByCriteria={loadRequirementsByCriteria}
+                    onPrepareStructureData={() => {
+                        if (selectedEvent?.EventID && !criteriaOptionsData[selectedEvent.EventID]) {
+                            fetchCriteriaOptionsForEvent(selectedEvent.EventID);
+                        }
+                    }}
                     onEditArea={editArea}
                     onEditCriteria={editCriteria}
                     onBulkDelete={bulkDeleteHierarchy}
@@ -839,7 +834,7 @@ function ALL() {
                     onConfirm={async ({ eventName, eventCode, description }) => {
                         try {
                             const token = localStorage.getItem('token');
-                            await axios.post('http://localhost:5000/api/events/copy', {
+                            await axios.post(`${API_BASE_URL}/api/events/copy`, {
                                 sourceEventId: copyPopup.event.EventID,
                                 newEventName: eventName,
                                 newEventCode: eventCode,

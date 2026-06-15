@@ -1,4 +1,5 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from "react";
+import { useModal } from "../UI/ModalProvider";
 import Header from "../Header/header.jsx";
 import { eventsAPI } from "../../utils/api";
 import Pagination from "../Pagination/Pagination";
@@ -11,6 +12,9 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
     const [selectedEvents, setSelectedEvents] = useState(new Set());
     const [downloadableFolders, setDownloadableFolders] = useState([]);
     const [currentPage, setCurrentPage] = useState(1);
+    const { showAlert } = useModal();
+
+    const itemsPerPage = 30; // limit to 30 per page
 
     // Helper to normalize folder/event names to a consistent form
     const normalizeName = (s) => {
@@ -76,7 +80,6 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
     }, [searchTerm]);
 
     useEffect(() => {
-        const itemsPerPage = 8;
         const pageCount = Math.max(1, Math.ceil(filteredEvents.length / itemsPerPage));
         if (currentPage > pageCount) {
             setCurrentPage(1);
@@ -217,7 +220,6 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
         );
     }
 
-    const itemsPerPage = 8;
     const totalPages = Math.max(1, Math.ceil(filteredEvents.length / itemsPerPage));
     const startIdx = (currentPage - 1) * itemsPerPage;
     const paginatedEvents = filteredEvents.slice(startIdx, startIdx + itemsPerPage);
@@ -295,15 +297,16 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
                                 </div>
 
                                 {/* Download Button - Only if folder exists */}
-                                {downloadableFolders.some(folder => normalizeName(folder) === normalizeName(event.EventName)) && (
+                                {downloadableFolders.some(folder => normalizeName(folder) === normalizeName(event.EventCode || event.EventName)) && (
                                     <button
                                         className="flex-shrink-0 px-2 py-1 bg-emerald-50 text-emerald-700 rounded-md text-xs font-medium hover:bg-emerald-100 transition-colors flex items-center gap-1 border border-emerald-200"
                                         onClick={async (e) => {
                                             e.stopPropagation();
                                             e.preventDefault();
                                             try {
-                                                const sanitizedName = event.EventName.replace(/[<>:"/\\|?*]/g, '_').trim();
-                                                const url = await eventsAPI.downloadEventZip(event.EventName);
+                                                const keyName = event.EventCode || event.EventName;
+                                                const sanitizedName = String(keyName).replace(/[<>:"/\\|?*]/g, '_').trim();
+                                                const url = await eventsAPI.downloadEventZip(keyName);
                                                 
                                                 const link = document.createElement('a');
                                                 link.href = url;
@@ -317,7 +320,7 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
                                                 }, 100);
                                             } catch (err) {
                                                 console.error('Download error:', err);
-                                                alert('Download failed: ' + (err.message || 'Unknown error'));
+                                                await showAlert('Download failed: ' + (err.message || 'Unknown error'));
                                             }
                                         }}
                                         title="Download event folder"

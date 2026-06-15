@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useModal } from "../UI/ModalProvider";
 
 // AddAreaModal: Modal for adding a new Area (choose event, area code, area name, description optional)
 export default function AddAreaModal({ isOpen, onClose, onSuccess }) {
@@ -12,6 +13,7 @@ export default function AddAreaModal({ isOpen, onClose, onSuccess }) {
     const [errors, setErrors] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [loadingEvents, setLoadingEvents] = useState(false);
+    const { showAlert } = useModal();
 
     // Fetch events for dropdown
     useEffect(() => {
@@ -67,17 +69,17 @@ export default function AddAreaModal({ isOpen, onClose, onSuccess }) {
                 AreaName: formData.AreaName,
                 Description: formData.Description || null
             });
-            if (response.success) {
+                if (response.success) {
                 if (onSuccess) onSuccess(response.data);
                 setFormData({ EventChildID: '', AreaCode: '', AreaName: '', Description: '' });
                 onClose();
-                alert('Area added successfully!');
+                await showAlert('Area added successfully!');
             } else {
-                alert(response.message || 'Failed to add area');
+                await showAlert(response.message || 'Failed to add area');
             }
         } catch (error) {
             console.error('Error submitting form:', error);
-            alert('An error occurred while adding the area. Please try again.');
+            await showAlert('An error occurred while adding the area. Please try again.');
         } finally {
             setIsSubmitting(false);
         }

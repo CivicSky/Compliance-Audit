@@ -1,8 +1,154 @@
 const db = require('../db');
 const { recordLog } = require('./logsController');
+const loginRateLimiter = require('../middleware/loginRateLimiter');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { createNotifications } = require('../utils/notificationService');
+const normalizeEmail = (email) => String(email || '').trim().toLowerCase();
+const COMPANY_EMAIL_DOMAIN = '@lccbonline.edu.ph';
+const isCompanyEmail = (email) => normalizeEmail(email).endsWith(COMPANY_EMAIL_DOMAIN);
+const pendingRegistrationStore = new Map();
+const OTP_TTL_MS = 10 * 60 * 1000;
+const INVITE_TTL_MS = 10 * 60 * 1000;
+const JWT_SECRET = process.env.JWT_SECRET || 'MY_SECRET_KEY';
+const INVITE_TOKEN_SECRET = process.env.INVITE_TOKEN_SECRET || JWT_SECRET;
+
+const hashValue = (value) => crypto.createHash('sha256').update(String(value)).digest('hex');
+
+const verifyInviteTokenPayload = (token) => {
+  if (!token) {
+    return { success: false, status: 400, message: 'Invite token is required' };
+  }
+
+  try {
+    const decoded = jwt.verify(token, INVITE_TOKEN_SECRET);
+    if (decoded?.type !== 'registration_invite') {
+      return { success: false, status: 400, message: 'Invalid invite link' };
+    }
+
+    const roleId = Number.parseInt(decoded.roleId, 10) || 2;
+    return {
+      success: true,
+      invite: {
+        email: decoded.email ? normalizeEmail(decoded.email) : null,
+        roleId,
+        expiresAt: decoded.exp ? decoded.exp * 1000 : Date.now() + INVITE_TTL_MS,
+      },
+    };
+  } catch (error) {
+    const isExpired = error?.name === 'TokenExpiredError';
+    return {
+      success: false,
+      status: isExpired ? 410 : 400,
+      message: isExpired ? 'Invite link expired' : 'Invalid invite link',
+    };
+  }
+};
+
+const cleanExpiredPendingRegistrations = () => {
+  const now = Date.now();
+  for (const [email, entry] of pendingRegistrationStore.entries()) {
+    if (!entry || entry.expiresAt <= now) pendingRegistrationStore.delete(email);
+  }
+};
+
+const createPendingRegistration = async (registrationData) => {
+  const firstName = String(registrationData.firstName || '').trim();
+  const middleInitial = String(registrationData.middleInitial || '').trim();
+  const lastName = String(registrationData.lastName || '').trim();
+  const password = String(registrationData.password || '');
+  const email = normalizeEmail(registrationData.email);
+  const inviteToken = String(registrationData.inviteToken || '').trim();
+  let roleId = Number.parseInt(registrationData.roleId, 10) || 2;
+
+  if (inviteToken) {
+    const inviteResult = verifyInviteTokenPayload(inviteToken);
+    if (!inviteResult.success) return inviteResult;
+
+    const invite = inviteResult.invite;
+    if (invite.email && invite.email !== email) {
+      return { success: false, status: 403, message: 'This invite link is for a different email address' };
+    }
+
+    roleId = invite.roleId;
+  }
+
+  if (!firstName || !lastName || !email || !password) {
+    return { success: false, status: 400, message: 'First name, last name, email, and password are required' };
+  }
+
+  if (!isCompanyEmail(email)) {
+    return { success: false, status: 400, message: `Only ${COMPANY_EMAIL_DOMAIN} email addresses can register` };
+  }
+
+  const [existingUsers] = await db.query('SELECT UserID FROM users WHERE Email = ?', [email]);
+  if (existingUsers.length > 0) {
+    return { success: false, status: 400, message: 'Email already registered' };
+  }
+
+  const otp = crypto.randomInt(100000, 1000000).toString();
+  pendingRegistrationStore.set(email, {
+    registrationData: {
+      firstName,
+      middleInitial: middleInitial || null,
+      lastName,
+      email,
+      passwordHash: crypto.createHash('md5').update(password).digest('hex'),
+      roleId,
+      inviteToken: inviteToken || null,
+    },
+    otpHash: hashValue(otp),
+    attempts: 0,
+    expiresAt: Date.now() + OTP_TTL_MS,
+  });
+
+  return { success: true, email, otp, roleId };
+};
+
+const sendOtpEmail = async (email, otp) => {
+  let nodemailer;
+  try {
+    nodemailer = require('nodemailer');
+  } catch (error) {
+    console.warn('[OTP] nodemailer is not installed');
+    return { sent: false, reason: 'nodemailer missing' };
+  }
+
+  const host = process.env.SMTP_HOST;
+  const port = Number(process.env.SMTP_PORT || 587);
+  const user = process.env.SMTP_USER || process.env.GMAIL_USER;
+  const pass = String(process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD || '').replace(/\s+/g, '');
+
+  if (!user || !pass) {
+    return { sent: false, reason: 'SMTP is not configured' };
+  }
+
+  const transporter = host
+    ? nodemailer.createTransport({
+        host,
+        port,
+        secure: port === 465,
+        auth: { user, pass },
+      })
+    : nodemailer.createTransport({
+        service: 'gmail',
+        auth: { user, pass },
+      });
+
+  try {
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || user,
+      to: email,
+      subject: 'Your Auditrack registration OTP',
+      text: `Your Auditrack registration one-time PIN is ${otp}. It expires in 10 minutes.`,
+      html: `<p>Your Auditrack registration one-time PIN is <strong>${otp}</strong>.</p><p>It expires in 10 minutes.</p>`,
+    });
+    return { sent: true };
+  } catch (error) {
+    console.warn(`[OTP] Email send failed for ${email}:`, error?.message || error);
+    return { sent: false, reason: error?.message || 'Failed to send email' };
+  }
+};
 
 // ===============================
 // LOGIN USER (WITH JWT TOKEN)
@@ -11,6 +157,20 @@ exports.loginUser = async (req, res) => {
   try {
     console.log("Login attempt:", req.body);
     const { email, password } = req.body;
+
+    // rate limit check (email + IP)
+    const remainingMs = loginRateLimiter.getRemainingMs(email, req.ip);
+    if (remainingMs && remainingMs > 0) {
+      const totalSeconds = Math.ceil(remainingMs / 1000);
+      const mins = Math.floor(totalSeconds / 60);
+      const secs = totalSeconds % 60;
+      const mmss = `${mins}:${String(secs).padStart(2, '0')}`;
+      return res.status(429).json({
+        success: false,
+        message: `Too many failed login attempts. Please wait ${mmss} before retrying.`,
+        remainingMs
+      });
+    }
 
     if (!email || !password) {
       return res.status(400).json({
@@ -31,6 +191,18 @@ exports.loginUser = async (req, res) => {
     );
 
     if (users.length === 0) {
+      const result = loginRateLimiter.recordFailure(email, req.ip);
+      if (result.blocked) {
+        const totalSeconds = Math.ceil(result.remainingMs / 1000);
+        const mins = Math.floor(totalSeconds / 60);
+        const secs = totalSeconds % 60;
+        const mmss = `${mins}:${String(secs).padStart(2, '0')}`;
+        return res.status(429).json({
+          success: false,
+          message: `Too many failed login attempts. Please wait ${mmss} before retrying.`,
+          remainingMs: result.remainingMs
+        });
+      }
       return res.status(401).json({
         success: false,
         message: "Invalid email or password",
@@ -68,9 +240,12 @@ exports.loginUser = async (req, res) => {
       try { recordLog(user.UserID, 'Login', `User ${user.Email} logged in`); } catch (e) {}
     }
 
+    // Reset any rate limiting state on successful login
+    try { loginRateLimiter.reset(email, req.ip); } catch (e) {}
+
     res.json({
       success: true,
-      message: "Login successful",
+      message: "Login successful. Failed attempt counter reset.",
       token,
       user,
     });
@@ -100,65 +275,266 @@ exports.logoutUser = async (req, res) => {
 };
 
 
-// ===============================
-// REGISTER USER
-// ===============================
-exports.registerUser = async (req, res) => {
+// CHECK LOGIN STATUS (remaining block time)
+exports.loginStatus = async (req, res) => {
   try {
-    const { firstName, middleInitial, lastName, email, password, roleId } = req.body;
+    const email = String(req.query.email || '').trim();
+    if (!email) {
+      return res.json({ success: true, remainingMs: 0 });
+    }
 
-    if (!firstName || !lastName || !email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "First name, last name, email, and password are required",
+    const remainingMs = loginRateLimiter.getRemainingMs(email, req.ip) || 0;
+    if (remainingMs && remainingMs > 0) {
+      const totalSeconds = Math.ceil(remainingMs / 1000);
+      const mins = Math.floor(totalSeconds / 60);
+      const secs = totalSeconds % 60;
+      const mmss = `${mins}:${String(secs).padStart(2, '0')}`;
+      return res.json({
+        success: true,
+        remainingMs,
+        message: `Too many failed login attempts. Please wait ${mmss} before retrying.`
       });
     }
 
-    const [existingUsers] = await db.query(
-      "SELECT UserID FROM users WHERE Email = ?",
-      [email]
-    );
+    return res.json({ success: true, remainingMs: 0 });
+  } catch (error) {
+    console.error('loginStatus error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to check login status' });
+  }
+};
 
-    if (existingUsers.length > 0) {
+
+exports.sendRegistrationOtp = async (req, res) => {
+  try {
+    const body = req.body || {};
+    const email = normalizeEmail(body.email);
+    const hasRegistrationPayload = Boolean(body.firstName || body.lastName || body.password);
+
+    cleanExpiredPendingRegistrations();
+
+    if (!email) {
       return res.status(400).json({
         success: false,
-        message: "Email already registered",
+        message: 'Email is required',
       });
     }
 
-    const hashedPassword = crypto
-      .createHash("md5")
-      .update(password)
-      .digest("hex");
+    if (!isCompanyEmail(email)) {
+      return res.status(400).json({
+        success: false,
+        message: `Only ${COMPANY_EMAIL_DOMAIN} email addresses can register`,
+      });
+    }
 
-    const [result] = await db.query(
-      "INSERT INTO users (FirstName, MiddleInitial, LastName, Email, PasswordHash, RoleID) VALUES (?, ?, ?, ?, ?, ?)",
-      [
-        firstName,
-        middleInitial || null,
-        lastName,
+    if (hasRegistrationPayload) {
+      const result = await createPendingRegistration(body);
+      if (!result.success) {
+        return res.status(result.status || 400).json({ success: false, message: result.message });
+      }
+
+      const otpResult = await sendOtpEmail(email, result.otp);
+      if (!otpResult.sent) {
+        pendingRegistrationStore.delete(email);
+        return res.status(502).json({
+          success: false,
+          message: otpResult.reason ? `Failed to send OTP email: ${otpResult.reason}` : 'Failed to send OTP email.',
+          email,
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: 'OTP sent to your email.',
         email,
-        hashedPassword,
-        roleId || 2,
-      ]
-    );
+        emailDelivery: 'sent',
+      });
+    }
+
+    const pending = pendingRegistrationStore.get(email);
+    if (!pending) {
+      return res.status(400).json({
+        success: false,
+        message: 'Registration data not found. Please submit the form again.',
+      });
+    }
+
+    const otp = crypto.randomInt(100000, 1000000).toString();
+    pending.otpHash = hashValue(otp);
+    pending.attempts = 0;
+    pending.expiresAt = Date.now() + OTP_TTL_MS;
+    pendingRegistrationStore.set(email, pending);
+
+    const otpResult = await sendOtpEmail(email, otp);
+    if (!otpResult.sent) {
+      pendingRegistrationStore.delete(email);
+      return res.status(502).json({
+        success: false,
+        message: otpResult.reason ? `Failed to send OTP email: ${otpResult.reason}` : 'Failed to send OTP email.',
+        email,
+      });
+    }
 
     res.status(201).json({
       success: true,
-      message: "User registered successfully",
-      userId: result.insertId,
+      email,
+      message: 'OTP sent to your email.',
+      emailDelivery: 'sent',
     });
-
-    if (result && result.insertId) {
-      try { recordLog(result.insertId, 'UserRegistered', `User registered: ${email}`); } catch (e) {}
-    }
 
   } catch (error) {
-    console.error("Registration error:", error);
+    console.error('Send registration OTP error:', error?.stack || error);
     res.status(500).json({
       success: false,
-      message: "An error occurred during registration",
+      message: error?.message || String(error) || 'Failed to send one-time PIN',
     });
+  }
+};
+
+exports.verifyRegistrationOtp = async (req, res) => {
+  try {
+    cleanExpiredPendingRegistrations();
+    const body = req.body || {};
+    const email = normalizeEmail(body.email);
+    const otp = String(body.otp || '').trim();
+
+    if (!email || !otp) {
+      return res.status(400).json({ success: false, message: 'Email and one-time PIN are required' });
+    }
+
+    const pending = pendingRegistrationStore.get(email);
+    if (!pending || pending.expiresAt <= Date.now()) {
+      pendingRegistrationStore.delete(email);
+      return res.status(400).json({ success: false, message: 'One-time PIN expired. Please request a new one.' });
+    }
+
+    if (pending.attempts >= 5) {
+      pendingRegistrationStore.delete(email);
+      return res.status(429).json({ success: false, message: 'Too many wrong OTP attempts. Please request a new one.' });
+    }
+
+    if (pending.otpHash !== hashValue(otp)) {
+      pending.attempts += 1;
+      pendingRegistrationStore.set(email, pending);
+      return res.status(400).json({ success: false, message: 'Wrong OTP. Please check your email and try again.' });
+    }
+
+    const registrationData = pending.registrationData;
+    if (registrationData.inviteToken) {
+      const inviteResult = verifyInviteTokenPayload(registrationData.inviteToken);
+      if (!inviteResult.success) {
+        pendingRegistrationStore.delete(email);
+        return res.status(inviteResult.status || 400).json({
+          success: false,
+          message: inviteResult.message || 'Invite link expired or invalid',
+        });
+      }
+
+      const invite = inviteResult.invite;
+      if (invite.email && invite.email !== email) {
+        pendingRegistrationStore.delete(email);
+        return res.status(403).json({ success: false, message: 'This invite link is for a different email address' });
+      }
+    }
+
+    const [existingUsers] = await db.query('SELECT UserID FROM users WHERE Email = ?', [email]);
+    if (existingUsers.length > 0) {
+      pendingRegistrationStore.delete(email);
+      return res.status(400).json({ success: false, message: 'Email already registered' });
+    }
+
+    const [result] = await db.query(
+      'INSERT INTO users (FirstName, MiddleInitial, LastName, Email, PasswordHash, RoleID, approval_status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [
+        registrationData.firstName,
+        registrationData.middleInitial || null,
+        registrationData.lastName,
+        registrationData.email,
+        registrationData.passwordHash,
+        registrationData.roleId || 2,
+        'pending',
+      ]
+    );
+
+    pendingRegistrationStore.delete(email);
+
+    try { recordLog(result.insertId, 'UserRegistered', `User registered after OTP: ${email}`); } catch (e) {}
+
+    return res.json({
+      success: true,
+      message: 'Email verified. Your account is pending approval.',
+      userId: result.insertId,
+      email,
+    });
+  } catch (error) {
+    console.error('Verify registration OTP error:', error?.stack || error);
+    res.status(500).json({ success: false, message: error?.message || 'Failed to verify one-time PIN' });
+  }
+};
+
+exports.registerUser = async (req, res) => {
+  return exports.sendRegistrationOtp(req, res);
+};
+
+exports.createRegistrationInvite = async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body?.email);
+    const roleId = Number.parseInt(req.body?.roleId, 10) || 3;
+
+    if (email && !isCompanyEmail(email)) {
+      return res.status(400).json({
+        success: false,
+        message: `Only ${COMPANY_EMAIL_DOMAIN} email addresses can register`,
+      });
+    }
+
+    const payload = {
+      type: 'registration_invite',
+      roleId,
+      createdBy: req.user?.userId || null,
+    };
+
+    if (email) payload.email = email;
+
+    const token = jwt.sign(payload, INVITE_TOKEN_SECRET, { expiresIn: '10m' });
+    const decoded = jwt.decode(token) || {};
+    const requestOrigin = req.get('origin');
+    const fallbackFrontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const frontendUrl = String(requestOrigin || fallbackFrontendUrl).replace(/\/$/, '');
+    const inviteUrl = `${frontendUrl}/register?invite=${encodeURIComponent(token)}`;
+
+    res.json({
+      success: true,
+      inviteUrl,
+      token,
+      expiresAt: decoded.exp ? decoded.exp * 1000 : Date.now() + INVITE_TTL_MS,
+      roleId,
+      email: email || null,
+    });
+  } catch (error) {
+    console.error('Create registration invite error:', error);
+    res.status(500).json({ success: false, message: 'Failed to create invite link' });
+  }
+};
+
+exports.validateRegistrationInvite = async (req, res) => {
+  try {
+    const token = String(req.params.token || req.query.token || '').trim();
+    const inviteResult = verifyInviteTokenPayload(token);
+
+    if (!inviteResult.success) {
+      return res.status(inviteResult.status || 400).json({
+        success: false,
+        message: inviteResult.message || 'Invite link expired or invalid',
+      });
+    }
+
+    res.json({
+      success: true,
+      invite: inviteResult.invite,
+    });
+  } catch (error) {
+    console.error('Validate registration invite error:', error);
+    res.status(500).json({ success: false, message: 'Failed to validate invite link' });
   }
 };
 
@@ -204,15 +580,12 @@ exports.getUsers = async (req, res) => {
 
     const usersWithFullName = users.map((user) => ({
       ...user,
-      FullName: `${user.FirstName}${user.MiddleInitial ? " " + user.MiddleInitial + "." : ""
-        } ${user.LastName}`,
+      FullName: `${user.FirstName}${user.MiddleInitial ? " " + user.MiddleInitial + "." : ""} ${user.LastName}`,
       AssignedOffices: Array.from(
-        new Set(
-          [
-            ...String(user.RequirementAssignedOffices || '').split('||').filter(Boolean),
-            ...String(user.PersonnelAssignedOffices || '').split('||').filter(Boolean)
-          ]
-        )
+        new Set([
+          ...String(user.RequirementAssignedOffices || '').split('||').filter(Boolean),
+          ...String(user.PersonnelAssignedOffices || '').split('||').filter(Boolean),
+        ])
       ),
     }));
 
@@ -220,7 +593,6 @@ exports.getUsers = async (req, res) => {
       success: true,
       users: usersWithFullName,
     });
-
   } catch (error) {
     console.error("Get users error:", error);
     res.status(500).json({
@@ -260,15 +632,13 @@ exports.getCurrentUser = async (req, res) => {
     const user = users[0];
     const userWithFullName = {
       ...user,
-      FullName: `${user.FirstName}${user.MiddleInitial ? " " + user.MiddleInitial + "." : ""
-        } ${user.LastName}`,
+      FullName: `${user.FirstName}${user.MiddleInitial ? " " + user.MiddleInitial + "." : ""} ${user.LastName}`,
     };
 
     res.json({
       success: true,
       user: userWithFullName,
     });
-
   } catch (error) {
     console.error("Get current user error:", error);
     res.status(500).json({
@@ -373,6 +743,20 @@ exports.updateApprovalStatus = async (req, res) => {
       "SELECT UserID, FirstName, MiddleInitial, LastName, Email, RoleID, ProfilePic, approval_status FROM users WHERE UserID = ?",
       [userId]
     );
+    // If the user was denied, remove their related records and delete the user
+    if (approval_status === 'denied') {
+      try {
+        // cleanup assignments and headofoffice entries
+        await db.query('DELETE FROM requirement_user_assignments WHERE UserID = ?', [userId]);
+        await db.query('DELETE FROM headofoffice WHERE UserID = ?', [userId]);
+        const [delResult] = await db.query('DELETE FROM users WHERE UserID = ?', [userId]);
+        try { recordLog(req.user.userId, 'UserDeniedDeleted', `User ${userId} denied and deleted`); } catch (e) {}
+        return res.json({ success: true, message: `User denied and deleted`, deletedRows: delResult.affectedRows });
+      } catch (cleanupErr) {
+        console.error('Failed to cleanup/delete denied user:', cleanupErr);
+        return res.status(500).json({ success: false, message: 'Failed to delete denied user' });
+      }
+    }
 
     res.json({ 
       success: true, 
@@ -464,5 +848,47 @@ exports.updateUserRole = async (req, res) => {
   } catch (error) {
     console.error("Update user role error:", error);
     res.status(500).json({ success: false, message: "Error updating user role" });
+  }
+};
+
+// ===============================
+// DELETE USERS (bulk)
+// ===============================
+exports.deleteUsers = async (req, res) => {
+  try {
+    const adminId = req.user && req.user.userId;
+    if (!adminId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+    // Verify admin
+    const [[adminRow]] = await db.query('SELECT RoleID FROM users WHERE UserID = ?', [adminId]);
+    if (!adminRow || Number(adminRow.RoleID) !== 1) {
+      return res.status(403).json({ success: false, message: 'Only admins can delete users' });
+    }
+
+    const ids = Array.isArray(req.body.ids) ? req.body.ids.map((v) => Number(v)) : [];
+    if (!ids || ids.length === 0) {
+      return res.status(400).json({ success: false, message: 'No user IDs provided' });
+    }
+
+    // Prevent deleting the requesting admin
+    if (ids.includes(adminId)) {
+      return res.status(400).json({ success: false, message: 'Cannot delete the currently authenticated user' });
+    }
+
+    const placeholders = ids.map(() => '?').join(',');
+
+    // Remove assignments and related records referencing these users
+    await db.query(`DELETE FROM requirement_user_assignments WHERE UserID IN (${placeholders})`, ids);
+    await db.query(`DELETE FROM headofoffice WHERE UserID IN (${placeholders})`, ids);
+
+    // Finally delete from users
+    const [result] = await db.query(`DELETE FROM users WHERE UserID IN (${placeholders})`, ids);
+
+    try { recordLog(adminId, 'DeleteUsers', `Deleted users: ${ids.join(',')}`); } catch (e) {}
+
+    res.json({ success: true, message: `Deleted ${result.affectedRows} user(s)` });
+  } catch (error) {
+    console.error('deleteUsers error:', error);
+    res.status(500).json({ success: false, message: 'Error deleting users' });
   }
 };

@@ -5,6 +5,7 @@ import AddAreaModal from "../AddAreaModal/AddAreaModal";
 import EditRequirementsModal from "../EditRequirements/EditRequirementsModal";
 import AreaProfile from "../AreaProfile/AreaProfile";
 import { areasAPI, usersAPI } from "../../utils/api";
+import { useModal } from "../UI/ModalProvider";
 import EditAreaModal from "../EditArea/EditArea";
 import RequirementsP from "../RequirementsProfile/RequirementsProfile";
 import { eventsAPI } from "../../utils/api";
@@ -35,8 +36,8 @@ export default function RequirementBars() {
     const [areaSelectionMode, setAreaSelectionMode] = useState(false);
     const [selectedAreaIds, setSelectedAreaIds] = useState([]);
 
-    // Default to admin (show features) until we confirm otherwise
-    const isAdmin = !currentUser || currentUser.RoleName === 'admin' || currentUser.RoleID === 1;
+    // Only treat as admin when the current user is loaded and has an admin role
+    const isAdmin = !!(currentUser && (currentUser.RoleName === 'admin' || currentUser.RoleID === 1));
 
     // Fetch current user on mount
     useEffect(() => {
@@ -114,13 +115,13 @@ export default function RequirementBars() {
                     requirementsPRef.current.refresh();
                 }
                 
-                alert('Requirement updated successfully!');
+                await showAlert('Requirement updated successfully!');
             } else {
-                alert(response.message || 'Failed to update requirement');
+                await showAlert(response.message || 'Failed to update requirement');
             }
         } catch (error) {
             console.error('Error updating requirement:', error);
-            alert('An error occurred while updating the requirement');
+            await showAlert('An error occurred while updating the requirement');
         }
     };
 
@@ -140,6 +141,8 @@ export default function RequirementBars() {
         }
     };
 
+    const { showAlert, showConfirm } = useModal();
+
     // Memoize handleSelectionChange to prevent infinite loops
     const handleSelectionChange = useCallback((count, ids) => {
         setSelectedCount(count);
@@ -150,10 +153,7 @@ export default function RequirementBars() {
         if (selectedIds.length === 0 || !requirementsPRef.current) return;
         
         // Confirm deletion
-        const confirmed = window.confirm(
-            `Are you sure you want to delete ${selectedIds.length} requirement(s)? This action cannot be undone.`
-        );
-        
+        const confirmed = await showConfirm(`Are you sure you want to delete ${selectedIds.length} requirement(s)? This action cannot be undone.`);
         if (!confirmed) return;
         
         try {
@@ -165,15 +165,15 @@ export default function RequirementBars() {
                 setDeleteMode(false);
                 // Show success message
                 console.log('Successfully deleted selected requirements');
-                alert(`Successfully deleted ${selectedIds.length} requirement(s)`);
+                await showAlert(`Successfully deleted ${selectedIds.length} requirement(s)`);
             } else {
                 // Show error message
                 console.error('Failed to delete requirements:', result.message);
-                alert(result.message || 'Failed to delete requirements');
+                await showAlert(result.message || 'Failed to delete requirements');
             }
         } catch (error) {
             console.error('Error deleting requirements:', error);
-            alert('An error occurred while deleting requirements');
+            await showAlert('An error occurred while deleting requirements');
         }
     };
 
@@ -205,7 +205,7 @@ export default function RequirementBars() {
     // Delete selected areas
     const handleDeleteSelectedAreas = async () => {
         if (selectedAreaIds.length === 0) return;
-        const confirmed = window.confirm(`Are you sure you want to delete ${selectedAreaIds.length} area(s)? This action cannot be undone.`);
+        const confirmed = await showConfirm(`Are you sure you want to delete ${selectedAreaIds.length} area(s)? This action cannot be undone.`);
         if (!confirmed) return;
         try {
             // Call backend to delete areas (implement this route in backend!)
@@ -214,12 +214,12 @@ export default function RequirementBars() {
                 setSelectedAreaIds([]);
                 setAreaSelectionMode(false);
                 if (areaProfileRef.current && areaProfileRef.current.refresh) areaProfileRef.current.refresh();
-                alert(`Successfully deleted ${selectedAreaIds.length} area(s)`);
+                await showAlert(`Successfully deleted ${selectedAreaIds.length} area(s)`);
             } else {
-                alert(response.message || 'Failed to delete areas');
+                await showAlert(response.message || 'Failed to delete areas');
             }
         } catch (error) {
-            alert('An error occurred while deleting areas');
+            await showAlert('An error occurred while deleting areas');
         }
     };
 
@@ -229,12 +229,12 @@ export default function RequirementBars() {
             const response = await areasAPI.updateArea(updatedArea.AreaID, updatedArea);
             if (response.success) {
                 if (areaProfileRef.current && areaProfileRef.current.refresh) areaProfileRef.current.refresh();
-                alert('Area updated successfully!');
+                await showAlert('Area updated successfully!');
             } else {
-                alert(response.message || 'Failed to update area');
+                await showAlert(response.message || 'Failed to update area');
             }
         } catch (error) {
-            alert('An error occurred while updating the area');
+            await showAlert('An error occurred while updating the area');
         }
     };
 

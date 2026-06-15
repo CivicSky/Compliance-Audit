@@ -82,6 +82,15 @@ exports.addHead = async (req, res) => {
     // Execute the query
     const [result] = await db.execute(query, values);
 
+    // Attempt to set the user's role to Personnel (but do not downgrade Admin)
+    try {
+      const [roleRows] = await db.execute('SELECT RoleID FROM roles WHERE RoleName = ? LIMIT 1', ['Personnel']);
+      const personnelRoleId = roleRows && roleRows.length > 0 ? roleRows[0].RoleID : 3;
+      await db.execute('UPDATE users SET RoleID = ? WHERE UserID = ? AND RoleID != 1', [personnelRoleId, userId]);
+    } catch (roleErr) {
+      console.error('Failed to set Personnel role for user:', roleErr);
+    }
+
     // Return success response with joined user data
     res.status(201).json({
       success: true,
@@ -186,6 +195,15 @@ exports.addMultipleHeads = async (req, res) => {
         `;
         const values = [userId, position.trim(), userCheck[0].Email || null];
         const [result] = await db.execute(query, values);
+
+        // Attempt to set the user's role to Personnel (but do not downgrade Admin)
+        try {
+          const [roleRows] = await db.execute('SELECT RoleID FROM roles WHERE RoleName = ? LIMIT 1', ['Personnel']);
+          const personnelRoleId = roleRows && roleRows.length > 0 ? roleRows[0].RoleID : 3;
+          await db.execute('UPDATE users SET RoleID = ? WHERE UserID = ? AND RoleID != 1', [personnelRoleId, userId]);
+        } catch (roleErr) {
+          console.error(`Failed to set Personnel role for user ${userId}:`, roleErr);
+        }
 
         addedHeads.push({
           HeadID: result.insertId,
@@ -485,10 +503,10 @@ exports.deleteHeads = async (req, res) => {
       });
     }
 
-    // Collect names before deletion for readable audit logs
+    // Collect names and user IDs before deletion for readable audit logs and cascading cleanup
     const placeholders = validIds.map(() => '?').join(',');
     const [headsToDelete] = await db.execute(
-      `SELECT h.HeadID, u.FirstName, u.LastName
+      `SELECT h.HeadID, h.UserID, u.FirstName, u.LastName
        FROM headofoffice h
        LEFT JOIN users u ON h.UserID = u.UserID
        WHERE h.HeadID IN (${placeholders})`,
@@ -509,6 +527,39 @@ exports.deleteHeads = async (req, res) => {
         success: false,
         message: 'No office heads found with the provided IDs'
       });
+    }
+
+    // Remove any requirement_user_assignments for the deleted users
+    try {
+      const userIds = headsToDelete.map(r => r.UserID).filter(id => Number.isInteger(Number(id)));
+      if (userIds.length > 0) {
+        const userPlaceholders = userIds.map(() => '?').join(',');
+        await db.execute(`DELETE FROM requirement_user_assignments WHERE UserID IN (${userPlaceholders})`, userIds);
+      }
+    } catch (cleanupErr) {
+      console.error('Failed to cleanup requirement_user_assignments for deleted heads:', cleanupErr);
+    }
+
+    // Revert deleted heads back to regular 'User' role if they no longer have headofoffice entries
+    try {
+      const userIds = headsToDelete.map(r => r.UserID).filter(id => Number.isInteger(Number(id)));
+      if (userIds.length > 0) {
+        const [roleRows] = await db.execute('SELECT RoleID FROM roles WHERE RoleName = ? LIMIT 1', ['User']);
+        const userRoleId = roleRows && roleRows.length > 0 ? roleRows[0].RoleID : 2;
+        const userPlaceholders = userIds.map(() => '?').join(',');
+
+        // Only downgrade non-admins who no longer have a headofoffice row
+        const updateQuery = `
+          UPDATE users u
+          LEFT JOIN headofoffice h ON h.UserID = u.UserID
+          SET u.RoleID = ?
+          WHERE u.UserID IN (${userPlaceholders}) AND u.RoleID != 1 AND h.UserID IS NULL
+        `;
+
+        await db.execute(updateQuery, [userRoleId, ...userIds]);
+      }
+    } catch (roleErr) {
+      console.error('Failed to revert role to User for deleted heads:', roleErr);
     }
 
     res.status(200).json({

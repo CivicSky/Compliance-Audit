@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
-import { officesAPI, requirementsAPI } from '../../utils/api';
+import { criteriaAPI, officesAPI, requirementsAPI } from '../../utils/api';
+import ModalHeader from './AddAreaPop/ModalHeader';
+import EventStructureSidebar from './AddAreaPop/EventStructureSidebar';
+import ToastBanner from './AddAreaPop/ToastBanner';
+import AddAreaForm from './AddAreaPop/AddAreaForm';
+import AddCriteriaForm from './AddAreaPop/AddCriteriaForm';
+import AddRequirementForm from './AddAreaPop/AddRequirementForm';
+import AssignPanel from './AddAreaPop/AssignPanel';
+import { saveButtonClass } from './AddAreaPop/formStyles';
 
 export default function AddAreaPop({
 	isOpen,
@@ -45,7 +53,10 @@ export default function AddAreaPop({
 		return topLevel.filter(c => String(c.AreaID) === String(criteriaForm.AreaID));
 	}, [criteriaOptions, criteriaForm.AreaID, event]);
 	const [eventOffices, setEventOffices] = useState([]);
-	const [eventRequirements, setEventRequirements] = useState([]);
+	const [assignmentCriteriaByArea, setAssignmentCriteriaByArea] = useState({});
+	const [assignmentRequirementsByCriteria, setAssignmentRequirementsByCriteria] = useState({});
+	const [loadingAssignmentCriteria, setLoadingAssignmentCriteria] = useState(new Set());
+	const [loadingAssignmentRequirements, setLoadingAssignmentRequirements] = useState(new Set());
 	const [selectedOfficeIds, setSelectedOfficeIds] = useState([]);
 	const [selectedRequirementIds, setSelectedRequirementIds] = useState([]);
 	const [officeSearchTerm, setOfficeSearchTerm] = useState('');
@@ -98,69 +109,40 @@ export default function AddAreaPop({
 	};
 
 	const requirementTree = useMemo(() => {
-		const areaMap = new Map();
-		const criteriaMetaById = new Map(
-			(criteriaOptions || []).map((crit) => [
-				Number(crit.CriteriaID),
-				{
-					AreaID: crit.AreaID ?? crit.area_id ?? null,
-					AreaName: crit.AreaName ?? crit.area_name ?? '',
-					AreaCode: crit.AreaCode ?? crit.area_code ?? '',
-					CriteriaName: crit.CriteriaName ?? crit.criteria_name ?? '',
-					CriteriaCode: crit.CriteriaCode ?? crit.criteria_code ?? '',
-				},
-			])
-		);
-		const areaMetaById = new Map(
-			(areas || []).map((area) => [
-				Number(area.AreaID),
-				{
-					AreaName: area.AreaName ?? area.area_name ?? '',
-					AreaCode: area.AreaCode ?? area.area_code ?? '',
-				},
-			])
-		);
+		const eventAreas = (areas || [])
+			.filter((area) => !event?.EventID || Number(area.EventID ?? area.EventChildID ?? event.EventID) === Number(event.EventID))
+			.slice()
+			.sort((a, b) => String(a.AreaCode || a.AreaName || '').localeCompare(String(b.AreaCode || b.AreaName || ''), undefined, { numeric: true, sensitivity: 'base' }));
 
-		for (const req of eventRequirements) {
-			const criteriaId = Number(req.CriteriaID);
-			const criteriaMeta = criteriaMetaById.get(criteriaId) || {};
-			const resolvedAreaId = req.AreaID ?? req.area_id ?? criteriaMeta.AreaID;
-			const hasArea = resolvedAreaId !== null && resolvedAreaId !== undefined && `${resolvedAreaId}` !== '';
-			const areaId = hasArea ? Number(resolvedAreaId) : null;
-			const areaFallback = areaId != null ? areaMetaById.get(areaId) : null;
+		return eventAreas.map((area) => {
+			const areaId = Number(area.AreaID);
+			const criteria = (assignmentCriteriaByArea[areaId] || []).map((crit) => {
+				const criteriaId = Number(crit.CriteriaID);
+				const code = crit.CriteriaCode ?? crit.criteria_code ?? '';
+				const name = crit.CriteriaName ?? crit.criteria_name ?? '';
+				const requirementsLoaded = Object.prototype.hasOwnProperty.call(assignmentRequirementsByCriteria, criteriaId);
+				return {
+					...crit,
+					id: criteriaId,
+					key: `criteria-${criteriaId}`,
+					label: code ? `${code} - ${name}` : name,
+					requirements: requirementsLoaded ? assignmentRequirementsByCriteria[criteriaId] || [] : [],
+					requirementsLoaded,
+				};
+			});
 
-			const areaKey = areaId != null ? `area-${areaId}` : 'area-none';
-			const areaName = req.AreaName || req.area_name || criteriaMeta.AreaName || areaFallback?.AreaName || 'No Area';
-			const areaCode = req.AreaCode || req.area_code || criteriaMeta.AreaCode || areaFallback?.AreaCode || '';
-			const criteriaKey = req.CriteriaID != null ? `criteria-${req.CriteriaID}` : `criteria-none-${req.RequirementID}`;
-			const criteriaName = req.CriteriaName || req.criteria_name || criteriaMeta.CriteriaName || 'No Criteria';
-			const criteriaCode = req.CriteriaCode || req.criteria_code || criteriaMeta.CriteriaCode || '';
-
-			if (!areaMap.has(areaKey)) {
-				areaMap.set(areaKey, {
-					key: areaKey,
-					label: areaCode ? `${areaCode} - ${areaName}` : areaName,
-					criteriaMap: new Map(),
-				});
-			}
-
-			const areaEntry = areaMap.get(areaKey);
-			if (!areaEntry.criteriaMap.has(criteriaKey)) {
-				areaEntry.criteriaMap.set(criteriaKey, {
-					key: criteriaKey,
-					label: criteriaCode ? `${criteriaCode} - ${criteriaName}` : criteriaName,
-					requirements: [],
-				});
-			}
-
-			areaEntry.criteriaMap.get(criteriaKey).requirements.push(req);
-		}
-
-		return Array.from(areaMap.values()).map((area) => ({
-			...area,
-			criteria: Array.from(area.criteriaMap.values()),
-		}));
-	}, [eventRequirements, criteriaOptions, areas]);
+			const areaCode = area.AreaCode ?? area.area_code ?? '';
+			const areaName = area.AreaName ?? area.area_name ?? '';
+			return {
+				...area,
+				id: areaId,
+				key: `area-${areaId}`,
+				label: areaCode ? `${areaCode} - ${areaName}` : areaName,
+				criteria,
+				criteriaLoaded: Object.prototype.hasOwnProperty.call(assignmentCriteriaByArea, areaId),
+			};
+		});
+	}, [areas, assignmentCriteriaByArea, assignmentRequirementsByCriteria, event?.EventID]);
 
 	const selectedRequirementIdSet = useMemo(() => {
 		return new Set(selectedRequirementIds.map((id) => Number(id)));
@@ -233,6 +215,58 @@ export default function AddAreaPop({
 	const allOfficesSelected = allOfficeIds.length > 0 && allOfficeIds.every((id) => selectedOfficeIds.includes(id));
 	const allRequirementsSelected = allRequirementIds.length > 0 && allRequirementIds.every((id) => selectedRequirementIdSet.has(id));
 
+	const loadAssignmentCriteriaForArea = async (areaId, force = false) => {
+		const normalizedAreaId = Number(areaId);
+		if (!Number.isInteger(normalizedAreaId) || normalizedAreaId <= 0) return [];
+		if (!force && Object.prototype.hasOwnProperty.call(assignmentCriteriaByArea, normalizedAreaId)) {
+			return assignmentCriteriaByArea[normalizedAreaId] || [];
+		}
+
+		try {
+			setLoadingAssignmentCriteria((prev) => new Set([...prev, normalizedAreaId]));
+			const payload = await criteriaAPI.getByArea(normalizedAreaId);
+			const list = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [];
+			setAssignmentCriteriaByArea((prev) => ({ ...prev, [normalizedAreaId]: list }));
+			return list;
+		} catch (err) {
+			console.error('Failed to load assignment criteria:', err);
+			setAssignmentCriteriaByArea((prev) => ({ ...prev, [normalizedAreaId]: [] }));
+			return [];
+		} finally {
+			setLoadingAssignmentCriteria((prev) => {
+				const next = new Set(prev);
+				next.delete(normalizedAreaId);
+				return next;
+			});
+		}
+	};
+
+	const loadAssignmentRequirementsForCriteria = async (criteriaId, force = false) => {
+		const normalizedCriteriaId = Number(criteriaId);
+		if (!Number.isInteger(normalizedCriteriaId) || normalizedCriteriaId <= 0) return [];
+		if (!force && Object.prototype.hasOwnProperty.call(assignmentRequirementsByCriteria, normalizedCriteriaId)) {
+			return assignmentRequirementsByCriteria[normalizedCriteriaId] || [];
+		}
+
+		try {
+			setLoadingAssignmentRequirements((prev) => new Set([...prev, normalizedCriteriaId]));
+			const payload = await requirementsAPI.getRequirementsByCriteria(normalizedCriteriaId);
+			const list = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [];
+			setAssignmentRequirementsByCriteria((prev) => ({ ...prev, [normalizedCriteriaId]: list }));
+			return list;
+		} catch (err) {
+			console.error('Failed to load assignment requirements:', err);
+			setAssignmentRequirementsByCriteria((prev) => ({ ...prev, [normalizedCriteriaId]: [] }));
+			return [];
+		} finally {
+			setLoadingAssignmentRequirements((prev) => {
+				const next = new Set(prev);
+				next.delete(normalizedCriteriaId);
+				return next;
+			});
+		}
+	};
+
 	useEffect(() => {
 		if (!isOpen || !event?.EventID || mainMode !== 'assign') return;
 
@@ -241,21 +275,12 @@ export default function AddAreaPop({
 			setError('');
 			setSuccess('');
 			try {
-				const [officesPayload, requirementsPayload] = await Promise.all([
-					officesAPI.getAll(),
-					requirementsAPI.getRequirementsByEvent(event.EventID),
-				]);
+				const officesPayload = await officesAPI.getAll();
 
 				const officesList = Array.isArray(officesPayload)
 					? officesPayload
 					: Array.isArray(officesPayload?.data)
 						? officesPayload.data
-						: [];
-
-				const requirementsList = Array.isArray(requirementsPayload)
-					? requirementsPayload
-					: Array.isArray(requirementsPayload?.data)
-						? requirementsPayload.data
 						: [];
 
 				const filteredOffices = officesList.filter((office) => {
@@ -264,7 +289,10 @@ export default function AddAreaPop({
 				});
 
 				setEventOffices(filteredOffices);
-				setEventRequirements(requirementsList);
+				setAssignmentCriteriaByArea({});
+				setAssignmentRequirementsByCriteria({});
+				setLoadingAssignmentCriteria(new Set());
+				setLoadingAssignmentRequirements(new Set());
 				setSelectedOfficeIds([]);
 				setSelectedRequirementIds([]);
 				setOfficeSearchTerm('');
@@ -279,14 +307,8 @@ export default function AddAreaPop({
 		loadAssignmentData();
 	}, [isOpen, event?.EventID, mainMode]);
 
-	const fieldClass = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-400';
-	const mainTabClass = (active) => `px-2.5 py-1.5 rounded-md text-sm font-semibold transition ${active ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`;
-	const tabClass = (active) => `px-3 py-2 rounded-lg text-sm font-semibold transition ${active ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`;
-	const actionButtonClass = 'px-4 py-2 rounded-lg bg-cyan-600 text-white text-sm font-semibold disabled:opacity-60 hover:bg-cyan-700 transition';
-	const modalShellClass =
-		mainMode === 'assign'
-			? 'w-full max-w-7xl h-[86vh] max-h-[90vh] overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-b from-white via-white to-slate-50 shadow-[0_30px_70px_rgba(15,23,42,0.28)] p-6 md:p-7 flex flex-col'
-			: 'w-full max-w-4xl h-[86vh] max-h-[90vh] overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-b from-white via-white to-slate-50 shadow-[0_30px_70px_rgba(15,23,42,0.28)] p-6 md:p-7 flex flex-col';
+	const fieldClass =
+		'w-full rounded-lg border border-stone-300/80 bg-app-surface px-3 py-2.5 text-sm text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500';
 
 	const resetAndClose = () => {
 		setMainMode('add');
@@ -300,7 +322,10 @@ export default function AddAreaPop({
 		}
 		setSaving(false);
 		setEventOffices([]);
-		setEventRequirements([]);
+		setAssignmentCriteriaByArea({});
+		setAssignmentRequirementsByCriteria({});
+		setLoadingAssignmentCriteria(new Set());
+		setLoadingAssignmentRequirements(new Set());
 		setCriteriaForm({ CriteriaCode: '', CriteriaName: '', Description: '', AreaID: '' });
 		setAreaForm({ AreaCode: '', AreaName: '', Description: '' });
 		setSelectedOfficeIds([]);
@@ -721,510 +746,141 @@ export default function AddAreaPop({
 	if (!isOpen || !event) return null;
 
 	return (
-		<div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out z-[120] bg-slate-950/45 backdrop-blur-[2px] flex items-center justify-center p-4">
-				<div className={`${modalShellClass} relative`}>
-				<div className="flex items-start justify-between mb-4">
-					<div>
-						<h3 className="text-3xl font-bold tracking-tight text-slate-900">Manage Event Structure</h3>
-						<p className="mt-1 inline-flex items-center rounded-full border border-cyan-200 bg-cyan-50 px-3.5 py-1.5 text-sm font-semibold text-cyan-700">{event.EventCode || event.EventName}</p>
-					</div>
-					<button
-						onClick={resetAndClose}
-						className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
-						aria-label="Close"
-					>
-						<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-						</svg>
-					</button>
-				</div>
-
-				{/* Main mode selector */}
-				<div className="mb-4 inline-flex rounded-lg border border-slate-200 bg-slate-100 p-0.5">
-					<button
-						onClick={() => {
+		<div
+			className="fixed inset-y-0 right-0 z-[120] flex bg-slate-900/50 py-2 pl-2 pr-2 backdrop-blur-[2px] sm:py-2.5 sm:pl-3 sm:pr-2.5"
+			style={{ left: 'calc(var(--sidebar-width, 0px) + 8px)' }}
+		>
+			<div className="relative flex h-full w-full flex-col overflow-hidden rounded-xl border border-stone-200/90 bg-app-muted shadow-2xl">
+				<div className="flex min-h-0 flex-1 gap-0">
+					<EventStructureSidebar
+						mainMode={mainMode}
+						mode={mode}
+						onSelectAdd={() => {
 							setMainMode('add');
 							setMode('add-area');
 							setError('');
 							setSuccess('');
 						}}
-						className={mainTabClass(mainMode === 'add')}
-					>
-						Add
-					</button>
-					<button
-						onClick={() => {
+						onSelectAssign={() => {
 							setMainMode('assign');
 							setError('');
 							setSuccess('');
 						}}
-						className={mainTabClass(mainMode === 'assign')}
-					>
-						Assign To Offices
-					</button>
-				</div>
+						onSelectAddArea={() => {
+							setMainMode('add');
+							setMode('add-area');
+							setError('');
+							setSuccess('');
+						}}
+						onSelectAddCriteria={() => {
+							setMainMode('add');
+							setMode('add-criteria');
+							setError('');
+							setSuccess('');
+						}}
+						onSelectAddRequirement={() => {
+							setMainMode('add');
+							setMode('add-requirement');
+							setError('');
+							setSuccess('');
+						}}
+					/>
 
-				{mainMode !== 'assign' && (error || success) && (
-					<div
-						className="pointer-events-none absolute left-1/2 top-[4.7rem] z-20 w-[min(92%,760px)] -translate-x-1/2"
-						style={{ transition: 'opacity 400ms ease', opacity: (error || success) ? (toastVisible ? 1 : 0) : 0 }}
-					>
-						{error ? (
-							<p className="rounded-lg border border-rose-300 bg-rose-100 px-3 py-2 text-sm text-rose-800 shadow-sm">
-								{error}
-							</p>
-						) : (
-							<p className="rounded-lg border border-emerald-300 bg-emerald-100 px-3 py-2 text-sm text-emerald-800 shadow-sm" aria-live="polite">
-								{success}
-							</p>
-						)}
-					</div>
-				)}
+					<div className="relative flex min-w-0 flex-1 flex-col border-l border-stone-200/90 bg-app-bg">
+						<ModalHeader event={event} onClose={resetAndClose} mainMode={mainMode} />
+						<ToastBanner error={error} success={success} toastVisible={toastVisible} />
 
-				{/* Sub-tabs for add/edit */}
-				{mainMode === 'add' && (
-					<div className="grid grid-cols-3 gap-2 mb-4 rounded-xl border border-slate-200 bg-slate-100 p-1">
-						<button onClick={() => setMode('add-area')} className={tabClass(mode === 'add-area')}>Add Area</button>
-						<button onClick={() => setMode('add-criteria')} className={tabClass(mode === 'add-criteria')}>Add Criteria</button>
-						<button onClick={() => setMode('add-requirement')} className={tabClass(mode === 'add-requirement')}>Add Requirement</button>
-					</div>
-				)}
-			
-
-				{/* Modal content */}
-				<div className="flex-1 min-h-0 overflow-y-auto pr-1">
-
-				   {/* Only show the correct form for the selected tab/sub-tab */}
-				   {mainMode === 'add' && mode === 'add-area' && (
-					   <form onSubmit={handleAddArea} className="space-y-3 rounded-xl border border-slate-200 bg-white/80 p-4">
-						   <input
-							   className={fieldClass}
-							   placeholder="Area Code"
-							   value={areaForm.AreaCode}
-							   onChange={(e) => setAreaForm(prev => ({ ...prev, AreaCode: e.target.value }))}
-						   />
-						   <input
-							   className={fieldClass}
-							   placeholder="Area Name"
-							   value={areaForm.AreaName}
-							   onChange={(e) => setAreaForm(prev => ({ ...prev, AreaName: e.target.value }))}
-						   />
-						{/* Description removed per request; backend will accept null */}
-						   <div className="flex gap-2 justify-end">
-							   <button type="submit" disabled={saving} className={actionButtonClass}>
-								   {saving ? 'Saving...' : 'Save Area'}
-							   </button>
-						   </div>
-					   </form>
-				   )}
-
-				   {mainMode === 'add' && mode === 'add-criteria' && (
-					   <form onSubmit={handleAddCriteria} className="space-y-3 rounded-xl border border-slate-200 bg-white/80 p-4">
-						   <select
-							   className={fieldClass}
-							   value={criteriaForm.AreaID}
-							   onChange={(e) => {
-								   const v = e.target.value;
-								   // if area is cleared, also clear any chosen parent criteria
-								   setCriteriaForm(prev => ({ ...prev, AreaID: v, ParentCriteriaID: v ? prev.ParentCriteriaID : '' }));
-							   }}
-						   >
-							   <option value="">No Area (optional)</option>
-							   {(areas || []).map((area) => (
-									   <option key={area.AreaID} value={area.AreaID}>{area.AreaCode ? `${area.AreaCode} - ${area.AreaName}` : area.AreaName}</option>
-								   ))}
-						   </select>
-						{/* Parent Criteria (optional) - filtered by selected Area */}
-						<select
-							className={fieldClass}
-							value={criteriaForm.ParentCriteriaID}
-							onChange={(e) => setCriteriaForm(prev => ({ ...prev, ParentCriteriaID: e.target.value }))}
-							disabled={!criteriaForm.AreaID}
-							title={!criteriaForm.AreaID ? 'Select an area first to choose a parent criteria' : ''}
-							>
-							<option value="">No parent (optional)</option>
-							{parentCriteriaOptions.map((crit) => (
-								<option key={crit.CriteriaID} value={crit.CriteriaID}>
-									{crit.CriteriaCode ? `${crit.CriteriaCode} - ${crit.CriteriaName}` : crit.CriteriaName}
-								</option>
-							))}
-						</select>
-						   <input
-							className={fieldClass}
-							placeholder={criteriaForm.ParentCriteriaID ? 'No code required for child criteria' : 'Criteria Code'}
-							value={criteriaForm.CriteriaCode}
-							onChange={(e) => setCriteriaForm(prev => ({ ...prev, CriteriaCode: (e.target.value || '').toUpperCase() }))}
-							disabled={!!criteriaForm.ParentCriteriaID}
-						/>
-						   <input
-							   className={fieldClass}
-							   placeholder="Criteria Name"
-							   value={criteriaForm.CriteriaName}
-							   onChange={(e) => setCriteriaForm(prev => ({ ...prev, CriteriaName: e.target.value }))}
-						   />
-						{/* Description removed per request; backend will accept null */}
-						   <div className="flex gap-2 justify-end">
-							   <button type="submit" disabled={saving} className={actionButtonClass}>
-								   {saving ? 'Saving...' : 'Save Criteria'}
-							   </button>
-						   </div>
-					   </form>
-				   )}
-
-				   {mainMode === 'add' && mode === 'add-requirement' && (
-					   <form onSubmit={handleAddRequirement} className="space-y-3 rounded-xl border border-slate-200 bg-white/80 p-4">
-						   <select
-							   className={fieldClass}
-							   value={requirementForm.AreaFilter}
-							   onChange={(e) => setRequirementForm(prev => ({ ...prev, AreaFilter: e.target.value, CriteriaID: '' }))}
-						   >
-							<option value="">Select area</option>
-							<option value="__no_area__">No Area (criteria without area)</option>
-							   {(areas || []).map((area) => (
-								   <option key={area.AreaID} value={area.AreaID}>{area.AreaCode ? `${area.AreaCode} - ${area.AreaName}` : area.AreaName}</option>
-							   ))}
-						   </select>
-						   <select
-							   className={fieldClass}
-							   value={requirementForm.CriteriaID}
-							   onChange={(e) => handleRequirementCriteriaChange(e.target.value, false, requirementForm.AreaFilter)}
-						   >
-							   <option value="">Select criteria</option>
-							   {filteredCriteriaOptions.map((crit) => (
-								   <option key={crit.CriteriaID} value={crit.CriteriaID}>
-									   {crit.CriteriaCode ? `${crit.CriteriaCode} - ${crit.CriteriaName}` : crit.CriteriaName} {crit.AreaName ? `- (${crit.AreaName})` : '- (No Area)'}
-								   </option>
-							   ))}
-						   </select>
-						   {requirementForm.AreaFilter && filteredCriteriaOptions.length === 0 && (
-							   <p className="text-xs text-gray-500">No criteria found for the selected area filter.</p>
-						   )}
-						   {!requirementForm.AreaFilter && (
-							   <p className="text-xs text-gray-500">Select an area first to load criteria.</p>
-						   )}
-						{/* Child Criteria Dropdown (optional) */}
-						{childCriteriaOptions.length > 0 && (
-							<select
-								className={fieldClass}
-								value={requirementForm.ChildCriteriaID}
-								onChange={(e) => {
-									const val = e.target.value;
-									setRequirementForm(prev => ({ ...prev, ChildCriteriaID: val }));
-									// load parent requirements and regenerate code based on chosen child
-									if (val) loadParentRequirementsFor(val, false, requirementForm.AreaFilter);
-									else if (requirementForm.CriteriaID) loadParentRequirementsFor(requirementForm.CriteriaID, false, requirementForm.AreaFilter);
-								}}
-								disabled={!requirementForm.CriteriaID}
-							>
-								<option value="">No child selected (use selected criteria)</option>
-								{childCriteriaOptions.map((cc) => (
-									<option key={cc.CriteriaID} value={cc.CriteriaID}>
-										{cc.CriteriaCode ? `${cc.CriteriaCode} - ${cc.CriteriaName}` : cc.CriteriaName}
-									</option>
-								))}
-							</select>
-						)}
-						<select
-							className={fieldClass}
-							value={requirementForm.ParentRequirementCode}
-							onChange={(e) => handleParentRequirementChange(e.target.value)}
-							disabled={!requirementForm.CriteriaID || loadingParents}
+						<div
+							className={`flex min-h-0 flex-1 flex-col overflow-hidden py-4 ${
+								mainMode === 'assign' ? 'px-3 sm:px-4' : 'px-4 sm:px-5'
+							}`}
 						>
-							<option value="">No parent requirement (optional)</option>
-							{parentRequirementOptions.map((req) => (
-								<option key={req.RequirementID} value={req.RequirementCode}>
-									{req.RequirementCode} - {req.Description}
-								</option>
-							))}
-						</select>
-						{requirementForm.CriteriaID && loadingParents && (
-							<p className="text-xs text-gray-500">Loading parent requirement options...</p>
-						)}
-						   <div>
-							   <label className="block text-xs font-semibold text-slate-600 mb-1">Requirement Code (editable)</label>
-							   <input
-								   className={fieldClass}
-								   value={requirementForm.RequirementCode || ''}
-								   onChange={(e) => setRequirementForm(prev => ({ ...prev, RequirementCode: e.target.value }))}
-								   placeholder="Leave empty to auto-generate"
-							   />
-						   </div>
-						   <textarea
-							   className={fieldClass}
-							   placeholder="Requirement Description"
-							   value={requirementForm.Description}
-							   onChange={(e) => setRequirementForm(prev => ({ ...prev, Description: e.target.value }))}
-							   disabled={!requirementForm.CriteriaID}
-						   />
-						   <div className="flex gap-2 justify-end">
-							   <button type="submit" disabled={saving || !requirementForm.CriteriaID} className={actionButtonClass}>
-								   {saving ? 'Saving...' : 'Save Requirement'}
-							   </button>
-						   </div>
-					   </form>
-				   )}
+							{mainMode === 'add' && (
+								<div className="mx-auto w-full max-w-2xl">
+									{mode === 'add-area' && (
+										<AddAreaForm
+											fieldClass={fieldClass}
+											saving={saving}
+											areaForm={areaForm}
+											setAreaForm={setAreaForm}
+											onSubmit={handleAddArea}
+										/>
+									)}
+									{mode === 'add-criteria' && (
+										<AddCriteriaForm
+											areas={areas}
+											criteriaForm={criteriaForm}
+											setCriteriaForm={setCriteriaForm}
+											parentCriteriaOptions={parentCriteriaOptions}
+											fieldClass={fieldClass}
+											saving={saving}
+											onSubmit={handleAddCriteria}
+										/>
+									)}
+									{mode === 'add-requirement' && (
+										<AddRequirementForm
+											areas={areas}
+											requirementForm={requirementForm}
+											setRequirementForm={setRequirementForm}
+											filteredCriteriaOptions={filteredCriteriaOptions}
+											handleRequirementCriteriaChange={handleRequirementCriteriaChange}
+											onChildCriteriaChange={(val) => {
+												if (val) loadParentRequirementsFor(val, false, requirementForm.AreaFilter);
+												else if (requirementForm.CriteriaID)
+													loadParentRequirementsFor(requirementForm.CriteriaID, false, requirementForm.AreaFilter);
+											}}
+											childCriteriaOptions={childCriteriaOptions}
+											parentRequirementOptions={parentRequirementOptions}
+											handleParentRequirementChange={handleParentRequirementChange}
+											loadingParents={loadingParents}
+											fieldClass={fieldClass}
+											saving={saving}
+											onSubmit={handleAddRequirement}
+										/>
+									)}
+								</div>
+							)}
 
-				   {mainMode === 'assign' && (
-					   <form onSubmit={handleAssignRequirementsToOffices} className="space-y-3 rounded-xl border border-slate-200 bg-white/80 p-4">
-						   <div className="flex items-center justify-between">
-							   <p className="text-sm font-semibold text-slate-700">Bulk Assign Requirements To Offices</p>
-							   <p className="text-xs text-slate-500">Select offices and requirements, then assign in one action.</p>
-						   </div>
-
-						   {loadingAssignmentData ? (
-							   <p className="text-sm text-slate-500 py-6">Loading offices and requirements...</p>
-						   ) : (
-							   <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)]">
-								   <div className="rounded-xl border border-slate-200 bg-white p-3">
-									   <div className="mb-2 flex items-center justify-between">
-										   <p className="text-sm font-semibold text-slate-700">Offices</p>
-										   <label className="inline-flex items-center gap-2 text-xs text-slate-600">
-											   <input
-												   type="checkbox"
-												   checked={allOfficesSelected}
-												   onChange={(e) => {
-													   if (e.target.checked) setSelectedOfficeIds(allOfficeIds);
-													   else setSelectedOfficeIds([]);
-												   }}
-											   />
-											   Select all
-										   </label>
-									   </div>
-									   <input
-										   type="text"
-										   className="mb-2 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
-										   placeholder="Search offices..."
-										   value={officeSearchTerm}
-										   onChange={(e) => setOfficeSearchTerm(e.target.value)}
-									   />
-									   <div className="h-72 overflow-y-scroll space-y-2 pr-1 [scrollbar-gutter:stable] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:rounded [&::-webkit-scrollbar-track]:bg-slate-100 [&::-webkit-scrollbar-thumb]:rounded [&::-webkit-scrollbar-thumb]:bg-slate-300 hover:[&::-webkit-scrollbar-thumb]:bg-slate-400">
-										   {eventOffices.length === 0 ? (
-											   <p className="text-xs text-slate-500">No offices found for this event.</p>
-										   ) : filteredEventOffices.length === 0 ? (
-											   <p className="text-xs text-slate-500">No matching offices for your search.</p>
-										   ) : (
-											   filteredEventOffices.map((office) => {
-												   const officeId = Number(office.id || office.OfficeID);
-												   const checked = selectedOfficeIds.includes(officeId);
-												   const label = office.office_name || office.OfficeName || `Office ${officeId}`;
-												   return (
-													   <label
-														   key={officeId}
-														   className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 text-sm transition ${
-															   checked
-																   ? 'border-cyan-300 bg-cyan-50 text-cyan-800 shadow-sm'
-																   : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
-														   }`}
-													   >
-														   <input
-															   type="checkbox"
-															   className="h-4 w-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"
-															   checked={checked}
-															   onChange={(e) => toggleOffice(officeId, e.target.checked)}
-														   />
-														   <span className="truncate">{label}</span>
-													   </label>
-												   );
-											   })
-										   )}
-									   </div>
-								   </div>
-
-								   <div className="rounded-xl border border-slate-200 bg-white p-3">
-									   <div className="mb-2 flex items-center justify-between">
-										   <p className="text-sm font-semibold text-slate-700">Requirements by Area and Criteria</p>
-										   <label className="inline-flex items-center gap-2 text-xs text-slate-600">
-											   <input
-												   type="checkbox"
-												   checked={allRequirementsSelected}
-												   onChange={(e) => toggleRequirementBatch(allRequirementIds, e.target.checked)}
-											   />
-											   Select all
-										   </label>
-									   </div>
-									   <input
-										   type="text"
-										   className="mb-2 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
-										   placeholder="Search areas, criteria, or requirements..."
-										   value={requirementSearchTerm}
-										   onChange={(e) => setRequirementSearchTerm(e.target.value)}
-									   />
-									   <div className="h-72 overflow-y-scroll space-y-3 pr-1 [scrollbar-gutter:stable] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:rounded [&::-webkit-scrollbar-track]:bg-slate-100 [&::-webkit-scrollbar-thumb]:rounded [&::-webkit-scrollbar-thumb]:bg-slate-300 hover:[&::-webkit-scrollbar-thumb]:bg-slate-400">
-										   {requirementTree.length === 0 ? (
-											   <p className="text-xs text-slate-500">No requirements found for this event.</p>
-										   ) : filteredRequirementTree.length === 0 ? (
-											   <p className="text-xs text-slate-500">No matching requirements for your search.</p>
-										   ) : (
-											   filteredRequirementTree.map((area) => {
-												   const areaRequirementIds = area.criteria.flatMap((criteria) =>
-													   criteria.requirements.map((req) => Number(req.RequirementID))
-												   );
-												   const areaChecked =
-													   areaRequirementIds.length > 0 &&
-													   areaRequirementIds.every((id) => selectedRequirementIdSet.has(id));
-
-												   return (
-													   <div key={area.key} className="rounded-xl border border-violet-200 bg-violet-50/30 p-2.5">
-														   <label className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-violet-500 to-fuchsia-500 px-3 py-2 text-sm font-semibold text-white shadow-sm">
-															   <input
-																   type="checkbox"
-																   className="h-4 w-4 rounded border-white/70 bg-white text-violet-600 focus:ring-white"
-																   checked={areaChecked}
-																   onChange={(e) => toggleRequirementBatch(areaRequirementIds, e.target.checked)}
-															   />
-															   {area.label}
-															   <span className="ml-auto rounded bg-white/20 px-2 py-0.5 text-[11px] font-medium">
-																   {areaRequirementIds.length} req
-															   </span>
-														   </label>
-
-														   <div className="relative ml-5 mt-3 space-y-2 border-l-4 border-violet-200 pl-4">
-															   {(() => {
-																   // Build criteria tree using criteriaOptions metadata (parent-child relationships)
-																   const list = area.criteria || [];
-																   const nodeMap = new Map();
-																   const roots = [];
-
-																   // Create nodes with requirements attached. Also synthesize parent nodes
-																   for (const c of list) {
-																	   // extract numeric CriteriaID from key if present (key like 'criteria-123')
-																	   const match = String(c.key || '').match(/\d+/);
-																	   const cid = match ? Number(match[0]) : null;
-																	   const nodeId = cid ?? c.key;
-
-																	   nodeMap.set(nodeId, {
-																		   id: cid,
-																		   key: c.key,
-																		   label: c.label,
-																		   requirements: c.requirements || [],
-																		   children: []
-																	   });
-
-																	   // If this criteria has a parent according to metadata, ensure the parent node exists
-																	   const meta = (criteriaOptions || []).find(x => Number(x.CriteriaID) === Number(cid));
-																	   const parentId = meta ? (meta.ParentCriteriaID ?? meta.parent_criteria_id ?? null) : null;
-																	   if (parentId && !nodeMap.has(Number(parentId))) {
-																		   const parentMeta = (criteriaOptions || []).find(x => Number(x.CriteriaID) === Number(parentId));
-																		   const parentLabel = parentMeta ? (parentMeta.CriteriaCode ? `${parentMeta.CriteriaCode} - ${parentMeta.CriteriaName}` : parentMeta.CriteriaName) : `Criteria ${parentId}`;
-																		   nodeMap.set(Number(parentId), {
-																			   id: Number(parentId),
-																			   key: `criteria-${parentId}`,
-																			   label: parentLabel,
-																			   requirements: [],
-																			   children: []
-																		   });
-																	   }
-																   }
-
-																   // Attach children using criteriaOptions metadata
-																   for (const node of nodeMap.values()) {
-																	   const meta = (criteriaOptions || []).find(x => Number(x.CriteriaID) === Number(node.id));
-																	   const parentId = meta ? (meta.ParentCriteriaID ?? meta.parent_criteria_id ?? null) : null;
-																	   if (parentId && nodeMap.has(Number(parentId))) {
-																		   nodeMap.get(Number(parentId)).children.push(node);
-																	   } else {
-																		   roots.push(node);
-																	   }
-																   }
-
-																   const renderNode = (node) => {
-																	   // gather all requirement IDs for this node and its descendants
-																	   const gatherReqIds = (n) => {
-																		   const own = (n.requirements || []).map(r => Number(r.RequirementID)).filter(Boolean);
-																		   const childIds = (n.children || []).flatMap(c => gatherReqIds(c));
-																		   return [...own, ...childIds];
-																	   };
-
-																	   const criteriaRequirementIds = Array.from(new Set(gatherReqIds(node)));
-																	   const criteriaChecked = criteriaRequirementIds.length > 0 && criteriaRequirementIds.every(id => selectedRequirementIdSet.has(id));
-
-																	   return (
-																		   <div key={node.key || `crit-${node.id}`} className="rounded-lg border border-indigo-200 bg-white overflow-hidden">
-																			   <label className="flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 px-3 py-2 text-xs font-semibold text-white">
-																				   <input
-																					   type="checkbox"
-																					   className="h-4 w-4 rounded border-white/70 bg-white text-indigo-600 focus:ring-white"
-																					   checked={criteriaChecked}
-																					   onChange={(e) => toggleRequirementBatch(criteriaRequirementIds, e.target.checked)}
-																				   />
-																				   {node.label}
-																				   <span className="ml-auto rounded bg-white/20 px-2 py-0.5 text-[10px] font-medium">
-																					   {criteriaRequirementIds.length}
-																				   </span>
-																			   </label>
-
-																			   {/* Requirements for this criteria */}
-																			   {node.requirements && node.requirements.length > 0 && (
-																				   <div className="space-y-1.5 bg-slate-50 px-3 py-2">
-																					   {node.requirements.map((req) => {
-																						   const reqId = Number(req.RequirementID);
-																						   const reqChecked = selectedRequirementIdSet.has(reqId);
-																						   const reqLabel = req.RequirementCode ? `${req.RequirementCode} - ${req.Description}` : req.Description;
-
-																						   return (
-																							   <label key={reqId} className={`flex items-center gap-2 rounded-md border px-2 py-1.5 text-xs transition ${reqChecked ? 'border-cyan-300 bg-cyan-50 text-cyan-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'}`}>
-																								   <input
-																									   type="checkbox"
-																									   className="h-4 w-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"
-																									   checked={reqChecked}
-																									   onChange={(e) => toggleRequirement(reqId, e.target.checked)}
-																								   />
-																								   <span className="truncate font-medium">{reqLabel}</span>
-																							   </label>
-																						   );
-																					   })}
-																				   </div>
-																			   )}
-
-																			   {/* Render child criteria recursively */}
-																			   {node.children && node.children.length > 0 && (
-																				   <div className="ml-4 mt-2 space-y-2">
-																					   {node.children.map(child => (
-																						   <div key={child.key || `child-${child.id}`} className="pl-2">
-																							   {renderNode(child)}
-																						   </div>
-																					   ))}
-																				   </div>
-																			   )}
-																		   </div>
-																	   );
-																   };
-
-																   return roots.map(r => renderNode(r));
-															   })()}
-														   </div>
-													   </div>
-												   );
-											   })
-										   )}
-									   </div>
-								   </div>
-							   </div>
-						   )}
-
-						   <div className="mt-2 flex flex-col gap-2 border-t border-slate-200 pt-3 sm:flex-row sm:items-center sm:justify-between">
-							   <p className="text-xs text-slate-600">
-								   Selected: {selectedOfficeIds.length} office(s), {selectedRequirementIds.length} requirement(s)
-							   </p>
-							   <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
-								   {(error || success) && (
-									   <p className={`max-w-[540px] text-right text-xs ${error ? 'text-rose-800' : 'text-emerald-800'}`}>
-										   {error || success}
-									   </p>
-								   )}
-								   <button type="submit" disabled={saving || loadingAssignmentData} className={actionButtonClass}>
-									   {saving ? 'Assigning...' : 'Assign Selected'}
-								   </button>
-							   </div>
-						   </div>
-					   </form>
-				   )}
+							{mainMode === 'assign' && (
+								<div className="flex min-h-0 flex-1 flex-col">
+								<AssignPanel
+									onAssign={handleAssignRequirementsToOffices}
+									loadingAssignmentData={loadingAssignmentData}
+									allOfficesSelected={allOfficesSelected}
+									allOfficeIds={allOfficeIds}
+									setSelectedOfficeIds={setSelectedOfficeIds}
+									officeSearchTerm={officeSearchTerm}
+									setOfficeSearchTerm={setOfficeSearchTerm}
+									eventOffices={eventOffices}
+									filteredEventOffices={filteredEventOffices}
+									selectedOfficeIds={selectedOfficeIds}
+									toggleOffice={toggleOffice}
+									requirementSearchTerm={requirementSearchTerm}
+									setRequirementSearchTerm={setRequirementSearchTerm}
+									requirementTree={requirementTree}
+									filteredRequirementTree={filteredRequirementTree}
+									selectedRequirementIdSet={selectedRequirementIdSet}
+									toggleRequirement={toggleRequirement}
+									toggleRequirementBatch={toggleRequirementBatch}
+									loadCriteriaForArea={loadAssignmentCriteriaForArea}
+									loadRequirementsForCriteria={loadAssignmentRequirementsForCriteria}
+									loadingCriteriaIds={loadingAssignmentCriteria}
+									loadingRequirementIds={loadingAssignmentRequirements}
+									allRequirementsSelected={allRequirementsSelected}
+									allRequirementIds={allRequirementIds}
+									selectedRequirementIds={selectedRequirementIds}
+									actionButtonClass={saveButtonClass}
+									saving={saving}
+									error={error}
+									success={success}
+									criteriaOptions={criteriaOptions}
+								/>
+								</div>
+							)}
+						</div>
+					</div>
 				</div>
-
-                   
-
 			</div>
 		</div>
 	);
 }
-

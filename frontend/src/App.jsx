@@ -4,6 +4,7 @@ import { createBrowserRouter, RouterProvider, Navigate } from "react-router-dom"
 
 import Login from './components/Login/login.jsx'
 import Register from './components/Register/register.jsx'
+import Otp from './components/Register/otp.jsx'
 import Home from './components/Home/home.jsx'
 import AppLayout from './AppLayout/AppLayout.jsx'
 import Organization from './components/Organization/organization.jsx'
@@ -17,6 +18,7 @@ import Criteria from './components/Criteria/Criteria.jsx'
 import AuditLogs from './components/AuditLogs/AuditLogs.jsx'
 import Area from './components/Area/Area.jsx'
 import ALLC from './components/ALLC/ALL.jsx'
+
 import ProtectedRoute from "./components/ProtectedRoute/ProtectedRoute.jsx";
 import PublicRoute from "./components/ProtectedRoute/PublicRoute.jsx";
 
@@ -35,6 +37,14 @@ export default function App() {
       element: (
         <PublicRoute>
           <Register />
+        </PublicRoute>
+      ),
+    },
+    {
+      path: "/otp",
+      element: (
+        <PublicRoute>
+          <Otp />
         </PublicRoute>
       ),
     },

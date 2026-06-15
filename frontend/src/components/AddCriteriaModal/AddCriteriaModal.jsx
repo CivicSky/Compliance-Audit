@@ -1,5 +1,7 @@
+import { API_BASE_URL } from '../../utils/apiBase';
 
 import React, { useState, useEffect } from 'react';
+import { useModal } from "../UI/ModalProvider";
 
 export default function AddCriteriaModal({ isOpen, onClose, onSuccess }) {
     const [formData, setFormData] = useState({
@@ -16,6 +18,7 @@ export default function AddCriteriaModal({ isOpen, onClose, onSuccess }) {
     const [errors, setErrors] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const { showAlert } = useModal();
 
     useEffect(() => {
         if (isOpen) {
@@ -48,7 +51,7 @@ export default function AddCriteriaModal({ isOpen, onClose, onSuccess }) {
     const fetchAreasByEvent = async (eventId) => {
         setIsLoading(true);
         try {
-            const response = await fetch(`http://localhost:5000/api/areas/event/${eventId}`);
+            const response = await fetch(`${API_BASE_URL}/api/areas/event/${eventId}`);
             const data = await response.json();
             if (data.success) {
                 setAreasList(data.data || []);
@@ -127,7 +130,7 @@ export default function AddCriteriaModal({ isOpen, onClose, onSuccess }) {
                 ...formData,
                 CriteriaCode: formData.ParentCriteriaID ? null : (formData.CriteriaCode ? String(formData.CriteriaCode).replace(/^\.+/, '') : formData.CriteriaCode)
             };
-            const response = await fetch('http://localhost:5000/api/criteria/add', {
+            const response = await fetch(`${API_BASE_URL}/api/criteria/add`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -137,12 +140,12 @@ export default function AddCriteriaModal({ isOpen, onClose, onSuccess }) {
                 setFormData({ EventID: '', AreaID: '', CriteriaCode: '', CriteriaName: '', Description: '', ParentCriteriaID: '' });
                 if (onSuccess) onSuccess(data.data);
                 onClose();
-                alert('Criteria added successfully!');
+                await showAlert('Criteria added successfully!');
             } else {
-                alert(data.message || 'Failed to add criteria');
+                await showAlert(data.message || 'Failed to add criteria');
             }
         } catch (error) {
-            alert('An error occurred while adding the criteria. Please try again.');
+            await showAlert('An error occurred while adding the criteria. Please try again.');
         } finally {
             setIsSubmitting(false);
         }

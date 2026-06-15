@@ -1,17 +1,22 @@
 import React, { useState, useEffect, useMemo, forwardRef, useImperativeHandle } from "react";
+import { createPortal } from 'react-dom';
 import { officesAPI, requirementsAPI, usersAPI } from "../../utils/api";
+import { useModal } from "../UI/ModalProvider";
 import userIcon from "../../assets/images/user.svg";
 import Pagination from "../Pagination/Pagination";
+import { API_BASE_URL } from '../../utils/apiBase';
 
 const OfficesP = forwardRef(
-    ({ searchTerm, deleteMode, onSelectionChange, onOfficeClick, onEditOffice, onAddRequirements, onDeleteOffice, eventType, officeTypes, heads, events = [], viewMode = 'grid', sortStatus, highlightOfficeId = null }, ref) => {
+    ({ searchTerm, deleteMode, onSelectionChange, onOfficeClick, onEditOffice, onAddRequirements, onDeleteOffice, eventType, officeTypes, heads, events = [], viewMode = 'grid', sortStatus, highlightOfficeId = null, hideHeader = false, departmentFilter = '', programTypeFilter = '', officeTypeFilter = '' }, ref) => {
         const [offices, setOffices] = useState([]);
         const [selectedIds, setSelectedIds] = useState([]);
         const [loading, setLoading] = useState(true);
         const [openMenuOfficeId, setOpenMenuOfficeId] = useState(null);
+        const [openMenuAnchorRect, setOpenMenuAnchorRect] = useState(null);
         const [activeHighlightOfficeId, setActiveHighlightOfficeId] = useState(null);
         const [myAssignedOfficeCounts, setMyAssignedOfficeCounts] = useState({});
         const [currentUser, setCurrentUser] = useState(null);
+        const { showAlert, showConfirm } = useModal();
 
         const isAdmin = currentUser?.RoleName === 'admin' || currentUser?.RoleID === 1;
 
@@ -165,7 +170,7 @@ const OfficesP = forwardRef(
                 }, 200);
             } catch (err) {
                 console.error('Failed to export office:', err);
-                alert(err?.response?.data?.message || err?.message || 'Failed to export office data.');
+                await showAlert(err?.response?.data?.message || err?.message || 'Failed to export office data.');
             }
         };
 
@@ -244,20 +249,47 @@ const OfficesP = forwardRef(
 
         // Filter by compile status if provided (compiled / partially_compiled / not_compiled)
         // Treat 'all' as no filter
-        const filtered = (sortStatus && sortStatus !== 'all')
+        const compiledFiltered = (sortStatus && sortStatus !== 'all')
             ? filteredByEvent.filter((o) => getStatusKey(o.overall_status) === sortStatus)
             : filteredByEvent;
 
-        // Pagination
+        // Filter by department if selected
+        const deptFiltered = departmentFilter
+            ? compiledFiltered.filter((o) => String(o.department_id ?? o.DepartmentID ?? o.DepartmentId ?? '') === String(departmentFilter))
+            : compiledFiltered;
+
+        // Filter by program type if selected
+        const programFiltered = programTypeFilter
+            ? deptFiltered.filter((o) => String(o.program_type_id ?? o.ProgramTypeID ?? o.ProgramTypeId ?? '') === String(programTypeFilter))
+            : deptFiltered;
+
+        // Filter by office type category (academic / non_academic)
+        const isAcademicLabel = (label) => {
+            if (!label) return false;
+            const name = String(label).toLowerCase();
+            if (/\bnon\b|non-?academic|not\s+academic/.test(name)) return false;
+            return /\bacademic\b/.test(name);
+        };
+
+        let filtered = programFiltered;
+        if (officeTypeFilter === 'academic') {
+            filtered = programFiltered.filter((o) => isAcademicLabel(o.office_type_name || o.office_type || o.officeTypeName || ''));
+        } else if (officeTypeFilter === 'non_academic') {
+            filtered = programFiltered.filter((o) => !isAcademicLabel(o.office_type_name || o.office_type || o.officeTypeName || ''));
+        }
+
+        // Pagination (cap list view at 30 items per page)
         const [currentPage, setCurrentPage] = useState(1);
-        const itemsPerPage = 6; // 3 columns x 2 rows
+        const itemsPerPageGrid = 6; // used only in grid view
+        const itemsPerPageList = 30;
+        const itemsPerPage = viewMode === 'list' ? itemsPerPageList : itemsPerPageGrid;
         const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
         const startIdx = (currentPage - 1) * itemsPerPage;
         const paginated = filtered.slice(startIdx, startIdx + itemsPerPage);
 
         useEffect(() => {
             if (currentPage > totalPages) setCurrentPage(1);
-        }, [filtered.length, totalPages]);
+        }, [filtered.length, totalPages, currentPage]);
 
         if (loading) {
             return (
@@ -288,12 +320,14 @@ const OfficesP = forwardRef(
             );
         }
 
+        const containerClass = `space-y-2 relative pb-4 ${viewMode === 'list' ? 'h-full overflow-auto' : ''}`;
+
         return (
-            <div className="space-y-2 relative pb-4">
+            <div className={containerClass}>
                 {/* Grid View */}
                 {viewMode === 'grid' && (
                     <>
-                        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {paginated.map((office) => {
                             const officeId = String(office?.id ?? office?.OfficeID ?? '');
                             const officeHeads = office.heads || [];
@@ -311,27 +345,35 @@ const OfficesP = forwardRef(
                             const displayEvent = eventCode || (officeEventId ? `#${officeEventId}` : 'No event');
                             console.debug('OfficesP: office', officeId, 'eventId:', officeEventId, 'matchedEvent:', matchedEvent, 'eventCode:', eventCode);
 
-                            return (
+                                return (
                                 <div
                                     key={office.id}
                                     onClick={() => !deleteMode && onOfficeClick(office)}
                                     className={`
-                                        relative min-h-[190px] overflow-visible rounded-2xl border transition-all duration-200
+                                        relative min-h-[220px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all duration-200
                                         ${deleteMode 
-                                            ? 'border-gray-200 hover:border-gray-300' 
-                                            : 'border-gray-100 hover:border-cyan-200 hover:shadow-[0_14px_28px_rgba(15,23,42,0.12)] cursor-pointer'
+                                            ? 'hover:border-gray-300' 
+                                            : 'hover:border-cyan-200 hover:shadow-md cursor-pointer'
                                         }
                                         ${isAssignedToMe ? 'border-cyan-400 bg-cyan-50/40 ring-1 ring-cyan-200' : ''}
-                                        ${isSelected ? 'ring-2 ring-indigo-500 border-indigo-500 bg-indigo-50/30' : 'bg-white'}
+                                        ${isSelected ? 'ring-2 ring-indigo-500 border-indigo-500 bg-indigo-50/30' : ''}
                                         ${isHighlighted ? 'ring-2 ring-cyan-500 border-cyan-300 shadow-[0_0_0_3px_rgba(6,182,212,0.15)]' : ''}
                                     `}
                                 >
-                                    <div className="h-full p-2 rounded-2xl overflow-visible bg-gradient-to-b from-white via-white to-slate-50/60 flex flex-col">
+                                    <div className="h-full p-4 rounded-2xl overflow-visible bg-gradient-to-b from-white via-white to-slate-50/60 flex flex-col">
                                         {/* Header */}
                                         <div className="flex items-start justify-between gap-2 mb-1">
-                                            <div className={`min-w-0 flex items-start gap-1.5 transform transition-transform duration-300 ease-out ${deleteMode || isSelected || isMenuOpen ? 'translate-x-3' : 'translate-x-0'}`}>
-                                                {deleteMode && (
-                                                    <div className="flex h-6 items-center justify-center transition-all duration-200 w-6">
+                                                <div className={`min-w-0 flex items-start gap-1.5 relative`}> 
+                                                    {/* Animated checkbox: absolutely positioned so it doesn't reserve space when hidden */}
+                                                    <div
+                                                        className={`absolute left-0 top-3`}
+                                                        style={{
+                                                            transform: deleteMode ? 'translateX(0)' : 'translateX(-2.5rem)',
+                                                            opacity: deleteMode ? 1 : 0,
+                                                            transition: 'transform 220ms cubic-bezier(0.2,0.8,0.2,1), opacity 180ms ease',
+                                                            pointerEvents: deleteMode ? 'auto' : 'none'
+                                                        }}
+                                                    >
                                                         <input
                                                             type="checkbox"
                                                             checked={isSelected}
@@ -340,28 +382,43 @@ const OfficesP = forwardRef(
                                                                 e.stopPropagation();
                                                                 handleCheckboxChange(office.id, e.target.checked);
                                                             }}
-                                                            className="h-3.5 w-3.5 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
+                                                            className="h-4 w-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
                                                             aria-label="Select office for deletion"
                                                         />
                                                     </div>
-                                                )}
 
-                                                <div className="mt-0.5 h-7 w-7 flex-shrink-0 rounded-lg bg-cyan-100 text-cyan-700 flex items-center justify-center">
-                                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                                                    </svg>
+                                                    {/* When deleteMode is active translate content to the right with a smooth transition */}
+                                                    <div
+                                                        className={`flex items-start gap-1.5`}
+                                                        style={{
+                                                            transform: deleteMode ? 'translateX(1.75rem)' : 'translateX(0)',
+                                                            transition: 'transform 220ms cubic-bezier(0.2,0.8,0.2,1)'
+                                                        }}
+                                                    > 
+                                                        <div className="mt-1 h-7 w-7 flex-shrink-0 rounded-lg bg-cyan-100 text-cyan-700 flex items-center justify-center">
+                                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                                            </svg>
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <h3 className={`text-[15px] font-semibold text-slate-900 truncate`}>
+                                                                {office.office_name}
+                                                            </h3>
+                                                            <p className="mt-0.5 text-[11px] text-slate-500 truncate">
+                                                                {eventCode || (officeEventId ? `#${officeEventId}` : 'No event')}
+                                                            </p>
+                                                            {(office.department_name || office.program_type_name) && (
+                                                                <p className="mt-0.5 text-[11px] text-slate-400 truncate">
+                                                                    {office.department_name ? office.department_name : ''}
+                                                                    {office.department_name && office.program_type_name ? ' • ' : ''}
+                                                                    {office.program_type_name ? office.program_type_name : ''}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                <div className="min-w-0">
-                                                    <h3 className={`text-[15px] font-semibold text-slate-900 truncate transition-transform duration-300 ease-out ${deleteMode || isSelected || isMenuOpen ? 'translate-x-3' : 'translate-x-0'}`}>
-                                                        {office.office_name}
-                                                    </h3>
-                                                    <p className="mt-0.5 text-[11px] text-slate-500 truncate">
-                                                        {displayEvent}
-                                                    </p>
-                                                </div>
-                                            </div>
                                             <div className="flex items-start gap-1">
-                                                <span className="px-1 py-1 text-xs font-medium bg-indigo-50 text-indigo-700 rounded-full border border-indigo-100">
+                                                <span className="px-1 py-1 text-xs font-medium bg-indigo-50 text-indigo-700 rounded-full border border-indigo-100 overflow-hidden max-w-[9rem] truncate">
                                                     {office.office_type_name}
                                                 </span>
 
@@ -371,9 +428,11 @@ const OfficesP = forwardRef(
                                                             type="button"
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
+                                                                const rect = e.currentTarget.getBoundingClientRect();
                                                                 setOpenMenuOfficeId((prev) => (prev === office.id ? null : office.id));
+                                                                setOpenMenuAnchorRect((prev) => (prev && String(openMenuOfficeId) === String(office.id) ? null : rect));
                                                             }}
-                                                            className="office-card-actions-button inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-100 z-40"
+                                                            className="office-card-actions-button inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-100 z-40"
                                                             aria-label="Open office actions"
                                                         >
                                                             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -381,54 +440,7 @@ const OfficesP = forwardRef(
                                                             </svg>
                                                         </button>
 
-                                                        {openMenuOfficeId === office.id && (
-                                                            <div className="office-card-actions-menu absolute right-0 top-8 z-30 w-40 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        setOpenMenuOfficeId(null);
-                                                                        onEditOffice?.(office);
-                                                                    }}
-                                                                    className="w-full px-3 py-2 text-left text-xs text-slate-700 transition hover:bg-slate-50"
-                                                                >
-                                                                    Edit Office Info
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        setOpenMenuOfficeId(null);
-                                                                        onAddRequirements?.(office);
-                                                                    }}
-                                                                    className="w-full px-3 py-2 text-left text-xs text-slate-700 transition hover:bg-slate-50"
-                                                                >
-                                                                    Add Requirements
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={async (e) => {
-                                                                        e.stopPropagation();
-                                                                        setOpenMenuOfficeId(null);
-                                                                        await handleExportOffice(office);
-                                                                    }}
-                                                                    className="w-full px-3 py-2 text-left text-xs text-slate-700 transition hover:bg-slate-50"
-                                                                >
-                                                                    Export Excel
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={async (e) => {
-                                                                        e.stopPropagation();
-                                                                        setOpenMenuOfficeId(null);
-                                                                        await onDeleteOffice?.(office);
-                                                                    }}
-                                                                    className="w-full px-3 py-2 text-left text-xs text-red-600 transition hover:bg-red-50"
-                                                                >
-                                                                    Delete Office
-                                                                </button>
-                                                            </div>
-                                                        )}
+                                                        {/* actions menu is rendered via portal to avoid clipping */}
                                                     </div>
                                                 )}
                                             </div>
@@ -479,7 +491,7 @@ const OfficesP = forwardRef(
                                                         <div className="flex flex-wrap items-center gap-1.5">
                                                             {officeHeads.map((head) => {
                                                                 const headPicUrl = head.ProfilePic
-                                                                    ? `http://localhost:5000/uploads/profile-pics/${head.ProfilePic}`
+                                                                    ? `${API_BASE_URL}/uploads/profile-pics/${head.ProfilePic}`
                                                                     : userIcon;
                                                                 return (
                                                                     <div key={head.HeadID} className="group relative">
@@ -515,185 +527,219 @@ const OfficesP = forwardRef(
                     </>
                 )}
 
-                {/* List View */}
+                {/* List View - table-like header + rows */}
                 {viewMode === 'list' && (
                     <>
                         <div className="space-y-2">
-                        {paginated.map((office) => {
-                            const officeHeads = office.heads || [];
-                            const primaryHead = officeHeads[0];
-                            const officeId = String(office?.id ?? office?.OfficeID ?? '');
-                            const profilePicUrl = primaryHead?.ProfilePic 
-                                ? `http://localhost:5000/uploads/profile-pics/${primaryHead.ProfilePic}`
-                                : (office.head_profile_pic 
-                                    ? `http://localhost:5000/uploads/profile-pics/${office.head_profile_pic}`
-                                    : userIcon);
+                            {/* Header Row (sticky when rendered here) */}
+                            {!hideHeader && (
+                                <div className="hidden md:grid grid-cols-[minmax(120px,1fr)_160px_160px_100px_140px_80px] gap-6 px-4 py-3 bg-white border border-slate-200 rounded-xl shadow-sm text-xs font-semibold text-gray-700 sticky top-0 z-30" style={{minWidth: '800px'}}>
+                                    <div className="flex items-center">Office Name</div>
+                                    <div className="flex items-center justify-center">Office Type</div>
+                                    <div className="flex items-center justify-center">Compliance Status</div>
+                                    <div className="flex items-center justify-center">Requirements</div>
+                                    <div className="flex items-center justify-center">Personnel</div>
+                                    <div className="flex items-center justify-end">Actions</div>
+                                </div>
+                            )}
 
-                            const isSelected = selectedIds.includes(office.id);
-                            const isHighlighted = officeId && officeId === String(activeHighlightOfficeId || '');
-                            const isAssignedToMe = (myAssignedOfficeCounts[officeId] || 0) > 0;
+                            {paginated.map((office) => {
+                                const officeHeads = office.heads || [];
+                                const officeId = String(office?.id ?? office?.OfficeID ?? '');
+                                const officeEventId = String(office.event_id ?? office.EventID ?? office.eventId ?? '');
+                                const matchedEvent = eventsMap.get(officeEventId);
+                                const eventCode = matchedEvent?.EventCode ?? matchedEvent?.event_code ?? matchedEvent?.eventCode ?? office.EventCode ?? office.event_code ?? '';
 
-                            return (
-                                <div
-                                    key={office.id}
-                                    onClick={() => !deleteMode && onOfficeClick(office)}
-                                    className={`
-                                        bg-white rounded-lg border transition-all duration-200
-                                        ${deleteMode 
-                                            ? 'border-gray-200 hover:border-gray-300' 
-                                            : 'border-gray-100 hover:border-indigo-200 hover:shadow-sm cursor-pointer'
-                                        }
-                                        ${isAssignedToMe ? 'border-cyan-400 bg-cyan-50/40 ring-1 ring-cyan-200' : ''}
-                                        ${isSelected ? 'ring-2 ring-indigo-500 border-indigo-500 bg-indigo-50/30' : ''}
-                                        ${isHighlighted ? 'ring-2 ring-cyan-500 border-cyan-300 bg-cyan-50/40' : ''}
-                                    `}
-                                >
-                                    <div className="px-4 py-3 rounded-lg overflow-hidden">
-                                        <div className="flex items-center gap-4">
-                                            {/* Office Icon */}
-                                            <div className="flex-shrink-0 w-8 h-8 bg-indigo-50 rounded-lg flex items-center justify-center">
-                                                <svg className="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                                                </svg>
-                                            </div>
+                                const isSelected = selectedIds.includes(office.id);
+                                const isHighlighted = officeId && officeId === String(activeHighlightOfficeId || '');
+                                const isAssignedToMe = (myAssignedOfficeCounts[officeId] || 0) > 0;
 
-                                            {/* Office Info */}
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2">
-                                                    <h3 className="text-sm font-medium text-gray-900">
-                                                        {office.office_name}
-                                                    </h3>
-                                                    <span className="px-2 py-0.5 text-xs font-medium bg-indigo-50 text-indigo-700 rounded-full">
-                                                        {office.office_type_name}
-                                                    </span>
-                                                </div>
-                                                <div className="flex items-center gap-3 mt-1">
-                                                    <span className="text-xs text-gray-500">
-                                                        {office.total_requirements || 0} requirements
-                                                    </span>
-                                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full border ${getStatusStyle(office.overall_status)}`}>
-                                                        <span className={`w-1 h-1 rounded-full ${getStatusDot(office.overall_status)}`}></span>
-                                                        {office.overall_status}
-                                                    </span>
-                                                </div>
-                                            </div>
-
-                                            {/* Personnel */}
-                                            <div className="flex items-center gap-2">
-                                                {officeHeads.length > 0 ? (
-                                                    <>
-                                                        <div className="flex items-center gap-1">
-                                                            {officeHeads.slice(0, 3).map((head) => (
-                                                                <img
-                                                                    key={head.HeadID}
-                                                                    src={head.ProfilePic ? `http://localhost:5000/uploads/profile-pics/${head.ProfilePic}` : userIcon}
-                                                                    alt={head.full_name}
-                                                                    className="w-6 h-6 rounded-full object-cover border-2 border-white"
-                                                                    onError={(e) => { e.target.src = userIcon; }}
-                                                                />
-                                                            ))}
-                                                        </div>
-                                                        <span className="text-xs text-gray-500">
-                                                            {officeHeads.length}
-                                                        </span>
-                                                    </>
-                                                ) : (
-                                                    <span className="text-xs text-gray-400">No personnel</span>
-                                                )}
-                                            </div>
-
-                                            {!deleteMode && isAdmin && (
-                                                <div className="relative">
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setOpenMenuOfficeId((prev) => (prev === office.id ? null : office.id));
-                                                        }}
-                                                        className="office-card-actions-button inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-100"
-                                                        aria-label="Open office actions"
-                                                    >
-                                                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6h.01M12 12h.01M12 18h.01" />
-                                                        </svg>
-                                                    </button>
-
-                                                    {openMenuOfficeId === office.id && (
-                                                        <div className="office-card-actions-menu absolute right-0 top-8 z-30 w-40 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
-                                                            <button
-                                                                type="button"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setOpenMenuOfficeId(null);
-                                                                    onEditOffice?.(office);
-                                                                }}
-                                                                className="w-full px-3 py-2 text-left text-xs text-slate-700 transition hover:bg-slate-50"
-                                                            >
-                                                                Edit Office Info
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setOpenMenuOfficeId(null);
-                                                                    onAddRequirements?.(office);
-                                                                }}
-                                                                className="w-full px-3 py-2 text-left text-xs text-slate-700 transition hover:bg-slate-50"
-                                                            >
-                                                                Add Requirements
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={async (e) => {
-                                                                    e.stopPropagation();
-                                                                    setOpenMenuOfficeId(null);
-                                                                    await handleExportOffice(office);
-                                                                }}
-                                                                className="w-full px-3 py-2 text-left text-xs text-slate-700 transition hover:bg-slate-50"
-                                                            >
-                                                                Export Excel
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={async (e) => {
-                                                                    e.stopPropagation();
-                                                                    setOpenMenuOfficeId(null);
-                                                                    await onDeleteOffice?.(office);
-                                                                }}
-                                                                className="w-full px-3 py-2 text-left text-xs text-red-600 transition hover:bg-red-50"
-                                                            >
-                                                                Delete Office
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
-
-                                            {/* Delete Checkbox */}
-                                            {deleteMode && (
-                                                <div className="flex-shrink-0">
+                                return (
+                                    <div
+                                        key={office.id}
+                                        onClick={() => !deleteMode && onOfficeClick(office)}
+                                        className={`
+                                            relative ${viewMode === 'list' ? 'overflow-visible' : 'overflow-hidden'} rounded-xl border border-gray-200 bg-white shadow-sm transition-all duration-200
+                                            ${deleteMode ? 'hover:border-gray-300' : 'hover:border-indigo-200 hover:shadow-md cursor-pointer'}
+                                            ${isAssignedToMe ? 'border-cyan-400 bg-cyan-50/40 ring-1 ring-cyan-200' : ''}
+                                            ${isSelected ? 'ring-2 ring-indigo-500 border-indigo-500 bg-indigo-50/30' : ''}
+                                            ${isHighlighted ? 'ring-2 ring-cyan-500 border-cyan-300 bg-cyan-50/40' : ''}
+                                        `}
+                                    >
+                                        <div className="grid grid-cols-[minmax(120px,1fr)_160px_160px_100px_140px_80px] gap-6 items-center px-6 py-4">
+                                            {/* Office Name */}
+                                            <div className="flex items-center gap-3 min-w-0 relative">
+                                                {/* Animated checkbox: absolute so no reserved space when hidden */}
+                                                <div
+                                                    className={`absolute left-0 top-3`}
+                                                    style={{
+                                                        transform: deleteMode ? 'translateX(0)' : 'translateX(-2.5rem)',
+                                                        opacity: deleteMode ? 1 : 0,
+                                                        transition: 'transform 220ms cubic-bezier(0.2,0.8,0.2,1), opacity 180ms ease',
+                                                        pointerEvents: deleteMode ? 'auto' : 'none'
+                                                    }}
+                                                >
                                                     <input
                                                         type="checkbox"
                                                         checked={isSelected}
-                                                        onChange={(e) => {
-                                                            e.stopPropagation();
-                                                            handleCheckboxChange(office.id, e.target.checked);
-                                                        }}
-                                                        className="w-3.5 h-3.5 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        onChange={(e) => { e.stopPropagation(); handleCheckboxChange(office.id, e.target.checked); }}
+                                                        className="h-4 w-4 text-indigo-600 rounded border-gray-300"
                                                     />
                                                 </div>
-                                            )}
+
+                                                <div
+                                                    className={`flex-shrink-0 h-8 w-8 flex items-center justify-center rounded-lg bg-indigo-50 text-indigo-600`}
+                                                    style={{
+                                                        transform: deleteMode ? 'translateX(1.75rem)' : 'translateX(0)',
+                                                        transition: 'transform 220ms cubic-bezier(0.2,0.8,0.2,1)'
+                                                    }}
+                                                > 
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                                    </svg>
+                                                </div>
+
+                                                <div className="min-w-0">
+                                                    <div className="text-sm font-semibold text-slate-900 truncate">{office.office_name}</div>
+                                                    <div className="text-xs text-slate-500 truncate">{eventCode}</div>
+                                                    {(office.department_name || office.program_type_name) && (
+                                                        <div className="text-xs text-slate-400 truncate">{office.department_name ? office.department_name : ''}{office.department_name && office.program_type_name ? ' • ' : ''}{office.program_type_name ? office.program_type_name : ''}</div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Office Type */}
+                                            <div className="flex items-center justify-center text-sm text-slate-700">
+                                                <div className="inline-block px-2 py-0.5 text-xs font-medium bg-indigo-50 text-indigo-700 rounded-full border">{office.office_type_name}</div>
+                                            </div>
+
+                                            {/* Compliance Status */}
+                                            <div className="flex items-center justify-center">
+                                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full border ${getStatusStyle(office.overall_status)}`}>
+                                                    <span className={`w-2 h-2 rounded-full ${getStatusDot(office.overall_status)}`}></span>
+                                                    {office.overall_status}
+                                                </span>
+                                            </div>
+
+                                            {/* Requirements */}
+                                            <div className="flex items-center justify-center">
+                                                <div className="text-sm font-medium text-slate-800">{office.total_requirements || 0}</div>
+                                            </div>
+
+                                            {/* Personnel */}
+                                            <div className="flex items-center justify-start">
+                                                <div className="flex items-center space-x-3">
+                                                    {officeHeads.slice(0, 4).map((head, idx) => (
+                                                        <img
+                                                            key={head.HeadID || idx}
+                                                            src={head.ProfilePic ? `${API_BASE_URL}/uploads/profile-pics/${head.ProfilePic}` : userIcon}
+                                                            alt={head.full_name}
+                                                            className="w-8 h-8 rounded-full object-cover border-2 border-white shadow-sm"
+                                                            onError={(e) => { e.target.src = userIcon; }}
+                                                        />
+                                                    ))}
+                                                    {officeHeads.length > 4 && (
+                                                        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-medium text-slate-600 border-2 border-white">
+                                                            +{officeHeads.length - 4}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Actions & Delete Checkbox (far right) */}
+                                            <div className="flex items-center justify-end pr-3">
+                                                {!deleteMode && isAdmin && (
+                                                    <div className="relative">
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => { 
+                                                                e.stopPropagation(); 
+                                                                const rect = e.currentTarget.getBoundingClientRect();
+                                                                setOpenMenuOfficeId((prev) => (prev === office.id ? null : office.id));
+                                                                setOpenMenuAnchorRect((prev) => (prev && String(openMenuOfficeId) === String(office.id) ? null : rect));
+                                                            }}
+                                                            className="office-card-actions-button inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-100 ml-2"
+                                                            aria-label="Open office actions"
+                                                        >
+                                                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6h.01M12 12h.01M12 18h.01" />
+                                                            </svg>
+                                                        </button>
+
+                                                        {/* menu rendered in portal to avoid clipping */}
+                                                    </div>
+                                                )}
+
+                                                {/* delete checkbox moved to left side of name column and animated there */}
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            );
-                        })}
+                                );
+                            })}
                         </div>
                     </>
                 )}
 
                 {/* Pagination controls */}
-                <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={(p) => setCurrentPage(p)} fixed={true} showWhenSinglePage={true} />
+                <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={(p) => setCurrentPage(p)}
+                    fixed={viewMode !== 'list'}
+                    showWhenSinglePage={true}
+                />
+
+                {/* Portal menu to avoid clipping inside card/list containers */}
+                {openMenuOfficeId && openMenuAnchorRect && (() => {
+                    try {
+                        const menuOffice = offices.find(o => String(o.id ?? o.OfficeID ?? '') === String(openMenuOfficeId));
+                        if (!menuOffice) return null;
+                        const menuWidth = 220;
+                        const viewportRight = window.innerWidth - 8;
+                        const left = Math.min((openMenuAnchorRect.right || 0) - menuWidth + window.scrollX, viewportRight - menuWidth);
+                        const top = (openMenuAnchorRect.bottom || 0) + window.scrollY + 8;
+
+                        return createPortal(
+                            <div
+                                className="office-card-actions-menu"
+                                style={{ position: 'fixed', top: top, left: Math.max(8, left), width: menuWidth, zIndex: 9999 }}
+                            >
+                                <div className="overflow-hidden rounded-lg border border-gray-100 bg-white py-1 shadow-lg">
+                                    <button type="button" onClick={(e) => { e.stopPropagation(); setOpenMenuOfficeId(null); setOpenMenuAnchorRect(null); onEditOffice?.(menuOffice); }} className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-xs text-slate-700 transition hover:bg-indigo-50 whitespace-nowrap">
+                                        <svg className="h-4 w-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                        <span>Edit Office Info</span>
+                                    </button>
+                                    <button type="button" onClick={(e) => { e.stopPropagation(); setOpenMenuOfficeId(null); setOpenMenuAnchorRect(null); onAddRequirements?.(menuOffice); }} className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-xs text-slate-700 transition hover:bg-emerald-50 whitespace-nowrap">
+                                        <svg className="h-4 w-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                        </svg>
+                                        <span>Add Requirements</span>
+                                    </button>
+                                    <button type="button" onClick={async (e) => { e.stopPropagation(); setOpenMenuOfficeId(null); setOpenMenuAnchorRect(null); await handleExportOffice(menuOffice); }} className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-xs text-slate-700 transition hover:bg-gray-50 whitespace-nowrap">
+                                        <svg className="h-4 w-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 16V6m0 0l-4 4m4-4 4 4" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21H3" />
+                                        </svg>
+                                        <span>Export Excel</span>
+                                    </button>
+                                    <button type="button" onClick={async (e) => { e.stopPropagation(); setOpenMenuOfficeId(null); setOpenMenuAnchorRect(null); await onDeleteOffice?.(menuOffice); }} className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-xs text-red-600 transition hover:bg-red-50 whitespace-nowrap">
+                                        <svg className="h-4 w-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
+                                        </svg>
+                                        <span>Delete Office</span>
+                                    </button>
+                                </div>
+                            </div>,
+                            document.body
+                        );
+                    } catch (e) {
+                        console.error('Failed to render portal menu', e);
+                        return null;
+                    }
+                })()}
             </div>
         );
     }

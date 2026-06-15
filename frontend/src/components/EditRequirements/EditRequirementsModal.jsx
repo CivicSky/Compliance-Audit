@@ -169,49 +169,53 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, use
 
   return (
     <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out bg-black bg-opacity-50 flex items-center justify-center z-[120]">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 min-h-[70vh] max-h-[95vh] flex flex-col">
-        {/* Header - Sticky */}
-        <div className="flex items-center justify-between p-6 border-b sticky top-0 bg-white z-10 rounded-t-lg">
-          <h2 className="text-xl font-semibold text-gray-800">{isAdmin ? 'Edit Requirement' : 'View Requirement'}</h2>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4 max-h-[95vh] overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-200 bg-white">
+          <h2 className="text-lg font-bold text-gray-900">{isAdmin ? 'Edit Requirement' : 'View Requirement'}</h2>
           <button
             onClick={onClose}
             disabled={isSubmitting}
             className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
+            aria-label="Close"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        {/* Form - Scrollable */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
-          <div className="p-6">
+          <div className="px-6 py-5 space-y-4">
 
 
             {/* Parent Requirement Dropdown */}
             <div className="mb-4">
-              <label htmlFor="ParentRequirementCode" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="ParentRequirementCode" className="block text-sm font-semibold text-gray-800 mb-1">
                 Parent Requirement (Optional)
               </label>
-              <select
-                id="ParentRequirementCode"
-                name="ParentRequirementCode"
-                value={formData.ParentRequirementCode}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                disabled={isSubmitting || !formData.CriteriaID || !isAdmin}
-              >
-                <option value="">
-                  {!formData.CriteriaID ? 'Select a criteria first' : 'None (Top-level requirement)'}
-                </option>
-                {requirementsList.map((req) => (
-                  <option key={req.RequirementID} value={req.RequirementCode}>
-                    {req.RequirementCode} - {req.Description?.substring(0, 50)}
-                    {req.Description?.length > 50 ? '...' : ''}
+              <div className="relative">
+                <select
+                  id="ParentRequirementCode"
+                  name="ParentRequirementCode"
+                  value={formData.ParentRequirementCode}
+                  onChange={handleInputChange}
+                  className="h-10 w-full appearance-none rounded-md border border-slate-200 bg-white px-3 pr-9 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                  disabled={isSubmitting || !formData.CriteriaID || !isAdmin}
+                >
+                  <option value="">
+                    {!formData.CriteriaID ? 'Select a criteria first' : 'None (Top-level requirement)'}
                   </option>
-                ))}
-              </select>
+                  {requirementsList.map((req) => (
+                    <option key={req.RequirementID} value={req.RequirementCode}>
+                      {req.RequirementCode} - {req.Description?.substring(0, 50)}
+                      {req.Description?.length > 50 ? '...' : ''}
+                    </option>
+                  ))}
+                </select>
+                <svg xmlns="http://www.w3.org/2000/svg" className="pointer-events-none absolute right-3 top-1/2 h-2.5 w-2.5 -translate-y-1/2 text-slate-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
+                </svg>
+              </div>
               {!formData.CriteriaID ? (
                 <p className="text-gray-500 text-xs mt-1">
                   Select a criteria to see available parent requirements
@@ -229,7 +233,7 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, use
 
             {/* Requirement Code */}
             <div className="mb-4">
-              <label htmlFor="RequirementCode" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="RequirementCode" className="block text-sm font-semibold text-gray-800 mb-1">
                 Requirement Code *
               </label>
               <input
@@ -238,8 +242,8 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, use
                 name="RequirementCode"
                 value={formData.RequirementCode}
                 onChange={handleInputChange}
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  errors.RequirementCode ? 'border-red-500' : 'border-gray-300'
+                className={`w-full rounded-md bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500 ${
+                  errors.RequirementCode ? 'border-red-500' : 'border border-slate-200'
                 }`}
                 placeholder="e.g., A.1 or just enter a number"
                 disabled={isSubmitting || !isAdmin}
@@ -256,7 +260,7 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, use
 
             {/* Description */}
             <div className="mb-4">
-              <label htmlFor="Description" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="Description" className="block text-sm font-semibold text-gray-800 mb-1">
                 Description *
               </label>
               <textarea
@@ -265,8 +269,8 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, use
                 value={formData.Description}
                 onChange={handleInputChange}
                 rows="4"
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none ${
-                  errors.Description ? 'border-red-500' : 'border-gray-300'
+                className={`w-full rounded-md bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500 resize-none ${
+                  errors.Description ? 'border-red-500' : 'border border-slate-200'
                 }`}
                 placeholder="Enter a detailed description of this requirement"
                 disabled={isSubmitting || !isAdmin}
@@ -278,21 +282,21 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, use
           </div>
 
           {/* Form Actions */}
-          <div className="flex justify-end space-x-3 p-6 pt-4 border-t">
+          <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-200 bg-white">
             {isAdmin && (
               <>
                 <button
                   type="button"
                   onClick={onClose}
                   disabled={isSubmitting}
-                  className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors disabled:opacity-50"
+                  className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {isSubmitting && (
                     <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
@@ -308,7 +312,7 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, use
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
+                className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
               >
                 Close
               </button>

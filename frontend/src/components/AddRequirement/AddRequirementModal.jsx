@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useModal } from "../UI/ModalProvider";
 
 export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
     const [formData, setFormData] = useState({
@@ -16,6 +17,7 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
     const [errors, setErrors] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const { showAlert } = useModal();
 
     // Fetch events when modal opens
     useEffect(() => {
@@ -238,14 +240,14 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                 }
                 
                 onClose();
-                alert('Requirement added successfully!');
+                await showAlert('Requirement added successfully!');
             } else {
-                alert(response.message || 'Failed to add requirement');
+                await showAlert(response.message || 'Failed to add requirement');
             }
             
         } catch (error) {
             console.error('Error submitting form:', error);
-            alert('An error occurred while adding the requirement. Please try again.');
+            await showAlert('An error occurred while adding the requirement. Please try again.');
         } finally {
             setIsSubmitting(false);
         }

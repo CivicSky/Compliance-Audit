@@ -37,27 +37,26 @@ const EditAreaModal = ({ visible, onClose, area = {}, onSave, userRole = 'user' 
 
   return (
     <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out bg-black bg-opacity-50 flex items-center justify-center z-[120]">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 min-h-[40vh] max-h-[95vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-xl font-semibold text-gray-800">{isAdmin ? 'Edit Area' : 'View Area'}</h2>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4 max-h-[95vh] overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-200">
+          <h2 className="text-lg font-bold text-gray-900">{isAdmin ? 'Edit Area' : 'View Area'}</h2>
           <button
             onClick={onClose}
             disabled={isSubmitting}
             className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
+            aria-label="Close"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6">
-          <div className="grid grid-cols-2 gap-4 mb-6">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-5">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 mb-6">
             {/* Area Code */}
             <div>
-              <label htmlFor="areaCode" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="areaCode" className="block text-sm font-semibold text-gray-800 mb-1">
                 Area Code *
               </label>
               <input
@@ -66,7 +65,7 @@ const EditAreaModal = ({ visible, onClose, area = {}, onSave, userRole = 'user' 
                 name="areaCode"
                 value={areaCode}
                 onChange={e => setAreaCode(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500"
                 placeholder="e.g., AREA1"
                 disabled={isSubmitting || !isAdmin}
                 required
@@ -74,7 +73,7 @@ const EditAreaModal = ({ visible, onClose, area = {}, onSave, userRole = 'user' 
             </div>
             {/* Area Name */}
             <div>
-              <label htmlFor="areaName" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="areaName" className="block text-sm font-semibold text-gray-800 mb-1">
                 Area Name *
               </label>
               <input
@@ -83,7 +82,7 @@ const EditAreaModal = ({ visible, onClose, area = {}, onSave, userRole = 'user' 
                 name="areaName"
                 value={areaName}
                 onChange={e => setAreaName(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500"
                 placeholder="e.g., Vision, Mission, Goals & Objectives"
                 disabled={isSubmitting || !isAdmin}
                 required
@@ -93,21 +92,21 @@ const EditAreaModal = ({ visible, onClose, area = {}, onSave, userRole = 'user' 
           {/* Description */}
           {/* Description removed - backend accepts null */}
           {/* Form Actions */}
-          <div className="flex justify-end space-x-3 pt-4 border-t">
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
             {isAdmin && (
               <>
                 <button
                   type="button"
                   onClick={onClose}
                   disabled={isSubmitting}
-                  className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors disabled:opacity-50"
+                  className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {isSubmitting && (
                     <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
@@ -123,7 +122,7 @@ const EditAreaModal = ({ visible, onClose, area = {}, onSave, userRole = 'user' 
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
+                className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
               >
                 Close
               </button>

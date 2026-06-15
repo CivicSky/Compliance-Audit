@@ -174,10 +174,11 @@ router.post('/user-upload', auth, userReqUpload.single('file'), async (req, res)
         // Get requirement info for event and office
         const db = require('../db');
         const [rows] = await db.query(`
-            SELECT r.RequirementID, r.RequirementCode, r.Description, c.EventID, e.EventName, rua.OfficeID, c.CriteriaName
+            SELECT r.RequirementID, r.RequirementCode, r.Description, c.EventID, e.EventName, e.EventCode, rua.OfficeID, c.CriteriaName, c.CriteriaCode, a.AreaID, a.AreaCode, a.AreaName
             FROM requirements r
             LEFT JOIN criteria c ON r.CriteriaID = c.CriteriaID
             LEFT JOIN Events e ON c.EventID = e.EventID
+            LEFT JOIN areas a ON c.AreaID = a.AreaID
             LEFT JOIN requirement_user_assignments rua ON rua.RequirementID = r.RequirementID AND rua.UserID = ?
             WHERE r.RequirementID = ?
             LIMIT 1
@@ -198,14 +199,15 @@ router.post('/user-upload', auth, userReqUpload.single('file'), async (req, res)
         if (userRows && userRows.length > 0) {
             userName = `${userRows[0].FirstName}_${userRows[0].LastName}`;
         }
-        // Sanitize names for folder and filename
-        const safeEventName = EventName.replace(/[^a-zA-Z0-9-_]/g, '_').substring(0, 40);
-        const safeOfficeName = officeName.replace(/[^a-zA-Z0-9-]/g, '.').substring(0, 40);
-        const safeCriteriaName = (CriteriaName || '').replace(/[^a-zA-Z0-9-]/g, '.').substring(0, 40);
-        const safeReqName = Description.replace(/[^a-zA-Z0-9-]/g, '.').substring(0, 40);
+        // Sanitize names for folder and filename; prefer EventCode for folder naming
+        const safeEventName = (rows[0].EventCode || EventName).replace(/[^a-zA-Z0-9-_]/g, '_').substring(0, 40);
+        const safeArea = ((rows[0].AreaCode || rows[0].AreaName) || 'NoArea').replace(/[^a-zA-Z0-9-]/g, '.').substring(0, 40);
+        const safeCriteriaCode = (rows[0].CriteriaCode || CriteriaName || '').replace(/[^a-zA-Z0-9-]/g, '.').substring(0, 40);
+        const safeReqCode = (RequirementCode || '').replace(/[^a-zA-Z0-9-]/g, '.').substring(0, 40);
         const safeUserName = userName.replace(/[^a-zA-Z0-9-]/g, '.').substring(0, 40);
         const ext = require('path').extname(req.file.originalname);
-        const finalFileName = `${safeOfficeName}.${safeCriteriaName}.${safeReqName}.${safeUserName}${ext}`;
+        // Filename pattern: event.area.criteriaCode.requirementCode.uploaderName
+        const finalFileName = `${safeEventName}.${safeArea}.${safeCriteriaCode}.${safeReqCode}.${safeUserName}${ext}`;
         const eventDir = path.join(__dirname, `../uploads/events/${safeEventName}`);
         if (!fs.existsSync(eventDir)) {
             fs.mkdirSync(eventDir, { recursive: true });
@@ -218,6 +220,32 @@ router.post('/user-upload', auth, userReqUpload.single('file'), async (req, res)
             'INSERT INTO office_proof_documents (office_id, uploaded_by, requirement_id, file_name, file_path, uploaded_at) VALUES (?, ?, ?, ?, ?, NOW())',
             [OfficeID, userId, requirementId, finalFileName, filePath]
         );
+
+        try {
+            const { createNotifications, getAdminUserIds } = require('../utils/notificationService');
+            const actorUserId = Number(req.user?.userId || userId);
+            const adminIds = await getAdminUserIds();
+            const uploaderDisplay = userName.replace(/_/g, ' ');
+            if (adminIds.length > 0 && OfficeID) {
+                await createNotifications({
+                    userIds: adminIds.filter((id) => id !== actorUserId),
+                    adminId: actorUserId,
+                    title: 'New evidence uploaded',
+                    message: `${uploaderDisplay} uploaded evidence for ${RequirementCode || 'a requirement'} in ${officeName}.`,
+                    type: 'info',
+                    relatedTable: 'requirement_file_upload',
+                    relatedId: Number(OfficeID),
+                    meta: {
+                        officeId: Number(OfficeID),
+                        requirementId: Number(requirementId),
+                        viewUserId: Number(userId),
+                        openSubmission: true,
+                    },
+                });
+            }
+        } catch (notifErr) {
+            console.error('Failed to notify admins about file upload:', notifErr);
+        }
 
         try {
             const actorUserId = Number(req.user?.userId || userId);

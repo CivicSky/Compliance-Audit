@@ -8,7 +8,7 @@ export default function EventCard({ event, onClick, onEdit, onCopy, onDelete, sh
     return (
         <div
             key={event.EventID}
-            className={`relative overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-b from-white via-white to-slate-50 p-3 md:p-4 min-h-[240px] transition duration-200 ${showCheckbox ? 'cursor-default' : 'cursor-pointer hover:border-cyan-200 hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(15,23,42,0.12)]'} shadow-[0_6px_14px_rgba(15,23,42,0.08)]`} 
+            className={`relative overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-b from-white via-white to-slate-50 p-4 md:p-6 min-h-[260px] transition duration-200 ${showCheckbox ? 'cursor-default' : 'cursor-pointer hover:border-cyan-200 hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(15,23,42,0.12)]'} shadow-[0_6px_14px_rgba(15,23,42,0.08)]`} 
             onClick={onClick}
         >
             <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-cyan-100/70" />
@@ -46,17 +46,17 @@ export default function EventCard({ event, onClick, onEdit, onCopy, onDelete, sh
                 <div className="flex items-start justify-between" style={{ paddingLeft: showCheckbox ? 4 : 0 }}>
                     <div className="min-w-0">
                         <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-700">Standard Event</p>
-                        <h3 className="mt-1 text-xl font-bold leading-tight text-slate-900 line-clamp-2">{event.EventName}</h3>
+                        <h3 className="mt-1 text-xl font-bold leading-tight text-slate-900 line-clamp-1">{event.EventCode || event.EventName}</h3>
                     </div>
                     {isAdmin && (
                         <>
                             <button
                                 ref={dotBtnRef}
-                                className="ml-3 rounded-lg border border-slate-200 bg-white p-1.5 text-slate-600 transition hover:bg-slate-100 focus:outline-none"
+                                className="ml-3 inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-100 focus:outline-none"
                                 onClick={e => { e.stopPropagation(); setShowOptions(v => !v); }}
                                 aria-label="More options"
                             >
-                                <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <circle cx="12" cy="5" r="1.5" />
                                     <circle cx="12" cy="12" r="1.5" />
                                     <circle cx="12" cy="19" r="1.5" />
@@ -77,7 +77,7 @@ export default function EventCard({ event, onClick, onEdit, onCopy, onDelete, sh
 
                 <div className="mt-3">
                     <span className="inline-flex max-w-full items-center rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 truncate">
-                        {event.EventCode}
+                        {event.EventName}
                     </span>
                 </div>
 

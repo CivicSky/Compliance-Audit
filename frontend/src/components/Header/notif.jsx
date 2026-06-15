@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { usersAPI } from '../../utils/api';
 import NotificationPopup from '../notif/notif';
+import { API_BASE_URL } from '../../utils/apiBase';
 
 function displayNameFromUser(user) {
   if (!user || typeof user !== 'object') return '';
@@ -45,12 +46,13 @@ export default function Header() {
     if (!userId) return;
     const fetchUnread = async () => {
       try {
-        const response = await fetch(`http://localhost:5000/api/notifications/user/${userId}/counts`, {
+        const response = await fetch(`${API_BASE_URL}/api/notifications/user/${userId}/counts`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         const data = await response.json();
-        if (data.success && data.data && typeof data.data.unread === 'number') {
-          setUnreadCount(data.data.unread);
+        if (data && data.success && data.data) {
+          const unread = Number(data.data.unread);
+          setUnreadCount(Number.isFinite(unread) ? unread : 0);
         }
       } catch {}
     };
@@ -122,7 +124,7 @@ export default function Header() {
               </svg>
               {unreadCount > 0 && (
                 <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] rounded-full px-1 py-0.5 min-w-[16px] text-center font-bold">
-                  {unreadCount}
+                  {unreadCount > 99 ? '99+' : unreadCount}
                 </span>
               )}
             </button>

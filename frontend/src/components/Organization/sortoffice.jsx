@@ -16,16 +16,13 @@ export default function Sortoffice({ value = 'all', onChange }) {
         <div className="relative inline-block" ref={ref}>
             <button
                 onClick={() => setOpen(v => !v)}
-                className="flex h-7 items-center justify-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-[8px] text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                className="relative flex h-8 min-w-[146px] items-center justify-center rounded-md border border-slate-200 bg-white px-4 text-center text-[10px] font-medium leading-4 text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-cyan-500"
                 title="Filter offices"
                 aria-label={`Filter offices: ${value === 'all' ? 'All Offices' : value === 'not_compiled' ? 'Not Complied' : value === 'partially_compiled' ? 'Partially Complied' : 'Complied'}`}
-                style={{ minWidth: '146px', maxWidth: '190px' }}
+                style={{ textAlignLast: 'center' }}
             >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-slate-600" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M3 5a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-.293.707L12 13.414V17a1 1 0 01-1.447.894L7 15H4a1 1 0 01-1-1V5z" />
-                </svg>
-                <span className="font-normal">{value === 'all' ? 'All Offices' : value === 'not_compiled' ? 'Not Complied' : value === 'partially_compiled' ? 'Partially Complied' : 'Complied'}</span>
-                <svg xmlns="http://www.w3.org/2000/svg" className="ml-0.5 h-2.5 w-2.5 text-slate-500" viewBox="0 0 20 20" fill="currentColor">
+                <span className="block w-full truncate text-center">{value === 'all' ? 'All Offices' : value === 'not_compiled' ? 'Not Complied' : value === 'partially_compiled' ? 'Partially Complied' : 'Complied'}</span>
+                <svg xmlns="http://www.w3.org/2000/svg" className="pointer-events-none absolute right-2.5 top-1/2 h-2.5 w-2.5 -translate-y-1/2 text-slate-500" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
                 </svg>
             </button>

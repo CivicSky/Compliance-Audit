@@ -97,7 +97,7 @@ const copyEvent = async (req, res) => {
         EventName: newEventName,
         EventCode: newEventCode,
         Description: newDescription || sourceEvent.Description,
-        FolderPath: sanitize(newEventName)
+        FolderPath: sanitize(newEventCode || newEventName)
       }
     });
     if (req.user && req.user.userId) {
@@ -169,8 +169,8 @@ const addEvent = async (req, res) => {
       [EventName, EventCode, Description || null]
     );
 
-    // Create folder for the event inside uploads/events
-    const sanitizedName = sanitizeFolderName(EventName);
+    // Create folder for the event inside uploads/events using EventCode (preferred for shorter, stable folder names)
+    const sanitizedName = sanitizeFolderName(EventCode || EventName);
     const eventFolderPath = path.join(__dirname, '..', 'uploads', 'events', sanitizedName);
     
     // Ensure uploads/events directory exists
@@ -224,19 +224,65 @@ const deleteEvents = async (req, res) => {
 
     // Delete events
       const placeholders = eventIds.map(() => '?').join(',');
-      // Fetch names for logging before deletion
-      const [toDeleteRows] = await db.query(`SELECT EventID, EventName FROM Events WHERE EventID IN (${placeholders})`, eventIds);
+      // Fetch names and codes for logging before deletion
+      const [toDeleteRows] = await db.query(`SELECT EventID, EventName, EventCode FROM Events WHERE EventID IN (${placeholders})`, eventIds);
       const deletedNames = toDeleteRows.map(r => r.EventName);
+      const deletedCodes = toDeleteRows.map(r => r.EventCode);
 
       const [result] = await db.query(
         `DELETE FROM Events WHERE EventID IN (${placeholders})`,
         eventIds
       );
+    // Attempt to delete corresponding folders under uploads/events for each deleted event name
+    const eventsBasePath = path.join(__dirname, '..', 'uploads', 'events');
+    const deletedFolders = [];
+
+    if (fs.existsSync(eventsBasePath)) {
+      for (let i = 0; i < toDeleteRows.length; i++) {
+        const evName = deletedNames[i];
+        const evCode = deletedCodes[i];
+        try {
+          // prefer code for folder lookup, fallback to name
+          const san = sanitizeFolderName(evCode || evName);
+          let folderPath = path.join(eventsBasePath, san);
+
+          if (!fs.existsSync(folderPath)) {
+            try {
+              const entries = fs.readdirSync(eventsBasePath, { withFileTypes: true });
+              const matched = entries.find(entry => entry.isDirectory() && sanitizeFolderName(entry.name) === san);
+              if (matched) {
+                folderPath = path.join(eventsBasePath, matched.name);
+              }
+            } catch (err) {
+              // ignore matching errors
+            }
+          }
+
+          if (fs.existsSync(folderPath) && fs.statSync(folderPath).isDirectory()) {
+            try {
+              // Node 14+ supports fs.rmSync with recursive; fallback to rmdirSync if needed
+              if (fs.rmSync) {
+                fs.rmSync(folderPath, { recursive: true, force: true });
+              } else {
+                fs.rmdirSync(folderPath, { recursive: true });
+              }
+              deletedFolders.push(folderPath);
+              console.log('Deleted event folder:', folderPath);
+            } catch (err) {
+              console.warn('Failed to delete event folder:', folderPath, err.message || err);
+            }
+          }
+        } catch (err) {
+          console.warn('Error during folder deletion for event', evName, err && err.message ? err.message : err);
+        }
+      }
+    }
 
     res.json({
       success: true,
       message: `${result.affectedRows} event(s) deleted successfully`,
-      deletedCount: result.affectedRows
+      deletedCount: result.affectedRows,
+      deletedFolders
     });
     if (req.user && req.user.userId) {
       try { recordLog(req.user.userId, 'EventDeleted', { eventIds, deletedNames }); } catch (e) {}
@@ -267,15 +313,17 @@ const updateEvent = async (req, res) => {
       });
     }
 
-    // Fetch existing event to determine if folder rename is needed
+    // Fetch existing event to determine if folder rename is needed (get both name and code)
     let existingEventName = null;
+    let existingEventCode = null;
     try {
-      const [existingRows] = await db.query('SELECT EventName FROM Events WHERE EventID = ?', [id]);
+      const [existingRows] = await db.query('SELECT EventName, EventCode FROM Events WHERE EventID = ?', [id]);
       if (existingRows && existingRows.length > 0) {
         existingEventName = existingRows[0].EventName;
+        existingEventCode = existingRows[0].EventCode;
       }
     } catch (err) {
-      console.warn('Could not fetch existing event name for folder rename check:', err.message || err);
+      console.warn('Could not fetch existing event name/code for folder rename check:', err.message || err);
     }
 
     // Update event, including status (do not touch CreatedAt)
@@ -298,10 +346,11 @@ const updateEvent = async (req, res) => {
     }
     // If the event name changed, attempt to rename its uploads folder to match new sanitized name
     try {
-      if (existingEventName && existingEventName !== EventName) {
+      // Prefer renaming folders when EventCode changed; fallback to EventName if code absent
+      if ((existingEventCode && existingEventCode !== EventCode) || (!existingEventCode && existingEventName && existingEventName !== EventName)) {
         const eventsBasePath = path.join(__dirname, '..', 'uploads', 'events');
-        const oldSan = sanitizeFolderName(existingEventName);
-        const newSan = sanitizeFolderName(EventName);
+        const oldSan = sanitizeFolderName(existingEventCode || existingEventName);
+        const newSan = sanitizeFolderName(EventCode || EventName);
 
         // Locate actual old folder: try exact, then match by sanitized entry names
         let oldFolderPath = path.join(eventsBasePath, oldSan);

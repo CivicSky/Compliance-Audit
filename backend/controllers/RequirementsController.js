@@ -1,6 +1,8 @@
 const db = require('../db');
 const { recordLog } = require('./logsController');
 const { createNotifications } = require('../utils/notificationService');
+const fs = require('fs');
+const path = require('path');
 
 const isUnknownColumnError = (error) =>
   error?.code === 'ER_BAD_FIELD_ERROR' || error?.errno === 1054;
@@ -724,6 +726,31 @@ const deleteRequirements = async (req, res) => {
       });
     }
 
+    // Before deleting requirements, remove any uploaded proof documents (files + DB rows)
+    try {
+      const placeholders = requirementIds.map(() => '?').join(',');
+      const [files] = await db.query(
+        `SELECT id, file_path FROM office_proof_documents WHERE requirement_id IN (${placeholders})`,
+        requirementIds
+      );
+      if (files && files.length > 0) {
+        for (const f of files) {
+          try {
+            const absPath = path.join(__dirname, '..', (f.file_path || '').replace(/^\//, ''));
+            if (fs.existsSync(absPath)) {
+              fs.unlinkSync(absPath);
+            }
+          } catch (fsErr) {
+            console.warn('Failed to delete requirement proof file from disk during requirement removal:', fsErr);
+          }
+        }
+        // remove DB records
+        await db.query(`DELETE FROM office_proof_documents WHERE requirement_id IN (${placeholders})`, requirementIds);
+      }
+    } catch (cleanupErr) {
+      console.error('Failed to cleanup office_proof_documents before deleting requirements:', cleanupErr);
+    }
+
     // Delete requirements
     const placeholders = requirementIds.map(() => '?').join(',');
     const [result] = await db.query(
@@ -851,7 +878,12 @@ const assignUsersToRequirement = async (req, res) => {
           message,
           type: 'info',
           relatedTable: 'requirements_assignment',
-          relatedId: Number(officeId || requirementId),
+          relatedId: Number(officeId),
+          meta: {
+            officeId: Number(officeId),
+            requirementId: Number(requirementId),
+            openSubmission: true,
+          },
         });
       } catch (notifError) {
         console.error('Failed to create requirement assignment notifications:', notifError);
@@ -980,22 +1012,70 @@ const removeUserAssignment = async (req, res) => {
   try {
     const { assignmentId } = req.params;
 
-    const [result] = await db.query(
-      'DELETE FROM requirement_user_assignments WHERE AssignmentID = ?',
+    // Load the assignment to know requirementId and userId
+    const [assignRows] = await db.query(
+      'SELECT AssignmentID, RequirementID, OfficeID, UserID FROM requirement_user_assignments WHERE AssignmentID = ? LIMIT 1',
       [assignmentId]
     );
 
-    if (result.affectedRows === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Assignment not found'
-      });
+    if (!assignRows || assignRows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Assignment not found' });
     }
 
-    res.json({
-      success: true,
-      message: 'User assignment removed successfully'
-    });
+    const assign = assignRows[0];
+    const requirementId = assign.RequirementID;
+    const userId = assign.UserID;
+    const officeId = assign.OfficeID;
+
+    // Delete uploaded proof documents related to this user + requirement (if any)
+    try {
+      const [files] = await db.query(
+        'SELECT id, file_name, file_path FROM office_proof_documents WHERE requirement_id = ? AND uploaded_by = ?',
+        [requirementId, userId]
+      );
+
+      if (files && files.length > 0) {
+        for (const f of files) {
+          try {
+            const absPath = path.join(__dirname, '..', (f.file_path || '').replace(/^\//, ''));
+            if (fs.existsSync(absPath)) {
+              fs.unlinkSync(absPath);
+            }
+          } catch (fsErr) {
+            console.warn('Failed to delete uploaded file from disk for assignment removal:', fsErr);
+          }
+        }
+
+        // Remove DB records for those files
+        await db.query('DELETE FROM office_proof_documents WHERE requirement_id = ? AND uploaded_by = ?', [requirementId, userId]);
+
+        // Try to log the unsubmit action
+        try {
+          const actorUserId = Number(req.user?.userId || userId);
+          if (Number.isInteger(actorUserId) && actorUserId > 0) {
+            await recordLog(actorUserId, 'RequirementFileDeletedOnAssignmentRemove', {
+              RequirementID: Number(requirementId),
+              AssignmentID: Number(assignmentId),
+              DeletedByUserID: Number(userId),
+              OfficeID: officeId || null
+            });
+          }
+        } catch (logErr) {
+          console.error('Failed to record file deletion log during assignment removal:', logErr);
+        }
+      }
+    } catch (fileErr) {
+      console.error('Error while cleaning uploaded files for removed assignment:', fileErr);
+    }
+
+    // Finally delete the assignment row
+    const [result] = await db.query('DELETE FROM requirement_user_assignments WHERE AssignmentID = ?', [assignmentId]);
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, message: 'Assignment not found' });
+    }
+
+    res.json({ success: true, message: 'User assignment removed successfully' });
   } catch (error) {
     console.error('Error removing user assignment:', error);
     res.status(500).json({
@@ -1038,19 +1118,36 @@ const getAvailableUsersForAssignment = async (req, res) => {
   try {
     const { requirementId, officeId } = req.query;
 
-    // Get all approved users with RoleID = 2
-    const [users] = await db.query(`
-      SELECT 
-        u.UserID,
-        u.FirstName,
-        u.MiddleInitial,
-        u.LastName,
-        u.Email,
-        u.ProfilePic
-      FROM users u
-      WHERE u.RoleID = 2 AND u.approval_status = 'approved'
-      ORDER BY u.FirstName, u.LastName
-    `);
+      let users = [];
+      // If officeId is provided, return both users with the 'Personnel' role and office heads for that office
+      if (officeId) {
+        // Only fetch office heads for the provided office
+        const [headUsers] = await db.query(`
+          SELECT u.UserID, u.FirstName, u.MiddleInitial, u.LastName, u.Email, u.ProfilePic
+          FROM headofoffice h
+          INNER JOIN office_head_assignments oha ON oha.HeadID = h.HeadID
+          INNER JOIN users u ON u.UserID = h.UserID
+          WHERE oha.OfficeID = ? AND u.approval_status = 'approved'
+          ORDER BY u.FirstName, u.LastName
+        `, [officeId]);
+
+        users = headUsers || [];
+      } else {
+        // Get all approved users with RoleID = 2 (legacy behavior)
+        const [allUsers] = await db.query(`
+          SELECT 
+            u.UserID,
+            u.FirstName,
+            u.MiddleInitial,
+            u.LastName,
+            u.Email,
+            u.ProfilePic
+          FROM users u
+          WHERE u.RoleID = 2 AND u.approval_status = 'approved'
+          ORDER BY u.FirstName, u.LastName
+        `);
+        users = allUsers;
+      }
 
     // If requirementId is provided, also check which users are already assigned to it
     if (requirementId) {
@@ -1066,11 +1163,32 @@ const getAvailableUsersForAssignment = async (req, res) => {
       const assignedUserIds = alreadyAssigned.map(a => a.UserID);
       
       // Mark users that are already assigned to this requirement
-      const usersWithStatus = users.map(user => ({
+      let usersWithStatus = users.map(user => ({
         ...user,
         isAssigned: assignedUserIds.includes(user.UserID)
       }));
-      
+
+      // If there are no available (not-yet-assigned) users and an officeId is provided,
+      // fall back to returning office heads for that office (they may not have the Personnel role).
+      const available = usersWithStatus.filter(u => !u.isAssigned);
+      if (available.length === 0 && officeId) {
+        // Fetch office heads specifically
+        const [fallbackHeads] = await db.query(`
+          SELECT u.UserID, u.FirstName, u.MiddleInitial, u.LastName, u.Email, u.ProfilePic
+          FROM headofoffice h
+          INNER JOIN office_head_assignments oha ON oha.HeadID = h.HeadID
+          INNER JOIN users u ON u.UserID = h.UserID
+          WHERE oha.OfficeID = ? AND u.approval_status = 'approved'
+          ORDER BY u.FirstName, u.LastName
+        `, [officeId]);
+
+        // mark assignment status for heads (likely false since available was empty)
+        usersWithStatus = (fallbackHeads || []).map(user => ({
+          ...user,
+          isAssigned: assignedUserIds.includes(user.UserID)
+        }));
+      }
+
       return res.json({
         success: true,
         data: usersWithStatus
@@ -1158,6 +1276,88 @@ const markUserAsUploaded = async (req, res) => {
   }
 };
 
+// Helper: Auto-assign office heads to one or many requirements for an office
+const autoAssignHeadsToRequirementsForOffice = async (officeId, requirementIds = [], actorUserId = null) => {
+  if (!officeId || !Array.isArray(requirementIds) || requirementIds.length === 0) return { success: true, assigned: 0 };
+
+  // Get head user IDs for the office
+  const [headRows] = await db.query(
+    `SELECT h.UserID FROM office_head_assignments oha
+     JOIN headofoffice h ON oha.HeadID = h.HeadID
+     WHERE oha.OfficeID = ?`,
+    [officeId]
+  );
+
+  const headUserIds = headRows.map(r => Number(r.UserID)).filter(id => Number.isInteger(id) && id > 0);
+  if (headUserIds.length === 0) return { success: true, assigned: 0 };
+
+  let totalAssigned = 0;
+
+  for (const reqId of requirementIds) {
+    const requirementId = Number(reqId);
+    if (!Number.isInteger(requirementId) || requirementId <= 0) continue;
+
+    // how many already assigned to this requirement in this office
+    const [countRows] = await db.query('SELECT COUNT(*) as count FROM requirement_user_assignments WHERE RequirementID = ? AND OfficeID = ?', [requirementId, officeId]);
+    const currentCount = Number(countRows[0]?.count || 0);
+    const remainingSlots = Math.max(0, 4 - currentCount);
+    if (remainingSlots <= 0) continue;
+
+    // which head users are not yet assigned to this requirement
+    const placeholders = headUserIds.map(() => '?').join(',');
+    const alreadyQuery = `SELECT UserID FROM requirement_user_assignments WHERE RequirementID = ? AND OfficeID = ? AND UserID IN (${placeholders})`;
+    const alreadyParams = [requirementId, officeId, ...headUserIds];
+    const [alreadyRows] = await db.query(alreadyQuery, alreadyParams);
+    const alreadyAssignedIds = new Set(alreadyRows.map(r => Number(r.UserID)));
+
+    const toAssign = headUserIds.filter(id => !alreadyAssignedIds.has(id)).slice(0, remainingSlots);
+    if (toAssign.length === 0) continue;
+
+    const insertValues = toAssign.map(userId => [requirementId, officeId, userId, actorUserId || null]);
+    await db.query('INSERT INTO requirement_user_assignments (RequirementID, OfficeID, UserID, AssignedBy) VALUES ?', [insertValues]);
+
+    // send notifications (best-effort)
+    try {
+      const [[requirementRow]] = await db.query(
+        `SELECT r.RequirementCode, o.OfficeName, e.EventName
+         FROM requirements r
+         LEFT JOIN criteria c ON c.CriteriaID = r.CriteriaID
+         LEFT JOIN events e ON e.EventID = c.EventID
+         LEFT JOIN offices o ON o.OfficeID = ?
+         WHERE r.RequirementID = ?
+         LIMIT 1`,
+        [officeId, requirementId]
+      );
+
+      const requirementCode = requirementRow?.RequirementCode || `Requirement #${requirementId}`;
+      const officeName = requirementRow?.OfficeName || 'your office';
+      const eventName = requirementRow?.EventName || 'an event';
+      const message = `You were assigned to ${requirementCode} for office ${officeName} in ${eventName}.`;
+
+      await createNotifications({
+        userIds: toAssign,
+        adminId: actorUserId,
+        title: 'New Requirement Assignment',
+        message,
+        type: 'info',
+        relatedTable: 'requirements_assignment',
+        relatedId: Number(officeId),
+        meta: {
+          officeId: Number(officeId),
+          requirementId: Number(requirementId),
+          openSubmission: true,
+        },
+      });
+    } catch (notifErr) {
+      console.error('autoAssign: failed to notify assigned users', notifErr);
+    }
+
+    totalAssigned += toAssign.length;
+  }
+
+  return { success: true, assigned: totalAssigned };
+};
+
 module.exports = {
   getAllRequirements,
   getRequirementsByEvent,
@@ -1177,5 +1377,6 @@ module.exports = {
   getUserAssignmentCount,
   getAvailableUsersForAssignment,
   updateUserUploadStatus,
-  markUserAsUploaded
+  markUserAsUploaded,
+  autoAssignHeadsToRequirementsForOffice
 };

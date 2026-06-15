@@ -33,7 +33,7 @@ exports.getLogs = async (req, res) => {
         u.RoleID,
         r.RoleName
       FROM logs l
-      INNER JOIN users u ON l.UserID = u.UserID
+      LEFT JOIN users u ON l.UserID = u.UserID
       LEFT JOIN roles r ON u.RoleID = r.RoleID`;
 
     // By default exclude low-value HTTP middleware logs like "POST /api/..." so the feed remains readable
@@ -48,7 +48,7 @@ exports.getLogs = async (req, res) => {
     const logs = rows.map((row) => {
       const mid = row.MiddleInitial ? ` ${row.MiddleInitial}.` : '';
       let displayName = `${row.FirstName || ''}${mid} ${row.LastName || ''}`.replace(/\s+/g, ' ').trim();
-      if (!displayName) displayName = row.Email || `User #${row.UserID}`;
+      if (!displayName) displayName = row.Email || `Deleted user #${row.UserID}`;
       const actorKind = row.RoleID === 1 ? 'Admin' : 'User';
       // Parse Details JSON when possible and build a short summary for UI
       let detailsSummary = null;
@@ -342,9 +342,9 @@ exports.getLogs = async (req, res) => {
         DetailsSummary: detailsSummary,
         DetailsParsed: detailsParsed,
         Message: message,
-        displayName: displayName || `User #${row.UserID}`,
-        RoleName: row.RoleName || actorKind,
-        actorKind,
+        displayName: displayName || `Deleted user #${row.UserID}`,
+        RoleName: row.RoleName || 'Deleted User',
+        actorKind: row.RoleName || 'Deleted User',
       };
     });
 

@@ -7,6 +7,7 @@ import EditAreaModal from '../EditArea/EditArea';
 import EditCriteriaModal from '../EditCriteria/EditCriteriaModal';
 import EditRequirementsModal from '../EditRequirements/EditRequirementsModal';
 import { usersAPI, officesAPI } from '../../utils/api';
+import { useModal } from "../UI/ModalProvider";
 import { useEffect } from 'react';
 
 export default function EventPopup({
@@ -32,10 +33,13 @@ export default function EventPopup({
     onAddCriteria,
     onAddRequirement,
     onLoadRequirementsByCriteria,
+    onPrepareStructureData,
     onEditArea,
     onEditCriteria,
     onBulkDelete
 }) {
+    const { showConfirm, showAlert } = useModal();
+
     const [isActionOpen, setIsActionOpen] = useState(false);
     const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
     const [deleteMode, setDeleteMode] = useState(false);
@@ -91,6 +95,7 @@ export default function EventPopup({
         load();
         return () => { mounted = false; };
     }, [selectedEvent]);
+
     if (!selectedEvent) return null;
 
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -237,7 +242,7 @@ export default function EventPopup({
 
     const handleBulkDelete = async () => {
         if (deleteCount === 0 || deleting) return;
-        const confirmed = window.confirm('Delete selected items? This action cannot be undone.');
+            const confirmed = await showConfirm('Delete selected items? This action cannot be undone.');
         if (!confirmed) return;
 
         try {
@@ -257,9 +262,29 @@ export default function EventPopup({
         }
     };
 
+    const handleSingleDelete = async ({ areaIds = [], criteriaIds = [], requirementIds = [] }) => {
+        if (deleting) return;
+        const confirmed = await showConfirm('Delete this item? This action cannot be undone.');
+        if (!confirmed) return;
+        try {
+            setDeleting(true);
+            setDeleteError('');
+            await onBulkDelete?.({
+                eventId: selectedEvent.EventID,
+                areaIds,
+                criteriaIds,
+                requirementIds
+            });
+        } catch (err) {
+            await showAlert(err?.message || 'Failed to delete item.');
+        } finally {
+            setDeleting(false);
+        }
+    };
+
     return (
-        <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out bg-black bg-opacity-50 flex items-center justify-center z-[120]">
-            <div className="bg-white rounded-lg w-full max-w-4xl h-[86vh] max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
+        <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out bg-black bg-opacity-50 z-[120]">
+            <div className="bg-white w-full h-full overflow-hidden shadow-2xl flex flex-col">
                 <div className="px-6 py-5 border-b border-slate-200 bg-white">
                     <div className="flex justify-between items-start gap-4">
                         <div>
@@ -283,6 +308,7 @@ export default function EventPopup({
                                 <div className="absolute right-12 top-11 z-20 bg-white border border-slate-200 rounded-xl shadow-lg min-w-[190px] py-1">
                                     <button
                                         onClick={() => {
+                                            onPrepareStructureData?.();
                                             setIsActionOpen(true);
                                             setIsActionMenuOpen(false);
                                         }}
@@ -407,6 +433,7 @@ export default function EventPopup({
                                                     isChecked={selectedAreaIds.has(Number(area.AreaID))}
                                                     onToggleSelect={(checked) => toggleAreaSelect(area, checked)}
                                                     onMenuClick={(item) => { setEditAreaData(item); setIsEditAreaOpen(true); }}
+                                                    onDeleteClick={(item) => handleSingleDelete({ areaIds: [Number(item.AreaID)] })}
                                                 >
                                                     {loadingCriteria.has(area.AreaID) ? (
                                                         <p className="text-xs text-gray-500 ml-4 mt-2">Loading criteria...</p>
@@ -450,6 +477,7 @@ export default function EventPopup({
                                                                             isChecked={selectedCriteriaIds.has(Number(node.CriteriaID))}
                                                                             onToggleSelect={(checked) => toggleCriteriaSelect(node, checked)}
                                                                             onMenuClick={(c) => { setEditCriteriaData(c); setIsEditCriteriaOpen(true); }}
+                                                                            onDeleteClick={(c) => handleSingleDelete({ criteriaIds: [Number(c.CriteriaID)] })}
                                                                         >
                                                                             <div className="ml-6 space-y-2">
                                                                                 {node.children && node.children.map(child => renderNode(child, depth + 1))}
@@ -460,6 +488,7 @@ export default function EventPopup({
                                                                                     selectedRequirementIds={selectedRequirementIds}
                                                                                     onToggleRequirement={toggleRequirementSelect}
                                                                                     onMenuClick={(req) => { setEditRequirementData(req); setIsEditRequirementOpen(true); }}
+                                                                                    onDeleteClick={(req) => handleSingleDelete({ requirementIds: [Number(req.RequirementID)] })}
                                                                                 />
                                                                             </div>
                                                                         </CriteriaSection>
@@ -531,6 +560,8 @@ export default function EventPopup({
                                                                     showCheckbox={deleteMode}
                                                                     isChecked={selectedCriteriaIds.has(Number(node.CriteriaID))}
                                                                     onToggleSelect={(checked) => toggleCriteriaSelect(node, checked)}
+                                                                    onMenuClick={(c) => { setEditCriteriaData(c); setIsEditCriteriaOpen(true); }}
+                                                                    onDeleteClick={(c) => handleSingleDelete({ criteriaIds: [Number(c.CriteriaID)] })}
                                                                 >
                                                                     <div className="ml-6 space-y-2">
                                                                         {node.children && node.children.map(child => renderNode(child))}
@@ -541,6 +572,7 @@ export default function EventPopup({
                                                                             selectedRequirementIds={selectedRequirementIds}
                                                                             onToggleRequirement={toggleRequirementSelect}
                                                                             onMenuClick={(req) => { setEditRequirementData(req); setIsEditRequirementOpen(true); }}
+                                                                            onDeleteClick={(req) => handleSingleDelete({ requirementIds: [Number(req.RequirementID)] })}
                                                                         />
                                                                     </div>
                                                                 </CriteriaSection>
@@ -628,11 +660,11 @@ export default function EventPopup({
                                     await onLoadRequirementsByCriteria(Number(criteriaId));
                                 }
                             } else {
-                                alert(response?.message || 'Failed to save requirement');
+                                await showAlert(response?.message || 'Failed to save requirement');
                             }
                         } catch (err) {
                             console.error('Failed saving requirement', err);
-                            alert(err?.message || 'An error occurred while saving requirement');
+                            await showAlert(err?.message || 'An error occurred while saving requirement');
                         } finally {
                             setIsEditRequirementOpen(false);
                         }
@@ -642,4 +674,3 @@ export default function EventPopup({
         </div>
     );
 }
-

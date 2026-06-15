@@ -1,6 +1,10 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from "react";
+import { createPortal } from 'react-dom';
 import user from "../../assets/images/user.svg";
 import { usersAPI } from "../../utils/api";
+import { useModal } from "../UI/ModalProvider";
+import Pagination from "../Pagination/Pagination";
+import { API_BASE_URL } from '../../utils/apiBase';
 
 const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = false, onSelectionChange, onUserClick, viewMode = 'list' }, ref) => {
     const [users, setUsers] = useState([]);
@@ -8,9 +12,13 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [selectedUsers, setSelectedUsers] = useState(new Set());
+    const [currentPage, setCurrentPage] = useState(1);
     const [currentUserID, setCurrentUserID] = useState(null);
     const [currentUser, setCurrentUser] = useState(null);
     const isAdmin = currentUser?.RoleName === 'admin' || currentUser?.RoleID === 1;
+    const [actionMenuUserId, setActionMenuUserId] = useState(null);
+    const [actionMenuAnchorRect, setActionMenuAnchorRect] = useState(null);
+    const { showConfirm } = useModal();
 
     const normalizeRoleKey = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
     const getRoleLabel = (person) => person.RoleName || (person.RoleID === 1 ? 'Admin' : 'User');
@@ -32,6 +40,8 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
         return 'bg-gray-100 text-gray-800 border-gray-200';
     };
 
+    const itemsPerPage = 30; // limit to 30 per page for users pagination
+
     // Fetch current user ID from token
     useEffect(() => {{
         const fetchCurrentUser = async () => {{
@@ -47,6 +57,38 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
         }};
         fetchCurrentUser();
     }}, []);
+
+    // Close action menu when clicking outside
+    useEffect(() => {
+        if (!actionMenuUserId) return;
+        const closeOnOutside = (event) => {
+            const target = event.target;
+            if (target.closest && (target.closest('.user-actions-menu') || target.closest('.user-actions-button'))) {
+                return;
+            }
+            setActionMenuUserId(null);
+            setActionMenuAnchorRect(null);
+        };
+        document.addEventListener('mousedown', closeOnOutside);
+        return () => document.removeEventListener('mousedown', closeOnOutside);
+    }, [actionMenuUserId]);
+
+    // Close action menu on scroll/resize (portal is anchored to a DOM rect)
+    useEffect(() => {
+        if (!actionMenuUserId) return;
+
+        const closeMenu = () => {
+            setActionMenuUserId(null);
+            setActionMenuAnchorRect(null);
+        };
+
+        window.addEventListener('resize', closeMenu);
+        window.addEventListener('scroll', closeMenu, true);
+        return () => {
+            window.removeEventListener('resize', closeMenu);
+            window.removeEventListener('scroll', closeMenu, true);
+        };
+    }, [actionMenuUserId]);
 
     // Fetch users data from database
     useEffect(() => {{
@@ -97,6 +139,16 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
         setFilteredUsers(sortedFiltered);
     }, [users, searchTerm, filterOptions]);
 
+    // Pagination: reset page when filters or search change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, filterOptions]);
+
+    const totalPages = Math.max(1, Math.ceil(filteredUsers.length / itemsPerPage));
+    const startIdx = (currentPage - 1) * itemsPerPage;
+    const paginatedUsers = filteredUsers.slice(startIdx, startIdx + itemsPerPage);
+    const visibleUsers = viewMode === 'list' ? paginatedUsers : filteredUsers;
+
     // Handle selection changes and notify parent component
     useEffect(() => {
         if (onSelectionChange) {
@@ -125,27 +177,26 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
 
     const deleteSelectedUsers = async (userIds) => {
         try {
-            console.log('Attempting to delete users:', userIds);
-            console.log('User IDs type:', typeof userIds, 'Is array:', Array.isArray(userIds));
-            
-            // Make API call to delete users (if delete endpoint exists)
-            // const response = await usersAPI.deleteUsers(userIds);
-            // For now, return not implemented
-            return { success: false, message: 'User deletion not implemented yet' };
-            
+            if (!Array.isArray(userIds) || userIds.length === 0) {
+                return { success: false, message: 'No user IDs provided' };
+            }
+
+            const response = await usersAPI.deleteUsers(userIds);
+            if (response && response.success) {
+                // refresh local list
+                await fetchUsers();
+                return { success: true, message: response.message };
+            }
+
+            return { success: false, message: response?.message || 'Deletion failed' };
         } catch (error) {
             console.error('Error deleting users:', error);
-            
-            // Check if it's a network error
-            if (error.code === 'ERR_NETWORK' || error.message.includes('Network Error')) {
-                return { success: false, message: 'Network error. Please check if the backend server is running on port 5000.' };
-            }
-            
-            // Check for specific error responses
             if (error.response) {
-                return { success: false, message: `Server error: ${error.response.data?.message || error.response.statusText}` };
+                return { success: false, message: error.response.data?.message || error.response.statusText };
             }
-            
+            if (error.code === 'ERR_NETWORK' || error.message.includes('Network Error')) {
+                return { success: false, message: 'Network error. Please check if the backend server is running.' };
+            }
             return { success: false, message: `Error deleting users: ${error.message}` };
         }
     };
@@ -254,10 +305,9 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
             )}
 
             <div className={viewMode === 'grid' ? 'grid grid-cols-1 gap-2 xl:grid-cols-2' : 'space-y-2'}>
-            {filteredUsers.map((person) => {
+            {visibleUsers.map((person) => {
                 // Construct full name
                 const fullName = `${person.FirstName}${person.MiddleInitial ? ' ' + person.MiddleInitial + '.' : ''} ${person.LastName}`;
-                const assignedOffices = Array.isArray(person.AssignedOffices) ? person.AssignedOffices : [];
                 const roleLabel = getRoleLabel(person);
                 const approvalLabel = getApprovalLabel(person);
                 const roleBadgeClass = getRoleBadgeClass(person);
@@ -268,7 +318,7 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
                 if (person.TempPreview) {
                     profilePicUrl = person.TempPreview;
                 } else if (person.ProfilePic) {
-                    profilePicUrl = `http://localhost:5000/uploads/profile-pics/${person.ProfilePic}`;
+                    profilePicUrl = `${API_BASE_URL}/uploads/profile-pics/${person.ProfilePic}`;
                 }
 
                 if (viewMode === 'list') {
@@ -282,65 +332,74 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
                                 currentUserID === person.UserID ? 'border-blue-300 bg-blue-50/40' : ''
                             } ${deleteMode ? 'cursor-pointer hover:border-gray-300' : 'cursor-pointer hover:border-indigo-200 hover:shadow-md'}`}
                         >
-                            <div className="flex items-center gap-3 px-3 py-2">
-                                {deleteMode && (
-                                    <div className="flex-shrink-0">
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedUsers.has(person.UserID)}
-                                            onChange={(e) => handleCheckboxChange(person.UserID, e.target.checked)}
-                                            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                            onClick={(e) => e.stopPropagation()}
+                            <div className="grid grid-cols-8 items-center gap-2 px-3 py-2">
+                                {/* Name & Email */}
+                                <div className="flex items-center gap-3 col-span-4 min-w-0">
+                                    {deleteMode && (
+                                        <div className="flex-shrink-0">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedUsers.has(person.UserID)}
+                                                onChange={(e) => handleCheckboxChange(person.UserID, e.target.checked)}
+                                                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                onClick={(e) => e.stopPropagation()}
+                                            />
+                                        </div>
+                                    )}
+                                    <div className="h-9 w-9 flex-shrink-0 rounded-full bg-[#d6f0ec] p-0.5">
+                                        <img
+                                            src={profilePicUrl}
+                                            alt={fullName}
+                                            className="h-full w-full rounded-full border border-white object-cover"
+                                            onError={e => { e.target.onerror = null; e.target.src = user; }}
                                         />
                                     </div>
-                                )}
-
-                                <div className="h-9 w-9 flex-shrink-0 rounded-full bg-[#d6f0ec] p-0.5">
-                                    <img
-                                        src={profilePicUrl}
-                                        alt={fullName}
-                                        className="h-full w-full rounded-full border border-white object-cover"
-                                        onError={e => { e.target.onerror = null; e.target.src = user; }}
-                                    />
-                                </div>
-
-                                <div className="min-w-0 flex-1">
-                                    <h3 className="truncate text-[13px] font-semibold text-gray-900">{fullName}</h3>
-                                    <div className="mt-0.5 flex items-center gap-2 text-[11px] text-gray-600">
-                                        <span className="truncate">{person.Email}</span>
-                                    </div>
-                                    <p className="mt-0.5 truncate text-[10px] text-slate-500" title={assignedOffices.join(', ')}>
-                                        Office: {assignedOffices.length > 0 ? assignedOffices.join(', ') : 'Unassigned'}
-                                    </p>
-                                </div>
-
-                                <div className="ml-auto flex items-center gap-2">
-                                    <div className="flex flex-col items-end leading-tight">
-                                        <div className="flex items-center gap-1">
-                                            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${roleBadgeClass}`}>
-                                                {roleLabel}
-                                            </span>
-                                            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${approvalBadgeClass}`}>
-                                                {approvalLabel}
-                                            </span>
+                                    <div className="min-w-0">
+                                        <h3 className="truncate text-[13px] font-semibold text-gray-900">{fullName}</h3>
+                                        <div className="mt-0.5 flex items-center gap-2 text-[11px] text-gray-600">
+                                            <span className="truncate">{person.Email}</span>
                                         </div>
                                     </div>
-
+                                </div>
+                                {/* Role */}
+                                <div className="flex items-center col-span-2 justify-center">
+                                    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${roleBadgeClass}`}>
+                                        {roleLabel}
+                                    </span>
+                                </div>
+                                {/* Approval Status */}
+                                <div className="flex items-center col-span-1 justify-center">
+                                    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${approvalBadgeClass}`}>
+                                        {approvalLabel}
+                                    </span>
+                                </div>
+                                {/* Actions */}
+                                <div className="flex items-center col-span-1 justify-end">
                                     {isAdmin && (
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                if (onUserClick) onUserClick(person);
-                                            }}
-                                            className="inline-flex h-6 w-6 items-center justify-center rounded-full text-gray-950 transition hover:bg-gray-100 hover:text-black"
-                                            aria-label="User actions"
-                                            title="User actions"
-                                        >
-                                            <svg className="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 6h.01M12 12h.01M12 18h.01" />
-                                            </svg>
-                                        </button>
-                                    )}
+                                            <div className="relative">
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        const rect = e.currentTarget.getBoundingClientRect();
+                                                        setActionMenuUserId((prev) => {
+                                                            const next = prev === person.UserID ? null : person.UserID;
+                                                            return next;
+                                                        });
+                                                        setActionMenuAnchorRect((prev) => {
+                                                            if (actionMenuUserId === person.UserID) return null;
+                                                            return rect;
+                                                        });
+                                                    }}
+                                                    className="user-actions-button inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-100"
+                                                    aria-label="User actions"
+                                                    title="User actions"
+                                                >
+                                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6h.01M12 12h.01M12 18h.01" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        )}
                                 </div>
                             </div>
                         </div>
@@ -384,7 +443,7 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
                                         {fullName}
                                     </h3>
                                     <p className="text-gray-600 text-sm">{person.Email}</p>
-                                    <p className="text-gray-500 text-xs">{employeeCode}</p>
+                                    
                                 </div>
                             </div>
 
@@ -405,6 +464,86 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
                 );
             })}
             </div>
+
+            {/* Portal action menu (prevents clipping inside card/list containers) */}
+            {isAdmin && actionMenuUserId && actionMenuAnchorRect && typeof document !== 'undefined' && (() => {
+                const menuPerson = users.find((u) => String(u.UserID) === String(actionMenuUserId))
+                    || filteredUsers.find((u) => String(u.UserID) === String(actionMenuUserId));
+
+                if (!menuPerson) return null;
+
+                const menuWidth = 220;
+                const viewportRight = window.innerWidth - 8;
+                const left = Math.min((actionMenuAnchorRect.right || 0) - menuWidth + window.scrollX, viewportRight - menuWidth);
+                const top = (actionMenuAnchorRect.bottom || 0) + window.scrollY + 8;
+
+                return createPortal(
+                    <div
+                        className="user-actions-menu"
+                        style={{ position: 'fixed', top, left: Math.max(8, left), width: menuWidth, zIndex: 9999 }}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="overflow-hidden rounded-lg border border-gray-100 bg-white py-1 shadow-lg">
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActionMenuUserId(null);
+                                    setActionMenuAnchorRect(null);
+                                    if (onUserClick) onUserClick(menuPerson);
+                                }}
+                                className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-xs text-slate-700 transition hover:bg-indigo-50 whitespace-nowrap"
+                            >
+                                <svg className="h-4 w-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                                <span>Edit</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={async (e) => {
+                                    e.stopPropagation();
+                                    setActionMenuUserId(null);
+                                    setActionMenuAnchorRect(null);
+                                    const confirmed = await showConfirm(`Delete user ${menuPerson.FirstName} ${menuPerson.LastName}? This cannot be undone.`);
+                                    if (!confirmed) return;
+                                    try {
+                                        const result = await deleteSelectedUsers([menuPerson.UserID]);
+                                        if (result?.success) {
+                                            fetchUsers();
+                                        } else {
+                                            setUsers((prev) => prev.filter((u) => u.UserID !== menuPerson.UserID));
+                                            console.warn('Delete user API not available, removed locally');
+                                        }
+                                    } catch (err) {
+                                        console.error('Error deleting user:', err);
+                                        setUsers((prev) => prev.filter((u) => u.UserID !== menuPerson.UserID));
+                                    }
+                                }}
+                                className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-xs text-red-600 transition hover:bg-red-50 whitespace-nowrap"
+                            >
+                                <svg className="h-4 w-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" />
+                                </svg>
+                                <span>Delete</span>
+                            </button>
+                        </div>
+                    </div>,
+                    document.body
+                );
+            })()}
+            {viewMode === 'list' && (
+                <div className="pt-1">
+                    <Pagination
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        onPageChange={(p) => setCurrentPage(p)}
+                        fixed={false}
+                        showWhenSinglePage={true}
+                    />
+                </div>
+            )}
         </div>
     );
 });

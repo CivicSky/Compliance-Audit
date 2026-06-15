@@ -9,6 +9,7 @@ export default function CriteriaSection({
     isChecked,
     onToggleSelect,
     onMenuClick,
+    onDeleteClick,
     children
 }) {
     return (
@@ -23,6 +24,7 @@ export default function CriteriaSection({
                 isChecked={isChecked}
                 onToggleSelect={onToggleSelect}
                 onMenuClick={onMenuClick}
+                onDeleteClick={onDeleteClick}
             />
             {isExpanded && children}
         </div>

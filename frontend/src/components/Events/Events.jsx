@@ -6,6 +6,7 @@ import AddEventModal from "../AddEvent/AddEventModal";
 import UnifiedSetupWizard from "../UnifiedSetupWizard/UnifiedSetupWizard";
 import { Wand2 } from "lucide-react";
 import { usersAPI } from "../../utils/api";
+import { useModal } from "../UI/ModalProvider";
 
 export default function Events() {
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -16,9 +17,10 @@ export default function Events() {
     const [selectedIds, setSelectedIds] = useState([]);
     const [currentUser, setCurrentUser] = useState(null);
     const eventsPRef = useRef();
+    const { showAlert, showConfirm } = useModal();
 
     // Default to admin (show features) until we confirm otherwise
-    const isAdmin = !currentUser || currentUser.RoleName === 'admin' || currentUser.RoleID === 1;
+    const isAdmin = !!(currentUser && (currentUser.RoleName === 'admin' || currentUser.RoleID === 1));
 
     // Fetch current user on mount
     useEffect(() => {
@@ -79,15 +81,15 @@ export default function Events() {
                     eventsPRef.current.refresh();
                 }
                 // Close modal and reset selected event after successful save
-                alert('Event updated successfully!');
+                await showAlert('Event updated successfully!');
                 return true; // Return success status
             } else {
-                alert(response.message || 'Failed to update event');
+                await showAlert(response.message || 'Failed to update event');
                 return false; // Return failure status
             }
         } catch (error) {
             console.error('Error updating event:', error);
-            alert('An error occurred while updating the event');
+            await showAlert('An error occurred while updating the event');
             return false; // Return failure status
         }
     };
@@ -114,10 +116,7 @@ export default function Events() {
         if (selectedIds.length === 0 || !eventsPRef.current) return;
         
         // Confirm deletion
-        const confirmed = window.confirm(
-            `Are you sure you want to delete ${selectedIds.length} event(s)? This action cannot be undone.`
-        );
-        
+        const confirmed = await showConfirm(`Are you sure you want to delete ${selectedIds.length} event(s)? This action cannot be undone.`);
         if (!confirmed) return;
         
         try {
@@ -129,15 +128,15 @@ export default function Events() {
                 setDeleteMode(false);
                 // Show success message
                 console.log('Successfully deleted selected events');
-                alert(`Successfully deleted ${selectedIds.length} event(s)`);
+                await showAlert(`Successfully deleted ${selectedIds.length} event(s)`);
             } else {
                 // Show error message
                 console.error('Failed to delete events:', result.message);
-                alert(result.message || 'Failed to delete events');
+                await showAlert(result.message || 'Failed to delete events');
             }
         } catch (error) {
             console.error('Error deleting events:', error);
-            alert('An error occurred while deleting events');
+            await showAlert('An error occurred while deleting events');
         }
     };
 

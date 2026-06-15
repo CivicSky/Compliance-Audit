@@ -3,8 +3,9 @@ const router = express.Router();
 const eventsController = require('../controllers/EventsController');
 const auth = require('../middleware/auth');
 
-// Get all events
-router.get('/', eventsController.getAllEvents);
+// Get all events (rate limited for pagination/touch endpoints)
+const rateLimit = require('../middleware/rateLimit');
+router.get('/', rateLimit({ windowMs: 60 * 1000, max: 40 }), eventsController.getAllEvents);
 
 // Add new event
 router.post('/add', auth, eventsController.addEvent);

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from "react";
 import Header from "../Header/header.jsx";
 import { eventsAPI } from "../../utils/api";
+import { useModal } from "../UI/ModalProvider";
 
 const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionChange, onEventClick }, ref) => {
     const [events, setEvents] = useState([]);
@@ -9,6 +10,7 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
     const [error, setError] = useState(null);
     const [selectedEvents, setSelectedEvents] = useState(new Set());
     const [downloadableFolders, setDownloadableFolders] = useState([]);
+    const { showAlert } = useModal();
 
     // Fetch events data from database
     useEffect(() => {
@@ -288,7 +290,7 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
                                                 }, 100);
                                             } catch (err) {
                                                 console.error('Download error:', err);
-                                                alert('Download failed: ' + (err.message || 'Unknown error'));
+                                                await showAlert('Download failed: ' + (err.message || 'Unknown error'));
                                             }
                                         }}
                                         title="Download event folder"

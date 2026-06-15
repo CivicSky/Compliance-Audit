@@ -2,9 +2,11 @@ const express = require("express");
 const router = express.Router();
 const OfficesController = require("../controllers/OfficesController");
 const optionalAuth = require("../middleware/optionalAuth");
+const rateLimit = require('../middleware/rateLimit');
 
 // Office Routes
-router.get("/", OfficesController.getAll);
+// Rate limit public offices list to reduce abusive paging calls
+router.get("/", rateLimit({ windowMs: 60 * 1000, max: 40 }), OfficesController.getAll);
 router.get("/:id/export", optionalAuth, OfficesController.exportOfficeExcel);
 router.get("/:id", OfficesController.getById);
 router.post("/", optionalAuth, OfficesController.create);

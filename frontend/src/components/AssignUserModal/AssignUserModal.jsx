@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { requirementsAPI } from '../../utils/api';
+import { useModal } from "../UI/ModalProvider";
+import { API_BASE_URL } from '../../utils/apiBase';
 
 export default function AssignUserModal({ isOpen, onClose, requirement, officeId, onSuccess, currentUserId, isAdmin = false }) {
     const [availableUsers, setAvailableUsers] = useState([]);
@@ -10,6 +12,7 @@ export default function AssignUserModal({ isOpen, onClose, requirement, officeId
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState('');
     const [activeTab, setActiveTab] = useState('assign'); // 'assign' or 'assigned'
+    const { showAlert, showConfirm } = useModal();
 
     // Fetch available users and assigned users when modal opens
     useEffect(() => {
@@ -91,7 +94,7 @@ export default function AssignUserModal({ isOpen, onClose, requirement, officeId
             );
             
             if (response.success) {
-                alert(`Successfully assigned ${selectedUserIds.length} user(s)!`);
+                await showAlert(`Successfully assigned ${selectedUserIds.length} user(s)!`);
                 if (onSuccess) {
                     onSuccess();
                 }
@@ -111,8 +114,9 @@ export default function AssignUserModal({ isOpen, onClose, requirement, officeId
     };
 
     const handleRemoveAssignment = async (assignmentId) => {
-        if (!confirm('Are you sure you want to remove this user assignment?')) return;
-        
+        const ok = await showConfirm('Are you sure you want to remove this user assignment?');
+        if (!ok) return;
+
         try {
             const response = await requirementsAPI.removeUserAssignment(assignmentId);
             if (response.success) {
@@ -259,7 +263,7 @@ export default function AssignUserModal({ isOpen, onClose, requirement, officeId
                                                         <div className="flex-shrink-0">
                                                             {user.ProfilePic ? (
                                                                 <img
-                                                                    src={`http://localhost:5000/uploads/profile-pics/${user.ProfilePic}`}
+                                                                    src={`${API_BASE_URL}/uploads/profile-pics/${user.ProfilePic}`}
                                                                     alt={fullName}
                                                                     className="w-8 h-8 rounded-full object-cover border border-gray-200"
                                                                     onError={(e) => {
@@ -358,7 +362,7 @@ export default function AssignUserModal({ isOpen, onClose, requirement, officeId
                                                 <div className="flex-shrink-0 relative">
                                                     {user.ProfilePic ? (
                                                         <img
-                                                            src={`http://localhost:5000/uploads/profile-pics/${user.ProfilePic}`}
+                                                            src={`${API_BASE_URL}/uploads/profile-pics/${user.ProfilePic}`}
                                                             alt={fullName}
                                                             className={`w-8 h-8 rounded-full object-cover border-2 ${hasUploaded ? 'border-green-500' : 'border-gray-300'}`}
                                                             onError={(e) => {

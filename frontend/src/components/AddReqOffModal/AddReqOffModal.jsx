@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useModal } from "../UI/ModalProvider";
+import { API_BASE_URL } from '../../utils/apiBase';
 
 export default function AddReqOffModal({ isOpen, onClose, office, onSave }) {
     const [requirements, setRequirements] = useState([]);
@@ -7,6 +9,7 @@ export default function AddReqOffModal({ isOpen, onClose, office, onSave }) {
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
+    const { showAlert } = useModal();
 
     useEffect(() => {
         if (isOpen && office) {
@@ -18,13 +21,13 @@ export default function AddReqOffModal({ isOpen, onClose, office, onSave }) {
         setLoading(true);
         try {
             // Fetch all requirements for the office's event
-            const response = await axios.get(`http://localhost:5000/api/requirements/all?eventId=${office.event_id}`);
+            const response = await axios.get(`${API_BASE_URL}/api/requirements/all?eventId=${office.event_id}`);
             const allRequirements = response.data.data || [];
             console.log('All requirements for event:', allRequirements);
             console.log('First requirement:', JSON.stringify(allRequirements[0], null, 2));
 
             // Fetch current office requirements
-            const officeReqResponse = await axios.get(`http://localhost:5000/api/offices/${office.id}/requirements`);
+            const officeReqResponse = await axios.get(`${API_BASE_URL}/api/offices/${office.id}/requirements`);
             const officeRequirements = officeReqResponse.data.data || [];
             const officeReqIds = officeRequirements.map(r => r.RequirementID);
 
@@ -63,7 +66,7 @@ export default function AddReqOffModal({ isOpen, onClose, office, onSave }) {
 
         setSaving(true);
         try {
-            await axios.post(`http://localhost:5000/api/offices/${office.id}/requirements`, {
+            await axios.post(`${API_BASE_URL}/api/offices/${office.id}/requirements`, {
                 requirementIds: selectedRequirements
             });
             
@@ -72,7 +75,7 @@ export default function AddReqOffModal({ isOpen, onClose, office, onSave }) {
             onClose();
         } catch (error) {
             console.error('Error adding requirements:', error);
-            alert('Failed to add requirements. Please try again.');
+            await showAlert('Failed to add requirements. Please try again.');
         } finally {
             setSaving(false);
         }

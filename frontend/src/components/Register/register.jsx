@@ -1,12 +1,20 @@
-import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate, Link, useLocation } from "react-router-dom";
+import { Eye, EyeOff } from "lucide-react";
 import bg from "../../assets/images/bglogins.jpg"
 import logo from "../../assets/images/lccb_logo.png"
 import auditrackLogo from "../../assets/images/logo.png"
-import axios from "axios";
+import { usersAPI } from "../../utils/api";
+import { useModal } from "../UI/ModalProvider";
+
+const COMPANY_EMAIL_DOMAIN = "@lccbonline.edu.ph";
 
 export default function Register() {
     const navigate = useNavigate();
+    const location = useLocation();
+    const { showAlert } = useModal();
+    const inviteToken = new URLSearchParams(location.search).get("invite") || "";
+    const inviteExpiredRef = useRef(false);
     const [formData, setFormData] = useState({
         firstName: "",
         middleInitial: "",
@@ -17,7 +25,56 @@ export default function Register() {
     });
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+    const [inviteChecking, setInviteChecking] = useState(Boolean(inviteToken));
+    const [inviteInfo, setInviteInfo] = useState(null);
     const [passwordError, setPasswordError] = useState("");
+    const [emailError, setEmailError] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
+
+    useEffect(() => {
+        if (!inviteToken) return;
+
+        let timerId;
+        let cancelled = false;
+
+        const handleExpiredInvite = async () => {
+            if (inviteExpiredRef.current) return;
+            inviteExpiredRef.current = true;
+            await showAlert("Invite expired.", "Invite Expired");
+            navigate("/login", { replace: true });
+        };
+
+        const validateInvite = async () => {
+            setInviteChecking(true);
+            try {
+                const response = await usersAPI.validateRegistrationInvite(inviteToken);
+                if (cancelled) return;
+
+                const invite = response.invite;
+                setInviteInfo(invite);
+                setFormData((current) => ({
+                    ...current,
+                    email: invite?.email || current.email,
+                    roleId: String(invite?.roleId || current.roleId || "2"),
+                }));
+
+                const remainingMs = Math.max(0, Number(invite?.expiresAt || 0) - Date.now());
+                timerId = window.setTimeout(handleExpiredInvite, remainingMs);
+            } catch {
+                if (cancelled) return;
+                await handleExpiredInvite();
+            } finally {
+                if (!cancelled) setInviteChecking(false);
+            }
+        };
+
+        validateInvite();
+
+        return () => {
+            cancelled = true;
+            if (timerId) window.clearTimeout(timerId);
+        };
+    }, [inviteToken, navigate, showAlert]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -30,6 +87,22 @@ export default function Register() {
         if (name === 'password') {
             validatePassword(value);
         }
+
+        if (name === 'email') {
+            validateEmail(value);
+        }
+    };
+
+    const validateEmail = (email) => {
+        const normalizedEmail = email.trim().toLowerCase();
+
+        if (!normalizedEmail.endsWith(COMPANY_EMAIL_DOMAIN)) {
+            setEmailError(`Email must use the ${COMPANY_EMAIL_DOMAIN} domain`);
+            return false;
+        }
+
+        setEmailError("");
+        return true;
     };
 
     const validatePassword = (password) => {
@@ -52,6 +125,12 @@ export default function Register() {
         setLoading(true);
         setError("");
 
+        if (!validateEmail(formData.email)) {
+            setLoading(false);
+            setError(`Only ${COMPANY_EMAIL_DOMAIN} email addresses can register`);
+            return;
+        }
+
         // Validate password before submitting
         if (!validatePassword(formData.password)) {
             setLoading(false);
@@ -68,25 +147,17 @@ export default function Register() {
                 roleId: parseInt(formData.roleId)
             });
 
-            // Send registration data to backend API (backend mounts user routes at /user)
-            const response = await axios.post("http://localhost:5000/api/user/register", {
-                firstName: formData.firstName,
-                middleInitial: formData.middleInitial,
-                lastName: formData.lastName,
-                email: formData.email,
-                password: formData.password,
-                roleId: parseInt(formData.roleId)
+            navigate("/otp", {
+                state: {
+                    firstName: formData.firstName,
+                    middleInitial: formData.middleInitial,
+                    lastName: formData.lastName,
+                    email: formData.email,
+                    password: formData.password,
+                    roleId: parseInt(inviteInfo?.roleId || formData.roleId, 10) || 2,
+                    inviteToken: inviteToken || null,
+                },
             });
-
-            console.log('Registration response:', response.data);
-
-            if (response.data.success) {
-                alert('Registration successful! Your account is pending approval. Please wait for the administrator to approve your account before you can login.');
-                // Redirect to login page on success (login component is mounted at '/')
-                navigate("/");
-            } else {
-                setError(response.data.message || "Registration failed");
-            }
         } catch (err) {
             console.error('Registration error full:', err);
             console.error('Error response:', err.response);
@@ -95,6 +166,17 @@ export default function Register() {
             setLoading(false);
         }
     };
+
+    if (inviteChecking) {
+        return (
+            <div className="flex h-screen items-center justify-center bg-slate-50">
+                <div className="text-center">
+                    <img src={logo} alt="App Logo" className="mx-auto mb-4 h-16 w-16" />
+                    <p className="text-sm font-medium text-gray-700">Checking invite link...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex h-screen overflow-hidden">
@@ -131,7 +213,7 @@ export default function Register() {
             </div>
 
             {/* Right side - Registration form */}
-            <div className="w-1/2 flex items-center justify-center bg-white transition-all duration-700 ease-in-out transform">
+            <div className="w-1/2 flex items-center justify-center bg-slate-50 transition-all duration-700 ease-in-out transform">
                 <div className="w-full max-w-md px-8 animate-fade-in-right">
                     {/* Logo and title */}
                     <div className="text-center mb-8 animate-slide-down">
@@ -214,29 +296,58 @@ export default function Register() {
                                 required
                                 value={formData.email}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                                placeholder="Enter your email"
+                                disabled={Boolean(inviteInfo?.email)}
+                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 text-sm ${
+                                    emailError
+                                        ? 'border-red-300 focus:ring-red-500'
+                                        : 'border-gray-300 focus:ring-blue-500 focus:border-transparent'
+                                }`}
+                                placeholder={`name${COMPANY_EMAIL_DOMAIN}`}
                             />
+                            <p className={`mt-1 text-xs ${emailError ? 'text-red-600' : 'text-gray-500'}`}>
+                                {emailError || `Use your ${COMPANY_EMAIL_DOMAIN} email address`}
+                            </p>
                         </div>
+
+                        {inviteInfo && (
+                            <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+                                Invite verified. This link expires 10 minutes after it was created.
+                            </div>
+                        )}
 
                         <div>
                             <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
                                 Password *
                             </label>
-                            <input
-                                type="password"
-                                id="password"
-                                name="password"
-                                required
-                                value={formData.password}
-                                onChange={handleChange}
-                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 text-sm ${
-                                    passwordError 
-                                        ? 'border-red-300 focus:ring-red-500' 
-                                        : 'border-gray-300 focus:ring-blue-500 focus:border-transparent'
-                                }`}
-                                placeholder="Create a password"
-                            />
+                            <div className="relative">
+                                <input
+                                    type={showPassword ? "text" : "password"}
+                                    id="password"
+                                    name="password"
+                                    required
+                                    value={formData.password}
+                                    onChange={handleChange}
+                                    className={`w-full px-3 py-2 pr-10 border rounded-md focus:outline-none focus:ring-2 text-sm ${
+                                        passwordError 
+                                            ? 'border-red-300 focus:ring-red-500' 
+                                            : 'border-gray-300 focus:ring-blue-500 focus:border-transparent'
+                                    }`}
+                                    placeholder="Create a password"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword((v) => !v)}
+                                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 transition-colors"
+                                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                    title={showPassword ? 'Hide password' : 'Show password'}
+                                >
+                                    {showPassword ? (
+                                        <EyeOff className="w-5 h-5" />
+                                    ) : (
+                                        <Eye className="w-5 h-5" />
+                                    )}
+                                </button>
+                            </div>
                             <div className="mt-1 text-xs space-y-1">
                                 <p className={`${formData.password.length >= 8 ? 'text-green-600' : 'text-gray-500'}`}>
                                     • At least 8 characters
@@ -252,9 +363,9 @@ export default function Register() {
 
                         <button
                             type="submit"
-                            disabled={loading || passwordError}
+                            disabled={loading || passwordError || emailError}
                             className={`w-full py-2 px-4 rounded-md font-medium transition-colors text-sm ${
-                                loading || passwordError
+                                loading || passwordError || emailError
                                     ? "bg-blue-300 cursor-not-allowed text-white" 
                                     : "bg-blue-600 hover:bg-blue-700 text-white"
                             }`}

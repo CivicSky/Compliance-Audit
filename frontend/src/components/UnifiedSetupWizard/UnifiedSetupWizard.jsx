@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronRight, ChevronLeft, X, Check, Plus, Wand2 } from 'lucide-react';
+import { API_BASE_URL } from '../../utils/apiBase';
 
 export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
     const [currentStep, setCurrentStep] = useState(0);
@@ -95,7 +96,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
 
     const fetchAvailableAreas = async (eventId) => {
         try {
-            const response = await fetch(`http://localhost:5000/api/areas/event/${eventId}`);
+            const response = await fetch(`${API_BASE_URL}/api/areas/event/${eventId}`);
             const data = await response.json();
             if (data.success) setAvailableAreas(data.data || []);
         } catch (error) {
@@ -105,7 +106,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
 
     const fetchAreasByEvent = async (eventId) => {
         try {
-            const response = await fetch(`http://localhost:5000/api/areas/event/${eventId}`);
+            const response = await fetch(`${API_BASE_URL}/api/areas/event/${eventId}`);
             const data = await response.json();
             if (data.success) setAreasList(data.data || []);
         } catch (error) {

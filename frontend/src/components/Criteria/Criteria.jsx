@@ -9,6 +9,7 @@ import ViewReqPASSCUModal from "../../components/ViewReqPASSCUModal/ViewReqPASSC
 import AddReqOffModal from "../../components/AddReqOffModal/AddReqOffModal";
 import EditCriteriaModal from "../../components/EditCriteria/EditCriteriaModal";
 import UnifiedSetupWizard from "../UnifiedSetupWizard/UnifiedSetupWizard";
+import { useModal } from "../UI/ModalProvider";
 import { Wand2 } from "lucide-react";
 
 export default function Organization() {
@@ -25,6 +26,8 @@ export default function Organization() {
     const [isAddReqModalOpen, setIsAddReqModalOpen] = useState(false);
     const [currentUser, setCurrentUser] = useState(null);
 
+    const { showAlert, showConfirm } = useModal();
+
     const [selectedOffice, setSelectedOffice] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -37,7 +40,7 @@ export default function Organization() {
     const criteriaPRef = useRef();
 
     // Default to admin (show features) until we confirm otherwise
-    const isAdmin = !currentUser || currentUser.RoleName === 'admin' || currentUser.RoleID === 1;
+    const isAdmin = !!(currentUser && (currentUser.RoleName === 'admin' || currentUser.RoleID === 1));
 
     // Fetch current user on mount
     useEffect(() => {
@@ -159,13 +162,13 @@ export default function Organization() {
 
             if (response?.success) {
                 officesPRef.current.refresh();
-                alert('Office updated successfully!');
+                await showAlert('Office updated successfully!');
             } else {
-                alert(response?.message || 'Failed to update office');
+                await showAlert(response?.message || 'Failed to update office');
             }
         } catch (err) {
             console.error(err);
-            alert('Error updating office');
+            await showAlert('Error updating office');
         }
     };
 
@@ -180,17 +183,19 @@ export default function Organization() {
     // Delete selected criteria
     const handleDeleteSelected = async () => {
         if (selectedIds.length === 0) return;
-        if (!window.confirm(`Delete ${selectedIds.length} criteria?`)) return;
+        const { showConfirm, showAlert } = useModal();
+        const ok = await showConfirm(`Delete ${selectedIds.length} criteria?`);
+        if (!ok) return;
         try {
             await criteriaAPI.deleteCriteria(selectedIds);
             setSelectedCount(0);
             setSelectedIds([]);
             setDeleteMode(false);
             if (criteriaPRef.current?.refresh) criteriaPRef.current.refresh();
-            alert('Deleted successfully!');
+            await showAlert('Deleted successfully!');
         } catch (err) {
             console.error('Failed to delete criteria', err);
-            alert('Delete failed');
+            await showAlert('Delete failed');
         }
     };
     // Handle criteria click for editing

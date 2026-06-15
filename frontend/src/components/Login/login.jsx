@@ -1,18 +1,73 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
 import { Eye, EyeOff } from "lucide-react";
 import logo from "../../assets/images/lccb_logo.png";
 import auditrackLogo from "../../assets/images/logo.png";
 import bg from "../../assets/images/bglogins.jpg";
 import { usersAPI } from "../../utils/api";
+import { useModal } from "../UI/ModalProvider";
 
 export default function Login() {
     const navigate = useNavigate();
+    const { showAlert } = useModal();
+    const location = useLocation();
     const [formData, setFormData] = useState({ email: "", password: "" });
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+    const [blockedMs, setBlockedMs] = useState(0);
+    const [blockedUntil, setBlockedUntil] = useState(null);
+
+    // restore blocked state from localStorage on mount
+    useEffect(() => {
+        try {
+            const stored = localStorage.getItem('loginBlockedUntil');
+            if (stored) {
+                const until = Number(stored);
+                if (!Number.isNaN(until) && until > Date.now()) {
+                    setBlockedUntil(until);
+                    setBlockedMs(Math.max(0, until - Date.now()));
+                } else {
+                    localStorage.removeItem('loginBlockedUntil');
+                }
+            }
+        } catch (e) {
+            // ignore storage errors
+        }
+    }, []);
+
+    // Server-side pre-check: query login-status when the email changes (debounced)
+    useEffect(() => {
+        let id;
+        const runCheck = async () => {
+            try {
+                const email = String(formData.email || '').trim();
+                if (!email) return;
+                const resp = await usersAPI.loginStatus(email);
+                const remaining = resp?.remainingMs || 0;
+                if (remaining > 0) {
+                    const until = Date.now() + remaining;
+                    setBlockedMs(remaining);
+                    setBlockedUntil(until);
+                    try { localStorage.setItem('loginBlockedUntil', String(until)); } catch(e) {}
+                    setError(resp?.message || `Too many failed login attempts. Please wait.`);
+                } else {
+                    // clear any persisted block if server says no block
+                    setBlockedMs(0);
+                    setBlockedUntil(null);
+                    try { localStorage.removeItem('loginBlockedUntil'); } catch(e) {}
+                    setError("");
+                }
+            } catch (err) {
+                // network errors are non-fatal for UX; keep existing state
+            }
+        };
+
+        // debounce calls while user types
+        id = setTimeout(runCheck, 400);
+        return () => clearTimeout(id);
+    }, [formData.email]);
 
     // 🔒 Redirect if already logged in
     useEffect(() => {
@@ -25,12 +80,25 @@ export default function Login() {
         }
     }, [navigate]);
 
+    // Show message from previous navigation (e.g., OTP verified)
+    useEffect(() => {
+        const msg = location.state?.message;
+        if (msg) {
+            setError(msg);
+            // show popup using modal provider
+            try { showAlert(msg); } catch (e) {}
+            // clear location state so message doesn't persist
+            navigate(location.pathname, { replace: true, state: null });
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (blockedMs && blockedMs > 0) return; // prevent submitting while blocked
         setLoading(true);
         setError("");
 
@@ -45,6 +113,9 @@ export default function Login() {
                 localStorage.setItem("token", response.token);
                 localStorage.setItem("user", JSON.stringify(response.user));
 
+                // clear any persisted block on successful login
+                try { localStorage.removeItem('loginBlockedUntil'); } catch (e) {}
+
                 // 🔥 Attach token globally
                 axios.defaults.headers.common["Authorization"] =
                     `Bearer ${response.token}`;
@@ -56,23 +127,51 @@ export default function Login() {
                 // Check approval status
                 if (response.approvalStatus === 'pending') {
                     setError("Your account is pending approval. Please wait for admin approval.");
-                    alert("⏳ Account Pending\n\nYour account is still pending approval. Please wait for the administrator to review your account.");
+                    await showAlert("Your account is still pending approval. Please wait for the administrator to review your account.");
                 } else if (response.approvalStatus === 'denied') {
                     setError("Your account has been denied access.");
-                    alert("❌ Access Denied\n\nYour account has been denied access. Please contact the administrator for more information.");
+                    await showAlert("Your account has been denied access. Please contact the administrator for more information.");
                 } else {
                     setError(response.message || "Login failed");
                 }
             }
         } catch (err) {
-            setError(
-                err.response?.data?.message ||
-                "Invalid email or password"
-            );
+            const resp = err.response;
+            if (resp && resp.status === 429) {
+                const remaining = resp.data?.remainingMs || 0;
+                const until = Date.now() + remaining;
+                setBlockedMs(remaining);
+                setBlockedUntil(until);
+                try { localStorage.setItem('loginBlockedUntil', String(until)); } catch(e) {}
+                setError(resp.data?.message || 'Too many failed login attempts.');
+            } else {
+                setError(
+                    resp?.data?.message ||
+                    "Invalid email or password"
+                );
+            }
         } finally {
             setLoading(false);
         }
     };
+
+    // Countdown for blocked state
+    useEffect(() => {
+        if (!blockedUntil) return;
+        const tick = () => {
+            const ms = Math.max(0, blockedUntil - Date.now());
+            setBlockedMs(ms);
+            if (ms <= 0) {
+                    setBlockedUntil(null);
+                    setBlockedMs(0);
+                    try { localStorage.removeItem('loginBlockedUntil'); } catch(e) {}
+                    setError("");
+                }
+        };
+        tick();
+        const id = setInterval(tick, 1000);
+        return () => clearInterval(id);
+    }, [blockedUntil]);
 
     return (
         <div className="flex h-screen overflow-hidden">
@@ -102,10 +201,23 @@ export default function Login() {
                     </div>
 
                     <form onSubmit={handleSubmit} className="space-y-6 animate-fade-in-up">
-                        {error && (
-                            <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm animate-shake">
-                                {error}
+                        {/* Show either blocked countdown OR the error message (not both) */}
+                        {blockedMs > 0 ? (
+                            <div className="p-3 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-md text-sm">
+                                {/* format as M:SS */}
+                                {(() => {
+                                    const total = Math.ceil(blockedMs / 1000);
+                                    const m = Math.floor(total / 60);
+                                    const s = total % 60;
+                                    return `Too many failed login attempts. Please wait ${m}:${String(s).padStart(2, '0')} before retrying.`;
+                                })()}
                             </div>
+                        ) : (
+                            error && (
+                                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm animate-shake">
+                                    {error}
+                                </div>
+                            )
                         )}
 
                         <input
@@ -116,6 +228,7 @@ export default function Login() {
                             onChange={handleChange}
                             placeholder="Email"
                             className="w-full px-3 py-3 border rounded-md"
+                            disabled={blockedMs > 0}
                         />
 
                         <div className="relative">
@@ -127,11 +240,13 @@ export default function Login() {
                                 onChange={handleChange}
                                 placeholder="Password"
                                 className="w-full px-3 py-3 pr-10 border rounded-md"
+                                disabled={blockedMs > 0}
                             />
                             <button
                                 type="button"
                                 onClick={() => setShowPassword(!showPassword)}
-                                className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 transition-colors"
+                                disabled={blockedMs > 0}
+                                className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
                             >
                                 {showPassword ? (
                                     <EyeOff className="w-5 h-5" />
@@ -143,10 +258,10 @@ export default function Login() {
 
                         <button
                             type="submit"
-                            disabled={loading}
-                            className="w-full py-3 bg-blue-600 text-white rounded-md transition-colors"
+                            disabled={loading || blockedMs > 0}
+                            className="w-full py-3 bg-blue-600 text-white rounded-md transition-colors disabled:opacity-60"
                         >
-                            {loading ? "Signing in..." : "Sign in"}
+                            {loading ? "Signing in..." : blockedMs > 0 ? `Locked (${Math.ceil(blockedMs/1000)}s)` : "Sign in"}
                         </button>
 
                         <p className="text-center text-sm">

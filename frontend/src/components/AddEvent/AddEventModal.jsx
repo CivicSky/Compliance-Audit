@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useModal } from "../UI/ModalProvider";
 
 export default function AddEventModal({ isOpen, onClose, onSuccess }) {
     const [formData, setFormData] = useState({
@@ -9,6 +10,7 @@ export default function AddEventModal({ isOpen, onClose, onSuccess }) {
 
     const [errors, setErrors] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const { showAlert } = useModal();
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -75,14 +77,14 @@ export default function AddEventModal({ isOpen, onClose, onSuccess }) {
                 }
                 
                 onClose();
-                alert('Event added successfully!');
+                await showAlert('Event added successfully!');
             } else {
-                alert(response.message || 'Failed to add event');
+                await showAlert(response.message || 'Failed to add event');
             }
             
         } catch (error) {
             console.error('Error submitting form:', error);
-            alert('An error occurred while adding the event. Please try again.');
+            await showAlert('An error occurred while adding the event. Please try again.');
         } finally {
             setIsSubmitting(false);
         }

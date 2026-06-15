@@ -1,8 +1,8 @@
 import axios from 'axios';
+import { API_BASE_URL } from './apiBase';
 
-// Use relative base URL so Vite proxy works in dev and prod
 const api = axios.create({
-  baseURL: '',
+  baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -51,6 +51,7 @@ export const complianceStatusOfficesAPI = {
 export const criteriaAPI = {
   getAll: async () => (await api.get('/api/criteria')).data,
   getByEvent: async (eventId) => (await api.get(`/api/criteria/event/${eventId}`)).data,
+  getByArea: async (areaId) => (await api.get(`/api/criteria/area/${areaId}`)).data,
   deleteCriteria: async (ids) => (await api.delete('/api/criteria/delete', { data: { criteriaIds: ids } })).data,
   addCriteria: async (data) => (await api.post('/api/criteria/add', data)).data,
 };
@@ -122,6 +123,11 @@ export const officeHeadsAPI = {
 export const usersAPI = {
   login: async (credentials) => (await api.post('/api/user/login', credentials)).data,
   register: async (userData) => (await api.post('/user/register', userData)).data,
+  loginStatus: async (email) => (await api.get(`/api/user/login-status?email=${encodeURIComponent(email)}`)).data,
+  createRegistrationInvite: async (data = {}) => (await api.post('/api/user/registration-invite', data)).data,
+  validateRegistrationInvite: async (token) => (
+    await api.get(`/api/user/registration-invite/${encodeURIComponent(token)}`)
+  ).data,
   getLoggedInUser: async () => (await api.get('/api/user/me')).data, // JWT required
   getAllUsers: async () => (await api.get('/api/user')).data,
   getCurrentUser: async (email) => (await api.get(`/user/current/${email}`)).data,
@@ -151,6 +157,11 @@ export const usersAPI = {
     const response = await api.put(`/api/user/${userId}/role`, {
       roleId: roleId
     });
+    return response.data;
+  },
+  deleteUsers: async (ids) => {
+    // Send array of ids in request body
+    const response = await api.delete('/api/user', { data: { ids } });
     return response.data;
   },
 };
@@ -193,6 +204,7 @@ export const eventsAPI = {
 export const requirementsAPI = {
   getAllRequirements: async () => (await api.get('/api/requirements/all')).data,
   getRequirementsByEvent: async (eventId) => (await api.get(`/api/requirements/event/${eventId}`)).data,
+  getRequirementsByCriteria: async (criteriaId) => (await api.get(`/api/requirements/criteria/${criteriaId}`)).data,
   addRequirement: async (data) => (await api.post('/api/requirements/add', data)).data,
   updateRequirement: async (id, data) => (await api.put(`/api/requirements/update/${id}`, data)).data,
   deleteRequirements: async (ids) => (await api.post('/api/requirements/delete', { requirementIds: ids })).data,
@@ -231,6 +243,7 @@ export const officesAPI = {
   createOffice: async (data) => (await api.post('/api/offices', data)).data,
   updateOffice: async (id, data) => (await api.put(`/api/offices/${id}`, data)).data,
   deleteOffice: async (id) => (await api.delete(`/api/offices/${id}`)).data,
+  getById: async (id) => (await api.get(`/api/offices/${id}`)).data,
   getOfficeRequirements: async (officeId) => (await api.get(`/api/offices/${officeId}/requirements`)).data,
   addOfficeRequirements: async (officeId, requirementIds) =>
     (await api.post(`/api/offices/${officeId}/requirements`, { requirementIds })).data,

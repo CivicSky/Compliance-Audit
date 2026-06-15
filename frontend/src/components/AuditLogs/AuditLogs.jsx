@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import Pagination from "../Pagination/Pagination";
 import Header from "../Header/header"
 
 
@@ -11,6 +12,8 @@ export default function AuditLogs() {
     const [userLookup, setUserLookup] = useState({});
     const [searchTerm, setSearchTerm] = useState("");
     const [actionFilter, setActionFilter] = useState("all");
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 30;
 
 
     const statusColorMap = {
@@ -322,6 +325,20 @@ export default function AuditLogs() {
         });
     }, [preparedLogs, searchTerm, actionFilter]);
 
+    // Pagination calculations
+    const totalPages = Math.max(1, Math.ceil(filteredLogs.length / itemsPerPage));
+    useEffect(() => {
+        if (currentPage > totalPages) setCurrentPage(1);
+    }, [currentPage, totalPages]);
+
+    useEffect(() => {
+        // reset to first page when filters/search change
+        setCurrentPage(1);
+    }, [searchTerm, actionFilter]);
+
+    const startIdx = (currentPage - 1) * itemsPerPage;
+    const visibleLogs = filteredLogs.slice(startIdx, startIdx + itemsPerPage);
+
     const clearControls = () => {
         setSearchTerm("");
         setActionFilter("all");
@@ -481,8 +498,7 @@ export default function AuditLogs() {
                                 <select
                                     value={actionFilter}
                                     onChange={(e) => setActionFilter(e.target.value)}
-                                    className="h-7 rounded-md border border-slate-200 bg-white px-2.5 text-center text-[8px] text-slate-700 transition focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                                    style={{ minWidth: 120 }}
+                                    className="h-8 min-w-[146px] appearance-none rounded-md border border-slate-200 bg-white px-4 text-center text-[10px] font-medium leading-4 text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-cyan-500"
                                 >
                                     <option value="all">All</option>
                                     <option value="Created">Created</option>
@@ -492,6 +508,9 @@ export default function AuditLogs() {
                                     <option value="Login">Login</option>
                                     <option value="Logout">Logout</option>
                                 </select>
+                                <svg xmlns="http://www.w3.org/2000/svg" className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-2.5 w-2.5 text-slate-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                    <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
+                                </svg>
                             </div>
                         </div>
                         </div>
@@ -515,8 +534,9 @@ export default function AuditLogs() {
                             {logs.length === 0 ? 'No audit logs found.' : 'No matching logs found.'}
                         </div>
                     ) : (
+                        <>
                         <div className="divide-y divide-gray-100 overflow-y-auto flex-1 min-h-0">
-                            {filteredLogs.map((log) => {
+                            {visibleLogs.map((log) => {
                                 const normalizedAction = log.normalizedAction;
                                 const color = statusColorMap[normalizedAction] || statusColorMap.default;
                                 const readableMessage = log.readableMessage;
@@ -557,6 +577,16 @@ export default function AuditLogs() {
                                 );
                             })}
                         </div>
+                        <div className="px-4 py-4 bg-white">
+                            <Pagination
+                                currentPage={currentPage}
+                                totalPages={totalPages}
+                                onPageChange={(p) => setCurrentPage(p)}
+                                fixed={false}
+                                showWhenSinglePage={false}
+                            />
+                        </div>
+                        </>
                     )}
                 </div>
             </div>

@@ -2,6 +2,9 @@ const db = require("../db");
 const ExcelJS = require("exceljs");
 const { recordLog } = require('./logsController');
 const { createNotifications } = require('../utils/notificationService');
+const { autoAssignHeadsToRequirementsForOffice } = require('./RequirementsController');
+const fs = require('fs');
+const path = require('path');
 const MAX_HEADS_PER_OFFICE = 4;
 
 const normalizeComplianceStatus = (statusId, statusName) => {
@@ -125,6 +128,10 @@ const OfficesController = {
           o.OfficeName,
           o.OfficeTypeID,
           o.EventID,
+          o.department_id,
+          o.program_type_id,
+          COALESCE(d.name, NULL) AS department_name,
+          COALESCE(pt.name, NULL) AS program_type_name,
           e.EventName,
           ot.TypeName,
           os.OverallStatus,
@@ -136,6 +143,8 @@ const OfficesController = {
         FROM offices o
         LEFT JOIN Events e ON o.EventID = e.EventID
         LEFT JOIN officetypes ot ON o.OfficeTypeID = ot.OfficeTypeID
+        LEFT JOIN departments d ON o.department_id = d.id
+        LEFT JOIN program_types pt ON o.program_type_id = pt.id
         LEFT JOIN (
           SELECT
             cso.OfficeID,
@@ -217,6 +226,10 @@ const OfficesController = {
           office_name: r.OfficeName,
           office_type_id: r.OfficeTypeID,
           office_type_name: r.TypeName || "Unknown Type",
+          department_id: r.department_id || null,
+          department_name: r.department_name || null,
+          program_type_id: r.program_type_id || null,
+          program_type_name: r.program_type_name || null,
           head_id: primaryHead?.HeadID || null,
           head_ids: officeHeads.map(h => h.HeadID), // Array of head IDs
           heads: officeHeads, // Full head objects
@@ -258,6 +271,10 @@ const OfficesController = {
           o.OfficeName,
           o.OfficeTypeID,
           o.EventID,
+          o.department_id,
+          o.program_type_id,
+          COALESCE(d.name, NULL) AS department_name,
+          COALESCE(pt.name, NULL) AS program_type_name,
           t.TypeName,
           os.OverallStatus,
           os.CompliancePercent,
@@ -266,6 +283,8 @@ const OfficesController = {
           e.EventCode
         FROM offices o
         LEFT JOIN officetypes t ON o.OfficeTypeID = t.OfficeTypeID
+        LEFT JOIN departments d ON o.department_id = d.id
+        LEFT JOIN program_types pt ON o.program_type_id = pt.id
         LEFT JOIN (
           SELECT
             cso.OfficeID,
@@ -340,6 +359,10 @@ const OfficesController = {
         OfficeName: r.OfficeName,
         OfficeTypeID: r.OfficeTypeID,
         TypeName: r.TypeName || "Unknown Type",
+        DepartmentID: r.department_id || null,
+        DepartmentName: r.department_name || null,
+        ProgramTypeID: r.program_type_id || null,
+        ProgramTypeName: r.program_type_name || null,
         HeadID: primaryHead?.HeadID || null,
         HeadIDs: officeHeads.map((head) => head.HeadID),
         Heads: officeHeads,
@@ -361,7 +384,7 @@ const OfficesController = {
   // CREATE NEW OFFICE (SUPPORTS MULTIPLE HEADS)
   // ================================
   create: async (req, res) => {
-    const { OfficeName, OfficeTypeID, HeadID, HeadIDs, EventID } = req.body;
+    const { OfficeName, OfficeTypeID, HeadID, HeadIDs, EventID, DepartmentID, ProgramTypeID } = req.body;
 
     // Support both single HeadID (legacy) and HeadIDs array (new)
     const headIdArray = normalizeHeadIds(HeadIDs, HeadID);
@@ -378,12 +401,14 @@ const OfficesController = {
     try {
       // Create the office; head assignments are stored in office_head_assignments
       const [result] = await db.query(
-        `INSERT INTO offices (OfficeName, OfficeTypeID, EventID)
-         VALUES (?, ?, ?)`,
+        `INSERT INTO offices (OfficeName, OfficeTypeID, EventID, department_id, program_type_id)
+         VALUES (?, ?, ?, ?, ?)`,
         [
           OfficeName,
           OfficeTypeID || null,
-          EventID || null
+          EventID || null,
+          DepartmentID != null ? DepartmentID : null,
+          ProgramTypeID != null ? ProgramTypeID : null
         ]
       );
 
@@ -412,7 +437,9 @@ const OfficesController = {
           OfficeName,
           OfficeTypeID,
           HeadIDs: headIdArray,
-          EventID
+          EventID,
+          DepartmentID: DepartmentID != null ? DepartmentID : null,
+          ProgramTypeID: ProgramTypeID != null ? ProgramTypeID : null
         }
       });
       // Audit log: record who created the office (if authenticated)
@@ -444,7 +471,18 @@ const OfficesController = {
                 type: 'info',
                 relatedTable: 'office_personnel',
                 relatedId: Number(newOfficeId),
+                meta: { officeId: Number(newOfficeId) },
               });
+            }
+            // Auto-assign these heads to any existing requirements for the office (if any)
+            try {
+              const [reqRows] = await db.query('SELECT RequirementID FROM compliancestatusoffices WHERE OfficeID = ?', [newOfficeId]);
+              const reqIds = reqRows.map(r => Number(r.RequirementID)).filter(id => Number.isInteger(id) && id > 0);
+              if (reqIds.length > 0) {
+                await autoAssignHeadsToRequirementsForOffice(newOfficeId, reqIds, actorId);
+              }
+            } catch (e) {
+              console.error('Auto-assign heads on office create failed:', e);
             }
           }
         }
@@ -468,7 +506,7 @@ const OfficesController = {
   // ================================
   update: async (req, res) => {
     const id = req.params.id;
-    const { OfficeName, OfficeTypeID, HeadID, HeadIDs, EventID } = req.body;
+    const { OfficeName, OfficeTypeID, HeadID, HeadIDs, EventID, DepartmentID, ProgramTypeID } = req.body;
 
     // Support both single HeadID (legacy) and HeadIDs array (new)
     const headIdArray = normalizeHeadIds(HeadIDs, HeadID);
@@ -489,9 +527,9 @@ const OfficesController = {
       // Update office info only; heads are managed via office_head_assignments
       const [result] = await db.query(
         `UPDATE offices 
-         SET OfficeName = ?, OfficeTypeID = ?, EventID = ?
+         SET OfficeName = ?, OfficeTypeID = ?, EventID = ?, department_id = ?, program_type_id = ?
          WHERE OfficeID = ?`,
-        [OfficeName, OfficeTypeID, EventID, id]
+        [OfficeName, OfficeTypeID, EventID, DepartmentID != null ? DepartmentID : null, ProgramTypeID != null ? ProgramTypeID : null, id]
       );
 
       // Remove all existing assignments for this office
@@ -531,6 +569,30 @@ const OfficesController = {
             getNamesByHeadIds(removedHeadIds),
           ]);
 
+          // If some heads were removed from this office, cleanup any requirement assignments
+          // that referred to those users within this office.
+          if (removedHeadIds.length > 0) {
+            try {
+              const placeholders = removedHeadIds.map(() => '?').join(',');
+              const [headRows] = await db.query(
+                `SELECT HeadID, UserID FROM headofoffice WHERE HeadID IN (${placeholders})`,
+                removedHeadIds
+              );
+
+              const userIds = headRows.map(r => r.UserID).filter(id => Number.isInteger(Number(id)));
+              if (userIds.length > 0) {
+                const userPlaceholders = userIds.map(() => '?').join(',');
+                // Delete any requirement_user_assignments scoped to this office for those users
+                await db.query(
+                  `DELETE FROM requirement_user_assignments WHERE UserID IN (${userPlaceholders}) AND OfficeID = ?`,
+                  [...userIds, id]
+                );
+              }
+            } catch (cleanupErr) {
+              console.error('Failed to cleanup requirement_user_assignments for removed office heads:', cleanupErr);
+            }
+          }
+
           const changes = {};
           if ((previousOffice.OfficeName || '') !== (OfficeName || '')) {
             changes.OfficeName = { from: previousOffice.OfficeName || '', to: OfficeName || '' };
@@ -565,7 +627,18 @@ const OfficesController = {
                 type: 'info',
                 relatedTable: 'office_personnel',
                 relatedId: Number(id),
+                meta: { officeId: Number(id) },
               });
+            }
+            // Auto-assign newly added heads to existing requirements for this office
+            try {
+              const [reqRows] = await db.query('SELECT RequirementID FROM compliancestatusoffices WHERE OfficeID = ?', [id]);
+              const reqIds = reqRows.map(r => Number(r.RequirementID)).filter(id2 => Number.isInteger(id2) && id2 > 0);
+              if (reqIds.length > 0) {
+                await autoAssignHeadsToRequirementsForOffice(id, reqIds, actorId);
+              }
+            } catch (e) {
+              console.error('Auto-assign heads on office update failed:', e);
             }
           }
         }
@@ -592,7 +665,109 @@ const OfficesController = {
         return res.status(404).json({ message: "Office not found" });
       }
 
-      // First, delete all requirements associated with this office
+      // Before deleting requirements, cleanup uploaded files related to this office
+      try {
+        // 1) Find requirement IDs linked to this office
+        const [reqRows] = await db.query('SELECT RequirementID FROM compliancestatusoffices WHERE OfficeID = ?', [id]);
+        console.log('Office delete: found requirement IDs for office', id, reqRows.map(r => r.RequirementID));
+        const requirementIds = Array.isArray(reqRows) ? reqRows.map(r => Number(r.RequirementID)).filter(n => Number.isInteger(n)) : [];
+
+        if (requirementIds.length > 0) {
+          const placeholders = requirementIds.map(() => '?').join(',');
+
+          // Delete any proof documents attached to these requirements (disk + DB)
+          try {
+            const [proofFiles] = await db.query(
+              `SELECT id, file_path FROM office_proof_documents WHERE requirement_id IN (${placeholders})`,
+              requirementIds
+            );
+            console.log('Office delete: found proofFiles for requirements:', (proofFiles || []).length);
+            if (proofFiles && proofFiles.length > 0) {
+              for (const f of proofFiles) {
+                try {
+                  const absPath = path.join(__dirname, '..', (f.file_path || '').replace(/^\//, ''));
+                  const exists = fs.existsSync(absPath);
+                  console.log('Attempting delete proof file:', absPath, 'exists=', exists);
+                  if (exists) {
+                    fs.unlinkSync(absPath);
+                    console.log('Deleted proof file:', absPath);
+                  } else {
+                    console.warn('Proof file not found on disk:', absPath);
+                  }
+                } catch (fsErr) {
+                  console.warn('Failed to delete office proof file during office deletion:', fsErr);
+                }
+              }
+              const [delRes] = await db.query(`DELETE FROM office_proof_documents WHERE requirement_id IN (${placeholders})`, requirementIds);
+              console.log('Deleted proof DB rows count:', delRes.affectedRows || 0);
+            }
+          } catch (e) {
+            console.error('Error cleaning up proof documents for requirements during office delete:', e);
+          }
+
+          // Delete any user-uploaded requirement files (disk + DB)
+          try {
+            const [userFiles] = await db.query(
+              `SELECT id, file_path FROM requirement_user_uploads WHERE requirement_id IN (${placeholders})`,
+              requirementIds
+            );
+            console.log('Office delete: found requirement_user_uploads count:', (userFiles || []).length);
+            if (userFiles && userFiles.length > 0) {
+              for (const uf of userFiles) {
+                try {
+                  const absPath = path.join(__dirname, '..', (uf.file_path || '').replace(/^\//, ''));
+                  const exists = fs.existsSync(absPath);
+                  console.log('Attempting delete user upload:', absPath, 'exists=', exists);
+                  if (exists) {
+                    fs.unlinkSync(absPath);
+                    console.log('Deleted user upload:', absPath);
+                  } else {
+                    console.warn('User upload file not found on disk:', absPath);
+                  }
+                } catch (fsErr) {
+                  console.warn('Failed to delete user requirement upload during office deletion:', fsErr);
+                }
+              }
+              const [delUserRes] = await db.query(`DELETE FROM requirement_user_uploads WHERE requirement_id IN (${placeholders})`, requirementIds);
+              console.log('Deleted requirement_user_uploads DB rows count:', delUserRes.affectedRows || 0);
+            }
+          } catch (e) {
+            console.error('Error cleaning up requirement_user_uploads during office delete:', e);
+          }
+
+          // Remove any requirement_user_assignments for these requirements scoped to this office
+          try {
+            await db.query(
+              `DELETE FROM requirement_user_assignments WHERE RequirementID IN (${placeholders}) AND OfficeID = ?`,
+              [...requirementIds, id]
+            );
+          } catch (e) {
+            console.error('Error cleaning up requirement_user_assignments during office delete:', e);
+          }
+        }
+
+        // 2) Remove any office-level proof documents (requirement_id IS NULL) for this office (disk + DB)
+        try {
+          const [officeProofs] = await db.query('SELECT id, file_path FROM office_proof_documents WHERE office_id = ? AND requirement_id IS NULL', [id]);
+          if (officeProofs && officeProofs.length > 0) {
+            for (const f of officeProofs) {
+              try {
+                const absPath = path.join(__dirname, '..', (f.file_path || '').replace(/^\//, ''));
+                if (fs.existsSync(absPath)) fs.unlinkSync(absPath);
+              } catch (fsErr) {
+                console.warn('Failed to delete office-level proof file during office deletion:', fsErr);
+              }
+            }
+            await db.query('DELETE FROM office_proof_documents WHERE office_id = ? AND requirement_id IS NULL', [id]);
+          }
+        } catch (e) {
+          console.error('Error cleaning up office-level proof documents during office delete:', e);
+        }
+      } catch (e) {
+        console.error('Error during uploaded files cleanup before deleting office:', e);
+      }
+
+      // Then delete all requirements associated with this office
       await db.query("DELETE FROM compliancestatusoffices WHERE OfficeID = ?", [id]);
 
       // Remove office-head assignments for this office
@@ -705,22 +880,28 @@ const OfficesController = {
           r.RequirementCode,
           r.Description,
           c.CriteriaID,
+          c.ParentCriteriaID,
           c.CriteriaCode,
           c.CriteriaName,
+          pc.CriteriaCode AS ParentCriteriaCode,
+          pc.CriteriaName AS ParentCriteriaName,
           a.AreaID,
           a.AreaCode,
           a.AreaName,
           cso.Status AS ComplianceStatusID,
-          cst.StatusName AS ComplianceStatusName
+          cst.StatusName AS ComplianceStatusName,
+          cso.comments AS Comments
         FROM compliancestatusoffices cso
         INNER JOIN requirements r ON cso.RequirementID = r.RequirementID
         LEFT JOIN criteria c ON r.CriteriaID = c.CriteriaID
+        LEFT JOIN criteria pc ON c.ParentCriteriaID = pc.CriteriaID
         LEFT JOIN areas a ON c.AreaID = a.AreaID
         LEFT JOIN compliancestatustypes cst ON cso.Status = cst.StatusID
         WHERE cso.OfficeID = ?
         ORDER BY
           COALESCE(a.AreaCode, 'ZZZ') ASC,
           COALESCE(a.AreaName, 'ZZZ') ASC,
+          COALESCE(COALESCE(pc.CriteriaCode, c.CriteriaCode), 'ZZZ') ASC,
           COALESCE(c.CriteriaCode, 'ZZZ') ASC,
           COALESCE(r.RequirementCode, 'ZZZ') ASC,
           r.RequirementID ASC`,
@@ -732,9 +913,12 @@ const OfficesController = {
       workbook.created = new Date();
 
       const sheet = workbook.addWorksheet('Office Export');
+      // Increase column widths to avoid truncation of long criteria/requirement titles.
+      // Do not set any row heights here so the client can auto-size rows as needed.
       sheet.columns = [
-        { key: 'status', width: 24 },
-        { key: 'requirement', width: 72 },
+        { key: 'status', width: 20 },
+        { key: 'requirement', width: 140 },
+        { key: 'comments', width: 64 },
       ];
 
       const thinBorder = {
@@ -744,26 +928,29 @@ const OfficesController = {
         right: { style: 'thin' },
       };
 
+      // Enable wrapText on headers so long titles can flow onto multiple lines
+      // while keeping row heights uncontrolled (no explicit height set).
       const areaHeaderStyle = {
         font: { bold: true, size: 13 },
-        alignment: { horizontal: 'center', vertical: 'middle' },
+        alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
       };
 
       const criteriaHeaderStyle = {
         font: { bold: true, size: 12 },
-        alignment: { horizontal: 'left', vertical: 'middle' },
+        alignment: { horizontal: 'left', vertical: 'middle', wrapText: true },
       };
 
       let rowIndex = 1;
 
       // Header: OFFICE NAME (merged and bordered)
-      sheet.mergeCells(`A${rowIndex}:B${rowIndex}`);
+      sheet.mergeCells(`A${rowIndex}:C${rowIndex}`);
       const officeCell = sheet.getCell(`A${rowIndex}`);
       officeCell.value = String(officeName).toUpperCase();
       officeCell.font = { bold: true, size: 14 };
       officeCell.alignment = { horizontal: 'center', vertical: 'middle' };
       officeCell.border = thinBorder;
       sheet.getCell(`B${rowIndex}`).border = thinBorder;
+      sheet.getCell(`C${rowIndex}`).border = thinBorder;
       rowIndex += 1;
 
       if (!requirementsRows.length) {
@@ -776,6 +963,7 @@ const OfficesController = {
       } else {
         const areasMap = new Map();
 
+        // Build criteria nodes with parent relationships per area
         requirementsRows.forEach((row) => {
           const areaCode = row.AreaCode || 'N/A';
           const areaName = row.AreaName || 'No Area';
@@ -785,75 +973,130 @@ const OfficesController = {
             areasMap.set(areaKey, {
               areaCode,
               areaName,
-              criteria: new Map(),
+              criteriaMap: new Map(),
             });
           }
 
           const areaEntry = areasMap.get(areaKey);
-          const criteriaCode = row.CriteriaCode || 'N/A';
-          const criteriaName = row.CriteriaName || 'No Criteria';
-          const criteriaKey = `${criteriaCode}__${criteriaName}`;
 
-          if (!areaEntry.criteria.has(criteriaKey)) {
-            areaEntry.criteria.set(criteriaKey, {
-              criteriaCode,
-              criteriaName,
+          const critId = row.CriteriaID != null ? Number(row.CriteriaID) : `req_${row.RequirementID}`;
+          const parentId = row.ParentCriteriaID != null ? Number(row.ParentCriteriaID) : null;
+
+          if (!areaEntry.criteriaMap.has(critId)) {
+            areaEntry.criteriaMap.set(critId, {
+              id: critId,
+              code: row.CriteriaCode || '',
+              name: row.CriteriaName || '',
+              parentId: parentId,
+              children: [],
               requirements: [],
             });
           }
 
-          areaEntry.criteria.get(criteriaKey).requirements.push({
+          // If parent exists in this row but parent node not yet created, synthesize parent node placeholder
+          if (parentId && !areaEntry.criteriaMap.has(parentId)) {
+            areaEntry.criteriaMap.set(parentId, {
+              id: parentId,
+              code: row.ParentCriteriaCode || '',
+              name: row.ParentCriteriaName || '',
+              parentId: null,
+              children: [],
+              requirements: [],
+            });
+          }
+
+          areaEntry.criteriaMap.get(critId).requirements.push({
             status: normalizeComplianceStatus(row.ComplianceStatusID, row.ComplianceStatusName),
             requirementCode: row.RequirementCode || 'N/A',
             description: row.Description || '',
+            comments: row.Comments || ''
           });
         });
 
+        // Link children to their parents per area
         for (const area of areasMap.values()) {
-          // Area title row merged across both columns
-          sheet.mergeCells(`A${rowIndex}:B${rowIndex}`);
+          for (const node of area.criteriaMap.values()) {
+            if (node.parentId && area.criteriaMap.has(node.parentId)) {
+              area.criteriaMap.get(node.parentId).children.push(node);
+            }
+          }
+        }
+
+        // Write areas and nested criteria -> child criteria -> requirements
+        for (const area of areasMap.values()) {
+          // Area title row merged across three columns
+          sheet.mergeCells(`A${rowIndex}:C${rowIndex}`);
           const areaTitleCell = sheet.getCell(`A${rowIndex}`);
           areaTitleCell.value = `${area.areaCode} - ${area.areaName}`;
           areaTitleCell.font = areaHeaderStyle.font;
           areaTitleCell.alignment = areaHeaderStyle.alignment;
           areaTitleCell.border = thinBorder;
           sheet.getCell(`B${rowIndex}`).border = thinBorder;
+          sheet.getCell(`C${rowIndex}`).border = thinBorder;
           rowIndex += 1;
 
-          for (const criteria of area.criteria.values()) {
-            // Criteria row aligned with requirement text column
-            const criteriaCode = String(criteria.criteriaCode || '').trim().replace(/\.+$/, '').toUpperCase();
-            const criteriaLabel = criteriaCode
-              ? `${criteriaCode}. ${criteria.criteriaName}`
-              : String(criteria.criteriaName || 'No Criteria');
+          // Determine root criteria (those without parent or whose parent is not in the same map)
+          const allNodes = Array.from(area.criteriaMap.values());
+          const roots = allNodes.filter(n => !n.parentId || !area.criteriaMap.has(n.parentId));
 
-            const criteriaLeftCell = sheet.getCell(`A${rowIndex}`);
-            const criteriaTitleCell = sheet.getCell(`B${rowIndex}`);
+          // Sort roots by code then name
+          roots.sort((a, b) => (String(a.code || a.name)).localeCompare(String(b.code || b.name)));
 
-            criteriaLeftCell.value = '';
-            criteriaLeftCell.border = thinBorder;
-
-            criteriaTitleCell.value = criteriaLabel;
-            criteriaTitleCell.font = criteriaHeaderStyle.font;
-            criteriaTitleCell.alignment = criteriaHeaderStyle.alignment;
-            criteriaTitleCell.border = thinBorder;
+          for (const root of roots) {
+            // Criteria header (root)
+            sheet.mergeCells(`A${rowIndex}:C${rowIndex}`);
+            const criteriaLabel = root.code ? `${String(root.code).trim().replace(/\.+$/, '').toUpperCase()}. ${root.name}` : root.name || 'No Criteria';
+            const criteriaCell = sheet.getCell(`A${rowIndex}`);
+            criteriaCell.value = criteriaLabel;
+            criteriaCell.font = criteriaHeaderStyle.font;
+            criteriaCell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+            criteriaCell.border = thinBorder;
+            sheet.getCell(`B${rowIndex}`).border = thinBorder;
+            sheet.getCell(`C${rowIndex}`).border = thinBorder;
             rowIndex += 1;
 
-            // Requirement rows (2-column table)
-            criteria.requirements.forEach((req) => {
-              const statusCell = sheet.getCell(`A${rowIndex}`);
-              const requirementCell = sheet.getCell(`B${rowIndex}`);
-
-              statusCell.value = req.status;
-              requirementCell.value = `${req.requirementCode} - ${req.description}`;
-
-              statusCell.alignment = { horizontal: 'left', vertical: 'middle' };
-              requirementCell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
-
-              statusCell.border = thinBorder;
-              requirementCell.border = thinBorder;
+            // Write requirements directly under root (if any)
+            for (const req of root.requirements) {
+              sheet.getCell(`A${rowIndex}`).value = req.status;
+              sheet.getCell(`B${rowIndex}`).value = `${req.requirementCode} - ${req.description}`;
+              sheet.getCell(`C${rowIndex}`).value = req.comments || '';
+              sheet.getCell(`A${rowIndex}`).alignment = { horizontal: 'left', vertical: 'middle' };
+              sheet.getCell(`B${rowIndex}`).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+              sheet.getCell(`C${rowIndex}`).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+              sheet.getCell(`A${rowIndex}`).border = thinBorder;
+              sheet.getCell(`B${rowIndex}`).border = thinBorder;
+              sheet.getCell(`C${rowIndex}`).border = thinBorder;
               rowIndex += 1;
-            });
+            }
+
+            // For each child criteria under this root
+            const children = (root.children || []).slice().sort((a,b) => (String(a.code || a.name)).localeCompare(String(b.code || b.name)));
+            for (const child of children) {
+              // Child header merged
+              sheet.mergeCells(`A${rowIndex}:C${rowIndex}`);
+              const childLabel = child.code ? `${String(child.code).trim().replace(/\.+$/, '').toUpperCase()}. ${child.name}` : child.name || 'No Criteria';
+              const childCell = sheet.getCell(`A${rowIndex}`);
+              childCell.value = childLabel;
+              childCell.font = { bold: true, size: 11 };
+              childCell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+              childCell.border = thinBorder;
+              sheet.getCell(`B${rowIndex}`).border = thinBorder;
+              sheet.getCell(`C${rowIndex}`).border = thinBorder;
+              rowIndex += 1;
+
+              for (const req of child.requirements) {
+                sheet.getCell(`A${rowIndex}`).value = req.status;
+                sheet.getCell(`B${rowIndex}`).value = `${req.requirementCode} - ${req.description}`;
+                sheet.getCell(`C${rowIndex}`).value = req.comments || '';
+                sheet.getCell(`A${rowIndex}`).alignment = { horizontal: 'left', vertical: 'middle' };
+                sheet.getCell(`B${rowIndex}`).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+                sheet.getCell(`C${rowIndex}`).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+                sheet.getCell(`A${rowIndex}`).border = thinBorder;
+                sheet.getCell(`B${rowIndex}`).border = thinBorder;
+                sheet.getCell(`C${rowIndex}`).border = thinBorder;
+                rowIndex += 1;
+              }
+            }
           }
         }
       }
@@ -929,6 +1172,14 @@ const OfficesController = {
           `INSERT INTO compliancestatusoffices (OfficeID, RequirementID, Status) VALUES ?`,
           [values]
         );
+
+        // Auto-assign current office heads to the newly-added requirements
+        try {
+          const actorId = req.user && req.user.userId;
+          await autoAssignHeadsToRequirementsForOffice(officeId, newRequirementIds, actorId);
+        } catch (e) {
+          console.error('Auto-assign heads on addOfficeRequirements failed:', e);
+        }
       }
 
       // Update the overall office status
@@ -980,6 +1231,38 @@ const OfficesController = {
 
       // Update the overall office status after removal
       await updateOverallOfficeStatus(officeId);
+
+      // Remove any user assignments for this requirement in this office
+      try {
+        await db.execute('DELETE FROM requirement_user_assignments WHERE RequirementID = ? AND OfficeID = ?', [requirementId, officeId]);
+      } catch (cleanupErr) {
+        console.error('Failed to cleanup requirement_user_assignments after removing office requirement:', cleanupErr);
+      }
+
+      // Also remove any uploaded proof documents (disk + DB) related to this requirement for the office
+      try {
+        const [files] = await db.query(
+          'SELECT id, file_path FROM office_proof_documents WHERE requirement_id = ? AND office_id = ?',
+          [requirementId, officeId]
+        );
+
+        if (files && files.length > 0) {
+          for (const f of files) {
+            try {
+              const absPath = path.join(__dirname, '..', (f.file_path || '').replace(/^\//, ''));
+              if (fs.existsSync(absPath)) {
+                fs.unlinkSync(absPath);
+              }
+            } catch (fsErr) {
+              console.warn('Failed to delete requirement proof file from disk during removeOfficeRequirement:', fsErr);
+            }
+          }
+
+          await db.query('DELETE FROM office_proof_documents WHERE requirement_id = ? AND office_id = ?', [requirementId, officeId]);
+        }
+      } catch (docErr) {
+        console.error('Failed to cleanup office_proof_documents after removing office requirement:', docErr);
+      }
 
       res.json({ 
         success: true, 

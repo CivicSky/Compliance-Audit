@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import Header from "../Header/header";
 import Sortoffice from "./sortoffice";
 import EventsAddDelete from "../ALLC/eventsadddelete";
@@ -12,10 +13,33 @@ import EditOfficeModal from "../../components/EditOffice/EditOfficeModal";
 import ViewReqPasscuModal from "../../components/ViewReqPasscuModal/ViewReqPasscuModal";
 import ViewReqPASSCUModal from "../../components/ViewReqPASSCUModal/ViewReqPASSCUModal";
 import AddReqOffModal from "../../components/AddReqOffModal/AddReqOffModal";
+import { useModal } from "../UI/ModalProvider";
+
+const normalizeOfficeRecord = (office) => {
+    if (!office) return null;
+    return {
+        ...office,
+        id: office.id ?? office.OfficeID,
+        OfficeID: office.OfficeID ?? office.id,
+        office_name: office.office_name ?? office.OfficeName,
+        OfficeName: office.OfficeName ?? office.office_name,
+        event_id: office.event_id ?? office.EventID,
+        EventID: office.EventID ?? office.event_id,
+    };
+};
 
 export default function Organization() {
+    const [searchParams, setSearchParams] = useSearchParams();
+    const [modalDeepLink, setModalDeepLink] = useState(null);
+    const notifDeepLinkHandled = useRef(false);
+
     const [officeTypes, setOfficeTypes] = useState([]);
     const [heads, setHeads] = useState([]);
+    const [departments, setDepartments] = useState([]);
+    const [programTypes, setProgramTypes] = useState([]);
+    const [selectedDepartmentFilter, setSelectedDepartmentFilter] = useState('');
+    const [selectedProgramTypeFilter, setSelectedProgramTypeFilter] = useState('');
+    const [selectedOfficeTypeFilter, setSelectedOfficeTypeFilter] = useState('');
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -39,6 +63,41 @@ export default function Organization() {
     const actionsButtonRef = useRef(null);
     const actionsMenuRef = useRef(null);
     const [isAddEventOpen, setIsAddEventOpen] = useState(false);
+
+    const headerRef = React.useRef(null);
+    const controlsRef = React.useRef(null);
+    const [contentHeight, setContentHeight] = useState(null);
+
+    // compute content height = viewport height - header height to keep this component fixed
+    const updateContentHeight = useCallback(() => {
+        const headerH = headerRef.current ? headerRef.current.offsetHeight : 0;
+        const controlsH = controlsRef.current ? controlsRef.current.offsetHeight : 0;
+        // leave a small gap for padding/margins
+        const gap = 16;
+        const h = Math.max(200, window.innerHeight - headerH - controlsH - gap);
+        setContentHeight(h);
+    }, []);
+
+    useEffect(() => {
+        // Measure after paint to ensure refs are populated
+        updateContentHeight();
+        const rafId = requestAnimationFrame(() => updateContentHeight());
+
+        window.addEventListener('resize', updateContentHeight);
+        return () => {
+            cancelAnimationFrame(rafId);
+            window.removeEventListener('resize', updateContentHeight);
+        };
+    }, [updateContentHeight]);
+
+    // Prevent page/body scrolling while this component is mounted
+    useEffect(() => {
+        const previous = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = previous;
+        };
+    }, []);
 
     // Fetch office types and events safely
     useEffect(() => {
@@ -96,6 +155,30 @@ export default function Organization() {
             fetchHeads();
         }, []);
 
+    // Fetch departments and program types for dropdowns
+    useEffect(() => {
+        const fetchLookups = async () => {
+            try {
+                const [depsRes, ptypesRes] = await Promise.all([
+                    fetch('/api/departments').then(r => r.ok ? r.json() : { data: [] }).catch(() => ({ data: [] })),
+                    fetch('/api/program_types').then(r => r.ok ? r.json() : { data: [] }).catch(() => ({ data: [] })),
+                ]);
+
+                const deps = Array.isArray(depsRes) ? depsRes : (depsRes.data || []);
+                const ptypes = Array.isArray(ptypesRes) ? ptypesRes : (ptypesRes.data || []);
+
+                setDepartments(deps);
+                setProgramTypes(ptypes);
+            } catch (err) {
+                console.error('Failed to load departments/program types:', err);
+                setDepartments([]);
+                setProgramTypes([]);
+            }
+        };
+
+        fetchLookups();
+    }, []);
+
     // Reset states on mount
     useEffect(() => {
         setDeleteMode(false);
@@ -111,10 +194,58 @@ export default function Organization() {
 
     const handleOfficeClick = (office) => {
         if (!deleteMode) {
-            setSelectedOffice(office);
+            setSelectedOffice(normalizeOfficeRecord(office));
             setIsViewReqModalOpen(true);
         }
     };
+
+    const openOfficeFromNotification = useCallback(async (officeId, deepLink = null) => {
+        const targetId = String(officeId || '');
+        if (!targetId) return false;
+
+        if (officesPRef.current?.openOfficeById) {
+            officesPRef.current.openOfficeById(targetId, { openModal: false });
+        }
+
+        try {
+            const raw = await officesAPI.getById(targetId);
+            const office = normalizeOfficeRecord(raw);
+            if (!office?.id) return false;
+
+            setSelectedOffice(office);
+            setModalDeepLink(deepLink);
+            setIsViewReqModalOpen(true);
+            return true;
+        } catch (err) {
+            console.error('Failed to open office from notification:', err);
+            return false;
+        }
+    }, []);
+
+    useEffect(() => {
+        if (notifDeepLinkHandled.current) return;
+        if (searchParams.get('fromNotif') !== '1') return;
+
+        const officeId = searchParams.get('officeId');
+        if (!officeId) return;
+
+        const deepLink = {
+            requirementId: searchParams.get('requirementId') || null,
+            openSubmission: searchParams.get('openSubmission') === '1',
+            viewUserId: searchParams.get('viewUserId') || null,
+        };
+
+        const run = async () => {
+            const opened = await openOfficeFromNotification(officeId, deepLink);
+            if (opened) {
+                notifDeepLinkHandled.current = true;
+                setSearchParams({}, { replace: true });
+            }
+        };
+
+        const timer = setTimeout(run, 350);
+        return () => clearTimeout(timer);
+    }, [searchParams, openOfficeFromNotification, setSearchParams]);
 
     const handleCloseViewReqModal = () => {
         setIsViewReqModalOpen(false);
@@ -145,27 +276,70 @@ export default function Organization() {
         }
     };
 
+    // Delete a single office from actions menu
+    const handleDeleteOffice = async (office) => {
+        if (!office) return;
+        const ok = await showConfirm(`Delete office "${office.office_name || office.OfficeName || office.id}"? This cannot be undone.`);
+        if (!ok) return;
+        try {
+            await officesAPI.deleteOffice(office.id || office.OfficeID);
+            if (officesPRef.current?.refresh) await officesPRef.current.refresh();
+            await showAlert('Office deleted');
+        } catch (err) {
+            console.error('Failed to delete office', err);
+            await showAlert('Delete failed');
+        }
+    };
+
     const handleEditSave = async (updatedOffice) => {
         try {
             const { officesAPI } = await import('../../utils/api');
             const response = await officesAPI.updateOffice(updatedOffice.id, updatedOffice);
 
             if (response?.success) {
-                officesPRef.current.refresh();
-                alert('Office updated successfully!');
+                // Refresh the offices list and fetch the updated office to update header without re-opening modal
+                if (officesPRef.current?.refresh) await officesPRef.current.refresh();
+
+                // Fetch the updated office details and update selectedOffice so the view modal shows fresh data
+                try {
+                    const updated = await officesAPI.getById(updatedOffice.id);
+                    if (updated && updated.OfficeID) {
+                        const mapped = {
+                            id: updated.OfficeID,
+                            office_name: updated.OfficeName,
+                            office_type_id: updated.OfficeTypeID,
+                            office_type_name: updated.TypeName || updated.office_type_name || '',
+                            head_ids: updated.HeadIDs || [],
+                            heads: updated.Heads || [],
+                            head_name: updated.HeadName || (updated.Heads ? (updated.Heads.map(h=> h.full_name).join(', ')) : ''),
+                            event_id: updated.EventID || updated.event_id,
+                            event_name: updated.EventName || updated.EventName || '',
+                            compliance_percent: updated.CompliancePercent || 0,
+                            overall_status: updated.OverallStatus || updated.overall_status || 'Not Complied'
+                        };
+                        setSelectedOffice(mapped);
+                    }
+                } catch (fetchErr) {
+                    console.warn('Failed to fetch updated office after save:', fetchErr);
+                }
+
+                setIsEditModalOpen(false);
+                setIsViewReqModalOpen(true);
+                await showAlert('Office updated successfully!');
             } else {
-                alert(response?.message || 'Failed to update office');
+                await showAlert(response?.message || 'Failed to update office');
             }
         } catch (err) {
             console.error(err);
-            alert('Error updating office');
+            await showAlert('Error updating office');
         }
     };
 
     // Delete selected offices
     const handleDeleteSelected = async () => {
         if (selectedIds.length === 0) return;
-        if (!window.confirm(`Delete ${selectedIds.length} office(s)?`)) return;
+        const ok = await showConfirm(`Delete ${selectedIds.length} office(s)?`);
+        if (!ok) return;
 
         try {
             for (let id of selectedIds) {
@@ -181,10 +355,10 @@ export default function Organization() {
                 await officesPRef.current.refresh();
             }
 
-            alert('Deleted successfully!');
+            await showAlert('Deleted successfully!');
         } catch (err) {
             console.error(err);
-            alert('Delete failed');
+            await showAlert('Delete failed');
         }
     };
 
@@ -195,6 +369,8 @@ export default function Organization() {
 
     const isPaascu = selectedEventType && (selectedEventType === 'PAASCU' || selectedEventType === 'PASSCU');
 
+    const { showAlert, showConfirm } = useModal();
+
     // Ensure selection is cleared in OfficesP when deleteMode is turned off
     useEffect(() => {
         if (!deleteMode && officesPRef.current && officesPRef.current.clearSelection) {
@@ -202,24 +378,30 @@ export default function Organization() {
         }
     }, [deleteMode]);
 
-    return (
-        <div className="h-screen w-full flex flex-col overflow-hidden">
-            <Header />
 
-            <div className="flex-1 min-h-0 flex flex-col overflow-hidden px-4 pb-6 pt-6 bg-gray-100">
-            <div className="mb-4 flex flex-col gap-2 relative">
+    return (
+        <div className="w-full h-screen flex flex-col bg-app">
+            {/* Fixed header */}
+            <div ref={headerRef} style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50, background: 'transparent' }}>
+                <Header />
+            </div>
+
+            {/* Fixed controls and filters */}
+            <div
+                className="flex flex-col gap-0 px-4 pt-6 pb-0"
+                style={{ marginTop: headerRef.current ? headerRef.current.offsetHeight : 0 }}
+            >
                 <div className="flex items-start justify-between gap-2">
-                    <div>
+                        <div ref={controlsRef}>
                         <h1 className="text-2xl font-bold text-gray-800 mb-1">Office Management</h1>
                         <p className="text-xs text-gray-600 ">{deleteMode ? '\u00A0' : 'Manage your Offices Status.'}</p>
                     </div>
-
                     <div className="flex items-center gap-1 pt-0.5">
                         {deleteMode && (
                             <button
                                 onClick={async () => {
                                     if (selectedCount === 0) return;
-                                    const confirmed = window.confirm(`Delete ${selectedCount} selected item(s)? This cannot be undone.`);
+                                    const confirmed = await showConfirm(`Delete ${selectedCount} selected item(s)? This cannot be undone.`);
                                     if (!confirmed) return;
                                     try {
                                         await handleDeleteSelected();
@@ -233,7 +415,6 @@ export default function Organization() {
                                 Delete Selected ({selectedCount})
                             </button>
                         )}
-
                         <button
                             type="button"
                             onClick={() => {
@@ -265,8 +446,7 @@ export default function Organization() {
                         </button>
                     </div>
                 </div>
-
-                <div className="flex w-full items-center justify-between gap-1">
+                <div className="flex w-full items-center justify-between gap-1 mt-2">
                     <div className="relative w-full max-w-sm">
                         <svg
                             xmlns="http://www.w3.org/2000/svg"
@@ -287,12 +467,65 @@ export default function Organization() {
                             onChange={e => setSearchTerm(e.target.value)}
                         />
                     </div>
-
                     <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-2 mr-2">
+                            <div className="relative inline-flex">
+                                <select
+                                    value={selectedOfficeTypeFilter}
+                                    onChange={(e) => setSelectedOfficeTypeFilter(e.target.value)}
+                                    className="h-8 min-w-[146px] appearance-none rounded-md border border-slate-200 bg-white px-4 text-center text-[10px] font-medium leading-4 text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                    style={{ textAlignLast: 'center' }}
+                                >
+                                    <option value="">All Office Types</option>
+                                    <option value="academic">Academic</option>
+                                    <option value="non_academic">Non Academic</option>
+                                </select>
+                                <svg xmlns="http://www.w3.org/2000/svg" className="pointer-events-none absolute right-2.5 top-1/2 h-2.5 w-2.5 -translate-y-1/2 text-slate-500" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
+                                </svg>
+                            </div>
+
+                            <div className="relative inline-flex">
+                                <select
+                                    value={selectedDepartmentFilter}
+                                    onChange={(e) => setSelectedDepartmentFilter(e.target.value)}
+                                    className="h-8 min-w-[146px] appearance-none rounded-md border border-slate-200 bg-white px-4 text-center text-[10px] font-medium leading-4 text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                    style={{ textAlignLast: 'center' }}
+                                >
+                                    <option value="">All Departments</option>
+                                    {departments.map((d) => (
+                                        <option key={d.id ?? d.ID ?? d.DepartmentID} value={d.id ?? d.ID ?? d.DepartmentID}>
+                                            {d.name ?? d.DepartmentName ?? d.Name}
+                                        </option>
+                                    ))}
+                                </select>
+                                <svg xmlns="http://www.w3.org/2000/svg" className="pointer-events-none absolute right-2.5 top-1/2 h-2.5 w-2.5 -translate-y-1/2 text-slate-500" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
+                                </svg>
+                            </div>
+
+                            <div className="relative inline-flex">
+                                <select
+                                    value={selectedProgramTypeFilter}
+                                    onChange={(e) => setSelectedProgramTypeFilter(e.target.value)}
+                                    className="h-8 min-w-[146px] appearance-none rounded-md border border-slate-200 bg-white px-4 text-center text-[10px] font-medium leading-4 text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                    style={{ textAlignLast: 'center' }}
+                                >
+                                    <option value="">All Program Types</option>
+                                    {programTypes.map((p) => (
+                                        <option key={p.id ?? p.ID ?? p.ProgramTypeID} value={p.id ?? p.ID ?? p.ProgramTypeID}>
+                                            {p.name ?? p.ProgramTypeName ?? p.Name}
+                                        </option>
+                                    ))}
+                                </select>
+                                <svg xmlns="http://www.w3.org/2000/svg" className="pointer-events-none absolute right-2.5 top-1/2 h-2.5 w-2.5 -translate-y-1/2 text-slate-500" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
+                                </svg>
+                            </div>
+                        </div>
                         <div className="relative inline-block">
                             <Sortoffice value={sortStatus} onChange={setSortStatus} />
                         </div>
-
                         <div className="flex h-9 items-center justify-end gap-1">
                             <div className="flex h-7 items-center gap-0.5 rounded-md border border-slate-200 bg-slate-100 p-0.5">
                                 <button
@@ -327,35 +560,62 @@ export default function Organization() {
                 </div>
             </div>
 
-            {/* Add Office button removed per request */}
-
-
             {/* Event Tabs (replaces dropdown) */}
-            <div className="mb-4 -mt-1">
+            <div className="px-4 mb-4 -mt-1">
                 <EventTabs selectedEventId={selectedEventType} onChange={setSelectedEventType} />
             </div>
 
-            <div className="relative z-10">
-                {/* Debug logs to verify data passed to OfficesP */}
-                {console.log('Selected Event Type:', selectedEventType)}
-                {console.log('Office Types:', officeTypes)}
-                {console.log('Heads:', heads)}
-                {console.log('Sort Status:', sortStatus)}
+            {/* List header (rendered outside scrollable area so it doesn't move) */}
+            {viewMode === 'list' && (
+                <div className="px-4">
+                    <div className="hidden md:grid grid-cols-[minmax(120px,1fr)_160px_160px_100px_140px_80px] gap-6 px-6 py-3 mb-1 bg-white border border-slate-200 rounded-xl shadow-sm text-xs font-semibold text-gray-700 w-full">
+                        <div className="flex items-center">Office Name</div>
+                        <div className="flex items-center justify-center">Office Type</div>
+                        <div className="flex items-center justify-center">Compliance Status</div>
+                        <div className="flex items-center justify-center">Requirements</div>
+                        <div className="flex items-center justify-start">Personnel</div>
+                        <div className="flex items-center justify-end">Actions</div>
+                    </div>
+                </div>
+            )}
 
-                <OfficesP
-                    ref={officesPRef}
-                    searchTerm={searchTerm}
-                    deleteMode={deleteMode}
-                    onSelectionChange={handleSelectionChange}
-                    onOfficeClick={handleOfficeClick}
-                    eventType={selectedEventType}
-                    events={events}
-                    viewMode={viewMode}
-                    sortStatus={sortStatus}
-                    officeTypes={officeTypes}   
-                    heads={heads}
-                />
-            </div>
+            {/* Scrollable card/container area - fixed height to prevent whole-page scrolling */}
+            <div
+                className="flex-1 min-h-0 px-4 pb-6 overflow-y-auto"
+                style={{ marginTop: 0, height: contentHeight ? `${contentHeight}px` : undefined }}
+            >
+                <div className="relative z-10">
+                    <div className="w-full">
+                    {/* Debug logs to verify data passed to OfficesP */}
+                    {console.log('Selected Event Type:', selectedEventType)}
+                    {console.log('Office Types:', officeTypes)}
+                    {console.log('Heads:', heads)}
+                    {console.log('Sort Status:', sortStatus)}
+
+                        <OfficesP
+                        ref={officesPRef}
+                        searchTerm={searchTerm}
+                        deleteMode={deleteMode}
+                        onSelectionChange={handleSelectionChange}
+                        onOfficeClick={handleOfficeClick}
+                        eventType={selectedEventType}
+                        events={events}
+                        viewMode={viewMode}
+                        sortStatus={sortStatus}
+                        officeTypes={officeTypes}   
+                        heads={heads}
+                        departmentFilter={selectedDepartmentFilter}
+                        programTypeFilter={selectedProgramTypeFilter}
+                        officeTypeFilter={selectedOfficeTypeFilter}
+                        onEditOffice={handleEditOffice}
+                        onAddRequirements={handleAddRequirements}
+                        onDeleteOffice={handleDeleteOffice}
+                        hideHeader={viewMode === 'list'}
+                        />
+                                {/* spacer so last card can be scrolled into view */}
+                                <div className="h-6 md:h-12" aria-hidden="true" />
+                    </div>
+                </div>
             </div>
 
             {/* Add Modal */}
@@ -385,8 +645,13 @@ export default function Organization() {
             {isViewReqModalOpen && isPaascu && (
                 <ViewReqPASSCUModal
                     isOpen={isViewReqModalOpen}
-                    onClose={handleCloseViewReqModal}
+                    onClose={() => {
+                        setModalDeepLink(null);
+                        handleCloseViewReqModal();
+                    }}
                     office={selectedOffice}
+                    deepLink={modalDeepLink}
+                    onDeepLinkHandled={() => setModalDeepLink(null)}
                     onEditOffice={handleEditOffice}
                     onAddRequirements={handleAddRequirements}
                 />
@@ -395,8 +660,13 @@ export default function Organization() {
             {isViewReqModalOpen && !isPaascu && (
                 <ViewReqPasscuModal
                     isOpen={isViewReqModalOpen}
-                    onClose={handleCloseViewReqModal}
+                    onClose={() => {
+                        setModalDeepLink(null);
+                        handleCloseViewReqModal();
+                    }}
                     office={selectedOffice}
+                    deepLink={modalDeepLink}
+                    onDeepLinkHandled={() => setModalDeepLink(null)}
                     onEditOffice={handleEditOffice}
                     onAddRequirements={handleAddRequirements}
                 />
@@ -411,7 +681,6 @@ export default function Organization() {
                             visible={isEditModalOpen}
                             onClose={() => {
                                 setIsEditModalOpen(false);
-                                setIsViewReqModalOpen(true);
                             }}
                             office={selectedOffice}
                             onSave={handleEditSave}
@@ -429,7 +698,6 @@ export default function Organization() {
                     isOpen={isAddReqModalOpen}
                     onClose={() => {
                         setIsAddReqModalOpen(false);
-                        setIsViewReqModalOpen(true);
                     }}
                     office={selectedOffice}
                     onSave={handleRequirementsSaved}

@@ -28,7 +28,8 @@ const upload = multer({
 });
 
 // ...existing office routes...
-router.post('/:id/proof', upload.single('file'), async (req, res) => {
+// Require authentication so we can record uploader identity in filename
+router.post('/:id/proof', auth, upload.single('file'), async (req, res) => {
   try {
     // Debug logging for upload
     console.log('--- Proof Upload Debug ---');
@@ -52,36 +53,42 @@ router.post('/:id/proof', upload.single('file'), async (req, res) => {
       if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
       return res.status(400).json({ success: false, message: 'Office is not assigned to an event' });
     }
-    // Get event name from database
-    const [eventRows] = await db.query('SELECT EventName FROM events WHERE EventID = ?', [eventId]);
+    // Get event code/name from database
+    const [eventRows] = await db.query('SELECT EventName, EventCode FROM events WHERE EventID = ?', [eventId]);
     if (eventRows.length === 0) {
       if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
       return res.status(404).json({ success: false, message: 'Event not found' });
     }
     const eventName = eventRows[0].EventName;
+    const eventCode = eventRows[0].EventCode;
     console.log('Event name from DB:', eventName);
     // Sanitize event name and office name for folder and filename
-    const safeEventName = eventName.replace(/[^a-zA-Z0-9-_]/g, '_').substring(0, 40);
+    // Prefer event code for the folder name if present
+    const safeEventName = (eventCode || eventName).replace(/[^a-zA-Z0-9-_]/g, '_').substring(0, 40);
     const safeOfficeName = officeName.replace(/[^a-zA-Z0-9-]/g, '.').substring(0, 40);
     console.log('Sanitized event name:', safeEventName);
     console.log('Sanitized office name:', safeOfficeName);
     // Get file extension from original file
     const ext = path.extname(req.file.originalname);
     console.log('File extension:', ext);
-    // Try to get user info from token (if available)
+    // Resolve uploader name from authenticated user (preferred) or fallback to UnknownUser
     let safeUserName = 'UnknownUser';
     try {
-      const authHeader = req.headers['authorization'] || req.headers['Authorization'];
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-        const token = authHeader.split(' ')[1];
-        // If you use JWT and want to decode, require jwt and decode here
-        // const jwt = require('jsonwebtoken');
-        // const decoded = jwt.decode(token);
-        // safeUserName = decoded && decoded.username ? decoded.username.replace(/[^a-zA-Z0-9-]/g, '.') : 'UnknownUser';
+      const db = require('../db');
+      const uploaderId = Number(req.user?.userId || 0);
+      if (uploaderId && uploaderId > 0) {
+        const [uRows] = await db.query('SELECT FirstName, LastName, Email FROM users WHERE UserID = ?', [uploaderId]);
+        if (uRows && uRows.length > 0) {
+          const u = uRows[0];
+          const display = `${u.FirstName || ''}${u.LastName ? ' ' + u.LastName : ''}`.trim() || u.Email || `user${uploaderId}`;
+          safeUserName = String(display).replace(/[^a-zA-Z0-9-]/g, '.').substring(0, 40) || 'UnknownUser';
+        }
       }
-    } catch (e) {}
-    // Use a filename pattern similar to requirement upload: {office_name}.proof.{user}.{ext}
-    const finalFileName = `${safeOfficeName}.proof.${safeUserName}${ext}`;
+    } catch (e) {
+      console.warn('Failed to resolve uploader name for proof file:', e);
+    }
+    // Use a filename pattern prefixed with event code: {event}.{office}.proof.{user}.{ext}
+    const finalFileName = `${safeEventName}.${safeOfficeName}.proof.${safeUserName}${ext}`;
     console.log('Final file name:', finalFileName);
     const eventDir = path.join(__dirname, `../uploads/events/${safeEventName}`);
     console.log('Event directory:', eventDir);
@@ -127,7 +134,7 @@ router.post('/:id/proof', upload.single('file'), async (req, res) => {
         return res.status(500).json({ success: false, message: 'Failed to save file', error: copyError.message });
       }
     }
-    // Relative path for database and URL
+    // Relative path for database and URL (event-coded folder)
     const filePath = `/uploads/events/${safeEventName}/${finalFileName}`;
     console.log('Relative file path for DB/URL:', filePath);
     // Save to database
@@ -180,8 +187,8 @@ router.get('/:id/proof', async (req, res) => {
       const [officeRows] = await db.query('SELECT EventID FROM offices WHERE OfficeID = ?', [req.params.id]);
       if (officeRows.length > 0 && officeRows[0].EventID) {
         const [eventRows] = await db.query('SELECT EventName FROM events WHERE EventID = ?', [officeRows[0].EventID]);
-        if (eventRows.length > 0) {
-          const safeEventName = eventRows[0].EventName.replace(/[^a-zA-Z0-9-_]/g, '_').substring(0, 40);
+          if (eventRows.length > 0) {
+            const safeEventName = (eventRows[0].EventCode || eventRows[0].EventName).replace(/[^a-zA-Z0-9-_]/g, '_').substring(0, 40);
           const safeOfficeName = doc.file_name.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9-]/g, '.');
           const ext = path.extname(doc.file_name);
           fileUrl = `/uploads/events/${safeEventName}/offices/${safeOfficeName}/proof/${doc.file_name}`;
