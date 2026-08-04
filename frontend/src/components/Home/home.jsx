@@ -458,9 +458,9 @@ export default function Home() {
 
         return {
             background: `conic-gradient(
-                #16a34a 0deg ${compiledDeg}deg,
-                #f59e0b ${compiledDeg}deg ${compiledDeg + partialDeg}deg,
-                #dc2626 ${compiledDeg + partialDeg}deg ${compiledDeg + partialDeg + notCompiledDeg}deg
+                #dbeafe 0deg ${compiledDeg}deg,
+                #93c5fd ${compiledDeg}deg ${compiledDeg + partialDeg}deg,
+                #2563eb ${compiledDeg + partialDeg}deg ${compiledDeg + partialDeg + notCompiledDeg}deg
             )`,
         };
     }, [compiledOffices, partialOffices, notCompiledOffices]);

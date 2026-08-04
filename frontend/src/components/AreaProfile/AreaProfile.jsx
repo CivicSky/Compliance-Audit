@@ -51,8 +51,8 @@ const AreaProfile = forwardRef(function AreaProfile({ eventId, onAreaClick, sele
           return (
             <div
               key={area.AreaID}
-              className={`bg-white rounded-lg shadow-md p-4 hover:border-purple-700 hover:shadow-xl cursor-pointer border-l-4 border-purple-400 border-solid ${isSelected ? 'area-selected-outer' : ''}`}
-              style={isSelected ? { borderLeftWidth: '8px', boxShadow: '0 0 0 4px #dc2626' } : {}}
+              className={`bg-white rounded-lg shadow-md p-4 hover:border-blue-700 hover:shadow-xl cursor-pointer border-l-4 border-blue-400 border-solid ${isSelected ? 'area-selected-outer' : ''}`}
+              style={isSelected ? { borderLeftWidth: '8px', boxShadow: '0 0 0 4px #2563eb' } : {}}
               onClick={() => {
                 if (onAreaClick) {
                   onAreaClick(area);
@@ -66,10 +66,10 @@ const AreaProfile = forwardRef(function AreaProfile({ eventId, onAreaClick, sele
                     checked={isSelected}
                     onChange={() => onAreaClick && onAreaClick(area)}
                     onClick={e => e.stopPropagation()}
-                    className="accent-red-600 w-5 h-5"
+                    className="accent-blue-600 w-5 h-5"
                   />
                 )}
-                <h3 className="font-semibold text-lg text-purple-700">{area.AreaCode} - {area.AreaName}</h3>
+                <h3 className="font-semibold text-lg text-blue-700">{area.AreaCode} - {area.AreaName}</h3>
               </div>
               <p className="text-gray-600 mt-1">{area.Description}</p>
               <p className="text-xs text-gray-400 mt-2">Event ID: {area.EventID}</p>

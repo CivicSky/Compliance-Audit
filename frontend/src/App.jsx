@@ -18,6 +18,7 @@ import Criteria from './components/Criteria/Criteria.jsx'
 import AuditLogs from './components/AuditLogs/AuditLogs.jsx'
 import Area from './components/Area/Area.jsx'
 import ALLC from './components/ALLC/ALL.jsx'
+import MasterList from './components/MasterList/MasterList.jsx'
 
 import ProtectedRoute from "./components/ProtectedRoute/ProtectedRoute.jsx";
 import PublicRoute from "./components/ProtectedRoute/PublicRoute.jsx";
@@ -69,6 +70,7 @@ export default function App() {
         { path: "area", element: <Area /> },
         { path: "setup", element: <ALLC /> },
         { path: "allc", element: <ALLC /> },
+        { path: "master-list", element: <MasterList /> },
       ],
     },
   

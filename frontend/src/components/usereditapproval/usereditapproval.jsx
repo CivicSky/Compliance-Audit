@@ -126,7 +126,7 @@ export default function UserEditApproval({ selectedUser, onClose, onSuccess }) {
                 <div className="flex gap-3 border-t border-slate-200 px-6 py-4">
                     <button
                         onClick={onClose}
-                        className="flex-1 rounded-md border border-slate-200 bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-300 disabled:opacity-50"
+                        className="flex-1 rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-red-100 disabled:opacity-50"
                         disabled={updating}
                         type="button"
                     >
@@ -134,7 +134,7 @@ export default function UserEditApproval({ selectedUser, onClose, onSuccess }) {
                     </button>
                     <button
                         onClick={handleApprovalStatusUpdate}
-                        className="flex-1 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-400"
+                        className="flex-1 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-green-400"
                         disabled={updating || (newApprovalStatus === selectedUser.approval_status && newRoleID === selectedUser.RoleID)}
                         type="button"
                     >

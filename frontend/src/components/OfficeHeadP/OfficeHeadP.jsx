@@ -620,7 +620,7 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                                     left: 12,
                                     width: 18,
                                     height: 18,
-                                    accentColor: '#dc2626',
+                                    accentColor: '#2563eb',
                                     transition: 'opacity 180ms ease, transform 180ms ease',
                                     transitionDelay: deleteMode ? '180ms' : '0ms',
                                     opacity: deleteMode ? 1 : 0,

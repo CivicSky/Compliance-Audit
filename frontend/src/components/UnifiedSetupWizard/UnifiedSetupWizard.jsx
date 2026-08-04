@@ -1205,17 +1205,17 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                         {/* Area - Nested under Event */}
                                         <div className="ml-3 space-y-3">
                                             {areaData.AreaName ? (
-                                                <div className="bg-gradient-to-r from-purple-600 to-purple-700 text-white px-3 py-2.5 rounded-lg shadow-md">
+                                                <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-3 py-2.5 rounded-lg shadow-md">
                                                     <div className="flex items-center gap-2">
                                                         <span className="text-sm">📍</span>
                                                         <div className="flex-1 min-w-0">
-                                                            <p className="text-[10px] font-medium text-purple-100 uppercase">Area</p>
+                                                            <p className="text-[10px] font-medium text-blue-100 uppercase">Area</p>
                                                             <p className="text-sm font-semibold truncate">{areaData.AreaName}</p>
                                                         </div>
-                                                        <Check size={14} className="text-purple-200 flex-shrink-0" />
+                                                        <Check size={14} className="text-blue-200 flex-shrink-0" />
                                                     </div>
                                                     {areaData.AreaCode && (
-                                                        <p className="text-[10px] text-purple-200 mt-1 pl-6">{areaData.AreaCode}</p>
+                                                        <p className="text-[10px] text-blue-200 mt-1 pl-6">{areaData.AreaCode}</p>
                                                     )}
                                                 </div>
                                             ) : (

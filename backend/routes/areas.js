@@ -52,7 +52,7 @@ router.put('/:areaId', auth, async (req, res) => {
         }
 
         const [rows] = await db.query(
-            `SELECT AreaID, AreaCode, AreaName, EventID, Description, SortOrder
+            `SELECT AreaID, AreaCode, AreaName, EventID, Description, SortOrder, CreatedAt, UpdatedAt
              FROM areas
              WHERE AreaID = ?`,
             [areaId]
@@ -88,7 +88,9 @@ router.get('/', async (req, res) => {
                 AreaName,
                 EventID,
                 Description,
-                SortOrder
+                SortOrder,
+                CreatedAt,
+                UpdatedAt
             FROM areas
             WHERE IsActive = 1
             ORDER BY SortOrder ASC
@@ -119,7 +121,9 @@ router.get('/event/:eventId', async (req, res) => {
                 AreaName,
                 EventID,
                 Description,
-                SortOrder
+                SortOrder,
+                CreatedAt,
+                UpdatedAt
             FROM areas
             WHERE EventID = ? AND IsActive = 1
             ORDER BY SortOrder ASC

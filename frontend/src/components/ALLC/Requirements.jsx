@@ -1,4 +1,5 @@
 import RowActionMenu from './RowActionMenu';
+import { formatDateTime } from '../../utils/formatDateTime';
 
 export default function RequirementItem({
     requirement,
@@ -25,10 +26,15 @@ export default function RequirementItem({
             <div className="flex-1">
                 <p className="font-medium text-gray-800">{requirement.RequirementCode}</p>
                 <p className="text-sm text-gray-600">{requirement.Description}</p>
+                <div className="mt-1 flex flex-wrap gap-2 text-[10px] text-slate-500">
+                    <span>Created: {formatDateTime(requirement.CreatedAt)}</span>
+                    <span>Updated: {formatDateTime(requirement.UpdatedAt || requirement.CreatedAt)}</span>
+                </div>
             </div>
             <RowActionMenu
                 onEdit={handleEdit ? () => handleEdit(requirement) : undefined}
                 onDelete={onDeleteClick ? () => onDeleteClick(requirement) : undefined}
+                buttonClassName="office-card-actions-button inline-flex h-10 w-10 items-center justify-center rounded-xl border-2 border-gray-300 bg-white text-gray-500 transition hover:border-gray-400 hover:bg-gray-100"
             />
         </div>
     );

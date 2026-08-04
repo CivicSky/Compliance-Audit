@@ -322,20 +322,20 @@ export default function BulkAssignPanel({
 
 										return (
 											<div key={area.key} className="overflow-hidden rounded-xl border border-slate-300/50 bg-white shadow-sm">
-												<div className="flex items-center gap-2 bg-purple-500 px-3 py-2.5 text-white">
+												<div className="flex items-center gap-2 bg-blue-500 px-3 py-2.5 text-white">
 													<Checkbox
-														className="border-white/50 bg-white text-purple-600"
+														className="border-white/50 bg-white text-blue-600"
 														checked={areaChecked}
 														onChange={(event) => handleAreaCheck(area, event.target.checked, areaRequirementIds)}
 													/>
 													<button type="button" className="min-w-0 flex-1 text-left" onClick={() => handleAreaExpand(area)}>
-														<span className="text-[10px] font-semibold uppercase tracking-wide text-purple-100">Area</span>
+														<span className="text-[10px] font-semibold uppercase tracking-wide text-blue-100">Area</span>
 														<p className="truncate text-sm font-semibold">{area.label}</p>
 													</button>
 													<span className="rounded-md bg-white/15 px-2 py-0.5 text-[10px] font-medium">
 														{area.criteriaLoaded ? areaRequirementIds.length : '...'}
 													</span>
-													<button type="button" className="rounded p-1 text-purple-100 hover:bg-white/15 hover:text-white" onClick={() => handleAreaExpand(area)}>
+													<button type="button" className="rounded p-1 text-blue-100 hover:bg-white/15 hover:text-white" onClick={() => handleAreaExpand(area)}>
 														<svg className={`h-4 w-4 transition ${areaExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
 															<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
 														</svg>

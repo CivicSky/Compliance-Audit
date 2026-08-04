@@ -30,7 +30,7 @@ exports.addArea = async (req, res) => {
         }
 
         const [areaRows] = await db.query(
-            `SELECT AreaID, AreaCode, AreaName, EventID, Description, SortOrder FROM areas WHERE AreaID = ?`,
+            `SELECT AreaID, AreaCode, AreaName, EventID, Description, SortOrder, CreatedAt, UpdatedAt FROM areas WHERE AreaID = ?`,
             [result.insertId]
         );
         res.json({ success: true, data: areaRows[0] });

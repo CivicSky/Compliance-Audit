@@ -552,7 +552,7 @@ export default function ViewReqPASSCUModal({
         } catch (err) {
             console.error('Excel preview error:', err);
             setExcelPreviewError(err.message || 'Failed to load Excel file');
-            setExcelHtml(`<div style="color:#dc2626;padding:1em;text-align:center;">
+            setExcelHtml(`<div style="color:#2563eb;padding:1em;text-align:center;">
                 <p style="font-weight:bold;margin-bottom:0.5em;">Error loading preview</p>
                 <p style="font-size:0.9em;color:#6b7280;">${err.message || 'Unable to load file'}</p>
             </div>`);

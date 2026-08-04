@@ -393,8 +393,8 @@ export default function Organization() {
             >
                 <div className="flex items-start justify-between gap-2">
                         <div ref={controlsRef}>
-                        <h1 className="text-2xl font-bold text-gray-800 mb-1">Office Management</h1>
-                        <p className="text-xs text-gray-600 ">{deleteMode ? '\u00A0' : 'Manage your Offices Status.'}</p>
+                        <h1 className="text-2xl font-bold text-gray-800 mb-1">Category Management</h1>
+                        <p className="text-xs text-gray-600 ">{deleteMode ? '\u00A0' : 'Manage your Categories.'}</p>
                     </div>
                     <div className="flex items-center gap-1 pt-0.5">
                         {deleteMode && (

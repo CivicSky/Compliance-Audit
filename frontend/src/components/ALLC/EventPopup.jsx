@@ -9,6 +9,7 @@ import EditRequirementsModal from '../EditRequirements/EditRequirementsModal';
 import { usersAPI, officesAPI } from '../../utils/api';
 import { useModal } from "../UI/ModalProvider";
 import { useEffect } from 'react';
+import { formatDateTime } from '../../utils/formatDateTime';
 
 export default function EventPopup({
     selectedEvent,
@@ -290,6 +291,14 @@ export default function EventPopup({
                         <div>
                             <h2 className="text-4xl font-bold tracking-tight text-slate-900">{selectedEvent.EventCode || selectedEvent.EventName}</h2>
                             <p className="text-slate-600 mt-1">{selectedEvent.EventName || selectedEvent.EventCode}</p>
+                            <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-500">
+                                <span className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1">
+                                    Created: <span className="font-semibold text-slate-700">{formatDateTime(selectedEvent.CreatedAt)}</span>
+                                </span>
+                                <span className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1">
+                                    Updated: <span className="font-semibold text-slate-700">{formatDateTime(selectedEvent.UpdatedAt || selectedEvent.CreatedAt)}</span>
+                                </span>
+                            </div>
                         </div>
                         <div className="relative flex items-center gap-2 ml-4">
                             <button
@@ -443,7 +452,7 @@ export default function EventPopup({
                                                         </p>
                                                     ) : (
                                                         <div className="relative mt-3 ml-6 pl-5">
-                                                            <span className="absolute left-0 top-0 bottom-0 w-1 bg-purple-300 rounded-full" />
+                                                            <span className="absolute left-0 top-0 bottom-0 w-1 bg-blue-300 rounded-full" />
                                                             <div className="space-y-2">
                                                                 {(() => {
                                                                     // Build a tree of criteria by ParentCriteriaID
@@ -528,7 +537,7 @@ export default function EventPopup({
                                                 </p>
                                             ) : expandedNoArea.has(selectedEvent.EventID) ? (
                                                 <div className="relative mt-3 ml-6 pl-5">
-                                                    <span className="absolute left-0 top-0 bottom-0 w-1 bg-purple-300 rounded-full" />
+                                                    <span className="absolute left-0 top-0 bottom-0 w-1 bg-blue-300 rounded-full" />
                                                     <div className="space-y-2">
                                                         {(() => {
                                                             const list = visibleNoAreaCriteria || [];

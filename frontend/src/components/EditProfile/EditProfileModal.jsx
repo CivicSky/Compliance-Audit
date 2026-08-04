@@ -191,7 +191,7 @@ const EditProfileModal = ({ user, isOpen, onClose, onUpdate }) => {
                         <button
                             type="submit"
                             disabled={isSubmitting}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center gap-2"
                         >
                             {isSubmitting && (
                                 <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">

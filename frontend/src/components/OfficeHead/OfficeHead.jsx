@@ -346,7 +346,7 @@ export default function Home() {
                             <button
                                 type="button"
                                 onClick={handleCopyInvite}
-                                className="h-10 rounded-md bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700"
+                                className="h-10 rounded-md bg-slate-800 px-4 text-sm font-semibold text-white transition hover:bg-slate-900"
                             >
                                 {copyLabel}
                             </button>

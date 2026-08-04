@@ -76,13 +76,13 @@ export default function EditEventPopup({ open, event, onCancel, onConfirm }) {
                 </div>
                 <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-200 bg-white">
                     <button
-                        className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                        className="rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-red-100"
                         onClick={onCancel}
                     >
                         Cancel
                     </button>
                     <button
-                        className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
+                        className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-green-700"
                         onClick={() => {
                             console.log('EditEventPopup onConfirm:', { EventName: eventName, EventCode: eventCode, Description: description, status });
                             onConfirm({ EventName: eventName, EventCode: eventCode, Description: description, status });

@@ -299,8 +299,8 @@ export default function Register() {
                             disabled={loading || passwordError || emailError}
                             className={`w-full py-2 px-4 rounded-md font-medium transition-colors text-sm ${
                                 loading || passwordError || emailError
-                                    ? "bg-blue-300 cursor-not-allowed text-white" 
-                                    : "bg-blue-600 hover:bg-blue-700 text-white"
+                                    ? "bg-gray-300 cursor-not-allowed text-white" 
+                                    : "bg-green-600 hover:bg-green-700 text-white"
                             }`}
                         >
                             {loading ? "Creating Account..." : "Create Account"}

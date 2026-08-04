@@ -467,18 +467,18 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
 
                     {/* Form Actions */}
                     <div className="flex justify-end space-x-3 pt-4 border-t">
-                        <button
-                            type="button"
-                            onClick={handleClose}
-                            disabled={isSubmitting}
-                            className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors disabled:opacity-50"
-                        >
+                            <button
+                                type="button"
+                                onClick={handleClose}
+                                disabled={isSubmitting}
+                                className="px-4 py-2 text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors disabled:opacity-50"
+                            >
                             Cancel
                         </button>
                         <button
                             type="submit"
                             disabled={isSubmitting || !formData.EventID || !formData.CriteriaID}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                         >
                             {isSubmitting && (
                                 <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">

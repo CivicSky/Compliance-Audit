@@ -259,7 +259,7 @@ export default function Login() {
                         <button
                             type="submit"
                             disabled={loading || blockedMs > 0}
-                            className="w-full py-3 bg-blue-600 text-white rounded-md transition-colors disabled:opacity-60"
+                            className="w-full py-3 bg-green-600 text-white rounded-md transition-colors hover:bg-green-700 disabled:opacity-60"
                         >
                             {loading ? "Signing in..." : blockedMs > 0 ? `Locked (${Math.ceil(blockedMs/1000)}s)` : "Sign in"}
                         </button>

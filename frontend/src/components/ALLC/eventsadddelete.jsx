@@ -5,7 +5,7 @@ export default function EventsAddDelete({ onSelect, onClose }) {
         <div className="absolute right-0 mt-2 w-40 bg-white border-2 border-gray-200 rounded-lg shadow-lg z-50">
             <button
                 onClick={() => { onSelect?.('add'); onClose?.(); }}
-                className="w-full text-left px-3 py-2 hover:bg-gray-100"
+                className="w-full text-left px-3 py-2 text-green-700 hover:bg-green-50"
             >
                 Add Events
             </button>

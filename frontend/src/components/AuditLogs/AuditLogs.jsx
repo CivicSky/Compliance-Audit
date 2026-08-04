@@ -22,7 +22,7 @@ export default function AuditLogs() {
         Deleted: "bg-red-100 text-red-700 border-red-300",
         Viewed: "bg-amber-100 text-amber-700 border-amber-300",
         Login: "bg-purple-100 text-purple-700 border-purple-300",
-        Logout: "bg-gray-100 text-gray-700 border-gray-300",
+        Logout: "bg-red-100 text-red-700 border-red-300",
         default: "bg-gray-100 text-gray-700 border-gray-300",
     };
 

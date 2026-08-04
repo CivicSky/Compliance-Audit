@@ -46,13 +46,13 @@ export default function CopyEventPopup({
 				</div>
 				<div className="flex justify-end gap-2">
 					<button
-						className="px-4 py-2 rounded bg-gray-200 text-gray-700 hover:bg-gray-300"
+						className="px-4 py-2 rounded bg-red-50 text-red-700 hover:bg-red-100"
 						onClick={onCancel}
 					>
 						Cancel
 					</button>
 					<button
-						className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
+						className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700"
 						onClick={() => onConfirm({ eventName, eventCode, description })}
 						disabled={!eventName.trim() || !eventCode.trim()}
 					>

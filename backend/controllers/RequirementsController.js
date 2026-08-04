@@ -413,7 +413,7 @@ const addEvent = async (req, res) => {
 
     // Insert new event
     const [result] = await db.query(
-      'INSERT INTO Events (EventName, EventCode, Description, CreatedAt) VALUES (?, ?, ?, NOW())',
+      'INSERT INTO Events (EventName, EventCode, Description, CreatedAt, UpdatedAt) VALUES (?, ?, ?, NOW(), NOW())',
       [EventName, EventCode, Description || null]
     );
 
@@ -485,7 +485,7 @@ const updateEvent = async (req, res) => {
 
     // Update event
     const [result] = await db.query(
-      'UPDATE Events SET EventName = ?, EventCode = ?, Description = ? WHERE EventID = ?',
+      'UPDATE Events SET EventName = ?, EventCode = ?, Description = ?, UpdatedAt = NOW() WHERE EventID = ?',
       [EventName, EventCode, Description || null, id]
     );
 

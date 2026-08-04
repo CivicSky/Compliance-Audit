@@ -346,7 +346,7 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
                                             />
                                         </div>
                                     )}
-                                    <div className="h-9 w-9 flex-shrink-0 rounded-full bg-[#d6f0ec] p-0.5">
+                                    <div className="h-9 w-9 flex-shrink-0 rounded-full bg-blue-100 p-0.5">
                                         <img
                                             src={profilePicUrl}
                                             alt={fullName}

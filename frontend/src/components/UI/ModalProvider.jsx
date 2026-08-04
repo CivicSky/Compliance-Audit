@@ -70,14 +70,14 @@ function ModalRoot({ type, title, message, onConfirm, onCancel }) {
         <div className="flex justify-end space-x-3">
           {type === 'confirm' && (
             <button
-              className="px-4 py-2 rounded bg-gray-100 hover:bg-gray-200"
+              className="px-4 py-2 rounded bg-red-50 text-red-700 hover:bg-red-100"
               onClick={onCancel}
             >
               Cancel
             </button>
           )}
           <button
-            className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
+            className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700"
             onClick={onConfirm}
           >
             OK

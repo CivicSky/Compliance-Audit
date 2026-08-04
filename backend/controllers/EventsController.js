@@ -18,7 +18,7 @@ const copyEvent = async (req, res) => {
 
     // Insert new event
     const [result] = await db.query(
-      'INSERT INTO Events (EventName, EventCode, Description, CreatedAt) VALUES (?, ?, ?, NOW())',
+      'INSERT INTO Events (EventName, EventCode, Description, CreatedAt, UpdatedAt) VALUES (?, ?, ?, NOW(), NOW())',
       [newEventName, newEventCode, newDescription || sourceEvent.Description || null]
     );
 
@@ -47,8 +47,8 @@ const copyEvent = async (req, res) => {
       const newAreaId = crit.AreaID ? areaIdMap[crit.AreaID] : null;
       try {
         const [critResult] = await db.query(
-          'INSERT INTO criteria (CriteriaCode, EventID, AreaID, ParentCriteriaID, CriteriaName, Description, CreatedAt, IsActive) VALUES (?, ?, ?, NULL, ?, ?, ?, ?)',
-          [crit.CriteriaCode, newEventId, newAreaId, crit.CriteriaName, crit.Description, crit.CreatedAt, crit.IsActive]
+          'INSERT INTO criteria (CriteriaCode, EventID, AreaID, ParentCriteriaID, CriteriaName, Description, CreatedAt, UpdatedAt, IsActive) VALUES (?, ?, ?, NULL, ?, ?, NOW(), NOW(), ?)',
+          [crit.CriteriaCode, newEventId, newAreaId, crit.CriteriaName, crit.Description, crit.IsActive]
         );
         criteriaIdMap[crit.CriteriaID] = critResult.insertId;
       } catch (err) {
@@ -78,7 +78,7 @@ const copyEvent = async (req, res) => {
         const newCriteriaId = req.CriteriaID ? criteriaIdMap[req.CriteriaID] : null;
         try {
           await db.query(
-            'INSERT INTO requirements (RequirementCode, Description, CriteriaID, ParentRequirementCode) VALUES (?, ?, ?, ?)',
+            'INSERT INTO requirements (RequirementCode, Description, CriteriaID, ParentRequirementCode, CreatedAt, UpdatedAt) VALUES (?, ?, ?, ?, NOW(), NOW())',
             [req.RequirementCode, req.Description, newCriteriaId, req.ParentRequirementCode]
           );
         } catch (err) {
@@ -165,7 +165,7 @@ const addEvent = async (req, res) => {
 
     // Insert new event
     const [result] = await db.query(
-      'INSERT INTO Events (EventName, EventCode, Description, CreatedAt) VALUES (?, ?, ?, NOW())',
+      'INSERT INTO Events (EventName, EventCode, Description, CreatedAt, UpdatedAt) VALUES (?, ?, ?, NOW(), NOW())',
       [EventName, EventCode, Description || null]
     );
 
@@ -328,7 +328,7 @@ const updateEvent = async (req, res) => {
 
     // Update event, including status (do not touch CreatedAt)
     const [result] = await db.query(
-      'UPDATE Events SET EventName = ?, EventCode = ?, Description = ?, status = ? WHERE EventID = ?',
+      'UPDATE Events SET EventName = ?, EventCode = ?, Description = ?, status = ?, UpdatedAt = NOW() WHERE EventID = ?',
       [EventName, EventCode, Description || null, status, id]
     );
 

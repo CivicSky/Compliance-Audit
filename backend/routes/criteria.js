@@ -66,7 +66,7 @@ router.put('/:id', auth, async (req, res) => {
         }
 
         const [result] = await db.query(
-            `UPDATE criteria SET CriteriaCode = ?, CriteriaName = ?, Description = ?, AreaID = ?, ParentCriteriaID = ?, EventID = ? WHERE CriteriaID = ?`,
+            `UPDATE criteria SET CriteriaCode = ?, CriteriaName = ?, Description = ?, AreaID = ?, ParentCriteriaID = ?, EventID = ?, UpdatedAt = NOW() WHERE CriteriaID = ?`,
             [CriteriaCode, CriteriaName, Description, AreaID, ParentCriteriaID, EventID, id]
         );
         if (result.affectedRows === 0) {
@@ -142,7 +142,9 @@ router.get('/area/:areaId', async (req, res) => {
                 EventID,
                 AreaID,
                 ParentCriteriaID,
-                Description
+                Description,
+                CreatedAt,
+                UpdatedAt
             FROM criteria
             WHERE AreaID = ? AND IsActive = 1
             ORDER BY CriteriaCode ASC
@@ -192,7 +194,7 @@ router.post('/add', auth, async (req, res) => {
             }
         }
         const [result] = await db.query(
-            `INSERT INTO criteria (EventID, AreaID, CriteriaCode, CriteriaName, Description, ParentCriteriaID, IsActive) VALUES (?, ?, ?, ?, ?, ?, 1)`,
+            `INSERT INTO criteria (EventID, AreaID, CriteriaCode, CriteriaName, Description, ParentCriteriaID, IsActive, CreatedAt, UpdatedAt) VALUES (?, ?, ?, ?, ?, ?, 1, NOW(), NOW())`,
             [EventID, AreaID || null, CriteriaCode, CriteriaName, safeDescription, ParentCriteriaID || null]
         );
 

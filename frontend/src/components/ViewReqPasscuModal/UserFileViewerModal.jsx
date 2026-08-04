@@ -43,7 +43,7 @@ export default function UserFileViewerModal({
     return (
         <div
             className="fixed inset-0 z-[131] bg-black/70"
-            style={leftStyle}
+
             onClick={onClose}
             role="presentation"
         >

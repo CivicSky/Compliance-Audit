@@ -14,7 +14,7 @@ export default function CriteriaSection({
 }) {
     return (
         <div className="relative my-3">
-            <span className="absolute -left-5 top-6 w-4 h-1 bg-purple-300 rounded-r-full" />
+            <span className="absolute -left-5 top-6 w-4 h-1 bg-blue-300 rounded-r-full" />
             <CriteriaItem
                 criteria={criteria}
                 isExpanded={isExpanded}

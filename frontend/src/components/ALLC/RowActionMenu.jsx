@@ -146,10 +146,10 @@ export default function RowActionMenu({
                 }}
                 aria-label="Actions"
                 title="Actions"
-                className={buttonClassName || 'office-card-actions-button inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-100'}
+                className={buttonClassName || 'office-card-actions-button inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-100'}
             >
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6h.01M12 12h.01M12 18h.01" />
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.25} d="M12 6h.01M12 12h.01M12 18h.01" />
                 </svg>
             </button>
             {menu ? createPortal(menu, document.body) : null}

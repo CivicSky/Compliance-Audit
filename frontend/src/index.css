@@ -30,12 +30,12 @@
     font-weight: 600;
     line-height: 1.25rem;
     color: #fff;
-    background-color: #4f46e5;
+    background-color: #16a34a;
     box-shadow: 0 1px 2px rgb(15 23 42 / 0.08);
     transition: background-color 0.15s ease, box-shadow 0.15s ease;
   }
   .btn-save:hover:not(:disabled) {
-    background-color: #4338ca;
+    background-color: #15803d;
   }
   .btn-save:disabled {
     opacity: 0.5;
@@ -45,11 +45,11 @@
 
 :root {
   --app-font: 'Poppins', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
-  /* Warm off-white surfaces — use across app (navbar excluded) */
-  --app-bg: #f7f6f3;
+  /* Cool blue surfaces — use across app (navbar excluded) */
+  --app-bg: #f3f7ff;
   --app-surface: #ffffff;
-  --app-surface-muted: #f3f2ef;
-  --app-border: #e5e4e0;
+  --app-surface-muted: #eaf1ff;
+  --app-border: #c7d8ff;
 }
 
 html, body, #root {
@@ -83,7 +83,7 @@ body {
 
 .notif-scroll {
   scrollbar-width: thin;
-  scrollbar-color: #c4c3be transparent;
+  scrollbar-color: #93c5fd transparent;
 }
 
 .notif-scroll::-webkit-scrollbar {
@@ -92,7 +92,7 @@ body {
 }
 
 .notif-scroll::-webkit-scrollbar-thumb {
-  background-color: #c4c3be;
+  background-color: #93c5fd;
   border-radius: 999px;
 }
 

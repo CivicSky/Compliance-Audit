@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import EventOptionsPopup from "./eventsoptions";
+import { formatDateTime } from "../../utils/formatDateTime";
 
 export default function EventCard({ event, onClick, onEdit, onCopy, onDelete, showCheckbox = false, isChecked = false, onToggleSelect, isAdmin = false }) {
     const [showOptions, setShowOptions] = useState(false);
@@ -25,7 +26,7 @@ export default function EventCard({ event, onClick, onEdit, onCopy, onDelete, sh
                     left: 12,
                     width: 18,
                     height: 18,
-                    accentColor: '#dc2626',
+                    accentColor: '#2563eb',
                     // fade/scale animation with delay so it appears after slide
                     transition: 'opacity 180ms ease, transform 180ms ease',
                     transitionDelay: showCheckbox ? '180ms' : '0ms',
@@ -79,6 +80,17 @@ export default function EventCard({ event, onClick, onEdit, onCopy, onDelete, sh
                     <span className="inline-flex max-w-full items-center rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 truncate">
                         {event.EventName}
                     </span>
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-3 text-[11px] text-slate-500">
+                    <div>
+                        <span className="block font-semibold uppercase tracking-wide text-slate-400">Created</span>
+                        <span className="text-slate-700">{formatDateTime(event.CreatedAt)}</span>
+                    </div>
+                    <div>
+                        <span className="block font-semibold uppercase tracking-wide text-slate-400">Updated</span>
+                        <span className="text-slate-700">{formatDateTime(event.UpdatedAt || event.CreatedAt)}</span>
+                    </div>
                 </div>
 
                 <div className="mt-auto border-t border-slate-200 pt-2.5">
