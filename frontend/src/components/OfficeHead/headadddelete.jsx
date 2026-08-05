@@ -7,13 +7,13 @@ export default function officeAddDelete({ onSelect, onClose }) {
                 onClick={() => { onSelect?.('add'); onClose?.(); }}
                 className="w-full text-left px-3 py-2 hover:bg-gray-100"
             >
-                Add Personel
+                Add Personnel
             </button>
             <button
                 onClick={() => { onSelect?.('delete'); onClose?.(); }}
                 className="w-full text-left px-3 py-2 hover:bg-gray-100 text-red-600"
             >
-                Delete Personel
+                Delete Personnel
             </button>
         </div>
     );

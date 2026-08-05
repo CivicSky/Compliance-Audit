@@ -180,7 +180,7 @@ export default function Login() {
                 className="w-1/2 bg-cover bg-center transition-all duration-700 ease-in-out"
                 style={{ backgroundImage: `url(${bg})` }}
             >
-                <div className="flex items-center justify-center h-full bg-blue-800 bg-opacity-60">
+                <div className="flex items-center justify-center h-full" style={{ background: 'linear-gradient(135deg, rgba(15,23,42,0.75) 0%, rgba(29,78,216,0.70) 100%)' }}>
                     <div className="text-white text-center animate-fade-in-left">
                         <img src={auditrackLogo} className="w-32 mx-auto mb-4 transition-all duration-500 hover:scale-105 drop-shadow-2xl" />
                         <h2 className="text-4xl font-bold animate-slide-up drop-shadow-lg">Auditrack</h2>
@@ -227,7 +227,7 @@ export default function Login() {
                             value={formData.email}
                             onChange={handleChange}
                             placeholder="Email"
-                            className="w-full px-3 py-3 border rounded-md"
+                            className="w-full px-3 py-3 border border-blue-200 rounded-md outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all duration-200 bg-blue-50/30"
                             disabled={blockedMs > 0}
                         />
 
@@ -239,7 +239,7 @@ export default function Login() {
                                 value={formData.password}
                                 onChange={handleChange}
                                 placeholder="Password"
-                                className="w-full px-3 py-3 pr-10 border rounded-md"
+                                className="w-full px-3 py-3 pr-10 border border-blue-200 rounded-md outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all duration-200 bg-blue-50/30"
                                 disabled={blockedMs > 0}
                             />
                             <button
@@ -259,7 +259,8 @@ export default function Login() {
                         <button
                             type="submit"
                             disabled={loading || blockedMs > 0}
-                            className="w-full py-3 bg-green-600 text-white rounded-md transition-colors hover:bg-green-700 disabled:opacity-60"
+                            className="w-full py-3 text-white font-semibold rounded-md transition-all duration-200 hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
+                            style={{ background: loading || blockedMs > 0 ? '#94a3b8' : 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)', boxShadow: loading || blockedMs > 0 ? 'none' : '0 4px 14px rgba(37,99,235,0.35)' }}
                         >
                             {loading ? "Signing in..." : blockedMs > 0 ? `Locked (${Math.ceil(blockedMs/1000)}s)` : "Sign in"}
                         </button>

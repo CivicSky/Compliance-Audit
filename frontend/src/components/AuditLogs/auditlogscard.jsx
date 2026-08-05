@@ -1,7 +1,4 @@
 import { useEffect, useState } from "react";
-import Header from "../Header/header"
-
-
 export default function AuditLogs() {
 
     const [logs, setLogs] = useState([]);

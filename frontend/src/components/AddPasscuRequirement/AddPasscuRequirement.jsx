@@ -249,7 +249,7 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out bg-black bg-opacity-50 flex items-center justify-center z-[120]">
+        <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out bg-black bg-opacity-50 flex items-center justify-center z-[50]">
             <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl mx-4 my-8 min-h-[70vh] max-h-[85vh] overflow-y-auto">
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b sticky top-0 bg-white z-10">
@@ -279,7 +279,7 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                                     name="EventID"
                                     value={formData.EventID}
                                     onChange={handleInputChange}
-                                    className="w-full px-3 py-2 border rounded-md border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                    className="w-full px-3 py-2 border rounded-md border-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-500"
                                     disabled={isSubmitting}
                                 >
                                     <option value="">Select an event</option>
@@ -301,7 +301,7 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                                     name="AreaID"
                                     value={formData.AreaID}
                                     onChange={handleInputChange}
-                                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 ${
                                         errors.AreaID ? 'border-red-500' : 'border-gray-300'
                                     }`}
                                     disabled={isSubmitting || isLoading || !formData.EventID}
@@ -331,7 +331,7 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                                     name="CriteriaID"
                                     value={formData.CriteriaID}
                                     onChange={handleInputChange}
-                                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 ${
                                         errors.CriteriaID ? 'border-red-500' : 'border-gray-300'
                                     }`}
                                     disabled={isSubmitting || isLoading}
@@ -366,7 +366,7 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                                     name="ParentRequirementCode"
                                     value={formData.ParentRequirementCode}
                                     onChange={handleInputChange}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500"
                                     disabled={isSubmitting || !formData.CriteriaID}
                                 >
                                     <option value="">
@@ -397,7 +397,7 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                                     name="RequirementCode"
                                     value={formData.RequirementCode}
                                     onChange={handleInputChange}
-                                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 ${
                                         errors.RequirementCode ? 'border-red-500' : 'border-gray-300'
                                     }`}
                                     placeholder="e.g., VMG.1.1.1"
@@ -419,7 +419,7 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                                     value={formData.Description}
                                     onChange={handleInputChange}
                                     rows="3"
-                                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none ${
+                                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none ${
                                         errors.Description ? 'border-red-500' : 'border-gray-300'
                                     }`}
                                     placeholder="Enter requirement description"

@@ -1,6 +1,5 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from "react";
 import { useModal } from "../UI/ModalProvider";
-import Header from "../Header/header.jsx";
 import { eventsAPI } from "../../utils/api";
 import Pagination from "../Pagination/Pagination";
 
@@ -259,7 +258,7 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
                                             type="checkbox"
                                             checked={selectedEvents.has(event.EventID)}
                                             onChange={(e) => handleCheckboxChange(event.EventID, e.target.checked)}
-                                            className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                                            className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-brand-500"
                                             onClick={(e) => e.stopPropagation()}
                                         />
                                     </div>

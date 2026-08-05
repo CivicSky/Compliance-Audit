@@ -350,7 +350,7 @@ const OfficesP = forwardRef(
                                     key={office.id}
                                     onClick={() => !deleteMode && onOfficeClick(office)}
                                     className={`
-                                        relative min-h-[220px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all duration-200
+                                        relative min-h-[267px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all duration-200
                                         ${deleteMode 
                                             ? 'hover:border-gray-300' 
                                             : 'hover:border-cyan-200 hover:shadow-md cursor-pointer'
@@ -382,7 +382,7 @@ const OfficesP = forwardRef(
                                                                 e.stopPropagation();
                                                                 handleCheckboxChange(office.id, e.target.checked);
                                                             }}
-                                                            className="h-4 w-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
+                                                            className="h-4 w-4 text-indigo-600 rounded border-gray-300 focus:ring-brand-500"
                                                             aria-label="Select office for deletion"
                                                         />
                                                     </div>

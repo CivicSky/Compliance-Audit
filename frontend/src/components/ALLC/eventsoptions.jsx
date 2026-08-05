@@ -1,4 +1,4 @@
-import { useRef, useEffect } from "react";
+﻿import { useRef, useEffect } from "react";
 
 export default function EventOptionsPopup({ onEdit, onCopy, onDelete, onClose, anchorRef }) {
     // Close popup if clicked outside
@@ -16,10 +16,10 @@ export default function EventOptionsPopup({ onEdit, onCopy, onDelete, onClose, a
     return (
         <div ref={popupRef} className="absolute right-0 top-10 z-50 w-[220px] overflow-hidden rounded-lg border border-gray-100 bg-white py-1 shadow-lg">
             <button
-                className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-xs text-slate-700 transition hover:bg-indigo-50 whitespace-nowrap"
+                className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-xs text-slate-700 transition hover:bg-blue-50 whitespace-nowrap"
                 onClick={() => { onEdit(); onClose(); }}
             >
-                <svg className="h-4 w-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <svg className="h-4 w-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
                 <span>Edit</span>
@@ -46,3 +46,4 @@ export default function EventOptionsPopup({ onEdit, onCopy, onDelete, onClose, a
         </div>
     );
 }
+

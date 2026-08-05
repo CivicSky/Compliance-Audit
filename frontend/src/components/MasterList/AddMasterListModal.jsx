@@ -3,9 +3,7 @@ import React, { useEffect, useState } from 'react';
 export default function AddMasterListModal({ isOpen, onClose, onSubmit, departments = [] }) {
   const [name, setName] = useState('');
   const [type, setType] = useState('Academic Program');
-  const [department, setDepartment] = useState('');
-  const [status, setStatus] = useState('Active');
-  const [description, setDescription] = useState('');
+  const [departmentId, setDepartmentId] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -13,9 +11,7 @@ export default function AddMasterListModal({ isOpen, onClose, onSubmit, departme
 
     setName('');
     setType('Academic Program');
-    setDepartment('');
-    setStatus('Active');
-    setDescription('');
+    setDepartmentId('');
     setLoading(false);
   }, [isOpen]);
 
@@ -28,7 +24,7 @@ export default function AddMasterListModal({ isOpen, onClose, onSubmit, departme
 
     if (!name.trim()) return;
 
-    if (isAcademic && !department) return;
+    if (isAcademic && !departmentId) return;
 
     setLoading(true);
 
@@ -36,9 +32,8 @@ export default function AddMasterListModal({ isOpen, onClose, onSubmit, departme
       await onSubmit?.({
         name: name.trim(),
         type,
-        department: isAcademic ? department : null,
-        status,
-        description: description.trim(),
+        entityTypeId: isAcademic ? 1 : 2,
+        departmentId: isAcademic ? departmentId : null,
       });
       onClose?.();
     } finally {
@@ -47,7 +42,7 @@ export default function AddMasterListModal({ isOpen, onClose, onSubmit, departme
   };
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 px-4">
+    <div className="fixed inset-0 z-[50] flex items-center justify-center bg-black/50 px-4">
       <div className="mx-4 w-full max-w-md overflow-hidden rounded-xl bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
           <div>
@@ -84,7 +79,12 @@ export default function AddMasterListModal({ isOpen, onClose, onSubmit, departme
             <div className="relative">
               <select
                 value={type}
-                onChange={(event) => setType(event.target.value)}
+                onChange={(event) => {
+                  setType(event.target.value);
+                  if (event.target.value !== 'Academic Program') {
+                    setDepartmentId('');
+                  }
+                }}
                 className="h-10 w-full appearance-none rounded-md border border-gray-300 bg-white px-4 pr-10 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="Academic Program">Academic Program</option>
@@ -101,14 +101,14 @@ export default function AddMasterListModal({ isOpen, onClose, onSubmit, departme
               <label className="mb-2 block text-sm font-medium text-gray-700">Department *</label>
               <div className="relative">
                 <select
-                  value={department}
-                  onChange={(event) => setDepartment(event.target.value)}
+                  value={departmentId}
+                  onChange={(event) => setDepartmentId(event.target.value)}
                   className="h-10 w-full appearance-none rounded-md border border-gray-300 bg-white px-4 pr-10 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required={isAcademic}
                 >
                   <option value="">Select Department</option>
                   {departments.map((dept) => (
-                    <option key={dept.id} value={dept.name}>
+                    <option key={dept.id} value={String(dept.id)}>
                       {dept.name}
                     </option>
                   ))}
@@ -120,33 +120,6 @@ export default function AddMasterListModal({ isOpen, onClose, onSubmit, departme
             </div>
           )}
 
-          <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">Status</label>
-            <div className="relative">
-              <select
-                value={status}
-                onChange={(event) => setStatus(event.target.value)}
-                className="h-10 w-full appearance-none rounded-md border border-gray-300 bg-white px-4 pr-10 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="Active">Active</option>
-                <option value="Inactive">Inactive</option>
-              </select>
-              <svg xmlns="http://www.w3.org/2000/svg" className="pointer-events-none absolute right-3 top-1/2 h-2.5 w-2.5 -translate-y-1/2 text-slate-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
-              </svg>
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">Description</label>
-            <textarea
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              rows={4}
-              className="w-full rounded-md border border-gray-300 bg-white px-4 py-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Add a short description"
-            />
-          </div>
 
           <div className="flex justify-end gap-3 border-t border-slate-200 pt-3">
             <button

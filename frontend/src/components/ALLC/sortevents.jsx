@@ -16,7 +16,7 @@ export default function SortEvents({ value = 'active', onChange }) {
         <div className="relative inline-block" ref={ref}>
             <button
                 onClick={() => setOpen(v => !v)}
-                className="relative h-8 min-w-[146px] appearance-none rounded-md border border-slate-200 bg-white px-4 text-[10px] font-medium leading-4 text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                className="relative h-8 min-w-[146px] appearance-none rounded-md border border-slate-200 bg-white px-4 text-[10px] font-medium leading-4 text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-500"
                 title="Filter standards"
                 aria-label={`Filter standards: ${value === 'inactive' ? 'Inactive' : 'Active'}`}
             >

@@ -64,7 +64,7 @@ export default function RequirementsToolbar({
                         placeholder="Search requirements..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-52 rounded-xl border border-slate-300/70 bg-slate-200/40 py-2 pl-9 pr-3 text-xs text-slate-800 placeholder:text-slate-500 transition focus:border-indigo-400 focus:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                        className="w-52 rounded-xl border border-slate-300/70 bg-slate-200/40 py-2 pl-9 pr-3 text-xs text-slate-800 placeholder:text-slate-500 transition focus:border-indigo-400 focus:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                     />
                     <svg className="pointer-events-none absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />

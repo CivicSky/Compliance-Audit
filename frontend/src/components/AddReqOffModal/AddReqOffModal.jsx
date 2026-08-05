@@ -94,7 +94,7 @@ export default function AddReqOffModal({ isOpen, onClose, office, onSave }) {
     const filteredRequirements = getFilteredRequirements();
 
     return (
-        <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out z-[120] bg-black/50 overflow-auto" onClick={onClose}>
+        <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out z-[50] bg-black/50 overflow-auto" onClick={onClose}>
             <div className="min-h-screen flex items-center justify-center p-4">
                 <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl my-8 flex flex-col h-[85vh]" onClick={(e) => e.stopPropagation()}>
                     {/* Header */}

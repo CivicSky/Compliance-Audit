@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import Header from "../Header/header"
 // Use the EventsProfile implementation (exports EventsP) so the page shows the detailed events
 import EventsP from "../EventsProfile/EventsProfle";
 import AddEventModal from "../AddEvent/AddEventModal";
@@ -7,6 +6,7 @@ import UnifiedSetupWizard from "../UnifiedSetupWizard/UnifiedSetupWizard";
 import { Wand2 } from "lucide-react";
 import { usersAPI } from "../../utils/api";
 import { useModal } from "../UI/ModalProvider";
+import Header from "../Header/header";
 
 export default function Events() {
     const [isModalOpen, setIsModalOpen] = useState(false);

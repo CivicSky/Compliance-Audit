@@ -789,7 +789,7 @@ export default function ViewReqPASSCUModal({
 
     return (
         <div
-            className="fixed inset-y-0 right-0 left-0 z-[120] flex bg-slate-900/55 backdrop-blur-[2px] lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out"
+            className="fixed inset-y-0 right-0 left-0 z-[50] flex bg-slate-900/55 backdrop-blur-[2px] lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out"
             style={{ left: 'var(--sidebar-width, 0px)', transition: 'left 200ms ease-in-out' }}
             onClick={onClose}
         >

@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import Header from "../Header/header";
 import { useModal } from "../UI/ModalProvider";
 import UsersP from "../UsersProfile/UsersProfle";
 import UserEditApproval from "../usereditapproval/usereditapproval";
@@ -146,9 +145,7 @@ export default function Users() {
 
     return (
         <div className="h-screen w-full flex flex-col overflow-hidden">
-            <Header />
-
-            <div className="flex-1 min-h-0 flex flex-col overflow-hidden px-4 pb-6 pt-6">
+<div className="flex-1 min-h-0 flex flex-col overflow-hidden px-4 pb-6 pt-6">
                 <div className="mb-4 flex flex-col gap-2 relative">
                     <div className="flex items-start justify-between gap-2">
                         <div>
@@ -203,7 +200,7 @@ export default function Users() {
                                 <input
                                     type="text"
                                     placeholder="Search users, role, or email..."
-                                    className="h-9 w-full rounded-lg border border-slate-200 bg-white pl-8 pr-3 text-[9px] text-slate-700 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                    className="h-9 w-full rounded-lg border border-slate-200 bg-white pl-8 pr-3 text-[9px] text-slate-700 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-brand-500"
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
                                 />
@@ -215,7 +212,7 @@ export default function Users() {
                                 <button
                                     type="button"
                                     onClick={() => setShowFilterDropdown((prev) => !prev)}
-                                    className="relative h-8 min-w-[146px] appearance-none rounded-md border border-slate-200 bg-white px-4 text-[10px] font-medium leading-4 text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                    className="relative h-8 min-w-[146px] appearance-none rounded-md border border-slate-200 bg-white px-4 text-[10px] font-medium leading-4 text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-500"
                                     title="Filter users by approval status"
                                 >
                                     <span className="block text-center truncate">{APPROVAL_FILTER_OPTIONS.find((opt) => opt.value === approvalFilter)?.label || 'All Personnel'}</span>
@@ -247,7 +244,7 @@ export default function Users() {
                                 <button
                                     type="button"
                                     onClick={() => setShowRoleDropdown((prev) => !prev)}
-                                    className="relative h-8 min-w-[146px] appearance-none rounded-md border border-slate-200 bg-white px-4 text-[10px] font-medium leading-4 text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                    className="relative h-8 min-w-[146px] appearance-none rounded-md border border-slate-200 bg-white px-4 text-[10px] font-medium leading-4 text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-500"
                                     title="Filter users by role"
                                 >
                                     <span className="block text-center truncate">{ROLE_FILTER_OPTIONS.find((opt) => opt.value === roleFilter)?.label || 'All Roles'}</span>

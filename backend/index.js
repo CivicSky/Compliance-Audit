@@ -32,6 +32,7 @@ const notificationRoutes = require('./routes/notif');
 const logsRoutes = require('./routes/logs');
 const departmentsRoutes = require('./routes/departments');
 const programTypesRoutes = require('./routes/program_types');
+const masterlistRoutes = require('./routes/masterlist');
 
 console.log('Backend started and logger active');
 
@@ -103,6 +104,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/logs', logsRoutes);
 app.use('/api/departments', departmentsRoutes);
 app.use('/api/program_types', programTypesRoutes);
+app.use('/api/masterlist', masterlistRoutes);
 // Ensure basic roles exist on startup (Admin, User, Personnel)
 const db = require('./db');
 async function ensureRoles() {

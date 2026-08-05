@@ -94,7 +94,7 @@ const EditCriteriaModal = ({ visible, onClose, event = {}, onSave, userRole = 'u
   };
 
   return (
-    <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out bg-black bg-opacity-50 flex items-center justify-center z-[120]">
+    <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out bg-black bg-opacity-50 flex items-center justify-center z-[50]">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4 max-h-[95vh] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between px-6 py-5 border-b border-slate-200">
           <h2 className="text-lg font-bold text-gray-900">{isAdmin ? 'Edit Criteria' : 'View Criteria'}</h2>
@@ -128,7 +128,7 @@ const EditCriteriaModal = ({ visible, onClose, event = {}, onSave, userRole = 'u
               name="CriteriaCode"
               value={criteriaCode}
               onChange={handleInputChange}
-              className={`w-full rounded-md bg-white px-4 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500 ${errors.CriteriaCode ? 'border-red-500' : 'border border-slate-200'}`}
+              className={`w-full rounded-md bg-white px-4 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500 ${errors.CriteriaCode ? 'border-red-500' : 'border border-slate-200'}`}
               placeholder="e.g., CUR.4.1"
               disabled={isSubmitting || !isAdmin || isChild}
               required={!isChild}
@@ -147,7 +147,7 @@ const EditCriteriaModal = ({ visible, onClose, event = {}, onSave, userRole = 'u
               name="CriteriaName"
               value={criteriaName}
               onChange={handleInputChange}
-              className={`w-full rounded-md bg-white px-4 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500 ${errors.CriteriaName ? 'border-red-500' : 'border border-slate-200'}`}
+              className={`w-full rounded-md bg-white px-4 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500 ${errors.CriteriaName ? 'border-red-500' : 'border border-slate-200'}`}
               placeholder="Enter criteria name"
               disabled={isSubmitting || !isAdmin}
               required
@@ -166,7 +166,7 @@ const EditCriteriaModal = ({ visible, onClose, event = {}, onSave, userRole = 'u
                 name="ParentCriteriaID"
                 value={parentCriteriaId}
                 onChange={handleInputChange}
-                className="h-10 w-full appearance-none rounded-md border border-slate-200 bg-white px-4 pr-9 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                className="h-10 w-full appearance-none rounded-md border border-slate-200 bg-white px-4 pr-9 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
                 disabled={isSubmitting || !isAdmin || isChild}
               >
                 <option value="">None (Top-level criteria)</option>

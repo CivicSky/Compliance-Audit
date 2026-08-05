@@ -275,7 +275,7 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out z-[120] flex items-center justify-center bg-black/50">
+        <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out z-[50] flex items-center justify-center bg-black/50">
             <div className="mx-4 w-full max-w-md overflow-hidden rounded-xl bg-white shadow-xl">
                 <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
                     <h2 className="text-xl font-semibold text-gray-800">Add New Office</h2>

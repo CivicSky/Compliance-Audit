@@ -1,5 +1,4 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from "react";
-import Header from "../Header/header.jsx";
 import { requirementsAPI } from "../../utils/api";
 
 const RequirementsP = forwardRef(

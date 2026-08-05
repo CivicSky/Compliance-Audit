@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import Pagination from "../Pagination/Pagination";
-import Header from "../Header/header"
-
+import Header from "../Header/header";
 
 export default function AuditLogs() {
 
@@ -474,7 +473,7 @@ export default function AuditLogs() {
                                 <input
                                     type="text"
                                     placeholder="Search activity, users, or actions..."
-                                    className="h-9 w-full rounded-lg border border-slate-200 bg-white pl-8 pr-3 text-[9px] text-slate-700 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                    className="h-9 w-full rounded-lg border border-slate-200 bg-white pl-8 pr-3 text-[9px] text-slate-700 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-brand-500"
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
                                 />
@@ -484,7 +483,7 @@ export default function AuditLogs() {
                                 onClick={clearControls}
                                 title="Clear controls"
                                 aria-label="Clear controls"
-                                className="flex h-9 w-9 min-w-[36px] items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                className="flex h-9 w-9 min-w-[36px] items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500"
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5" aria-hidden="true">
                                     <path d="m3 6 3 0 14 0" />
@@ -498,7 +497,7 @@ export default function AuditLogs() {
                                 <select
                                     value={actionFilter}
                                     onChange={(e) => setActionFilter(e.target.value)}
-                                    className="h-8 min-w-[146px] appearance-none rounded-md border border-slate-200 bg-white px-4 text-center text-[10px] font-medium leading-4 text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                    className="h-8 min-w-[146px] appearance-none rounded-md border border-slate-200 bg-white px-4 text-center text-[10px] font-medium leading-4 text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-500"
                                 >
                                     <option value="all">All</option>
                                     <option value="Created">Created</option>

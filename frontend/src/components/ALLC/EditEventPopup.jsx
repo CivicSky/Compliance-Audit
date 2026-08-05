@@ -19,7 +19,7 @@ export default function EditEventPopup({ open, event, onCancel, onConfirm }) {
     if (!open) return null;
 
     return (
-        <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out bg-black bg-opacity-40 flex items-center justify-center z-[120]">
+        <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out bg-black bg-opacity-40 flex items-center justify-center z-[50]">
             <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
                 <div className="flex items-center justify-between px-6 py-5 border-b border-slate-200">
                     <h2 className="text-lg font-bold text-gray-900">Edit Event</h2>
@@ -34,7 +34,7 @@ export default function EditEventPopup({ open, event, onCancel, onConfirm }) {
                         <label className="block text-sm font-semibold text-gray-800 mb-1">Event Name</label>
                         <input
                             type="text"
-                            className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                            className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
                             value={eventName}
                             onChange={e => setEventName(e.target.value)}
                         />
@@ -43,7 +43,7 @@ export default function EditEventPopup({ open, event, onCancel, onConfirm }) {
                         <label className="block text-sm font-semibold text-gray-800 mb-1">Event Code</label>
                         <input
                             type="text"
-                            className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                            className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
                             value={eventCode}
                             onChange={e => setEventCode(e.target.value)}
                         />
@@ -51,7 +51,7 @@ export default function EditEventPopup({ open, event, onCancel, onConfirm }) {
                     <div>
                         <label className="block text-sm font-semibold text-gray-800 mb-1">Description</label>
                         <textarea
-                            className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                            className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
                             rows={4}
                             value={description}
                             onChange={e => setDescription(e.target.value)}
@@ -61,7 +61,7 @@ export default function EditEventPopup({ open, event, onCancel, onConfirm }) {
                         <label className="block text-sm font-semibold text-gray-800 mb-1">Status</label>
                         <div className="relative">
                             <select
-                                className="h-10 w-full appearance-none rounded-md border border-slate-200 bg-white px-3 pr-9 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                className="h-10 w-full appearance-none rounded-md border border-slate-200 bg-white px-3 pr-9 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
                                 value={status}
                                 onChange={e => setStatus(e.target.value)}
                             >

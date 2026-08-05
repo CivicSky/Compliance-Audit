@@ -1,10 +1,10 @@
-import React, { useMemo, useState } from 'react';
+﻿import React, { useMemo, useState } from 'react';
 
 function Checkbox({ checked, onChange, className = '' }) {
 	return (
 		<input
 			type="checkbox"
-			className={`h-4 w-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/30 ${className}`}
+			className={`h-4 w-4 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500/30 ${className}`}
 			checked={checked}
 			onChange={onChange}
 		/>
@@ -124,15 +124,15 @@ export default function BulkAssignPanel({
 		};
 
 		return (
-			<div key={critKey} className={depth > 0 ? 'ml-3 border-l-2 border-indigo-200 pl-3' : ''}>
-				<div className="flex items-start gap-2 rounded-lg bg-indigo-500 px-2.5 py-2 text-white shadow-sm">
+			<div key={critKey} className={depth > 0 ? 'ml-3 border-l-2 border-blue-200 pl-3' : ''}>
+				<div className="flex items-start gap-2 rounded-lg bg-blue-500 px-2.5 py-2 text-white shadow-sm">
 					<Checkbox
-						className="border-white/50 bg-white text-indigo-600"
+						className="border-white/50 bg-white text-blue-600"
 						checked={criteriaChecked}
 						onChange={(event) => handleCheck(event.target.checked)}
 					/>
 					<button type="button" className="min-w-0 flex-1 text-left" onClick={handleExpand}>
-						<span className="text-[10px] font-semibold uppercase tracking-wide text-indigo-100">Criteria</span>
+						<span className="text-[10px] font-semibold uppercase tracking-wide text-blue-100">Criteria</span>
 						<p className="text-xs font-medium leading-snug text-white">{node.label}</p>
 					</button>
 					<span className="shrink-0 rounded-md bg-white/15 px-1.5 py-0.5 text-[10px] font-medium text-white">
@@ -140,7 +140,7 @@ export default function BulkAssignPanel({
 					</span>
 					<button
 						type="button"
-						className="shrink-0 rounded p-1 text-indigo-100 hover:bg-white/15 hover:text-white"
+						className="shrink-0 rounded p-1 text-blue-100 hover:bg-white/15 hover:text-white"
 						onClick={handleExpand}
 						aria-label={critExpanded ? 'Collapse' : 'Expand'}
 					>
@@ -233,7 +233,7 @@ export default function BulkAssignPanel({
 		<form onSubmit={onAssign} className="flex h-full min-h-0 flex-col">
 			{loadingAssignmentData ? (
 				<div className="flex flex-1 flex-col items-center justify-center gap-3 py-16">
-					<div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+					<div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
 					<p className="text-sm text-slate-500">Loading offices and areas...</p>
 				</div>
 			) : (
@@ -256,7 +256,7 @@ export default function BulkAssignPanel({
 								</div>
 								<input
 									type="search"
-									className="mt-2 w-full rounded-lg border border-slate-300/60 bg-white px-2.5 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+									className="mt-2 w-full rounded-lg border border-slate-300/60 bg-white px-2.5 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
 									placeholder="Search offices..."
 									value={officeSearchTerm}
 									onChange={(event) => setOfficeSearchTerm(event.target.value)}
@@ -277,7 +277,7 @@ export default function BulkAssignPanel({
 												key={officeId}
 												className={`flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2.5 text-sm transition ${
 													checked
-														? 'border-indigo-300/80 bg-indigo-50/90 text-indigo-900 shadow-sm'
+														? 'border-blue-300/80 bg-blue-50/90 text-indigo-900 shadow-sm'
 														: 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
 												}`}
 											>
@@ -302,7 +302,7 @@ export default function BulkAssignPanel({
 								<p className="mt-0.5 text-[11px] text-slate-500">Area &gt; Criteria &gt; Requirement</p>
 								<input
 									type="search"
-									className="mt-2 w-full rounded-lg border border-slate-300/60 bg-white px-2.5 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+									className="mt-2 w-full rounded-lg border border-slate-300/60 bg-white px-2.5 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
 									placeholder="Search loaded hierarchy..."
 									value={requirementSearchTerm}
 									onChange={(event) => setRequirementSearchTerm(event.target.value)}
@@ -386,3 +386,4 @@ export default function BulkAssignPanel({
 		</form>
 	);
 }
+

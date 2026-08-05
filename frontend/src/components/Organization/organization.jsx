@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import Header from "../Header/header";
 import Sortoffice from "./sortoffice";
 import EventsAddDelete from "../ALLC/eventsadddelete";
 import EventTabs from "./EventTabs";
@@ -383,8 +382,7 @@ export default function Organization() {
         <div className="w-full h-screen flex flex-col bg-app">
             {/* Fixed header */}
             <div ref={headerRef} style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50, background: 'transparent' }}>
-                <Header />
-            </div>
+</div>
 
             {/* Fixed controls and filters */}
             <div
@@ -439,7 +437,7 @@ export default function Organization() {
                         <button
                             type="button"
                             onClick={() => setIsModalOpen(true)}
-                            className="inline-flex h-8 items-center gap-1 rounded-lg bg-emerald-600 px-3 text-[11px] font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            className="inline-flex h-8 items-center gap-1 rounded-lg bg-emerald-600 px-3 text-[11px] font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
                         >
                             <span className="text-sm leading-none">+</span>
                             Add
@@ -462,7 +460,7 @@ export default function Organization() {
                         <input
                             type="text"
                             placeholder="Search offices..."
-                            className="h-9 w-full rounded-lg border border-slate-200 bg-white pl-8 pr-3 text-[9px] text-slate-700 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                            className="h-9 w-full rounded-lg border border-slate-200 bg-white pl-8 pr-3 text-[9px] text-slate-700 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-brand-500"
                             value={searchTerm}
                             onChange={e => setSearchTerm(e.target.value)}
                         />
@@ -473,7 +471,7 @@ export default function Organization() {
                                 <select
                                     value={selectedOfficeTypeFilter}
                                     onChange={(e) => setSelectedOfficeTypeFilter(e.target.value)}
-                                    className="h-8 min-w-[146px] appearance-none rounded-md border border-slate-200 bg-white px-4 text-center text-[10px] font-medium leading-4 text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                    className="h-8 min-w-[146px] appearance-none rounded-md border border-slate-200 bg-white px-4 text-center text-[10px] font-medium leading-4 text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-500"
                                     style={{ textAlignLast: 'center' }}
                                 >
                                     <option value="">All Office Types</option>
@@ -489,7 +487,7 @@ export default function Organization() {
                                 <select
                                     value={selectedDepartmentFilter}
                                     onChange={(e) => setSelectedDepartmentFilter(e.target.value)}
-                                    className="h-8 min-w-[146px] appearance-none rounded-md border border-slate-200 bg-white px-4 text-center text-[10px] font-medium leading-4 text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                    className="h-8 min-w-[146px] appearance-none rounded-md border border-slate-200 bg-white px-4 text-center text-[10px] font-medium leading-4 text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-500"
                                     style={{ textAlignLast: 'center' }}
                                 >
                                     <option value="">All Departments</option>
@@ -508,7 +506,7 @@ export default function Organization() {
                                 <select
                                     value={selectedProgramTypeFilter}
                                     onChange={(e) => setSelectedProgramTypeFilter(e.target.value)}
-                                    className="h-8 min-w-[146px] appearance-none rounded-md border border-slate-200 bg-white px-4 text-center text-[10px] font-medium leading-4 text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                    className="h-8 min-w-[146px] appearance-none rounded-md border border-slate-200 bg-white px-4 text-center text-[10px] font-medium leading-4 text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-500"
                                     style={{ textAlignLast: 'center' }}
                                 >
                                     <option value="">All Program Types</option>

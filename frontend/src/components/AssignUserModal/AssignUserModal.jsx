@@ -145,7 +145,7 @@ export default function AssignUserModal({ isOpen, onClose, requirement, officeId
     if (!isOpen || !requirement) return null;
 
     return (
-        <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out bg-black bg-opacity-50 flex items-center justify-center z-[120]" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out bg-black bg-opacity-50 flex items-center justify-center z-[50]" onClick={(e) => e.stopPropagation()}>
             <div className="bg-white rounded-lg shadow-xl w-full max-w-xl mx-4 max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-t-lg">
@@ -202,7 +202,7 @@ export default function AssignUserModal({ isOpen, onClose, requirement, officeId
                                         value={searchTerm}
                                         onChange={(e) => setSearchTerm(e.target.value)}
                                         placeholder="Search users..."
-                                        className="w-full px-3 py-2 pl-9 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                        className="w-full px-3 py-2 pl-9 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm"
                                     />
                                     <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -257,7 +257,7 @@ export default function AssignUserModal({ isOpen, onClose, requirement, officeId
                                                         checked={isSelected}
                                                         onChange={() => !isDisabled && toggleUserSelection(user.UserID)}
                                                         disabled={isDisabled}
-                                                        className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                                                        className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-brand-500"
                                                     />
                                                     <div className="ml-2.5 flex items-center flex-1">
                                                         <div className="flex-shrink-0">

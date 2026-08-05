@@ -1,7 +1,6 @@
 import CopyEventPopup from './CopyEventPopup';
 import { useState, useEffect, useRef } from 'react';
 import Pagination from '../Pagination/Pagination';
-import Header from '../Header/header';
 import axios from 'axios';
 import SortEvents from './sortevents';
 import { API_BASE_URL } from '../../utils/apiBase';
@@ -75,7 +74,7 @@ function ALL() {
     // Track abort controllers to cancel stale requests
     const abortControllersRef = useRef({});
     
-    const itemsPerPage = 30; // limit to 30 per page
+    const itemsPerPage = 4; // limit to 4 per page
 
     useEffect(() => {
         setCurrentPage(1);
@@ -164,7 +163,11 @@ function ALL() {
             setError(null);
         } catch (err) {
             console.error('Error fetching events:', err);
-            setError('Failed to load events');
+            if (err.response?.status === 429) {
+                setError('Rate limit exceeded (Max 30 requests/min). Please try again later.');
+            } else {
+                setError('Failed to load events');
+            }
         } finally {
             setLoading(false);
         }
@@ -565,8 +568,7 @@ function ALL() {
 
     return (
         <div className="px-4 pb-6 pt-6 w-full overflow-hidden">
-            <Header />
-            <div className="mb-4 flex flex-col gap-2 relative">
+<div className="mb-4 flex flex-col gap-2 relative">
                 <div className="flex items-start justify-between gap-2">
                     <div>
                         <h1 className="text-2xl font-bold text-gray-800 mb-1">Compliance Standards</h1>
@@ -629,7 +631,7 @@ function ALL() {
                         <button
                             type="button"
                             onClick={() => setIsAddEventOpen(true)}
-                            className="inline-flex h-8 items-center gap-1 rounded-lg bg-emerald-600 px-3 text-[11px] font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            className="inline-flex h-8 items-center gap-1 rounded-lg bg-emerald-600 px-3 text-[11px] font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
                         >
                             <span className="text-sm leading-none">+</span>
                             Add
@@ -654,7 +656,7 @@ function ALL() {
                             <input
                                 type="text"
                                 placeholder="Search events, codes, or descriptions..."
-                                className="h-9 w-full rounded-lg border border-slate-200 bg-white pl-8 pr-3 text-[9px] text-slate-700 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                className="h-9 w-full rounded-lg border border-slate-200 bg-white pl-8 pr-3 text-[9px] text-slate-700 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-brand-500"
                                 value={searchTerm}
                                 onChange={handleSearchChange}
                             />

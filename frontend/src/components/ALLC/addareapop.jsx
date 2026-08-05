@@ -308,7 +308,7 @@ export default function AddAreaPop({
 	}, [isOpen, event?.EventID, mainMode]);
 
 	const fieldClass =
-		'w-full rounded-lg border border-stone-300/80 bg-app-surface px-3 py-2.5 text-sm text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500';
+		'w-full rounded-lg border border-blue-100 bg-app-surface px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors';
 
 	const resetAndClose = () => {
 		setMainMode('add');
@@ -746,12 +746,10 @@ export default function AddAreaPop({
 	if (!isOpen || !event) return null;
 
 	return (
-		<div
-			className="fixed inset-y-0 right-0 z-[120] flex bg-slate-900/50 py-2 pl-2 pr-2 backdrop-blur-[2px] sm:py-2.5 sm:pl-3 sm:pr-2.5"
-			style={{ left: 'calc(var(--sidebar-width, 0px) + 8px)' }}
-		>
-			<div className="relative flex h-full w-full flex-col overflow-hidden rounded-xl border border-stone-200/90 bg-app-muted shadow-2xl">
-				<div className="flex min-h-0 flex-1 gap-0">
+		<div className="fixed top-0 right-0 bottom-0 z-[50] flex bg-slate-900/50 backdrop-blur-[2px]" style={{ left: 'calc(var(--sidebar-width, 0px) + 12px)' }}>
+			<div className="relative flex h-full w-full flex-col overflow-hidden rounded-none border border-blue-100 bg-app-muted shadow-2xl">
+				<ModalHeader event={event} onClose={resetAndClose} mainMode={mainMode} />
+				<div className="flex min-h-0 flex-1 gap-4">
 					<EventStructureSidebar
 						mainMode={mainMode}
 						mode={mode}
@@ -786,9 +784,8 @@ export default function AddAreaPop({
 						}}
 					/>
 
-					<div className="relative flex min-w-0 flex-1 flex-col border-l border-stone-200/90 bg-app-bg">
-						<ModalHeader event={event} onClose={resetAndClose} mainMode={mainMode} />
-						<ToastBanner error={error} success={success} toastVisible={toastVisible} />
+				<div className="relative flex min-w-0 flex-1 flex-col bg-app-bg">
+
 
 						<div
 							className={`flex min-h-0 flex-1 flex-col overflow-hidden py-4 ${

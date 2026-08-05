@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import Header from "../Header/header"
 import OfficeHeadP from "../OfficeHeadP/OfficeHeadP";
 import AddOfficeHeadModal from "../AddHead/AddOfficeHeadModal";
 import Sortoffice from "./sorthead";
@@ -164,8 +163,7 @@ export default function Home() {
 
     return (
         <div className="h-screen w-full flex flex-col overflow-hidden">
-            <Header />
-            {/* Control panel and header label fixed at the top, cards area scrollable */}
+{/* Control panel and header label fixed at the top, cards area scrollable */}
             <div className="flex-1 min-h-0 flex flex-col px-4 pb-6 pt-6 bg-gray-100">
                 {/* Control panel (title, search, filters, buttons) */}
                 <div className="mb-4 flex flex-col gap-2 relative">
@@ -217,7 +215,7 @@ export default function Home() {
                             <button
                                 type="button"
                                 onClick={() => setIsModalOpen(true)}
-                                className="inline-flex h-8 items-center gap-1 rounded-lg bg-emerald-600 px-3 text-[11px] font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                className="inline-flex h-8 items-center gap-1 rounded-lg bg-emerald-600 px-3 text-[11px] font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
                             >
                                 <span className="text-sm leading-none">+</span>
                                 Add
@@ -252,7 +250,7 @@ export default function Home() {
                             <input
                                 type="text"
                                 placeholder="Search personnel, office, or email..."
-                                className="h-9 w-full rounded-lg border border-slate-200 bg-white pl-8 pr-3 text-[9px] text-slate-700 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                className="h-9 w-full rounded-lg border border-slate-200 bg-white pl-8 pr-3 text-[9px] text-slate-700 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-brand-500"
                                 value={searchTerm}
                                 onChange={e => setSearchTerm(e.target.value)}
                             />

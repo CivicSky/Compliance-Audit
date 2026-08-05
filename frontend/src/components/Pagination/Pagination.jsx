@@ -1,7 +1,7 @@
 import React from "react";
 
 
-export default function Pagination({ currentPage, totalPages, onPageChange, fixed = false, showWhenSinglePage = false }) {
+export default function Pagination({ currentPage, totalPages, onPageChange, fixed = true, showWhenSinglePage = false }) {
     if (totalPages <= 0) return null;
     if (totalPages <= 1 && !showWhenSinglePage) return null;
 
@@ -27,11 +27,12 @@ export default function Pagination({ currentPage, totalPages, onPageChange, fixe
     }
 
     const containerClass = fixed
-        ? 'fixed left-1/2 lg:left-[calc((100%+var(--sidebar-width))/2)] lg:transition-[left] lg:duration-200 lg:ease-in-out bottom-6 transform -translate-x-1/2 flex justify-center z-50 gap-3 px-4'
+        ? 'fixed bottom-6 left-1/2 lg:left-[calc((100%+var(--sidebar-width))/2)] -translate-x-1/2 z-[40] flex justify-center items-center gap-3 px-6 py-2.5 bg-white/95 backdrop-blur border border-slate-200 shadow-xl rounded-full'
         : 'w-full flex justify-center gap-3 mt-4 mb-8';
 
     return (
-        <div className={containerClass}>
+        <>
+            <div className={containerClass}>
             <button
                 onClick={() => onPageChange(1)}
                 disabled={currentPage === 1}
@@ -109,5 +110,7 @@ export default function Pagination({ currentPage, totalPages, onPageChange, fixe
                 {'>>'}
             </button>
         </div>
-    );
+        {fixed && <div className="h-16 w-full pointer-events-none shrink-0" aria-hidden="true" />}
+    </>
+  );
 }

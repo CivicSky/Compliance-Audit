@@ -238,7 +238,7 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
     const safeHeads = Array.isArray(heads) ? heads : [];
 
     return (
-        <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out z-[120] flex items-center justify-center bg-black/40">
+        <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out z-[50] flex items-center justify-center bg-black/40">
             <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
                 <div className="flex items-center justify-between px-6 py-5 border-b border-slate-200">
                     <h2 className="text-lg font-bold text-gray-900">{isAdmin ? 'Edit Office' : 'View Office'}</h2>
@@ -255,7 +255,7 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
                             type="text"
                             value={officeName}
                             onChange={(e) => setOfficeName(e.target.value)}
-                            className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                            className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
                             disabled={!isAdmin}
                             required
                         />
@@ -271,7 +271,7 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
                             <select
                                 value={officeTypeID}
                                 onChange={(e) => setOfficeTypeID(e.target.value)}
-                                className="h-10 w-full appearance-none rounded-md border border-slate-200 bg-white px-3 pr-9 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                className="h-10 w-full appearance-none rounded-md border border-slate-200 bg-white px-3 pr-9 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
                                 disabled={!isAdmin}
                                 required
                             >
@@ -298,7 +298,7 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
                                         setSelectedDepartmentID(e.target.value);
                                         setSelectedProgramTypeID("");
                                     }}
-                                    className="h-10 w-full appearance-none rounded-md border border-slate-200 bg-white px-3 pr-9 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                    className="h-10 w-full appearance-none rounded-md border border-slate-200 bg-white px-3 pr-9 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
                                     required
                                 >
                                     <option value="">Select Department</option>
@@ -326,7 +326,7 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
                                 <select
                                     value={selectedProgramTypeID}
                                     onChange={(e) => setSelectedProgramTypeID(e.target.value)}
-                                    className="h-10 w-full appearance-none rounded-md border border-slate-200 bg-white px-3 pr-9 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                    className="h-10 w-full appearance-none rounded-md border border-slate-200 bg-white px-3 pr-9 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
                                     required
                                 >
                                     <option value="">Select Program Type</option>
@@ -356,7 +356,7 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
                                     value={headSearchTerm}
                                     onChange={(e) => setHeadSearchTerm(e.target.value)}
                                     placeholder="Search heads..."
-                                    className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                    className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
                                 />
                                 <button
                                     type="button"

@@ -168,7 +168,7 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, use
   if (!visible) return null;
 
   return (
-    <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out bg-black bg-opacity-50 flex items-center justify-center z-[120]">
+    <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out bg-black bg-opacity-50 flex items-center justify-center z-[50]">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4 max-h-[95vh] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between px-6 py-5 border-b border-slate-200 bg-white">
           <h2 className="text-lg font-bold text-gray-900">{isAdmin ? 'Edit Requirement' : 'View Requirement'}</h2>
@@ -199,7 +199,7 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, use
                   name="ParentRequirementCode"
                   value={formData.ParentRequirementCode}
                   onChange={handleInputChange}
-                  className="h-10 w-full appearance-none rounded-md border border-slate-200 bg-white px-3 pr-9 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                  className="h-10 w-full appearance-none rounded-md border border-slate-200 bg-white px-3 pr-9 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
                   disabled={isSubmitting || !formData.CriteriaID || !isAdmin}
                 >
                   <option value="">
@@ -242,7 +242,7 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, use
                 name="RequirementCode"
                 value={formData.RequirementCode}
                 onChange={handleInputChange}
-                className={`w-full rounded-md bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500 ${
+                className={`w-full rounded-md bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500 ${
                   errors.RequirementCode ? 'border-red-500' : 'border border-slate-200'
                 }`}
                 placeholder="e.g., A.1 or just enter a number"
@@ -269,7 +269,7 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, use
                 value={formData.Description}
                 onChange={handleInputChange}
                 rows="4"
-                className={`w-full rounded-md bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500 resize-none ${
+                className={`w-full rounded-md bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none ${
                   errors.Description ? 'border-red-500' : 'border border-slate-200'
                 }`}
                 placeholder="Enter a detailed description of this requirement"

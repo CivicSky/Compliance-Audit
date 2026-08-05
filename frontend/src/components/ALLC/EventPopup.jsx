@@ -284,7 +284,7 @@ export default function EventPopup({
     };
 
     return (
-        <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out bg-black bg-opacity-50 z-[120]">
+        <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out bg-black bg-opacity-50 z-[50]">
             <div className="bg-white w-full h-full overflow-hidden shadow-2xl flex flex-col">
                 <div className="px-6 py-5 border-b border-slate-200 bg-white">
                     <div className="flex justify-between items-start gap-4">
@@ -377,39 +377,7 @@ export default function EventPopup({
                 {/* Hierarchy + Offices sidebar inside modal */}
                 <div className="flex-1 min-h-0 overflow-hidden px-6 pb-6">
                     <div className="flex gap-6 h-full min-h-[300px]">
-                        <div className="w-1/3 border-r border-slate-200 pr-4 overflow-y-auto">
-                            <div className="py-2">
-                                <div className="sticky top-0 z-10 bg-white pt-2 pb-2">
-                                    <h4 className="text-sm font-semibold text-slate-700 mb-2">Offices</h4>
-                                    <input
-                                        type="text"
-                                        value={officeSearch}
-                                        onChange={(e) => setOfficeSearch(e.target.value)}
-                                        placeholder="Search offices..."
-                                        className="h-9 w-full rounded-md border border-slate-200 px-2 text-sm text-slate-700 shadow-sm focus:outline-none"
-                                    />
-                                </div>
-
-                                <div className="mt-3 space-y-2 pt-2">
-                                    {loadingOffices ? (
-                                        <div className="text-sm text-gray-500">Loading offices...</div>
-                                    ) : offices.length === 0 ? (
-                                        <div className="text-sm text-gray-500">No offices for this event</div>
-                                    ) : (
-                                        (offices || []).filter(o => String(o.office_name || o.OfficeName || o.office_name || '').toLowerCase().includes(officeSearch.trim().toLowerCase())).map((office) => (
-                                            <div
-                                                key={office.id || office.OfficeID || office.office_id}
-                                                className="flex items-center gap-2 rounded-lg border px-2.5 py-2 text-sm transition border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
-                                            >
-                                                <span className="truncate">{office.office_name || office.OfficeName || office.office_name}</span>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto pl-4">
+                        <div className="w-3/4 border-r border-slate-200 pr-4 overflow-y-auto">
                             <div className="sticky top-0 z-10 bg-white pt-3 pb-2">
                                 <h4 className="text-sm font-semibold text-slate-700 mb-2">Areas</h4>
                                 <input
@@ -595,6 +563,38 @@ export default function EventPopup({
                                         </div>
                                     </div>
                                 )}
+                            </div>
+                        </div>
+
+                        <div className="w-1/3 pl-4 overflow-y-auto">
+                            <div className="py-2">
+                                <div className="sticky top-0 z-10 bg-white pt-2 pb-2">
+                                    <h4 className="text-sm font-semibold text-slate-700 mb-2">Offices</h4>
+                                    <input
+                                        type="text"
+                                        value={officeSearch}
+                                        onChange={(e) => setOfficeSearch(e.target.value)}
+                                        placeholder="Search offices..."
+                                        className="h-9 w-full rounded-md border border-slate-200 px-2 text-sm text-slate-700 shadow-sm focus:outline-none"
+                                    />
+                                </div>
+
+                                <div className="mt-3 space-y-2 pt-2">
+                                    {loadingOffices ? (
+                                        <div className="text-sm text-gray-500">Loading offices...</div>
+                                    ) : offices.length === 0 ? (
+                                        <div className="text-sm text-gray-500">No offices for this event</div>
+                                    ) : (
+                                        (offices || []).filter(o => String(o.office_name || o.OfficeName || o.office_name || '').toLowerCase().includes(officeSearch.trim().toLowerCase())).map((office) => (
+                                            <div
+                                                key={office.id || office.OfficeID || office.office_id}
+                                                className="flex items-center gap-2 rounded-lg border px-2.5 py-2 text-sm transition border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                                            >
+                                                <span className="truncate">{office.office_name || office.OfficeName || office.office_name}</span>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>

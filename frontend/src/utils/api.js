@@ -65,6 +65,17 @@ export const areasAPI = {
   deleteAreas: async (areaIds) => (await api.post('/api/areas/delete', { areaIds })).data,
 };
 
+export const masterlistAPI = {
+  getAll: async () => (await api.get('/api/masterlist')).data,
+  addItem: async (item) => (await api.post('/api/masterlist/add', item)).data,
+  updateItem: async (id, item) => (await api.put(`/api/masterlist/${id}`, item)).data,
+  deleteItem: async (id) => (await api.delete(`/api/masterlist/${id}`)).data,
+};
+
+export const departmentsAPI = {
+  getAll: async () => (await api.get('/api/departments')).data,
+};
+
 // ========================
 // Office Heads API
 // ========================

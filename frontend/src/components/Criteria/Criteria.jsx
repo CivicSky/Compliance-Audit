@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import Header from "../Header/header";
 import { officesAPI, officeHeadsAPI, officetypesAPI, eventsAPI, criteriaAPI, usersAPI } from "../../utils/api";
 import CriteriaP from "../../components/CriteriaP/CriteriaP";
 import AddCriteriaModal from "../../components/AddCriteriaModal/AddCriteriaModal";
@@ -114,8 +113,8 @@ export default function Organization() {
 
     // Refresh CriteriaP after adding new criteria
     const handleSuccess = () => {
-        if (officesPRef.current?.refresh) {
-            officesPRef.current.refresh();
+        if (criteriaPRef.current?.refresh) {
+            criteriaPRef.current.refresh();
         }
     };
 
@@ -129,8 +128,8 @@ export default function Organization() {
     const handleCloseViewReqModal = () => {
         setIsViewReqModalOpen(false);
         // Refresh offices list to update compliance status
-        if (officesPRef.current?.refresh) {
-            officesPRef.current.refresh();
+        if (criteriaPRef.current?.refresh) {
+            criteriaPRef.current.refresh();
         }
     };
 
@@ -150,8 +149,8 @@ export default function Organization() {
         setIsAddReqModalOpen(false);
         setIsViewReqModalOpen(true);
         // Refresh requirements in view modal
-        if (officesPRef.current?.refresh) {
-            officesPRef.current.refresh();
+        if (criteriaPRef.current?.refresh) {
+            criteriaPRef.current.refresh();
         }
     };
 
@@ -161,7 +160,7 @@ export default function Organization() {
             const response = await officesAPI.updateOffice(updatedOffice.id, updatedOffice);
 
             if (response?.success) {
-                officesPRef.current.refresh();
+                criteriaPRef.current.refresh();
                 await showAlert('Office updated successfully!');
             } else {
                 await showAlert(response?.message || 'Failed to update office');
@@ -251,7 +250,7 @@ export default function Organization() {
                             setSelectedEventId(e.target.value);
                             setSelectedEventType(selected?.EventName || '');
                         }}
-                        className="w-full appearance-none px-5 py-3 border-2 border-purple-400 rounded-xl bg-white text-gray-800 font-semibold shadow focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all duration-200 hover:border-purple-600 hover:shadow-lg"
+                        className="w-full appearance-none px-5 py-3 border-2 border-purple-400 rounded-xl bg-white text-gray-800 font-semibold shadow focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all duration-200 hover:border-purple-600 hover:shadow-lg"
                     >
                         {events.map(event => (
                             <option key={event.EventID} value={event.EventID} className="text-base">

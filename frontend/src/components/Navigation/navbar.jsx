@@ -12,7 +12,7 @@ export default function Navbar() {
         const stored = window.localStorage.getItem('sidebarExpanded');
         const expanded = stored === null ? false : stored === 'true';
         // Keep layout offset at collapsed width so hover/expand overlays content.
-        document.documentElement.style.setProperty('--sidebar-width', '4rem');
+        document.documentElement.style.setProperty('--sidebar-width', 'calc(4rem / 0.9)');
         return expanded;
     };
 
@@ -74,7 +74,7 @@ export default function Navbar() {
     const effectiveExpanded = isSidebarExpanded || isHoverExpanded;
     useEffect(() => {
         // Keep layout offset fixed; sidebar expands as an overlay.
-        document.documentElement.style.setProperty('--sidebar-width', '4rem');
+        document.documentElement.style.setProperty('--sidebar-width', 'calc(4rem / 0.9)');
     }, [effectiveExpanded]);
 
     // Close menus on outside click
@@ -95,7 +95,7 @@ export default function Navbar() {
 
     // NavLink style function
     const navLinkClass = ({ isActive }) =>
-        `flex items-center py-2.5 rounded-lg transition-colors duration-200 text-slate-100 text-xs font-medium ${effectiveExpanded ? 'gap-2 px-3 justify-start' : 'h-10 w-10 mx-auto px-0 justify-center'} ${isActive ? 'bg-cyan-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]' : 'hover:bg-slate-800/90'}`;
+        `flex items-center py-2.5 rounded-lg transition-colors duration-200 text-slate-200 text-xs font-medium ${effectiveExpanded ? 'gap-2 px-3 justify-start' : 'h-10 w-10 mx-auto px-0 justify-center'} ${isActive ? 'bg-blue-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.15)]' : 'hover:bg-white/10'}`;
 
     const labelStyle = {
         maxWidth: effectiveExpanded ? '12rem' : '0px',
@@ -126,7 +126,7 @@ export default function Navbar() {
     );
 
     const mobileNavLinkClass = ({ isActive }) =>
-        `flex items-center gap-2 py-2.5 px-3 rounded-lg transition-colors duration-200 text-slate-100 text-xs font-medium ${isActive ? 'bg-cyan-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]' : 'hover:bg-slate-800/90'}`;
+        `flex items-center gap-2 py-2.5 px-3 rounded-lg transition-colors duration-200 text-slate-200 text-xs font-medium ${isActive ? 'bg-blue-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.15)]' : 'hover:bg-white/10'}`;
 
     const mobileSectionClass = "flex items-center gap-2 px-3 py-0.5";
 
@@ -136,14 +136,16 @@ export default function Navbar() {
             <nav
                 onMouseEnter={() => { if (!isSidebarExpanded) setIsHoverExpanded(true); }}
                 onMouseLeave={() => { if (!isSidebarExpanded) setIsHoverExpanded(false); }}
-                className={`hidden lg:flex fixed top-0 left-0 h-screen bg-gradient-to-b from-slate-950 to-slate-900 border-r border-slate-800 shadow-xl z-50 flex-col justify-between p-4 overflow-hidden transition-[width] duration-200 ease-in-out ${effectiveExpanded ? 'w-64' : 'w-16'}`}
+                className={`nav-no-zoom hidden lg:flex fixed top-0 left-0 h-screen border-r border-blue-900/50 shadow-xl z-50 flex-col justify-between p-4 overflow-hidden transition-[width] duration-200 ease-in-out ${effectiveExpanded ? 'w-64' : 'w-16'}`}
+                style={{ background: 'linear-gradient(180deg, #0f172a 0%, #0c1836 60%, #0f172a 100%)' }}
             >
                 <div className="flex flex-col space-y-2">
                     {/* Logo */}
                     <div className="mb-2 flex items-center gap-2">
                         <button
                             onClick={() => setIsSidebarExpanded((prev) => !prev)}
-                            className="p-1.5 rounded-md border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors duration-200"
+                            className="p-1.5 rounded-md text-blue-300 hover:bg-white/10 hover:text-white transition-colors duration-200"
+                            style={{ border: '1px solid rgba(59,130,246,0.3)' }}
                             aria-label={effectiveExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
                             title={effectiveExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
                         >
@@ -170,7 +172,7 @@ export default function Navbar() {
                     {currentUser && currentUser.RoleID === 1 && (
                         <div className="space-y-1">
                             <div className={sectionClass} style={sectionStyle}>
-                                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Analyze</span>
+                                <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: '#60a5fa' }}>Analyze</span>
                             </div>
                             <NavLink to="/home" className={navLinkClass}>
                                 <span className="w-4 text-center">
@@ -186,7 +188,7 @@ export default function Navbar() {
                 {/* Management Section */}
                 <div className="space-y-1">
                     <div className={sectionClass} style={sectionStyle}>
-                        <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Management</span>
+                        <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: '#60a5fa' }}>Management</span>
                     </div>
                     
                     {/* Reordered: Events > ALLC > (Area, Criteria, Requirements commented) > Offices */}
@@ -234,8 +236,8 @@ export default function Navbar() {
                     <NavLink
                         to="/home/allc"
                         className={({ isActive }) =>
-                            `flex items-center py-2.5 rounded-lg transition-colors duration-200 text-white ${effectiveExpanded ? 'gap-2 px-3 justify-start' : 'h-10 w-10 mx-auto px-0 justify-center'} ${
-                                isActive ? 'bg-blue-600 shadow-inner' : 'hover:bg-gray-800'
+                            `flex items-center py-2.5 rounded-lg transition-colors duration-200 text-slate-200 text-xs font-medium ${effectiveExpanded ? 'gap-2 px-3 justify-start' : 'h-10 w-10 mx-auto px-0 justify-center'} ${
+                                isActive ? 'bg-blue-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.15)]' : 'hover:bg-white/10'
                             }`
                         }
                     >
@@ -252,8 +254,8 @@ export default function Navbar() {
                     <NavLink
                         to="/home/master-list"
                         className={({ isActive }) =>
-                            `flex items-center py-2.5 rounded-lg transition-colors duration-200 text-white ${effectiveExpanded ? 'gap-2 px-3 justify-start' : 'h-10 w-10 mx-auto px-0 justify-center'} ${
-                                isActive ? 'bg-blue-600 shadow-inner' : 'hover:bg-gray-800'
+                            `flex items-center py-2.5 rounded-lg transition-colors duration-200 text-slate-200 text-xs font-medium ${effectiveExpanded ? 'gap-2 px-3 justify-start' : 'h-10 w-10 mx-auto px-0 justify-center'} ${
+                                isActive ? 'bg-blue-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.15)]' : 'hover:bg-white/10'
                             }`
                         }
                     >
@@ -337,8 +339,8 @@ export default function Navbar() {
                             }
                         }}
                         className={({ isActive }) =>
-                            `flex items-center py-2.5 rounded-lg transition-colors duration-200 text-white ${effectiveExpanded ? 'gap-2 px-3 justify-start' : 'h-10 w-10 mx-auto px-0 justify-center'} ${
-                                isActive ? 'bg-blue-600 shadow-inner' : 'hover:bg-gray-800'
+                            `flex items-center py-2.5 rounded-lg transition-colors duration-200 text-slate-200 text-xs font-medium ${effectiveExpanded ? 'gap-2 px-3 justify-start' : 'h-10 w-10 mx-auto px-0 justify-center'} ${
+                                isActive ? 'bg-blue-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.15)]' : 'hover:bg-white/10'
                             }`
                         }
                     >
@@ -348,14 +350,14 @@ export default function Navbar() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 10h.01M15 10h.01M9 14h.01M15 14h.01" />
                             </svg>
                         </span>
-                        <span className={labelClass} style={labelStyle}>Categories</span>
+                        <span className={labelClass} style={labelStyle}>Offices and Programs</span>
                     </NavLink>
                 </div>
 
                     {/* Users */}
                     <div className="space-y-1">
                         <div className={sectionClass} style={sectionStyle}>
-                            <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Users</span>
+                            <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: '#60a5fa' }}>Users</span>
                         </div>
                         {currentUser && currentUser.RoleID === 1 && (
                             <NavLink to="/home/officehead" className={navLinkClass}>
@@ -379,7 +381,7 @@ export default function Navbar() {
                     {currentUser && currentUser.RoleID === 1 && (
                         <div className="space-y-1">
                             <div className={sectionClass} style={sectionStyle}>
-                                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Logs</span>
+                                <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: '#60a5fa' }}>Logs</span>
                             </div>
                             <NavLink to="/home/audit-logs" className={navLinkClass}>
                                 <span className="w-4 text-center">
@@ -394,8 +396,8 @@ export default function Navbar() {
                 </div>
 
                 {/* Profile Menu */}
-                <div className="relative border-t border-gray-700 pt-2" ref={profileMenuRef}>
-                    <div className={`flex items-center p-1.5 hover:bg-gray-800 rounded-lg transition-colors duration-200 ${effectiveExpanded ? 'justify-between' : 'justify-center'}`}>
+                <div className="relative border-t border-blue-900/60 pt-2" ref={profileMenuRef}>
+                    <div className={`flex items-center p-1.5 hover:bg-white/10 rounded-lg transition-colors duration-200 ${effectiveExpanded ? 'justify-between' : 'justify-center'}`}>
                         <NavLink to="/home/Profile" className={`flex items-center ${effectiveExpanded ? 'gap-3 flex-1' : 'justify-center'}`}>
                             <div className="w-7 h-7 bg-blue-600 rounded-full flex items-center justify-center overflow-hidden">
                                 {currentUser && currentUser.ProfilePic ? (
@@ -426,7 +428,7 @@ export default function Navbar() {
                             </div>
                         </NavLink>
 
-                        <button onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)} className={`p-1 rounded-md hover:bg-gray-700 transition-colors duration-200 ${effectiveExpanded ? '' : 'ml-1'}`}>
+                        <button onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)} className={`p-1 rounded-md hover:bg-white/10 transition-colors duration-200 ${effectiveExpanded ? '' : 'ml-1'}`}>
                             <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
                             </svg>
@@ -434,7 +436,7 @@ export default function Navbar() {
                     </div>
 
                     {isProfileMenuOpen && (
-                        <div className="absolute bottom-full left-0 right-0 mb-2 bg-gray-800 border border-gray-700 rounded-lg shadow-lg py-1">
+                        <div className="absolute bottom-full left-0 right-0 mb-2 rounded-lg shadow-lg py-1" style={{ background: '#0f172a', border: '1px solid rgba(59,130,246,0.25)' }}>
                             <button
                                 onClick={handleLogout}
                                 className="flex w-full items-center gap-3 px-3 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 transition-colors duration-200"
@@ -448,7 +450,7 @@ export default function Navbar() {
 
             {/* Mobile Navigation */}
             <div className="lg:hidden">
-                <nav className="fixed top-0 left-0 right-0 bg-gray-900 shadow-xl z-50 p-4">
+                <nav className="nav-no-zoom fixed top-0 left-0 right-0 shadow-xl z-50 p-4" style={{ background: 'linear-gradient(90deg, #0f172a 0%, #0c1836 100%)', borderBottom: '1px solid rgba(59,130,246,0.2)' }}>
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <img src={auditrackLogo} alt="Auditrack Logo" className="w-8 h-8 object-contain" />
@@ -470,13 +472,14 @@ export default function Navbar() {
                 {isMobileMenuOpen && <div className="fixed inset-0 bg-black bg-opacity-50 z-40" onClick={() => setIsMobileMenuOpen(false)}></div>}
 
                 {/* Mobile Sidebar */}
-                <div ref={mobileMenuRef} className={`fixed top-0 left-0 h-screen w-80 bg-gray-900 shadow-xl z-50 transform transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col justify-between p-4`}>
+                <div ref={mobileMenuRef} className={`nav-no-zoom fixed top-0 left-0 h-screen w-80 shadow-xl z-50 transform transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col justify-between p-4`}
+                    style={{ background: 'linear-gradient(180deg, #0f172a 0%, #0c1836 100%)' }}>
                     <div className="flex flex-col space-y-4 mt-16">
                         {/* Analyze */}
                         {currentUser && currentUser.RoleID === 1 && (
                             <div className="space-y-1">
                                 <div className={mobileSectionClass}>
-                                    <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Analyze</span>
+                                    <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: '#60a5fa' }}>Analyze</span>
                                 </div>
                                 <NavLink
                                     to="/home"
@@ -496,7 +499,7 @@ export default function Navbar() {
                         {/* Management */}
                         <div className="space-y-1">
                             <div className={mobileSectionClass}>
-                                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Management</span>
+                                <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: '#60a5fa' }}>Management</span>
                             </div>
 
                             <NavLink
@@ -559,7 +562,7 @@ export default function Navbar() {
                         {/* Users */}
                         <div className="space-y-1">
                             <div className={mobileSectionClass}>
-                                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Users</span>
+                                <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: '#60a5fa' }}>Users</span>
                             </div>
                             {currentUser && currentUser.RoleID === 1 && (
                                 <NavLink
@@ -587,7 +590,7 @@ export default function Navbar() {
                         {currentUser && currentUser.RoleID === 1 && (
                             <div className="space-y-1">
                                 <div className={mobileSectionClass}>
-                                    <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Logs</span>
+                                    <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: '#60a5fa' }}>Logs</span>
                                 </div>
                                 <NavLink
                                     to="/home/audit-logs"
@@ -606,8 +609,8 @@ export default function Navbar() {
                     </div>
 
                     {/* Mobile Profile Section */}
-                    <div className="relative border-t border-gray-700 pt-3">
-                        <div className="flex items-center justify-between p-2 hover:bg-gray-800 rounded-lg transition-colors duration-200">
+                    <div className="relative border-t border-blue-900/60 pt-3">
+                        <div className="flex items-center justify-between p-2 hover:bg-white/10 rounded-lg transition-colors duration-200">
                             <NavLink to="/home/Profile" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 flex-1">
                                 <div className="w-7 h-7 bg-blue-600 rounded-full flex items-center justify-center">
                                     <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">

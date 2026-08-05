@@ -1,4 +1,4 @@
-import RowActionMenu from './RowActionMenu';
+﻿import RowActionMenu from './RowActionMenu';
 import { formatDateTime } from '../../utils/formatDateTime';
 
 export default function CriteriaItem({
@@ -17,7 +17,7 @@ export default function CriteriaItem({
     const handleEdit = onEditClick || onMenuClick;
     return (
         <div
-            className="bg-indigo-500 text-white p-3 rounded-lg cursor-pointer hover:bg-indigo-600 transition flex items-center gap-3"
+            className="bg-blue-500 text-white p-3 rounded-lg cursor-pointer hover:bg-blue-600 transition flex items-center gap-3"
             onClick={onToggle}
         >
             {showCheckbox && (
@@ -29,7 +29,7 @@ export default function CriteriaItem({
                     className="h-4 w-4 accent-white"
                 />
             )}
-            <span className="text-lg">{isExpanded ? '▼' : '▶'}</span>
+            <span className="text-lg">{isExpanded ? 'â–¼' : 'â–¶'}</span>
             <div className="flex-1 min-w-0">
                 <span className="font-semibold text-lg truncate block">
                     {(() => {
@@ -38,12 +38,12 @@ export default function CriteriaItem({
                         return code ? `${code}. ${name}` : name;
                     })()}
                 </span>
-                <div className="mt-1 flex flex-wrap gap-2 text-[10px] text-indigo-100">
+                <div className="mt-1 flex flex-wrap gap-2 text-[10px] text-blue-100">
                     <span>Created: {formatDateTime(criteria.CreatedAt)}</span>
                     <span>Updated: {formatDateTime(criteria.UpdatedAt || criteria.CreatedAt)}</span>
                 </div>
             </div>
-            {loading && <span className="text-xs opacity-75">⏳</span>}
+            {loading && <span className="text-xs opacity-75">â³</span>}
             <RowActionMenu
                 onEdit={handleEdit ? () => handleEdit(criteria) : undefined}
                 onDelete={onDeleteClick ? () => onDeleteClick(criteria) : undefined}
@@ -52,3 +52,4 @@ export default function CriteriaItem({
         </div>
     );
 }
+

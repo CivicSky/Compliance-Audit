@@ -16,7 +16,7 @@ export default function Sortoffice({ value = 'all', onChange }) {
         <div className="relative inline-block" ref={ref}>
             <button
                 onClick={() => setOpen(v => !v)}
-                className="relative flex h-8 min-w-[146px] items-center justify-center rounded-md border border-slate-200 bg-white px-4 text-center text-[10px] font-medium leading-4 text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                className="relative flex h-8 min-w-[146px] items-center justify-center rounded-md border border-slate-200 bg-white px-4 text-center text-[10px] font-medium leading-4 text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-500"
                 title="Filter offices"
                 aria-label={`Filter offices: ${value === 'all' ? 'All Offices' : value === 'not_compiled' ? 'Not Complied' : value === 'partially_compiled' ? 'Partially Complied' : 'Complied'}`}
                 style={{ textAlignLast: 'center' }}

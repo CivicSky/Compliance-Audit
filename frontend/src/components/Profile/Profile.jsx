@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import Header from '../Header/header';
 import { usersAPI } from '../../utils/api';
 import EditProfileModal from '../EditProfile/EditProfileModal.jsx';
 import { API_BASE_URL } from '../../utils/apiBase';
@@ -16,7 +15,6 @@ function DetailRow({ label, value }) {
 function ProfileShell({ children }) {
 	return (
 		<div className="min-h-screen w-full bg-app">
-			<Header />
 			<div className="mx-auto max-w-5xl px-4 pb-12 pt-[88px] sm:px-6 lg:px-8">{children}</div>
 		</div>
 	);

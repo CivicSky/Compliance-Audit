@@ -450,28 +450,29 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
     ];
 
     return (
-        <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out bg-black/50 flex items-center justify-center z-[120] p-4">
+        <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out bg-black/50 flex items-center justify-center z-[50] p-4">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
                 
                 {/* Header */}
-                <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div className="px-6 py-4 border-b border-blue-100 flex items-center justify-between" style={{ background: 'linear-gradient(90deg, #eff6ff 0%, #f8fafc 100%)' }}>
                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center">
-                            <Wand2 size={18} className="text-indigo-600" />
+                        <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                            <Wand2 size={18} className="text-blue-600" />
                         </div>
-                        <h2 className="text-lg font-semibold text-gray-900">Setup Wizard</h2>
+                        <h2 className="text-lg font-semibold text-slate-900">Setup Wizard</h2>
                     </div>
                     <button
                         onClick={onClose}
-                        className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+                        className="p-1.5 rounded-lg transition-colors"
+                        style={{ background: '#eff6ff', border: '1px solid #bfdbfe', color: '#2563eb' }}
                         disabled={isSubmitting}
                     >
-                        <X size={18} className="text-gray-500" />
+                        <X size={18} />
                     </button>
                 </div>
 
                 {/* Progress Steps */}
-                <div className="px-6 py-4 bg-gray-50/50 border-b border-gray-100">
+                <div className="px-6 py-4 border-b border-blue-100" style={{ background: 'linear-gradient(90deg, #f0f5ff 0%, #f8fafc 100%)' }}>
                     <div className="flex items-center justify-between">
                         {(() => {
                             // Map currentStep to visual step (0,1 → 1, else same)
@@ -483,9 +484,9 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                         <div className={`
                                             w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all
                                             ${step.number < visualStep 
-                                                ? 'bg-emerald-100 text-emerald-600 border-2 border-emerald-200' 
+                                                ? 'bg-blue-100 text-blue-600 border-2 border-blue-200' 
                                                 : step.number === visualStep
-                                                ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-200'
+                                                ? 'bg-blue-600 text-white shadow-sm shadow-blue-200'
                                                 : 'bg-gray-100 text-gray-400'
                                             }
                                         `}>
@@ -493,7 +494,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                         </div>
                                         <span className={`
                                             text-xs font-medium
-                                            ${step.number === visualStep ? 'text-indigo-600' : 'text-gray-500'}
+                                            ${step.number === visualStep ? 'text-blue-600' : 'text-gray-500'}
                                         `}>
                                             {step.label}
                                         </span>
@@ -501,7 +502,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                     {idx < steps.length - 1 && (
                                         <div className={`
                                             flex-1 h-0.5 mx-2 rounded-full
-                                            ${step.number < visualStep ? 'bg-emerald-200' : 'bg-gray-200'}
+                                            ${step.number < visualStep ? 'bg-blue-200' : 'bg-gray-200'}
                                         `} />
                                     )}
                                 </React.Fragment>
@@ -516,8 +517,8 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                     <div className={`flex-1 overflow-y-auto p-6 ${currentStep > 0 && currentStep < 5 ? 'pr-3' : ''}`}>
                     {/* Success Toast */}
                     {successMessage && (
-                        <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700 text-sm flex items-center gap-2">
-                            <Check size={16} className="text-emerald-600" />
+                        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-sm flex items-center gap-2">
+                            <Check size={16} className="text-blue-600" />
                             {successMessage}
                         </div>
                     )}
@@ -536,14 +537,14 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                     className={`
                                         p-4 border rounded-xl text-left transition-all
                                         ${eventMode === 'create'
-                                            ? 'border-indigo-500 bg-indigo-50/50 ring-2 ring-indigo-500/20'
-                                            : 'border-gray-200 hover:border-indigo-200 hover:bg-gray-50'
+                                            ? 'border-blue-500 bg-blue-50/50 ring-2 ring-blue-500/20'
+                                            : 'border-gray-200 hover:border-blue-200 hover:bg-blue-50/30'
                                         }
                                     `}
                                 >
                                     <div className="flex items-center gap-3">
-                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${eventMode === 'create' ? 'bg-indigo-100' : 'bg-gray-100'}`}>
-                                            <Plus size={18} className={eventMode === 'create' ? 'text-indigo-600' : 'text-gray-500'} />
+                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${eventMode === 'create' ? 'bg-blue-100' : 'bg-gray-100'}`}>
+                                            <Plus size={18} className={eventMode === 'create' ? 'text-blue-600' : 'text-gray-500'} />
                                         </div>
                                         <div>
                                             <h4 className="text-sm font-medium text-gray-900">Create New</h4>
@@ -557,14 +558,14 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                     className={`
                                         p-4 border rounded-xl text-left transition-all
                                         ${eventMode === 'select'
-                                            ? 'border-indigo-500 bg-indigo-50/50 ring-2 ring-indigo-500/20'
-                                            : 'border-gray-200 hover:border-indigo-200 hover:bg-gray-50'
+                                            ? 'border-blue-500 bg-blue-50/50 ring-2 ring-blue-500/20'
+                                            : 'border-gray-200 hover:border-blue-200 hover:bg-blue-50/30'
                                         }
                                     `}
                                 >
                                     <div className="flex items-center gap-3">
-                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${eventMode === 'select' ? 'bg-indigo-100' : 'bg-gray-100'}`}>
-                                            <Wand2 size={18} className={eventMode === 'select' ? 'text-indigo-600' : 'text-gray-500'} />
+                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${eventMode === 'select' ? 'bg-blue-100' : 'bg-gray-100'}`}>
+                                            <Wand2 size={18} className={eventMode === 'select' ? 'text-blue-600' : 'text-gray-500'} />
                                         </div>
                                         <div>
                                             <h4 className="text-sm font-medium text-gray-900">Select Existing</h4>
@@ -595,7 +596,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                                     setCreatedIds(prev => ({ ...prev, eventId: selected.EventID }));
                                                 }
                                             }}
-                                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                                            className="w-full px-3 py-2 text-sm border border-blue-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
                                         >
                                             <option value="">-- Select an event --</option>
                                             {availableEvents.map((event) => (
@@ -629,7 +630,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                                     w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2
                                                     ${errors.eventData?.EventCode
                                                         ? 'border-rose-300 focus:ring-rose-500/20 focus:border-rose-500'
-                                                        : 'border-gray-200 focus:ring-indigo-500/20 focus:border-indigo-500'
+                                                        : 'border-gray-200 focus:ring-blue-500/20 focus:border-blue-500'
                                                     }
                                                 `}
                                             />
@@ -651,7 +652,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                                     w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2
                                                     ${errors.eventData?.EventName
                                                         ? 'border-rose-300 focus:ring-rose-500/20 focus:border-rose-500'
-                                                        : 'border-gray-200 focus:ring-indigo-500/20 focus:border-indigo-500'
+                                                        : 'border-gray-200 focus:ring-blue-500/20 focus:border-blue-500'
                                                     }
                                                 `}
                                             />
@@ -670,7 +671,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                             onChange={handleEventChange}
                                             placeholder="Add event details..."
                                             rows={2}
-                                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                                         />
                                     </div>
                                 </div>
@@ -705,14 +706,14 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                         className={`
                                             p-3 border rounded-xl text-left transition-all
                                             ${areaMode === mode
-                                                ? 'border-indigo-500 bg-indigo-50/50 ring-2 ring-indigo-500/20'
-                                                : 'border-gray-200 hover:border-indigo-200 hover:bg-gray-50'
+                                                ? 'border-blue-500 bg-blue-50/50 ring-2 ring-blue-500/20'
+                                                : 'border-gray-200 hover:border-blue-200 hover:bg-blue-50/30'
                                             }
                                         `}
                                     >
                                         <div className="flex items-center gap-2">
-                                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${areaMode === mode ? 'bg-indigo-100' : 'bg-gray-100'}`}>
-                                                <Icon size={16} className={areaMode === mode ? 'text-indigo-600' : 'text-gray-500'} />
+                                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${areaMode === mode ? 'bg-blue-100' : 'bg-gray-100'}`}>
+                                                <Icon size={16} className={areaMode === mode ? 'text-blue-600' : 'text-gray-500'} />
                                             </div>
                                             <div>
                                                 <h4 className="text-sm font-medium text-gray-900">{label}</h4>
@@ -744,7 +745,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                                     setCriteriaData(prev => ({ ...prev, AreaID: selected.AreaID }));
                                                 }
                                             }}
-                                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                                         >
                                             <option value="">-- Select an area --</option>
                                             {availableAreas.map((area) => (
@@ -778,7 +779,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                                     w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2
                                                     ${errors.areaData?.AreaCode
                                                         ? 'border-rose-300 focus:ring-rose-500/20 focus:border-rose-500'
-                                                        : 'border-gray-200 focus:ring-indigo-500/20 focus:border-indigo-500'
+                                                        : 'border-gray-200 focus:ring-blue-500/20 focus:border-blue-500'
                                                     }
                                                 `}
                                             />
@@ -800,7 +801,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                                     w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2
                                                     ${errors.areaData?.AreaName
                                                         ? 'border-rose-300 focus:ring-rose-500/20 focus:border-rose-500'
-                                                        : 'border-gray-200 focus:ring-indigo-500/20 focus:border-indigo-500'
+                                                        : 'border-gray-200 focus:ring-blue-500/20 focus:border-blue-500'
                                                     }
                                                 `}
                                             />
@@ -819,7 +820,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                             onChange={handleAreaChange}
                                             placeholder="Add area details..."
                                             rows={2}
-                                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                                         />
                                     </div>
                                 </div>
@@ -846,14 +847,14 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                         className={`
                                             p-3 border rounded-xl text-left transition-all
                                             ${criteriaMode === mode
-                                                ? 'border-indigo-500 bg-indigo-50/50 ring-2 ring-indigo-500/20'
-                                                : 'border-gray-200 hover:border-indigo-200 hover:bg-gray-50'
+                                                ? 'border-blue-500 bg-blue-50/50 ring-2 ring-blue-500/20'
+                                                : 'border-gray-200 hover:border-blue-200 hover:bg-blue-50/30'
                                             }
                                         `}
                                     >
                                         <div className="flex items-center gap-2">
-                                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${criteriaMode === mode ? 'bg-indigo-100' : 'bg-gray-100'}`}>
-                                                <Icon size={16} className={criteriaMode === mode ? 'text-indigo-600' : 'text-gray-500'} />
+                                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${criteriaMode === mode ? 'bg-blue-100' : 'bg-gray-100'}`}>
+                                                <Icon size={16} className={criteriaMode === mode ? 'text-blue-600' : 'text-gray-500'} />
                                             </div>
                                             <div>
                                                 <h4 className="text-sm font-medium text-gray-900">{label}</h4>
@@ -865,7 +866,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                             </div>
 
                             {criteriaData.AreaID && (
-                                <div className="p-3 bg-indigo-50/50 border border-indigo-100 rounded-lg">
+                                <div className="p-3 bg-blue-50/50 border border-blue-100 rounded-lg">
                                     <p className="text-xs text-gray-600">
                                         <span className="font-medium">Selected Area:</span> {areasList.find(a => a.AreaID == criteriaData.AreaID)?.AreaName || 'Area'}
                                     </p>
@@ -894,7 +895,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                                         });
                                                     }
                                                 }}
-                                                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                                                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                                             >
                                                 <option value="">-- Select a criteria --</option>
                                                 {availableCriteria
@@ -935,7 +936,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                                     w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2
                                                     ${errors.criteriaData?.CriteriaCode
                                                         ? 'border-rose-300 focus:ring-rose-500/20 focus:border-rose-500'
-                                                        : 'border-gray-200 focus:ring-indigo-500/20 focus:border-indigo-500'
+                                                        : 'border-gray-200 focus:ring-blue-500/20 focus:border-blue-500'
                                                     }
                                                 `}
                                             />
@@ -957,7 +958,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                                     w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2
                                                     ${errors.criteriaData?.CriteriaName
                                                         ? 'border-rose-300 focus:ring-rose-500/20 focus:border-rose-500'
-                                                        : 'border-gray-200 focus:ring-indigo-500/20 focus:border-indigo-500'
+                                                        : 'border-gray-200 focus:ring-blue-500/20 focus:border-blue-500'
                                                     }
                                                 `}
                                             />
@@ -976,7 +977,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                                 name="ParentCriteriaID"
                                                 value={criteriaData.ParentCriteriaID}
                                                 onChange={handleCriteriaChange}
-                                                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                                                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                                             >
                                                 <option value="">None (Top-level)</option>
                                                 {parentCriteria
@@ -1000,7 +1001,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                             onChange={handleCriteriaChange}
                                             placeholder="Add criteria details..."
                                             rows={2}
-                                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                                         />
                                     </div>
                                 </div>
@@ -1027,14 +1028,14 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                         className={`
                                             p-3 border rounded-xl text-left transition-all
                                             ${requirementMode === mode
-                                                ? 'border-indigo-500 bg-indigo-50/50 ring-2 ring-indigo-500/20'
-                                                : 'border-gray-200 hover:border-indigo-200 hover:bg-gray-50'
+                                                ? 'border-blue-500 bg-blue-50/50 ring-2 ring-blue-500/20'
+                                                : 'border-gray-200 hover:border-blue-200 hover:bg-blue-50/30'
                                             }
                                         `}
                                     >
                                         <div className="flex items-center gap-2">
-                                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${requirementMode === mode ? 'bg-indigo-100' : 'bg-gray-100'}`}>
-                                                <Icon size={16} className={requirementMode === mode ? 'text-indigo-600' : 'text-gray-500'} />
+                                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${requirementMode === mode ? 'bg-blue-100' : 'bg-gray-100'}`}>
+                                                <Icon size={16} className={requirementMode === mode ? 'text-blue-600' : 'text-gray-500'} />
                                             </div>
                                             <div>
                                                 <h4 className="text-sm font-medium text-gray-900">{label}</h4>
@@ -1062,7 +1063,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                                     <select
                                                         value={requirementData.ParentRequirementCode || ''}
                                                         onChange={(e) => setRequirementData(prev => ({ ...prev, ParentRequirementCode: e.target.value }))}
-                                                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                                                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                                                     >
                                                         <option value="">-- Select a parent --</option>
                                                         {criteriaRequirements.map((req) => (
@@ -1094,7 +1095,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                                 w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2
                                                 ${errors.requirementData?.RequirementCode
                                                     ? 'border-rose-300 focus:ring-rose-500/20 focus:border-rose-500'
-                                                    : 'border-gray-200 focus:ring-indigo-500/20 focus:border-indigo-500'
+                                                    : 'border-gray-200 focus:ring-blue-500/20 focus:border-blue-500'
                                                 }
                                             `}
                                         />
@@ -1113,7 +1114,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                             onChange={handleRequirementChange}
                                             placeholder="Describe the requirement..."
                                             rows={2}
-                                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                                         />
                                     </div>
                                 </div>
@@ -1138,7 +1139,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                 </p>
                                 {areaData.AreaName && (
                                     <p className="flex items-center gap-2">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
                                         <strong>Area:</strong> {areaData.AreaName}
                                     </p>
                                 )}
@@ -1159,16 +1160,16 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
 
                     {/* Preview Sidebar - Visible on steps 1-4 */}
                     {currentStep > 0 && currentStep < 5 && (
-                        <div className="w-72 border-l border-gray-100 bg-gray-50 flex flex-col overflow-hidden">
+                        <div className="w-72 border-l border-blue-100 flex flex-col overflow-hidden" style={{ background: 'linear-gradient(180deg, #f0f5ff 0%, #f8fafc 100%)' }}>
                             {/* Preview Header */}
-                            <div className="p-4 border-b border-gray-200 bg-white">
-                                <h4 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
-                                    <svg className="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div className="p-4 border-b border-blue-100 bg-white">
+                                <h4 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                                    <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                                     </svg>
                                     Structure Preview
                                 </h4>
-                                <p className="text-xs text-gray-500 mt-1">
+                                <p className="text-xs text-slate-500 mt-1">
                                     {(eventData.EventName ? 1 : 0) + (areaData.AreaName ? 1 : 0) + (criteriaData.CriteriaName ? 1 : 0) + (requirementData.RequirementCode ? 1 : 0)}/4 items configured
                                 </p>
                             </div>
@@ -1233,17 +1234,17 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                             {/* Criteria - Nested under Area */}
                                             <div className="ml-3 space-y-3">
                                                 {criteriaData.CriteriaName ? (
-                                                    <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white px-3 py-2.5 rounded-lg shadow-md">
+                                                    <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-3 py-2.5 rounded-lg shadow-md">
                                                         <div className="flex items-center gap-2">
                                                             <span className="text-sm">📊</span>
                                                             <div className="flex-1 min-w-0">
-                                                                <p className="text-[10px] font-medium text-indigo-100 uppercase">Criteria</p>
+                                                                <p className="text-[10px] font-medium text-blue-100 uppercase">Criteria</p>
                                                                 <p className="text-sm font-semibold truncate">{criteriaData.CriteriaName}</p>
                                                             </div>
-                                                            <Check size={14} className="text-indigo-200 flex-shrink-0" />
+                                                            <Check size={14} className="text-blue-200 flex-shrink-0" />
                                                         </div>
                                                         {criteriaData.CriteriaCode && (
-                                                            <p className="text-[10px] text-indigo-200 mt-1 pl-6">{criteriaData.CriteriaCode}</p>
+                                                            <p className="text-[10px] text-blue-200 mt-1 pl-6">{criteriaData.CriteriaCode}</p>
                                                         )}
                                                     </div>
                                                 ) : (
@@ -1294,16 +1295,16 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                             </div>
 
                             {/* Progress Footer */}
-                            <div className="p-4 border-t border-gray-200 bg-white">
+                            <div className="p-4 border-t border-blue-100 bg-white">
                                 <div className="flex items-center justify-between mb-2">
-                                    <p className="text-xs text-gray-500">Progress</p>
-                                    <p className="text-xs font-medium text-indigo-600">
+                                    <p className="text-xs text-slate-500">Progress</p>
+                                    <p className="text-xs font-medium text-blue-600">
                                         {(eventData.EventName ? 1 : 0) + (areaData.AreaName ? 1 : 0) + (criteriaData.CriteriaName ? 1 : 0) + (requirementData.RequirementCode ? 1 : 0)}/4
                                     </p>
                                 </div>
                                 <div className="w-full bg-gray-200 rounded-full h-2">
                                     <div 
-                                        className="bg-gradient-to-r from-indigo-500 to-indigo-600 h-2 rounded-full transition-all duration-300"
+                                        className="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full transition-all duration-300"
                                         style={{ 
                                             width: `${((eventData.EventName ? 1 : 0) + (areaData.AreaName ? 1 : 0) + (criteriaData.CriteriaName ? 1 : 0) + (requirementData.RequirementCode ? 1 : 0)) * 25}%` 
                                         }}
@@ -1315,11 +1316,11 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                 </div>
 
                 {/* Footer */}
-                <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex items-center justify-between">
+                <div className="px-6 py-4 border-t border-blue-100 flex items-center justify-between" style={{ background: '#f8fafc' }}>
                     <button
                         onClick={handlePrevious}
                         disabled={currentStep === 0 || isSubmitting}
-                        className="px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                        className="px-3 py-2 text-sm font-medium text-slate-600 bg-white border border-blue-100 rounded-lg hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
                     >
                         <ChevronLeft size={16} />
                         Back
@@ -1329,7 +1330,8 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                         <button
                             onClick={handleNext}
                             disabled={isSubmitting || !eventMode}
-                            className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                            className="px-4 py-2 text-sm font-semibold text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                            style={{ background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)', boxShadow: '0 2px 8px rgba(37,99,235,0.30)' }}
                         >
                             {isSubmitting ? 'Processing...' : 'Continue'}
                             <ChevronRight size={16} />
@@ -1348,3 +1350,4 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
         </div>
     );
 }
+

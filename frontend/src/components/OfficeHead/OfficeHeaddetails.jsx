@@ -132,7 +132,7 @@ export default function OfficeHeaddetails({ visible, onClose, head, offices = []
 
 	return (
 		<div
-			className="fixed inset-y-0 right-0 z-[120] flex items-center justify-center bg-black/55 p-4 backdrop-blur-[2px]"
+			className="fixed inset-y-0 right-0 z-[50] flex items-center justify-center bg-black/55 p-4 backdrop-blur-[2px]"
 			style={{ left: 'var(--sidebar-width, 0px)', transition: 'left 200ms ease-in-out' }}
 			onClick={onClose}
 		>

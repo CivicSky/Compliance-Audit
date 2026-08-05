@@ -131,7 +131,7 @@ export default function AddOfficeHeadModal({ isOpen, onClose, onSuccess }) {
 
     return (
         <div
-            className="fixed inset-y-0 right-0 z-[120] flex items-center justify-center bg-black bg-opacity-50"
+            className="fixed inset-y-0 right-0 z-[50] flex items-center justify-center bg-black bg-opacity-50"
             style={{ left: 'var(--sidebar-width, 0px)', transition: 'left 200ms ease-in-out' }}
         >
             <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4">

@@ -4,11 +4,14 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
 import ModalProvider from './components/UI/ModalProvider'
+import { ToastProvider } from './components/UI/Toast'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <ModalProvider>
-      <App />
-    </ModalProvider>
+    <ToastProvider>
+      <ModalProvider>
+        <App />
+      </ModalProvider>
+    </ToastProvider>
   </StrictMode>
 )

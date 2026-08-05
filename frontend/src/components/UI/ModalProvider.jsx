@@ -1,25 +1,17 @@
 import React, { createContext, useContext, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
+import { useToast } from './Toast'
 
 const ModalContext = createContext(null)
 
 export function ModalProvider({ children }) {
   const [modal, setModal] = useState({ open: false })
+  const { toast } = useToast()
 
   const showAlert = useCallback((message, title = 'Notice') => {
-    return new Promise((resolve) => {
-      setModal({
-        open: true,
-        type: 'alert',
-        title,
-        message,
-        onConfirm: () => {
-          setModal({ open: false })
-          resolve(true)
-        },
-      })
-    })
-  }, [])
+    toast({ title, description: message, variant: 'info', duration: 1500 })
+    return Promise.resolve(true)
+  }, [toast])
 
   const showConfirm = useCallback((message, title = 'Confirm') => {
     return new Promise((resolve) => {
@@ -60,6 +52,8 @@ export function useModal() {
 }
 
 function ModalRoot({ type, title, message, onConfirm, onCancel }) {
+  if (type === 'alert') return null
+
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-lg shadow-lg w-96 max-w-full p-6">

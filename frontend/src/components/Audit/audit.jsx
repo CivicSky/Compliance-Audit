@@ -1,7 +1,4 @@
 import React from "react";
-import Header from "../Header/header"
-
-
 export default function Requirements() {
     return (
         <div className="px-6 pb-6 pt-6 w-full">

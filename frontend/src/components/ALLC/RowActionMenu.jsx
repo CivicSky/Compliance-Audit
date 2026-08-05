@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 export default function RowActionMenu({
@@ -106,9 +106,9 @@ export default function RowActionMenu({
         >
             {menuItems.map((item) => {
                 const tone = item.tone || 'slate';
-                const hoverClass = item.hoverClassName || (tone === 'red' ? 'hover:bg-red-50' : tone === 'emerald' ? 'hover:bg-emerald-50' : tone === 'indigo' ? 'hover:bg-indigo-50' : 'hover:bg-gray-50');
+                const hoverClass = item.hoverClassName || (tone === 'red' ? 'hover:bg-red-50' : tone === 'emerald' ? 'hover:bg-emerald-50' : tone === 'indigo' ? 'hover:bg-blue-50' : 'hover:bg-gray-50');
                 const textClass = item.textClassName || (tone === 'red' ? 'text-red-600' : 'text-gray-700');
-                const iconClass = item.iconClassName || (tone === 'red' ? 'text-red-600' : tone === 'emerald' ? 'text-emerald-600' : tone === 'indigo' ? 'text-indigo-600' : 'text-gray-600');
+                const iconClass = item.iconClassName || (tone === 'red' ? 'text-red-600' : tone === 'emerald' ? 'text-emerald-600' : tone === 'indigo' ? 'text-blue-600' : 'text-gray-600');
 
                 return (
                     <button
@@ -156,3 +156,4 @@ export default function RowActionMenu({
         </>
     );
 }
+

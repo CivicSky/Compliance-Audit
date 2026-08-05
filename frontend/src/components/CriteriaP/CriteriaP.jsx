@@ -122,7 +122,7 @@ const CriteriaP = forwardRef(function CriteriaP({ searchTerm = "", eventId = nul
                     {deleteMode && (
                       <input
                         type="checkbox"
-                        className="mr-3 h-5 w-5 text-purple-300 border-gray-300 rounded focus:ring-purple-500"
+                        className="mr-3 h-5 w-5 text-purple-300 border-gray-300 rounded focus:ring-brand-500"
                         checked={selected.includes(c.CriteriaID)}
                         onChange={() => handleSelect(c.CriteriaID)}
                       />

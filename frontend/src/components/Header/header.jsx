@@ -109,28 +109,48 @@ export default function Header() {
   const formattedTime = dateTime.toLocaleTimeString();
 
   return (
-    <div className="fixed top-0 left-0 w-full bg-white shadow z-50" style={{margin:0, borderRadius:0, height:'72px'}}>
-      <div className="flex items-center justify-between h-full px-6 w-full lg:w-[calc(100%-var(--sidebar-width))] lg:ml-[var(--sidebar-width)] transition-[margin-left,width] duration-200">
-        <div className="text-2xl font-semibold text-gray-800">
-          Hello{name ? `, ${name}` : ''}
-        </div>
+    <div
+      className="fixed top-16 left-0 w-full z-40 lg:top-0 lg:ml-[var(--sidebar-width)] lg:w-[calc(100%-var(--sidebar-width))]"
+      style={{ margin: 0, borderRadius: 0, height: '56px' }}
+    >
+      {/* Blue-tinted glass header bar */}
+      <div
+        className="flex items-center justify-between h-full px-5 w-full lg:w-[calc(100%-var(--sidebar-width))] lg:ml-[var(--sidebar-width)] transition-[margin-left,width] duration-200"
+        style={{
+          background: 'linear-gradient(90deg, #ffffff 0%, #f0f5ff 100%)',
+          borderBottom: '1px solid #dbeafe',
+          boxShadow: '0 1px 8px rgba(37,99,235,0.08)',
+        }}
+      >
+        {/* Greeting */}
         <div className="flex items-center gap-3">
-          <div className="text-lg text-gray-600 font-mono">
-            {formattedDate} {formattedTime}
+          <div className="h-7 w-1 rounded-full" style={{ background: 'linear-gradient(180deg, #2563eb, #60a5fa)' }} />
+          <div className="text-base font-semibold" style={{ color: '#1e3a8a' }}>
+            Hello{name ? `, ${name}` : ''}
+          </div>
+        </div>
+
+        {/* Right side */}
+        <div className="flex items-center gap-3">
+          <div className="text-xs font-medium px-3 py-1.5 rounded-lg" style={{ color: '#475569', background: '#f1f5f9', border: '1px solid #e2e8f0' }}>
+            {formattedDate} · {formattedTime}
           </div>
 
-          
           {/* Notification Bell */}
           <div className="relative">
             <button
               ref={notificationButtonRef}
-              className="relative focus:outline-none bg-white rounded-md shadow-lg border border-gray-200 p-1.5 hover:shadow-2xl transition-all duration-200 flex items-center justify-center"
+              className="relative focus:outline-none rounded-lg p-1.5 transition-all duration-200 flex items-center justify-center"
               onClick={() => setShowNotifications((v) => !v)}
               aria-label="Show notifications"
-              style={{ boxShadow: '0 4px 16px 0 rgba(0,0,0,0.10), 0 1.5px 4px 0 rgba(0,0,0,0.08)' }}
+              style={{
+                background: '#eff6ff',
+                border: '1px solid #bfdbfe',
+                boxShadow: '0 1px 4px rgba(37,99,235,0.12)',
+              }}
             >
               {/* Bell Icon */}
-              <svg className="w-5 h-5 text-gray-500 hover:text-indigo-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4.5 h-4.5" style={{ color: '#2563eb', width: '18px', height: '18px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 15V11a6 6 0 10-12 0v4c0 .386-.146.735-.405 1.005L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
               </svg>
               {unreadCount > 0 && (
@@ -141,7 +161,7 @@ export default function Header() {
             </button>
             {/* Notification Popup */}
             {showNotifications && (
-              <div className="absolute right-0 z-50 mt-2 flex w-[420px] max-h-[min(560px,calc(100vh-5.5rem))] flex-col overflow-hidden rounded-xl border border-stone-200 bg-app-surface shadow-2xl">
+              <div className="absolute right-0 z-50 mt-2 flex w-[420px] max-h-[min(560px,calc(100vh-5.5rem))] flex-col overflow-hidden rounded-xl border border-blue-100 bg-white shadow-2xl">
                 <NotificationPopup onClose={() => setShowNotifications(false)} />
               </div>
             )}

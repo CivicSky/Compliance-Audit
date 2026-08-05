@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import Header from "../../components/Header/header";
 import AddRequirementModal from "../AddRequirement/AddRequirementModal";
 import AddPasscuRequirement from "../AddPasscuRequirement/AddPasscuRequirement";
 import EditRequirementsModal from "../EditRequirements/EditRequirementsModal";
@@ -109,13 +108,13 @@ export default function RequirementBars() {
                     requirementsPRef.current.refresh();
                 }
                 
-                alert('Requirement updated successfully!');
+                await showAlert('Requirement updated successfully!');
             } else {
-                alert(response.message || 'Failed to update requirement');
+                await showAlert(response.message || 'Failed to update requirement');
             }
         } catch (error) {
             console.error('Error updating requirement:', error);
-            alert('An error occurred while updating the requirement');
+            await showAlert('An error occurred while updating the requirement');
         }
     };
 
@@ -217,7 +216,7 @@ export default function RequirementBars() {
                     <select
                         value={selectedEventId}
                         onChange={(e) => setSelectedEventId(e.target.value)}
-                        className="w-full appearance-none px-5 py-3 border-2 border-purple-400 rounded-xl bg-white text-gray-800 font-semibold shadow focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all duration-200 hover:border-purple-600 hover:shadow-lg"
+                        className="w-full appearance-none px-5 py-3 border-2 border-purple-400 rounded-xl bg-white text-gray-800 font-semibold shadow focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all duration-200 hover:border-purple-600 hover:shadow-lg"
                     >
                         {events.map((event) => (
                             <option key={event.EventID} value={event.EventID} className="text-base">

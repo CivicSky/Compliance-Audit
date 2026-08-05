@@ -22,6 +22,7 @@ import MasterList from './components/MasterList/MasterList.jsx'
 
 import ProtectedRoute from "./components/ProtectedRoute/ProtectedRoute.jsx";
 import PublicRoute from "./components/ProtectedRoute/PublicRoute.jsx";
+import NotFound from './components/UI/NotFound'
 
 export default function App() {
   const router = createBrowserRouter([
@@ -75,6 +76,7 @@ export default function App() {
     },
   
     { path: "/", element: <Navigate to="/login" replace /> },
+    { path: '*', element: <NotFound /> }
   ]);
 
 

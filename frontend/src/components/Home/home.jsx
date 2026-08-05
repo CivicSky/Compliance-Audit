@@ -10,7 +10,6 @@ import {
 } from "../../utils/api";
 import api from "../../utils/api";
 import { Link } from "react-router-dom";
-import Header from "../Header/header";
 import UnifiedSetupWizard from "../UnifiedSetupWizard/UnifiedSetupWizard";
 import {
     Activity,
@@ -479,8 +478,6 @@ export default function Home() {
 
     return (
         <div className="h-screen w-full flex flex-col overflow-hidden">
-            <Header pageTitle="Dashboard" />
-
             <div className="flex-1 overflow-y-auto px-4 pb-6 pt-6">
                 <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div>
@@ -489,18 +486,19 @@ export default function Home() {
                     </div>
 
                     <div className="flex items-center gap-2">
-                        <div className="rounded-xl border border-slate-200 bg-white px-4 py-2 shadow-sm">
+                        <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-2 shadow-sm">
                             <p className="text-xs text-slate-500">Completion Rate</p>
                             <p className="text-lg font-semibold text-slate-800">{completionRate}%</p>
                         </div>
 
                 {isAdmin && (
                             <button
-                                onClick={() => setShowWizard(true)}
-                                className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 px-5 py-3 font-semibold text-white shadow-md transition hover:from-emerald-700 hover:to-emerald-800"
-                            >
-                                <Plus size={18} /> Quick Setup
-                            </button>
+                            onClick={() => setShowWizard(true)}
+                            className="flex items-center gap-2 rounded-xl px-5 py-3 font-semibold text-white shadow-md transition hover:shadow-lg"
+                            style={{ background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' }}
+                        >
+                            <Plus size={18} /> Quick Setup
+                        </button>
                 )}
                     </div>
             </div>
@@ -705,7 +703,7 @@ export default function Home() {
                     <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                         <div className="mb-3 flex items-center justify-between gap-3">
                             <h2 className="text-lg font-semibold text-slate-800">Recent Activity Feed</h2>
-                            <Link to="/home/audit-logs" className="text-sm font-medium text-cyan-700 hover:text-cyan-800">
+                            <Link to="/home/audit-logs" className="text-sm font-medium" style={{ color: '#1d4ed8' }}>
                                 View all logs
                             </Link>
                         </div>
