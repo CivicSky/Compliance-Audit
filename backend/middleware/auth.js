@@ -17,11 +17,11 @@ module.exports = function (req, res, next) {
   }
 
   try {
-    // 🔑 Verify token
     const decoded = jwt.verify(token, "MY_SECRET_KEY"); // replace with process.env.JWT_SECRET in production
     req.user = decoded; // Now req.user.userId is available
     next();
   } catch (error) {
-    return res.status(403).json({ success: false, message: "Invalid token" });
+    return res.status(401).json({ success: false, message: "Session expired or invalid token" });
   }
 };
+

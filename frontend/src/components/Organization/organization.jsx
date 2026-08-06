@@ -501,26 +501,9 @@ export default function Organization() {
                                     <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
                                 </svg>
                             </div>
-
-                            <div className="relative inline-flex">
-                                <select
-                                    value={selectedProgramTypeFilter}
-                                    onChange={(e) => setSelectedProgramTypeFilter(e.target.value)}
-                                    className="h-8 min-w-[146px] appearance-none rounded-md border border-slate-200 bg-white px-4 text-center text-[10px] font-medium leading-4 text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                                    style={{ textAlignLast: 'center' }}
-                                >
-                                    <option value="">All Program Types</option>
-                                    {programTypes.map((p) => (
-                                        <option key={p.id ?? p.ID ?? p.ProgramTypeID} value={p.id ?? p.ID ?? p.ProgramTypeID}>
-                                            {p.name ?? p.ProgramTypeName ?? p.Name}
-                                        </option>
-                                    ))}
-                                </select>
-                                <svg xmlns="http://www.w3.org/2000/svg" className="pointer-events-none absolute right-2.5 top-1/2 h-2.5 w-2.5 -translate-y-1/2 text-slate-500" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
-                                </svg>
-                            </div>
                         </div>
+
+
                         <div className="relative inline-block">
                             <Sortoffice value={sortStatus} onChange={setSortStatus} />
                         </div>

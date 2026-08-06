@@ -207,31 +207,18 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
         e.preventDefault();
         if (!office) return;
 
-        if (isAdmin && isAcademicType(officeTypeID)) {
-            if (!selectedDepartmentID) {
-                showAlert('Please select a department for Academic office types.');
-                return;
-            }
-
-            const selectedDepartment = departments.find((d) => String(d.id ?? d.DepartmentID ?? d.ID ?? d.Id) === String(selectedDepartmentID));
-            if (departmentRequiresProgramTypes(selectedDepartment) && !selectedProgramTypeID) {
-                showAlert('Please select a program type for the selected department.');
-                return;
-            }
-        }
-
         const updatedOffice = {
+            master_list_id: office.master_list_id || null,
             OfficeName: officeName,
             OfficeTypeID: officeTypeID,
-            HeadIDs: selectedHeadIDs.map(id => parseInt(id)), // Send array of head IDs
+            HeadIDs: selectedHeadIDs.map(id => parseInt(id)),
             EventID: office.event_id || office.EventID || null,
-            DepartmentID: selectedDepartmentID ? parseInt(selectedDepartmentID) : null,
-            ProgramTypeID: selectedProgramTypeID ? parseInt(selectedProgramTypeID) : null,
         };
 
-        onSave({ id: office.id, ...updatedOffice });
+        onSave({ id: office.id || office.OfficeID, ...updatedOffice });
         onClose();
     };
+
 
     if (!visible) return null;
 
@@ -287,65 +274,6 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
                             </svg>
                         </div>
                     </div>
-
-                    {isAdmin && isAcademicType(officeTypeID) && (
-                        <div>
-                            <label className="block text-sm font-semibold text-gray-800 mb-1">Department</label>
-                            <div className="relative">
-                                <select
-                                    value={selectedDepartmentID}
-                                    onChange={(e) => {
-                                        setSelectedDepartmentID(e.target.value);
-                                        setSelectedProgramTypeID("");
-                                    }}
-                                    className="h-10 w-full appearance-none rounded-md border border-slate-200 bg-white px-3 pr-9 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                                    required
-                                >
-                                    <option value="">Select Department</option>
-                                    {departments.map((d) => {
-                                        const id = d.id ?? d.DepartmentID ?? d.ID ?? d.Id;
-                                        const name = d.name ?? d.DepartmentName ?? d.Name ?? d.Department;
-                                        return (
-                                            <option key={id} value={id}>
-                                                {name}
-                                            </option>
-                                        );
-                                    })}
-                                </select>
-                                <svg xmlns="http://www.w3.org/2000/svg" className="pointer-events-none absolute right-3 top-1/2 h-2.5 w-2.5 -translate-y-1/2 text-slate-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                    <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
-                                </svg>
-                            </div>
-                        </div>
-                    )}
-
-                    {isAdmin && isAcademicType(officeTypeID) && selectedDepartmentID && departmentRequiresProgramTypes(departments.find((d) => String(d.id ?? d.DepartmentID ?? d.ID ?? d.Id) === String(selectedDepartmentID))) && (
-                        <div>
-                            <label className="block text-sm font-semibold text-gray-800 mb-1">Program Type</label>
-                            <div className="relative">
-                                <select
-                                    value={selectedProgramTypeID}
-                                    onChange={(e) => setSelectedProgramTypeID(e.target.value)}
-                                    className="h-10 w-full appearance-none rounded-md border border-slate-200 bg-white px-3 pr-9 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                                    required
-                                >
-                                    <option value="">Select Program Type</option>
-                                    {programTypes.map((p) => {
-                                        const id = p.id ?? p.ProgramTypeID ?? p.ID ?? p.Id;
-                                        const name = p.name ?? p.ProgramTypeName ?? p.Name ?? p.TypeName;
-                                        return (
-                                            <option key={id} value={id}>
-                                                {name}
-                                            </option>
-                                        );
-                                    })}
-                                </select>
-                                <svg xmlns="http://www.w3.org/2000/svg" className="pointer-events-none absolute right-3 top-1/2 h-2.5 w-2.5 -translate-y-1/2 text-slate-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                    <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
-                                </svg>
-                            </div>
-                        </div>
-                    )}
 
                     <div>
                         <label className="block text-sm font-semibold text-gray-800">Head(s) <span className="text-gray-500 font-normal text-xs">(select up to {MAX_HEADS})</span></label>

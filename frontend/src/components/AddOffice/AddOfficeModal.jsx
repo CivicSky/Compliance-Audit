@@ -1,24 +1,22 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { officesAPI, officeHeadsAPI } from "../../utils/api";
+import { officesAPI, officeHeadsAPI, masterlistAPI } from "../../utils/api";
 import { useModal } from "../UI/ModalProvider";
 import { API_BASE_URL } from '../../utils/apiBase';
 
 const MAX_HEADS = 4;
 
 export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes, events }) {
-    const [officeName, setOfficeName] = useState("");
+    const [selectedMasterListId, setSelectedMasterListId] = useState("");
+    const [masterListItems, setMasterListItems] = useState([]);
+    const [masterListLoading, setMasterListLoading] = useState(false);
     const [officeTypeID, setOfficeTypeID] = useState("");
-    const [selectedHeadIDs, setSelectedHeadIDs] = useState([]); // Array for multiple heads
+    const [selectedHeadIDs, setSelectedHeadIDs] = useState([]);
     const [eventID, setEventID] = useState("");
     const [heads, setHeads] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [departments, setDepartments] = useState([]);
-    const [programTypes, setProgramTypes] = useState([]);
-    const [selectedDepartmentID, setSelectedDepartmentID] = useState("");
-    const [selectedProgramTypeID, setSelectedProgramTypeID] = useState("");
     const [headSearchTerm, setHeadSearchTerm] = useState("");
 
-    const { showAlert, showConfirm } = useModal();
+    const { showAlert } = useModal();
 
     const getHeadDisplayName = (head) => {
         return `${head?.FirstName || ""} ${head?.MiddleInitial ? `${head.MiddleInitial}.` : ""} ${head?.LastName || ""}`
@@ -52,28 +50,20 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
         });
     }, [heads, headSearchTerm]);
 
-
-
-    // Reset form & fetch heads when modal opens
+    // Reset form when modal opens
     useEffect(() => {
         if (isOpen) {
-            setOfficeName("");
+            setSelectedMasterListId("");
             setOfficeTypeID("");
             setSelectedHeadIDs([]);
             setEventID("");
-            setSelectedDepartmentID("");
-            setSelectedProgramTypeID("");
             setHeadSearchTerm("");
+            setMasterListItems([]);
 
-            // Fetch available office heads
             const fetchHeads = async () => {
                 try {
                     const headsArr = await officeHeadsAPI.getAllHeads();
-                    console.log('Fetched heads:', headsArr);
-                    // API returns array directly now
                     const headsData = Array.isArray(headsArr) ? headsArr : (headsArr?.data || []);
-                    // Show all heads - don't filter by assignment status
-                    // Users can choose any head, assigned or not
                     setHeads(headsData);
                 } catch (err) {
                     console.error("Failed to fetch office heads:", err);
@@ -84,126 +74,62 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
         }
     }, [isOpen]);
 
-    // Fetch departments and program types (with safe fallbacks)
+    // Fetch available master list items when eventID changes
     useEffect(() => {
-        if (!isOpen) return;
+        if (!isOpen || !eventID) {
+            setMasterListItems([]);
+            setSelectedMasterListId("");
+            return;
+        }
 
-        const fetchLookups = async () => {
+        const fetchAvailableMasterList = async () => {
+            setMasterListLoading(true);
             try {
-                // Try departments
-                let deps = [];
-                try {
-                    const res = await fetch('/api/departments');
-                    if (res.ok) {
-                        const json = await res.json();
-                        deps = Array.isArray(json) ? json : (json.data || json.departments || []);
-                    }
-                } catch (err) {
-                    // network/endpoint missing — will fallback to hardcoded list below
-                }
-
-                // Try program types
-                let ptypes = [];
-                try {
-                    const res2 = await fetch('/api/program_types');
-                    if (res2.ok) {
-                        const json2 = await res2.json();
-                        ptypes = Array.isArray(json2) ? json2 : (json2.data || json2.program_types || []);
-                    }
-                } catch (err) {
-                    // fallback handled below
-                }
-
-                // If departments endpoint returned empty, keep empty list
-
-                // Do not hardcode program types; use DB-provided list (may be empty)
-                setDepartments(Array.isArray(deps) ? deps : []);
-                setProgramTypes(Array.isArray(ptypes) ? ptypes : []);
+                const res = await masterlistAPI.getAvailableForEvent(eventID);
+                const items = Array.isArray(res) ? res : (res.data || []);
+                setMasterListItems(items);
             } catch (err) {
-                console.error('Failed to load departments/program types:', err);
+                console.error("Failed to fetch available master list items:", err);
+                setMasterListItems([]);
+            } finally {
+                setMasterListLoading(false);
             }
         };
 
-        fetchLookups();
-    }, [isOpen]);
+        fetchAvailableMasterList();
+    }, [isOpen, eventID]);
 
-    const getOfficeTypeById = (id) => {
-        return officeTypes?.find((t) => String(t.OfficeTypeID) === String(id));
-    };
+    // Selected master list item helper
+    const selectedMasterItem = useMemo(() => {
+        return masterListItems.find(item => String(item.id) === String(selectedMasterListId)) || null;
+    }, [masterListItems, selectedMasterListId]);
 
-    const isAcademicType = (officeTypeId) => {
-        const t = getOfficeTypeById(officeTypeId);
-        const name = String(t?.TypeName || t?.name || '').toLowerCase();
-        if (!name) return false;
-        // If the label explicitly contains 'non' (e.g., 'Non Academic' or 'non-academic'), treat as non-academic
-        if (/\bnon\b|non-?academic|not\s+academic/.test(name)) return false;
-        return /\bacademic\b/.test(name);
-    };
-
-    const departmentRequiresProgramTypes = (dept) => {
-        if (!dept) return true;
-        const name = String(dept?.name || dept?.Name || dept).toLowerCase();
-        // IBED does not require program types
-        return name !== 'ibed';
-    };
-
-    // Auto-select program type for certain departments
+    // Auto-set officeTypeID based on selected master list item
     useEffect(() => {
-        if (!selectedDepartmentID) {
-            // clear program type when no department selected
-            setSelectedProgramTypeID("");
-            return;
+        if (!selectedMasterItem || !Array.isArray(officeTypes) || officeTypes.length === 0) return;
+
+        const isAcademic = selectedMasterItem.entityTypeId === 1 || selectedMasterItem.type === 'Academic Program';
+
+        const matchedType = officeTypes.find(t => {
+            const name = String(t.TypeName || t.name || '').toLowerCase();
+            if (isAcademic) {
+                return name.includes('academic') && !name.includes('non');
+            } else {
+                return name.includes('non');
+            }
+        });
+
+        if (matchedType) {
+            setOfficeTypeID(String(matchedType.OfficeTypeID || matchedType.id));
         }
+    }, [selectedMasterItem, officeTypes]);
 
-        const dept = departments.find(d => String(d.id ?? d.DepartmentID ?? d.ID ?? d.Id) === String(selectedDepartmentID));
-        const deptName = String(dept?.name || dept?.DepartmentName || dept?.Name || '').toLowerCase();
-
-        // helper to find program type id by name match
-        const findProgramTypeId = (match) => {
-            if (!Array.isArray(programTypes) || programTypes.length === 0) return null;
-            const found = programTypes.find(p => {
-                const pname = String(p.name || p.ProgramTypeName || p.Name || p.TypeName || '').toLowerCase();
-                return pname.includes(match);
-            });
-            return found ? (found.id ?? found.ProgramTypeID ?? found.ID ?? found.Id ?? '') : null;
-        };
-
-        // Graduate School -> select program type containing 'graduate'
-        if (deptName.includes('graduate')) {
-            const id = findProgramTypeId('graduate');
-            if (id) setSelectedProgramTypeID(String(id));
-            return;
-        }
-
-        // Continuing Education (TCP/ETEEAP) -> select program type containing 'continu'
-        if (deptName.includes('continuing') || deptName.includes('tcp') || deptName.includes('eteeap')) {
-            const id = findProgramTypeId('continu');
-            if (id) setSelectedProgramTypeID(String(id));
-            return;
-        }
-
-        // otherwise clear selection (user can choose manually)
-        setSelectedProgramTypeID("");
-    }, [selectedDepartmentID, departments, programTypes]);
-
-    // Clear department/program selections when Office Type is non-academic
-    useEffect(() => {
-        if (!isAcademicType(officeTypeID)) {
-            // if switched to non-academic, clear department and program type
-            setSelectedDepartmentID("");
-            setSelectedProgramTypeID("");
-        }
-    }, [officeTypeID]);
-
-    // Toggle head selection
     const toggleHeadSelection = (headId) => {
         setSelectedHeadIDs(prev => {
             if (prev.includes(headId)) {
                 return prev.filter(id => id !== headId);
             } else {
-                if (prev.length >= MAX_HEADS) {
-                    return prev;
-                }
+                if (prev.length >= MAX_HEADS) return prev;
                 return [...prev, headId];
             }
         });
@@ -214,20 +140,8 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        // Validate required fields
-        if (!officeName || !officeTypeID || selectedHeadIDs.length === 0 || !eventID) {
-            await showAlert("Please fill out all required fields (at least one head must be selected).");
-            return;
-        }
-
-        const academic = isAcademicType(officeTypeID);
-            if (academic && !selectedDepartmentID) {
-            await showAlert('Please select a department for Academic office types.');
-            return;
-        }
-
-        if (academic && departmentRequiresProgramTypes(departments.find(d => String(d.id || d.DepartmentID || d.DepartmentId) === String(selectedDepartmentID))) && !selectedProgramTypeID) {
-            await showAlert('Please select a program type for the selected department.');
+        if (!eventID || !selectedMasterListId || selectedHeadIDs.length === 0) {
+            await showAlert("Please fill out all required fields (select Event, Category Name, and at least one Head).");
             return;
         }
 
@@ -240,32 +154,27 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
 
         try {
             const newOffice = {
-                OfficeName: officeName,
+                master_list_id: parseInt(selectedMasterListId),
+                OfficeName: selectedMasterItem?.name || "",
                 OfficeTypeID: parseInt(officeTypeID),
-                HeadIDs: selectedHeadIDs.map(id => parseInt(id)), // Send array of head IDs
-                EventID: parseInt(eventID),
-                DepartmentID: selectedDepartmentID ? parseInt(selectedDepartmentID) : null,
-                ProgramTypeID: selectedProgramTypeID ? parseInt(selectedProgramTypeID) : null
+                HeadIDs: selectedHeadIDs.map(id => parseInt(id)),
+                EventID: parseInt(eventID)
             };
 
-            console.log('Submitting office:', newOffice);
-                const res = await officesAPI.createOffice(newOffice);
-                console.log('Create office response:', res);
+            const res = await officesAPI.createOffice(newOffice);
+            const success = res?.success === true || res?.data?.success === true || res?.office || res?.OfficeID || res?.id;
 
-                // Accept several possible backend response shapes
-                const success = res?.success === true || res?.data?.success === true || res?.office || res?.OfficeID || res?.id;
-                if (success) {
-                    await showAlert('Office added successfully!');
-                    try { onSuccess(); } catch { }
-                    try { onClose(); } catch { }
-                } else {
-                    const errorMsg = res?.details || res?.error || res?.message || (typeof res === 'string' ? res : 'Failed to add office');
-                    console.error('Backend error adding office:', res);
-                    await showAlert(`Error adding office: ${errorMsg}`);
-                }
+            if (success) {
+                await showAlert('Category / Office added to audit successfully!');
+                try { onSuccess(); } catch { }
+                try { onClose(); } catch { }
+            } else {
+                const errorMsg = res?.details || res?.error || res?.message || 'Failed to add category';
+                await showAlert(`Error adding category: ${errorMsg}`);
+            }
         } catch (err) {
-            console.error("Error adding office:", err);
-            const errorMsg = err.response?.data?.details || err.response?.data?.error || err.message || "Failed to add office. Please try again.";
+            console.error("Error adding category:", err);
+            const errorMsg = err.response?.data?.details || err.response?.data?.error || err.message || "Failed to add category.";
             await showAlert(`Database error: ${errorMsg}`);
         } finally {
             setLoading(false);
@@ -278,7 +187,7 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
         <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out z-[50] flex items-center justify-center bg-black/50">
             <div className="mx-4 w-full max-w-md overflow-hidden rounded-xl bg-white shadow-xl">
                 <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
-                    <h2 className="text-xl font-semibold text-gray-800">Add New Office</h2>
+                    <h2 className="text-xl font-semibold text-gray-800">Add Category to Audit</h2>
                     <button
                         type="button"
                         onClick={onClose}
@@ -292,6 +201,7 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-4 px-6 py-5">
+                    {/* Event Select */}
                     <div>
                         <label className="mb-2 block text-sm font-medium text-gray-700">Event *</label>
                         <div className="relative">
@@ -309,103 +219,60 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
                                     </option>
                                 ))}
                             </select>
-                            <svg xmlns="http://www.w3.org/2000/svg" className="pointer-events-none absolute right-3 top-1/2 h-2.5 w-2.5 -translate-y-1/2 text-slate-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="pointer-events-none absolute right-3 top-1/2 h-2.5 w-2.5 -translate-y-1/2 text-slate-500" viewBox="0 0 20 20" fill="currentColor">
                                 <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
                             </svg>
                         </div>
                     </div>
 
+                    {/* Category Name Select from Master List */}
                     <div>
-                        <label className="mb-2 block text-sm font-medium text-gray-700">Office Name *</label>
-                        <input
-                            type="text"
-                            value={officeName}
-                            onChange={(e) => setOfficeName(e.target.value)}
-                            className="h-10 w-full rounded-md border border-gray-300 bg-white px-4 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            required
-                        />
-                    </div>
-
-                    <div>
-                        <label className="mb-2 block text-sm font-medium text-gray-700">Office Type *</label>
+                        <label className="mb-2 block text-sm font-medium text-gray-700">Category Name * <span className="text-xs font-normal text-gray-500">(From Master List)</span></label>
                         <div className="relative">
                             <select
-                                value={officeTypeID}
-                                onChange={(e) => setOfficeTypeID(e.target.value)}
-                                className="h-10 w-full appearance-none rounded-md border border-gray-300 bg-white px-4 pr-10 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                value={selectedMasterListId}
+                                onChange={(e) => setSelectedMasterListId(e.target.value)}
+                                className="h-10 w-full appearance-none rounded-md border border-gray-300 bg-white px-4 pr-10 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                                disabled={!eventID || masterListLoading}
                                 required
                             >
-                                <option value="">Select Type</option>
-                                {officeTypes.map((type) => (
-                                    <option key={type.OfficeTypeID} value={type.OfficeTypeID}>
-                                        {type.TypeName}
+                                <option value="">
+                                    {!eventID 
+                                        ? "Please select an event first" 
+                                        : masterListLoading 
+                                        ? "Loading master list items..." 
+                                        : masterListItems.length === 0 
+                                        ? "No available items for this event" 
+                                        : "Select Category from Master List"}
+                                </option>
+                                {masterListItems.map((item) => (
+                                    <option key={item.id} value={item.id}>
+                                        {item.name} ({item.type}{item.department ? ` • ${item.department}` : ''})
                                     </option>
                                 ))}
                             </select>
-                            <svg xmlns="http://www.w3.org/2000/svg" className="pointer-events-none absolute right-3 top-1/2 h-2.5 w-2.5 -translate-y-1/2 text-slate-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="pointer-events-none absolute right-3 top-1/2 h-2.5 w-2.5 -translate-y-1/2 text-slate-500" viewBox="0 0 20 20" fill="currentColor">
                                 <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
                             </svg>
                         </div>
+                        {selectedMasterItem && (
+                            <div className="mt-2 flex items-center gap-2 text-xs">
+                                <span className={`rounded-full px-2.5 py-0.5 font-medium border ${
+                                    selectedMasterItem.entityTypeId === 1 || selectedMasterItem.type === 'Academic Program'
+                                        ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                        : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                }`}>
+                                    {selectedMasterItem.type}
+                                </span>
+                                {selectedMasterItem.department && (
+                                    <span className="text-gray-500">Dept: {selectedMasterItem.department}</span>
+                                )}
+                            </div>
+                        )}
                     </div>
 
-                    {isAcademicType(officeTypeID) && (
-                        <div>
-                            <label className="mb-2 block text-sm font-medium text-gray-700">Department *</label>
-                            <div className="relative">
-                                <select
-                                    value={selectedDepartmentID}
-                                    onChange={(e) => {
-                                        setSelectedDepartmentID(e.target.value);
-                                        setSelectedProgramTypeID("");
-                                    }}
-                                    className="h-10 w-full appearance-none rounded-md border border-gray-300 bg-white px-4 pr-10 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    required
-                                >
-                                    <option value="">Select Department</option>
-                                    {departments.map((d) => {
-                                        const id = d.id ?? d.DepartmentID ?? d.ID ?? d.Id;
-                                        const name = d.name ?? d.DepartmentName ?? d.Name ?? d.Department;
-                                        return (
-                                            <option key={id} value={id}>
-                                                {name}
-                                            </option>
-                                        );
-                                    })}
-                                </select>
-                                <svg xmlns="http://www.w3.org/2000/svg" className="pointer-events-none absolute right-3 top-1/2 h-2.5 w-2.5 -translate-y-1/2 text-slate-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                    <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
-                                </svg>
-                            </div>
-                        </div>
-                    )}
 
-                    {isAcademicType(officeTypeID) && selectedDepartmentID && departmentRequiresProgramTypes(departments.find(d => String(d.id ?? d.DepartmentID ?? d.ID ?? d.Id) === String(selectedDepartmentID))) && (
-                        <div>
-                            <label className="mb-2 block text-sm font-medium text-gray-700">Program Type *</label>
-                            <div className="relative">
-                                <select
-                                    value={selectedProgramTypeID}
-                                    onChange={(e) => setSelectedProgramTypeID(e.target.value)}
-                                    className="h-10 w-full appearance-none rounded-md border border-gray-300 bg-white px-4 pr-10 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    required
-                                >
-                                    <option value="">Select Program Type</option>
-                                    {programTypes.map((p) => {
-                                        const id = p.id ?? p.ProgramTypeID ?? p.ID ?? p.Id;
-                                        const name = p.name ?? p.ProgramTypeName ?? p.Name ?? p.TypeName;
-                                        return (
-                                            <option key={id} value={id}>
-                                                {name}
-                                            </option>
-                                        );
-                                    })}
-                                </select>
-                                <svg xmlns="http://www.w3.org/2000/svg" className="pointer-events-none absolute right-3 top-1/2 h-2.5 w-2.5 -translate-y-1/2 text-slate-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                    <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
-                                </svg>
-                            </div>
-                        </div>
-                    )}
+
 
                     <div>
                         <label className="block text-sm font-medium text-gray-700">Head(s) <span className="text-gray-500 font-normal text-xs">(select up to {MAX_HEADS})</span></label>

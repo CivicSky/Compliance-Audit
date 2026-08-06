@@ -125,13 +125,18 @@ const OfficesController = {
       const [officeRows] = await db.query(`
         SELECT 
           o.OfficeID,
-          o.OfficeName,
+          COALESCE(m.entity_name, o.OfficeName) AS OfficeName,
+          o.master_list_id,
           o.OfficeTypeID,
           o.EventID,
-          o.department_id,
-          o.program_type_id,
+          m.entity_type_id,
+          m.department_id,
           COALESCE(d.name, NULL) AS department_name,
-          COALESCE(pt.name, NULL) AS program_type_name,
+          CASE m.entity_type_id
+            WHEN 1 THEN 'Academic Program'
+            WHEN 2 THEN 'Non-Academic Office'
+            ELSE 'Unknown'
+          END AS category_name,
           e.EventName,
           ot.TypeName,
           os.OverallStatus,
@@ -141,10 +146,10 @@ const OfficesController = {
           os.PartiallyCompliedCount,
           os.NotCompliedCount
         FROM offices o
+        LEFT JOIN master_list m ON o.master_list_id = m.id
+        LEFT JOIN departments d ON m.department_id = d.id
         LEFT JOIN Events e ON o.EventID = e.EventID
         LEFT JOIN officetypes ot ON o.OfficeTypeID = ot.OfficeTypeID
-        LEFT JOIN departments d ON o.department_id = d.id
-        LEFT JOIN program_types pt ON o.program_type_id = pt.id
         LEFT JOIN (
           SELECT
             cso.OfficeID,
@@ -224,12 +229,14 @@ const OfficesController = {
         return {
           id: r.OfficeID,
           office_name: r.OfficeName,
+          OfficeName: r.OfficeName,
+          master_list_id: r.master_list_id || null,
           office_type_id: r.OfficeTypeID,
           office_type_name: r.TypeName || "Unknown Type",
           department_id: r.department_id || null,
           department_name: r.department_name || null,
-          program_type_id: r.program_type_id || null,
-          program_type_name: r.program_type_name || null,
+          entity_type_id: r.entity_type_id || null,
+          category_name: r.category_name || null,
           head_id: primaryHead?.HeadID || null,
           head_ids: officeHeads.map(h => h.HeadID), // Array of head IDs
           heads: officeHeads, // Full head objects
@@ -247,6 +254,7 @@ const OfficesController = {
           partially_complied_count: r.PartiallyCompliedCount || 0,
           not_complied_count: r.NotCompliedCount || 0
         };
+
       });
 
       console.log('Formatted offices with multiple heads:', formatted);
@@ -268,13 +276,18 @@ const OfficesController = {
       const [rows] = await db.query(`
         SELECT 
           o.OfficeID,
-          o.OfficeName,
+          COALESCE(m.entity_name, o.OfficeName) AS OfficeName,
+          o.master_list_id,
           o.OfficeTypeID,
           o.EventID,
-          o.department_id,
-          o.program_type_id,
+          m.entity_type_id,
+          m.department_id,
           COALESCE(d.name, NULL) AS department_name,
-          COALESCE(pt.name, NULL) AS program_type_name,
+          CASE m.entity_type_id
+            WHEN 1 THEN 'Academic Program'
+            WHEN 2 THEN 'Non-Academic Office'
+            ELSE 'Unknown'
+          END AS category_name,
           t.TypeName,
           os.OverallStatus,
           os.CompliancePercent,
@@ -282,9 +295,9 @@ const OfficesController = {
           e.EventName,
           e.EventCode
         FROM offices o
+        LEFT JOIN master_list m ON o.master_list_id = m.id
+        LEFT JOIN departments d ON m.department_id = d.id
         LEFT JOIN officetypes t ON o.OfficeTypeID = t.OfficeTypeID
-        LEFT JOIN departments d ON o.department_id = d.id
-        LEFT JOIN program_types pt ON o.program_type_id = pt.id
         LEFT JOIN (
           SELECT
             cso.OfficeID,
@@ -357,12 +370,13 @@ const OfficesController = {
       res.json({
         OfficeID: r.OfficeID,
         OfficeName: r.OfficeName,
+        master_list_id: r.master_list_id || null,
         OfficeTypeID: r.OfficeTypeID,
         TypeName: r.TypeName || "Unknown Type",
         DepartmentID: r.department_id || null,
         DepartmentName: r.department_name || null,
-        ProgramTypeID: r.program_type_id || null,
-        ProgramTypeName: r.program_type_name || null,
+        entity_type_id: r.entity_type_id || null,
+        category_name: r.category_name || null,
         HeadID: primaryHead?.HeadID || null,
         HeadIDs: officeHeads.map((head) => head.HeadID),
         Heads: officeHeads,
@@ -374,6 +388,7 @@ const OfficesController = {
         CompliancePercent: r.CompliancePercent || 0,
         TotalRequirements: r.TotalRequirements || 0
       });
+
     } catch (err) {
       console.error("Error fetching office:", err);
       res.status(500).json({ error: "Database error" });
@@ -381,10 +396,10 @@ const OfficesController = {
   },
 
   // ================================
-  // CREATE NEW OFFICE (SUPPORTS MULTIPLE HEADS)
+  // CREATE NEW OFFICE (SUPPORTS MULTIPLE HEADS & MASTER LIST LINK)
   // ================================
   create: async (req, res) => {
-    const { OfficeName, OfficeTypeID, HeadID, HeadIDs, EventID, DepartmentID, ProgramTypeID } = req.body;
+    const { master_list_id, OfficeName, OfficeTypeID, HeadID, HeadIDs, EventID } = req.body;
 
     // Support both single HeadID (legacy) and HeadIDs array (new)
     const headIdArray = normalizeHeadIds(HeadIDs, HeadID);
@@ -396,26 +411,42 @@ const OfficesController = {
       });
     }
 
-    console.log('Received create office request:', { OfficeName, OfficeTypeID, headIdArray, EventID });
+    let nameToSave = OfficeName;
+    let typeIdToSave = OfficeTypeID;
+
+    if (master_list_id) {
+      const [mlRows] = await db.query('SELECT entity_type_id, entity_name FROM master_list WHERE id = ?', [master_list_id]);
+      if (mlRows.length > 0) {
+        nameToSave = mlRows[0].entity_name;
+        if (!typeIdToSave) {
+          const isAcademic = mlRows[0].entity_type_id === 1;
+          const [typeRows] = await db.query(
+            'SELECT OfficeTypeID FROM officetypes WHERE LOWER(TypeName) LIKE ? LIMIT 1',
+            [isAcademic ? '%academic%' : '%non%']
+          );
+          typeIdToSave = typeRows[0]?.OfficeTypeID || (isAcademic ? 2 : 1);
+        }
+      }
+    }
+
+    console.log('Received create office request:', { master_list_id, OfficeName: nameToSave, OfficeTypeID: typeIdToSave, headIdArray, EventID });
 
     try {
-      // Create the office; head assignments are stored in office_head_assignments
       const [result] = await db.query(
-        `INSERT INTO offices (OfficeName, OfficeTypeID, EventID, department_id, program_type_id)
-         VALUES (?, ?, ?, ?, ?)`,
+        `INSERT INTO offices (OfficeName, master_list_id, OfficeTypeID, EventID)
+         VALUES (?, ?, ?, ?)`,
         [
-          OfficeName,
-          OfficeTypeID || null,
-          EventID || null,
-          DepartmentID != null ? DepartmentID : null,
-          ProgramTypeID != null ? ProgramTypeID : null
+          nameToSave || '',
+          master_list_id ? Number(master_list_id) : null,
+          typeIdToSave || null,
+          EventID || null
         ]
       );
+
 
       const newOfficeId = result.insertId;
       console.log('Office created successfully:', newOfficeId);
 
-      // Assign all heads to this office in the assignment junction table
       if (headIdArray.length > 0) {
         for (const hid of headIdArray) {
           await db.query(
@@ -426,7 +457,6 @@ const OfficesController = {
         console.log('Assigned heads to office:', headIdArray);
       }
 
-      // Initialize OverallOfficeStatus for the new office
       await updateOverallOfficeStatus(newOfficeId);
 
       res.json({
@@ -434,15 +464,14 @@ const OfficesController = {
         message: 'Office created successfully',
         data: {
           OfficeID: newOfficeId,
-          OfficeName,
+          OfficeName: nameToSave,
+          master_list_id: master_list_id ? Number(master_list_id) : null,
           OfficeTypeID,
           HeadIDs: headIdArray,
-          EventID,
-          DepartmentID: DepartmentID != null ? DepartmentID : null,
-          ProgramTypeID: ProgramTypeID != null ? ProgramTypeID : null
+          EventID
         }
       });
-      // Audit log: record who created the office (if authenticated)
+      // Audit log
       try {
         const actorId = req.user && req.user.userId;
         if (actorId) {
@@ -453,7 +482,7 @@ const OfficesController = {
           ]);
 
           await recordLog(actorId, 'OfficeAdded', {
-            OfficeName,
+            OfficeName: nameToSave,
             OfficeType: officeTypeName,
             EventName: eventName,
             HeadNames: headNames,
@@ -467,14 +496,13 @@ const OfficesController = {
                 userIds: assignedHeadDetails.map((item) => item.userId),
                 adminId: actorId,
                 title: 'Assigned As Office Personnel',
-                message: `You were assigned to office ${OfficeName} under event ${eventName}.`,
+                message: `You were assigned to office ${nameToSave} under event ${eventName}.`,
                 type: 'info',
                 relatedTable: 'office_personnel',
                 relatedId: Number(newOfficeId),
                 meta: { officeId: Number(newOfficeId) },
               });
             }
-            // Auto-assign these heads to any existing requirements for the office (if any)
             try {
               const [reqRows] = await db.query('SELECT RequirementID FROM compliancestatusoffices WHERE OfficeID = ?', [newOfficeId]);
               const reqIds = reqRows.map(r => Number(r.RequirementID)).filter(id => Number.isInteger(id) && id > 0);
@@ -491,8 +519,6 @@ const OfficesController = {
       }
     } catch (err) {
       console.error("Error creating office:", err);
-      console.error("Error details:", err.message);
-      console.error("Error SQL:", err.sql);
       res.status(500).json({ 
         success: false, 
         error: "Database error", 
@@ -502,13 +528,12 @@ const OfficesController = {
   },
 
   // ================================
-  // UPDATE OFFICE (SUPPORTS MULTIPLE HEADS)
+  // UPDATE OFFICE (SUPPORTS MULTIPLE HEADS & MASTER LIST LINK)
   // ================================
   update: async (req, res) => {
     const id = req.params.id;
-    const { OfficeName, OfficeTypeID, HeadID, HeadIDs, EventID, DepartmentID, ProgramTypeID } = req.body;
+    const { master_list_id, OfficeName, OfficeTypeID, HeadID, HeadIDs, EventID } = req.body;
 
-    // Support both single HeadID (legacy) and HeadIDs array (new)
     const headIdArray = normalizeHeadIds(HeadIDs, HeadID);
 
     if (headIdArray.length > MAX_HEADS_PER_OFFICE) {
@@ -524,13 +549,27 @@ const OfficesController = {
         return res.status(404).json({ success: false, message: "Office not found" });
       }
 
-      // Update office info only; heads are managed via office_head_assignments
+      let nameToSave = OfficeName;
+      if (master_list_id) {
+        const [mlRows] = await db.query('SELECT entity_name FROM master_list WHERE id = ?', [master_list_id]);
+        if (mlRows.length > 0) {
+          nameToSave = mlRows[0].entity_name;
+        }
+      }
+
       const [result] = await db.query(
         `UPDATE offices 
-         SET OfficeName = ?, OfficeTypeID = ?, EventID = ?, department_id = ?, program_type_id = ?
+         SET OfficeName = ?, master_list_id = ?, OfficeTypeID = ?, EventID = ?
          WHERE OfficeID = ?`,
-        [OfficeName, OfficeTypeID, EventID, DepartmentID != null ? DepartmentID : null, ProgramTypeID != null ? ProgramTypeID : null, id]
+        [
+          nameToSave || previousOffice.OfficeName || '',
+          master_list_id ? Number(master_list_id) : null,
+          OfficeTypeID,
+          EventID,
+          id
+        ]
       );
+
 
       // Remove all existing assignments for this office
       await db.query(

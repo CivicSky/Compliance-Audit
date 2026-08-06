@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 export default function NotificationToast({ title = 'Notice', message = '', visible = false, duration = 1500, onDismiss }) {
+
   const [isMounted, setIsMounted] = useState(false)
 
   useEffect(() => {
@@ -30,10 +31,11 @@ export default function NotificationToast({ title = 'Notice', message = '', visi
   if (!visible && !isMounted) return null
 
   return createPortal(
-    <div className={`fixed top-24 right-4 z-50 w-[min(28rem,calc(100%-2rem))] max-w-full rounded-3xl border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm text-cyan-800 shadow-lg shadow-cyan-100/80 transition-all duration-300 ease-out ${isMounted ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'}`}>
-      <div className="font-semibold text-base text-cyan-900">{title}</div>
-      <div className="mt-2 leading-6">{message}</div>
+    <div className={`fixed top-20 right-4 z-[100] inline-flex items-center gap-2.5 max-w-full rounded-full border border-cyan-200 bg-cyan-50 px-4 py-2 text-sm text-cyan-800 shadow-md shadow-cyan-100/80 transition-all duration-300 ease-out ${isMounted ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'}`}>
+      <span className="font-semibold text-cyan-900 whitespace-nowrap">{title}:</span>
+      <span className="text-cyan-800">{message}</span>
     </div>,
     document.body
   )
 }
+

@@ -150,160 +150,6 @@ const sendOtpEmail = async (email, otp) => {
   }
 };
 
-// ===============================
-// LOGIN USER (WITH JWT TOKEN)
-// ===============================
-exports.loginUser = async (req, res) => {
-  try {
-    console.log("Login attempt:", req.body);
-    const { email, password } = req.body;
-
-    // rate limit check (email + IP)
-    const remainingMs = loginRateLimiter.getRemainingMs(email, req.ip);
-    if (remainingMs && remainingMs > 0) {
-      const totalSeconds = Math.ceil(remainingMs / 1000);
-      const mins = Math.floor(totalSeconds / 60);
-      const secs = totalSeconds % 60;
-      const mmss = `${mins}:${String(secs).padStart(2, '0')}`;
-      return res.status(429).json({
-        success: false,
-        message: `Too many failed login attempts. Please wait ${mmss} before retrying.`,
-        remainingMs
-      });
-    }
-
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "Email and password are required",
-      });
-    }
-
-    const hashedPassword = crypto
-      .createHash("md5")
-      .update(password)
-      .digest("hex");
-
-    // Find user
-    const [users] = await db.query(
-      "SELECT UserID, FirstName, MiddleInitial, LastName, Email, RoleID, ProfilePic, approval_status FROM users WHERE Email = ? AND PasswordHash = ?",
-      [email, hashedPassword]
-    );
-
-    if (users.length === 0) {
-      const result = loginRateLimiter.recordFailure(email, req.ip);
-      if (result.blocked) {
-        const totalSeconds = Math.ceil(result.remainingMs / 1000);
-        const mins = Math.floor(totalSeconds / 60);
-        const secs = totalSeconds % 60;
-        const mmss = `${mins}:${String(secs).padStart(2, '0')}`;
-        return res.status(429).json({
-          success: false,
-          message: `Too many failed login attempts. Please wait ${mmss} before retrying.`,
-          remainingMs: result.remainingMs
-        });
-      }
-      return res.status(401).json({
-        success: false,
-        message: "Invalid email or password",
-      });
-    }
-
-    const user = users[0];
-
-    // � Check approval status
-    if (user.approval_status === 'pending') {
-      return res.status(403).json({
-        success: false,
-        message: "Your account is pending approval. Please wait for admin approval.",
-        approvalStatus: 'pending'
-      });
-    }
-
-    if (user.approval_status === 'denied') {
-      return res.status(403).json({
-        success: false,
-        message: "Your account has been denied. Please contact the administrator.",
-        approvalStatus: 'denied'
-      });
-    }
-
-    // �🔥 Create JWT
-    const token = jwt.sign(
-      { userId: user.UserID },
-      "MY_SECRET_KEY", // ✔ change to env later
-      { expiresIn: "7d" }
-    );
-
-    // Record successful login
-    if (user && user.UserID) {
-      try { recordLog(user.UserID, 'Login', `User ${user.Email} logged in`); } catch (e) {}
-    }
-
-    // Reset any rate limiting state on successful login
-    try { loginRateLimiter.reset(email, req.ip); } catch (e) {}
-
-    res.json({
-      success: true,
-      message: "Login successful. Failed attempt counter reset.",
-      token,
-      user,
-    });
-
-  } catch (error) {
-    console.error("Login error:", error);
-    // Do not log if no user ID is available
-    res.status(500).json({
-      success: false,
-      message: "Login failed",
-    });
-  }
-};
-
-// LOGOUT USER (records audit entry)
-exports.logoutUser = async (req, res) => {
-  try {
-    const userId = req.user?.userId || null;
-    if (userId) {
-      try { recordLog(userId, 'Logout', `User ${userId} logged out`); } catch (e) {}
-    }
-    res.json({ success: true, message: 'Logout successful' });
-  } catch (error) {
-    console.error('Logout error:', error);
-    res.status(500).json({ success: false, message: 'Logout failed' });
-  }
-};
-
-
-// CHECK LOGIN STATUS (remaining block time)
-exports.loginStatus = async (req, res) => {
-  try {
-    const email = String(req.query.email || '').trim();
-    if (!email) {
-      return res.json({ success: true, remainingMs: 0 });
-    }
-
-    const remainingMs = loginRateLimiter.getRemainingMs(email, req.ip) || 0;
-    if (remainingMs && remainingMs > 0) {
-      const totalSeconds = Math.ceil(remainingMs / 1000);
-      const mins = Math.floor(totalSeconds / 60);
-      const secs = totalSeconds % 60;
-      const mmss = `${mins}:${String(secs).padStart(2, '0')}`;
-      return res.json({
-        success: true,
-        remainingMs,
-        message: `Too many failed login attempts. Please wait ${mmss} before retrying.`
-      });
-    }
-
-    return res.json({ success: true, remainingMs: 0 });
-  } catch (error) {
-    console.error('loginStatus error:', error);
-    return res.status(500).json({ success: false, message: 'Failed to check login status' });
-  }
-};
-
-
 exports.sendRegistrationOtp = async (req, res) => {
   try {
     const body = req.body || {};
@@ -538,6 +384,193 @@ exports.validateRegistrationInvite = async (req, res) => {
   }
 };
 
+// ===============================
+// LOGIN USER (WITH JWT TOKEN)
+// ===============================
+exports.loginUser = async (req, res) => {
+  try {
+    console.log("Login attempt:", req.body);
+    const { email, password } = req.body;
+
+    const remainingMs = loginRateLimiter.getRemainingMs(email, req.ip);
+    if (remainingMs && remainingMs > 0) {
+      const totalSeconds = Math.ceil(remainingMs / 1000);
+      const mins = Math.floor(totalSeconds / 60);
+      const secs = totalSeconds % 60;
+      const mmss = `${mins}:${String(secs).padStart(2, '0')}`;
+      return res.status(429).json({
+        success: false,
+        message: `Too many failed login attempts. Please wait ${mmss} before retrying.`,
+        remainingMs
+      });
+    }
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and password are required",
+      });
+    }
+
+    const hashedPassword = crypto
+      .createHash("md5")
+      .update(password)
+      .digest("hex");
+
+    const [users] = await db.query(
+      "SELECT UserID, FirstName, MiddleInitial, LastName, Email, RoleID, ProfilePic, approval_status FROM users WHERE Email = ? AND PasswordHash = ?",
+      [email, hashedPassword]
+    );
+
+    if (users.length === 0) {
+      const result = loginRateLimiter.recordFailure(email, req.ip);
+      if (result.blocked) {
+        const totalSeconds = Math.ceil(result.remainingMs / 1000);
+        const mins = Math.floor(totalSeconds / 60);
+        const secs = totalSeconds % 60;
+        const mmss = `${mins}:${String(secs).padStart(2, '0')}`;
+        return res.status(429).json({
+          success: false,
+          message: `Too many failed login attempts. Please wait ${mmss} before retrying.`,
+          remainingMs: result.remainingMs
+        });
+      }
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password",
+      });
+    }
+
+    const user = users[0];
+
+    if (user.approval_status === 'pending') {
+      return res.status(403).json({
+        success: false,
+        message: "Your account is pending approval. Please wait for admin approval.",
+        approvalStatus: 'pending'
+      });
+    }
+
+    if (user.approval_status === 'denied') {
+      return res.status(403).json({
+        success: false,
+        message: "Your account has been denied. Please contact the administrator.",
+        approvalStatus: 'denied'
+      });
+    }
+
+    const token = jwt.sign(
+      { userId: user.UserID },
+      "MY_SECRET_KEY",
+      { expiresIn: "8h" }
+    );
+
+    if (user && user.UserID) {
+      try { recordLog(user.UserID, 'Login', `User ${user.Email} logged in`); } catch (e) {}
+    }
+
+    try { loginRateLimiter.reset(email, req.ip); } catch (e) {}
+
+    res.json({
+      success: true,
+      message: "Login successful.",
+      token,
+      user,
+    });
+  } catch (error) {
+    console.error("Login error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Login failed",
+    });
+  }
+};
+
+exports.logoutUser = async (req, res) => {
+  try {
+    const userId = req.user?.userId || null;
+    if (userId) {
+      try { recordLog(userId, 'Logout', `User ${userId} logged out`); } catch (e) {}
+    }
+    res.json({ success: true, message: 'Logout successful' });
+  } catch (error) {
+    console.error('Logout error:', error);
+    res.status(500).json({ success: false, message: 'Logout failed' });
+  }
+};
+
+exports.loginStatus = async (req, res) => {
+  try {
+    const email = String(req.query.email || '').trim();
+    if (!email) {
+      return res.json({ success: true, remainingMs: 0 });
+    }
+
+    const remainingMs = loginRateLimiter.getRemainingMs(email, req.ip) || 0;
+    if (remainingMs && remainingMs > 0) {
+      const totalSeconds = Math.ceil(remainingMs / 1000);
+      const mins = Math.floor(totalSeconds / 60);
+      const secs = totalSeconds % 60;
+      const mmss = `${mins}:${String(secs).padStart(2, '0')}`;
+      return res.json({
+        success: true,
+        remainingMs,
+        message: `Too many failed login attempts. Please wait ${mmss} before retrying.`
+      });
+    }
+
+    return res.json({ success: true, remainingMs: 0 });
+  } catch (error) {
+    console.error('loginStatus error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to check login status' });
+  }
+};
+
+
+// ===============================
+// GET USER BY EMAIL
+// ===============================
+exports.getCurrentUser = async (req, res) => {
+  try {
+    const { email } = req.params;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
+      });
+    }
+
+    const [users] = await db.query(
+      "SELECT u.UserID, u.FirstName, u.MiddleInitial, u.LastName, u.Email, u.RoleID, u.ProfilePic, u.approval_status, r.RoleName FROM users u LEFT JOIN roles r ON u.RoleID = r.RoleID WHERE u.Email = ?",
+      [email]
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const user = users[0];
+    const userWithFullName = {
+      ...user,
+      FullName: `${user.FirstName}${user.MiddleInitial ? " " + user.MiddleInitial + "." : ""} ${user.LastName}`,
+    };
+
+    res.json({
+      success: true,
+      user: userWithFullName,
+    });
+  } catch (error) {
+    console.error("Get current user error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching user",
+    });
+  }
+};
 
 // ===============================
 // GET ALL USERS
@@ -602,57 +635,8 @@ exports.getUsers = async (req, res) => {
   }
 };
 
-
-// ===============================
-// GET USER BY EMAIL
-// ===============================
-exports.getCurrentUser = async (req, res) => {
-  try {
-    const { email } = req.params;
-
-    if (!email) {
-      return res.status(400).json({
-        success: false,
-        message: "Email is required",
-      });
-    }
-
-    const [users] = await db.query(
-      "SELECT u.UserID, u.FirstName, u.MiddleInitial, u.LastName, u.Email, u.RoleID, u.ProfilePic, u.approval_status, r.RoleName FROM users u LEFT JOIN roles r ON u.RoleID = r.RoleID WHERE u.Email = ?",
-      [email]
-    );
-
-    if (users.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    }
-
-    const user = users[0];
-    const userWithFullName = {
-      ...user,
-      FullName: `${user.FirstName}${user.MiddleInitial ? " " + user.MiddleInitial + "." : ""} ${user.LastName}`,
-    };
-
-    res.json({
-      success: true,
-      user: userWithFullName,
-    });
-  } catch (error) {
-    console.error("Get current user error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Error fetching user",
-    });
-  }
-};
-
-
-// ===============================
-// GET LOGGED-IN USER VIA TOKEN
-// ===============================
 exports.getLoggedInUser = async (req, res) => {
+
   try {
     const userId = req.user.userId; // from decoded token
 

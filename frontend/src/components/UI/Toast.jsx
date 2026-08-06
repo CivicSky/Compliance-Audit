@@ -20,9 +20,9 @@ let toastIdCounter = 0;
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
 
-  const toast = useCallback(({ title, description, variant = 'info', duration = 4000 }) => {
+  const toast = useCallback(({ title = 'Notice', description, variant = 'info', duration = 1500 }) => {
     const id = ++toastIdCounter;
-    setToasts(prev => [...prev, { id, title, description, variant, duration }].slice(-5));
+    setToasts(prev => [...prev, { id, title: title || 'Notice', description, variant, duration }].slice(-5));
   }, []);
 
   const dismiss = useCallback((id) => {
@@ -33,7 +33,7 @@ export function ToastProvider({ children }) {
     <ToastContext.Provider value={{ toast }}>
       {children}
       {typeof document !== 'undefined' && createPortal(
-        <div className="fixed top-4 right-4 z-[70] flex flex-col gap-3 pointer-events-none">
+        <div className="fixed top-20 right-4 z-[100] flex flex-col items-end gap-2 pointer-events-none">
           {toasts.map(t => (
             <ToastItem key={t.id} toast={t} onDismiss={() => dismiss(t.id)} />
           ))}
@@ -45,39 +45,39 @@ export function ToastProvider({ children }) {
 }
 
 function ToastItem({ toast, onDismiss }) {
+  const [isMounted, setIsMounted] = useState(false);
+
   useEffect(() => {
+    const enterTimer = setTimeout(() => setIsMounted(true), 10);
+    let timer;
     if (toast.duration && toast.duration > 0) {
-      const timer = setTimeout(onDismiss, toast.duration);
-      return () => clearTimeout(timer);
+      timer = setTimeout(() => {
+        setIsMounted(false);
+        setTimeout(onDismiss, 300);
+      }, toast.duration);
     }
+    return () => {
+      clearTimeout(enterTimer);
+      if (timer) clearTimeout(timer);
+    };
   }, [toast, onDismiss]);
 
-  const variants = {
-    success: { color: 'bg-[var(--success-500,#22c55e)]', Icon: CheckCircle, iconColor: 'text-[var(--success-500,#22c55e)]' },
-    error: { color: 'bg-[var(--danger-500,#ef4444)]', Icon: XCircle, iconColor: 'text-[var(--danger-500,#ef4444)]' },
-    warning: { color: 'bg-[var(--warning-500,#f59e0b)]', Icon: AlertTriangle, iconColor: 'text-[var(--warning-500,#f59e0b)]' },
-    info: { color: 'bg-[var(--info-500,#3b82f6)]', Icon: Info, iconColor: 'text-[var(--info-500,#3b82f6)]' },
-  };
-
-  const { color, Icon, iconColor } = variants[toast.variant] || variants.info;
+  const messageText = toast.description || (typeof toast.title === 'string' && toast.title !== 'Notice' ? toast.title : '');
+  const displayTitle = toast.description ? (toast.title || 'Notice') : 'Notice';
 
   return (
-    <div className="pointer-events-auto bg-white rounded-lg shadow-lg border border-gray-100 overflow-hidden flex min-w-[300px] max-w-sm animate-in slide-in-from-right-8 fade-in duration-300">
-      <div className={`w-1 flex-shrink-0 ${color}`} />
-      <div className="flex-1 p-4 flex items-start gap-3">
-        <Icon className={`w-5 h-5 flex-shrink-0 mt-0.5 ${iconColor}`} />
-        <div className="flex-1">
-          <h4 className="text-sm font-semibold text-gray-900">{toast.title}</h4>
-          {toast.description && <p className="text-sm text-gray-500 mt-1">{toast.description}</p>}
-        </div>
-        <button 
-          onClick={onDismiss}
-          className="text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
-          aria-label="Close notification"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      </div>
+    <div className={`pointer-events-auto inline-flex items-center gap-2.5 max-w-full rounded-full border border-cyan-200 bg-cyan-50 px-4 py-2 text-sm text-cyan-800 shadow-md shadow-cyan-100/80 transition-all duration-300 ease-out ${isMounted ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'}`}>
+      <span className="font-semibold text-cyan-900 whitespace-nowrap">{displayTitle}:</span>
+      <span className="text-cyan-800">{messageText}</span>
+      <button 
+        onClick={() => { setIsMounted(false); setTimeout(onDismiss, 300); }} 
+        className="ml-1 text-cyan-600 hover:text-cyan-900 transition-colors p-0.5 rounded-full hover:bg-cyan-100"
+        aria-label="Close"
+      >
+        <X className="w-3.5 h-3.5" />
+      </button>
     </div>
   );
 }
+
+

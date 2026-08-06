@@ -20,24 +20,28 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor for 401 Unauthorized
+// Response interceptor for 401/403 Unauthorized & Expired Tokens
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     const originalRequest = error.config;
     // Only redirect if not a login or register request
     if (
-      error.response?.status === 401 &&
+      (error.response?.status === 401 || error.response?.status === 403) &&
       originalRequest &&
-      !originalRequest.url.endsWith('/login') &&
-      !originalRequest.url.endsWith('/register')
+      !originalRequest.url.includes('/login') &&
+      !originalRequest.url.includes('/register')
     ) {
       localStorage.removeItem('token');
-      window.location.href = '/login';
+      localStorage.removeItem('user');
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
 );
+
 
 // ========================
 // Compliance Status Offices API
@@ -67,10 +71,12 @@ export const areasAPI = {
 
 export const masterlistAPI = {
   getAll: async () => (await api.get('/api/masterlist')).data,
+  getAvailableForEvent: async (eventId) => (await api.get(`/api/masterlist/available/${eventId}`)).data,
   addItem: async (item) => (await api.post('/api/masterlist/add', item)).data,
   updateItem: async (id, item) => (await api.put(`/api/masterlist/${id}`, item)).data,
   deleteItem: async (id) => (await api.delete(`/api/masterlist/${id}`)).data,
 };
+
 
 export const departmentsAPI = {
   getAll: async () => (await api.get('/api/departments')).data,

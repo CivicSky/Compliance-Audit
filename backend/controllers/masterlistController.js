@@ -48,6 +48,41 @@ exports.getAll = async (req, res) => {
   }
 };
 
+exports.getAvailableForEvent = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const [rows] = await db.query(
+      `
+      SELECT
+        m.id,
+        m.entity_name,
+        m.entity_type_id,
+        m.department_id,
+        m.created_at,
+        m.updated_at,
+        d.name AS department_name,
+        CASE m.entity_type_id
+          WHEN 1 THEN 'Academic Program'
+          WHEN 2 THEN 'Non-Academic Office'
+          ELSE 'Unknown'
+        END AS entity_type
+      FROM ${TABLE_NAME} m
+      LEFT JOIN departments d ON m.department_id = d.id
+      WHERE m.id NOT IN (
+        SELECT master_list_id FROM offices WHERE EventID = ? AND master_list_id IS NOT NULL
+      )
+      ORDER BY m.entity_name ASC
+      `,
+      [eventId]
+    );
+    return res.json({ success: true, data: rows.map(formatMasterListRow) });
+  } catch (error) {
+    console.error('Error fetching available master list items:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch available items', error: error.message });
+  }
+};
+
+
 exports.addItem = async (req, res) => {
   try {
     const { name, entityTypeId, type, departmentId, department } = req.body;
