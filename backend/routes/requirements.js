@@ -314,7 +314,7 @@ router.delete('/:requirementId/file/:userId', auth, async (req, res) => {
         if (remainingCount === 0) {
             try {
                 await db.query(
-                    'UPDATE requirement_user_assignments SET HasUploaded = 0 WHERE RequirementID = ? AND UserID = ?',
+                    'UPDATE requirement_user_assignments SET HasUploaded = FALSE WHERE RequirementID = ? AND UserID = ?',
                     [requirementId, userId]
                 );
             } catch (uErr) {
@@ -433,9 +433,29 @@ router.post('/user-upload', auth, userReqUpload.single('file'), async (req, res)
             finalFileName = `${baseFileName}_${collisionCounter}${ext}`;
         }
 
+        const { uploadToSupabaseBucket } = require('../utils/supabaseStorage');
+
         const destPath = require('path').join(eventDir, finalFileName);
-        fs.renameSync(req.file.path, destPath);
-        const filePath = `/uploads/events/${safeEventName}/${finalFileName}`;
+        let filePath = `/uploads/events/${safeEventName}/${finalFileName}`;
+
+        try {
+            const supabaseRes = await uploadToSupabaseBucket(
+                req.file.path, 
+                `events/${safeEventName}/${finalFileName}`, 
+                req.file.mimetype
+            );
+            if (supabaseRes && supabaseRes.publicUrl) {
+                filePath = supabaseRes.publicUrl;
+            }
+        } catch (supabaseErr) {
+            console.warn('Supabase cloud storage upload notice (falling back to local disk):', supabaseErr.message);
+            fs.renameSync(req.file.path, destPath);
+        }
+
+        // Clean up temp file if still present
+        if (fs.existsSync(req.file.path)) {
+            try { fs.unlinkSync(req.file.path); } catch (e) {}
+        }
 
         const fileComment = comment ? comment.trim() : '';
 
@@ -444,9 +464,9 @@ router.post('/user-upload', auth, userReqUpload.single('file'), async (req, res)
             [resolvedOfficeId, userId, requirementId, finalFileName, fileTitle, fileComment, filePath]
         );
 
-        // Update HasUploaded flag to 1
+        // Update HasUploaded flag to TRUE
         await db.query(
-            'UPDATE requirement_user_assignments SET HasUploaded = 1 WHERE RequirementID = ? AND UserID = ?',
+            'UPDATE requirement_user_assignments SET HasUploaded = TRUE WHERE RequirementID = ? AND UserID = ?',
             [requirementId, userId]
         );
 

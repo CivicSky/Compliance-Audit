@@ -11,6 +11,7 @@ import {
 import api from "../../utils/api";
 import { Link } from "react-router-dom";
 import UnifiedSetupWizard from "../UnifiedSetupWizard/UnifiedSetupWizard";
+import { DashboardSkeleton } from "../UI/Skeleton";
 import {
     Activity,
     Building2,
@@ -473,7 +474,7 @@ export default function Home() {
         { title: "Requirements", value: requirements.length, subtitle: "Total compliance items", Icon: FileCheck2, tone: "text-rose-600" },
     ];
 
-    if (loading) return <div className="p-6">Loading dashboard...</div>;
+    if (loading) return <DashboardSkeleton />;
     if (error) return <div className="p-6 text-red-600">{error}</div>;
 
     return (

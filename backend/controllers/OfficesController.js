@@ -1375,12 +1375,12 @@ const OfficesController = {
         }
       }
 
-      // Use INSERT ... ON DUPLICATE KEY UPDATE to handle both insert and update, including comments
+      // Use INSERT ... ON CONFLICT DO UPDATE to handle both insert and update, including comments in PostgreSQL
       await db.query(
         `INSERT INTO compliancestatusoffices (OfficeID, RequirementID, Status, comments)
          VALUES (?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE Status = ?, comments = ?`,
-        [officeId, requirementId, statusId, comments || null, statusId, comments || null]
+         ON CONFLICT (OfficeID, RequirementID) DO UPDATE SET Status = EXCLUDED.Status, comments = EXCLUDED.comments`,
+        [officeId, requirementId, statusId, comments || null]
       );
 
       // Update the overall office status
@@ -1440,20 +1440,21 @@ async function updateOverallOfficeStatus(officeId) {
       overallStatus = 'Partially Complied';
     }
 
-    // Insert or update the overall status
-    await db.query(`
-      INSERT INTO OverallOfficeStatus 
+    // Insert or update the overall status in PostgreSQL
+    await db.query(
+      `INSERT INTO OverallOfficeStatus 
         (OfficeID, CompliedCount, PartiallyCompliedCount, NotCompliedCount, TotalRequirements, CompliancePercent, OverallStatus)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE
-        CompliedCount = VALUES(CompliedCount),
-        PartiallyCompliedCount = VALUES(PartiallyCompliedCount),
-        NotCompliedCount = VALUES(NotCompliedCount),
-        TotalRequirements = VALUES(TotalRequirements),
-        CompliancePercent = VALUES(CompliancePercent),
-        OverallStatus = VALUES(OverallStatus),
-        LastUpdated = CURRENT_TIMESTAMP
-    `, [officeId, complied, partially, notComplied, total, compliancePercent.toFixed(2), overallStatus]);
+      ON CONFLICT (OfficeID) DO UPDATE SET
+        CompliedCount = EXCLUDED.CompliedCount,
+        PartiallyCompliedCount = EXCLUDED.PartiallyCompliedCount,
+        NotCompliedCount = EXCLUDED.NotCompliedCount,
+        TotalRequirements = EXCLUDED.TotalRequirements,
+        CompliancePercent = EXCLUDED.CompliancePercent,
+        OverallStatus = EXCLUDED.OverallStatus,
+        LastUpdated = CURRENT_TIMESTAMP`,
+      [officeId, complied, partially, notComplied, total, compliancePercent.toFixed(2), overallStatus]
+    );
 
   } catch (err) {
     console.error('Error updating overall office status:', err);

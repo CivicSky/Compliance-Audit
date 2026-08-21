@@ -5,6 +5,7 @@ import { usersAPI } from "../../utils/api";
 import { useModal } from "../UI/ModalProvider";
 import Pagination from "../Pagination/Pagination";
 import { API_BASE_URL } from '../../utils/apiBase';
+import { CardListSkeleton } from "../UI/Skeleton";
 
 const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = false, onSelectionChange, onUserClick, viewMode = 'list' }, ref) => {
     const [users, setUsers] = useState([]);
@@ -234,12 +235,7 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
     if (loading) {
         return (
             <div className="mt-6 w-full">
-                <div className="bg-white rounded-md p-4 shadow-lg border-2 border-gray-200">
-                    <div className="flex items-center justify-center py-8">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                        <span className="ml-3 text-gray-600">Loading users...</span>
-                    </div>
-                </div>
+                <CardListSkeleton count={4} />
             </div>
         );
     }

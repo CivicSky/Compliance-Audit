@@ -17,14 +17,14 @@ exports.addArea = async (req, res) => {
             // Preferred query for schemas with CreatedAt/UpdatedAt columns
             [result] = await db.query(
                 `INSERT INTO areas (AreaCode, AreaName, EventID, Description, IsActive, CreatedAt, UpdatedAt)
-                 VALUES (?, ?, ?, ?, 1, NOW(), NOW())`,
+                 VALUES (?, ?, ?, ?, TRUE, NOW(), NOW())`,
                 [AreaCode, AreaName, eventId, Description || null]
             );
         } catch (insertErr) {
             // Fallback query for schemas without CreatedAt/UpdatedAt columns
             [result] = await db.query(
                 `INSERT INTO areas (AreaCode, AreaName, EventID, Description, IsActive)
-                 VALUES (?, ?, ?, ?, 1)`,
+                 VALUES (?, ?, ?, ?, TRUE)`,
                 [AreaCode, AreaName, eventId, Description || null]
             );
         }

@@ -2,6 +2,7 @@ import React, { useState, useEffect, forwardRef, useImperativeHandle } from "rea
 import { useModal } from "../UI/ModalProvider";
 import { eventsAPI } from "../../utils/api";
 import Pagination from "../Pagination/Pagination";
+import { CardListSkeleton } from "../UI/Skeleton";
 
 const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionChange, onEventClick }, ref) => {
     const [events, setEvents] = useState([]);
@@ -163,11 +164,8 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
 
     if (loading) {
         return (
-            <div className="w-full py-8">
-                <div className="flex flex-col items-center justify-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-2 border-indigo-600 border-t-transparent"></div>
-                    <span className="mt-3 text-sm text-gray-500">Loading events...</span>
-                </div>
+            <div className="w-full py-4">
+                <CardListSkeleton count={4} />
             </div>
         );
     }

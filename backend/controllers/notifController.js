@@ -12,9 +12,9 @@ class NotificationController {
             const queryParams = [userId];
             
             if (filter === 'read') {
-                whereClause += ' AND n.IsRead = 1';
+                whereClause += ' AND n.IsRead = TRUE';
             } else if (filter === 'unread') {
-                whereClause += ' AND n.IsRead = 0';
+                whereClause += ' AND n.IsRead = FALSE';
             }
             
             const [notifications] = await db.query(`
@@ -104,7 +104,7 @@ class NotificationController {
             
             await db.query(`
                 UPDATE notifications 
-                SET IsRead = 1, ReadAt = NOW() 
+                SET IsRead = TRUE, ReadAt = NOW() 
                 WHERE NotificationID = ?
             `, [notificationId]);
             
@@ -129,8 +129,8 @@ class NotificationController {
             
             await db.query(`
                 UPDATE notifications 
-                SET IsRead = 1, ReadAt = NOW() 
-                WHERE UserID = ? AND IsRead = 0
+                SET IsRead = TRUE, ReadAt = NOW() 
+                WHERE UserID = ? AND IsRead = FALSE
             `, [userId]);
             
             res.json({
@@ -155,8 +155,8 @@ class NotificationController {
             const [counts] = await db.query(`
                 SELECT 
                     COUNT(*) as total,
-                    SUM(CASE WHEN IsRead = 0 THEN 1 ELSE 0 END) as unread,
-                    SUM(CASE WHEN IsRead = 1 THEN 1 ELSE 0 END) as \`read\`
+                    SUM(CASE WHEN IsRead = FALSE THEN 1 ELSE 0 END) as unread,
+                    SUM(CASE WHEN IsRead = TRUE THEN 1 ELSE 0 END) as \`read\`
                 FROM notifications 
                 WHERE UserID = ?
             `, [userId]);

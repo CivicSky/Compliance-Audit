@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Pagination from "../Pagination/Pagination";
 import Header from "../Header/header";
+import { CardListSkeleton } from "../UI/Skeleton";
 
 export default function AuditLogs() {
     const [logs, setLogs] = useState([]);
@@ -668,11 +669,9 @@ export default function AuditLogs() {
                         </div>
                     </div>
 
-                    {/* Logs List Container */}
                     {loading ? (
-                        <div className="flex-1 flex flex-col items-center justify-center p-8 text-slate-400">
-                            <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent mb-2" />
-                            <span className="text-xs font-medium">Loading activity history...</span>
+                        <div className="flex-1 overflow-y-auto">
+                            <CardListSkeleton count={8} />
                         </div>
                     ) : filteredLogs.length === 0 ? (
                         <div className="flex-1 flex flex-col items-center justify-center p-12 text-center">

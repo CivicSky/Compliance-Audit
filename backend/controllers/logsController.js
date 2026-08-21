@@ -38,7 +38,7 @@ exports.getLogs = async (req, res) => {
 
     // By default exclude low-value HTTP middleware logs like "POST /api/..." so the feed remains readable
     if (!includeHttp) {
-      sql += ` WHERE l.Action NOT REGEXP '^(GET|POST|PUT|PATCH|DELETE)\\s+'`;
+      sql += ` WHERE l.Action !~ '^(GET|POST|PUT|PATCH|DELETE)\\s+'`;
     }
 
     sql += ` ORDER BY l.Timestamp DESC, l.LogID DESC LIMIT ?`;

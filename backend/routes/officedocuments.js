@@ -118,30 +118,40 @@ router.post('/:id/proof', auth, upload.single('file'), async (req, res) => {
     if (!fs.existsSync(req.file.path)) {
       return res.status(500).json({ success: false, message: 'Temp file not found' });
     }
+    const { uploadToSupabaseBucket } = require('../utils/supabaseStorage');
+    let filePath = `/uploads/events/${safeEventName}/${finalFileName}`;
+
     try {
-      fs.renameSync(req.file.path, destPath);
-    } catch (renameError) {
-      console.error('Error renaming file:', renameError);
+      const supabaseRes = await uploadToSupabaseBucket(
+        req.file.path, 
+        `events/${safeEventName}/${finalFileName}`, 
+        req.file.mimetype
+      );
+      if (supabaseRes && supabaseRes.publicUrl) {
+        filePath = supabaseRes.publicUrl;
+      }
+    } catch (supabaseErr) {
+      console.warn('Supabase cloud storage proof upload notice (falling back to local disk):', supabaseErr.message);
       try {
-        fs.copyFileSync(req.file.path, destPath);
-        fs.unlinkSync(req.file.path);
-      } catch (copyError) {
-        console.error('Error copying file:', copyError);
-        if (fs.existsSync(req.file.path)) {
+        fs.renameSync(req.file.path, destPath);
+      } catch (renameError) {
+        try {
+          fs.copyFileSync(req.file.path, destPath);
           fs.unlinkSync(req.file.path);
+        } catch (copyError) {
+          if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+          return res.status(500).json({ success: false, message: 'Failed to save file', error: copyError.message });
         }
-        return res.status(500).json({ success: false, message: 'Failed to save file', error: copyError.message });
       }
     }
-    // Relative path for database and URL (event-coded folder)
-    const filePath = `/uploads/events/${safeEventName}/${finalFileName}`;
-    console.log('Relative file path for DB/URL:', filePath);
+
+    if (fs.existsSync(req.file.path)) {
+      try { fs.unlinkSync(req.file.path); } catch (e) {}
+    }
+
+    console.log('File path for DB/URL:', filePath);
     // Save to database
     await saveOfficeProofDocument(officeId, finalFileName, req.file.originalname, filePath);
-    if (!fs.existsSync(destPath)) {
-      console.error('ERROR: File was not saved to expected location:', destPath);
-      return res.status(500).json({ success: false, message: 'File was not saved correctly' });
-    }
     console.log('--- Proof Upload Debug End ---');
     res.json({ 
       success: true, 

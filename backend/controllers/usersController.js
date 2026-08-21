@@ -604,7 +604,7 @@ exports.getUsers = async (req, res) => {
        LEFT JOIN (
          SELECT
            rua.UserID,
-           GROUP_CONCAT(DISTINCT o.OfficeName ORDER BY o.OfficeName SEPARATOR '||') AS AssignedOffices
+           string_agg(DISTINCT o.OfficeName, '||' ORDER BY o.OfficeName) AS AssignedOffices
          FROM requirement_user_assignments rua
          LEFT JOIN offices o ON o.OfficeID = rua.OfficeID
          GROUP BY rua.UserID
@@ -612,7 +612,7 @@ exports.getUsers = async (req, res) => {
        LEFT JOIN (
          SELECT
            h.UserID,
-           GROUP_CONCAT(DISTINCT o.OfficeName ORDER BY o.OfficeName SEPARATOR '||') AS AssignedOffices
+           string_agg(DISTINCT o.OfficeName, '||' ORDER BY o.OfficeName) AS AssignedOffices
          FROM headofoffice h
          LEFT JOIN office_head_assignments oha ON oha.HeadID = h.HeadID
          LEFT JOIN offices o ON o.OfficeID = oha.OfficeID
@@ -621,7 +621,7 @@ exports.getUsers = async (req, res) => {
        LEFT JOIN (
          SELECT
            aaa.auditor_user_id AS UserID,
-           GROUP_CONCAT(DISTINCT CONCAT(ar.AreaCode, ': ', ar.AreaName) ORDER BY ar.AreaCode SEPARATOR ', ') AS AssignedAreas
+           string_agg(DISTINCT CONCAT(ar.AreaCode, ': ', ar.AreaName), ', ' ORDER BY CONCAT(ar.AreaCode, ': ', ar.AreaName)) AS AssignedAreas
          FROM auditor_area_assignments aaa
          JOIN areas ar ON aaa.area_id = ar.AreaID
          GROUP BY aaa.auditor_user_id
@@ -693,9 +693,20 @@ exports.updateUser = async (req, res) => {
       return res.status(403).json({ success: false, message: "Not authorized" });
     }
 
-    const { FirstName, MiddleInitial, LastName, Email } = req.body;
     // Store only the filename if uploaded, like office head
     let ProfilePic = req.file ? req.file.filename : req.body.ProfilePic || null;
+
+    if (req.file) {
+      try {
+        const { uploadToSupabaseBucket } = require('../utils/supabaseStorage');
+        const supabaseRes = await uploadToSupabaseBucket(req.file.path, req.file.filename, req.file.mimetype, 'profile-pics');
+        if (supabaseRes && supabaseRes.publicUrl) {
+          ProfilePic = supabaseRes.publicUrl;
+        }
+      } catch (sErr) {
+        console.warn('Profile pic cloud upload notice (falling back to local disk):', sErr.message);
+      }
+    }
 
     const [result] = await db.query(
       `UPDATE users SET FirstName = ?, MiddleInitial = ?, LastName = ?, Email = ?, ProfilePic = ? WHERE UserID = ?`,

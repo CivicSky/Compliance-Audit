@@ -7,6 +7,7 @@ import EditOfficeHeadModal from '../EditHead/EditOfficeHeadModal.jsx';
 import Pagination from "../Pagination/Pagination";
 import OfficeHeaddetails from "../OfficeHead/OfficeHeaddetails.jsx";
 import { API_BASE_URL } from '../../utils/apiBase';
+import { CardListSkeleton } from "../UI/Skeleton";
 
 const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode = false, onSelectionChange, viewMode = 'grid' }, ref) => {
     const [officeHeads, setOfficeHeads] = useState([]);
@@ -410,12 +411,7 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
     if (loading) {
         return (
             <div className="mt-6 w-full">
-                <div className="bg-white rounded-md p-4 shadow-lg border-2 border-gray-200">
-                    <div className="flex items-center justify-center py-8">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                        <span className="ml-3 text-gray-600">Loading office personnel...</span>
-                    </div>
-                </div>
+                <CardListSkeleton count={4} />
             </div>
         );
     }

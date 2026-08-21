@@ -148,8 +148,8 @@ const addRequirement = async (req, res) => {
     const maxAttempts = 6;
     let inserted = null;
 
-    // Use a dedicated connection so we can retry safely
-    const conn = await db.getConnection();
+    // Use db directly as postgres manages connection pooling automatically
+    const conn = db;
     try {
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
         let candidateCode = RequirementCode && String(RequirementCode).trim();
@@ -260,7 +260,7 @@ const addRequirement = async (req, res) => {
         }
       }
     } finally {
-      conn.release();
+      if (conn && typeof conn.release === 'function') conn.release();
     }
 
     if (!inserted) {
@@ -918,7 +918,7 @@ const getAssignedUsers = async (req, res) => {
         rua.UserID,
         MIN(rua.AssignedAt) AS AssignedAt,
         MAX(rua.AssignedBy) AS AssignedBy,
-        MAX(rua.HasUploaded) AS HasUploaded,
+        bool_or(rua.HasUploaded) AS HasUploaded,
         u.FirstName,
         u.MiddleInitial,
         u.LastName,
@@ -937,7 +937,7 @@ const getAssignedUsers = async (req, res) => {
           uploaded_by AS UserID, 
           uploaded_at AS AssignedAt, 
           NULL AS AssignedBy, 
-          1 AS HasUploaded
+          TRUE AS HasUploaded
         FROM office_proof_documents
         WHERE requirement_id = ?
       ) rua
@@ -1232,7 +1232,7 @@ const updateUserUploadStatus = async (req, res) => {
 
     const [result] = await db.query(
       'UPDATE requirement_user_assignments SET HasUploaded = ? WHERE AssignmentID = ?',
-      [hasUploaded ? 1 : 0, assignmentId]
+      [hasUploaded ? true : false, assignmentId]
     );
 
     if (result.affectedRows === 0) {
@@ -1268,7 +1268,7 @@ const markUserAsUploaded = async (req, res) => {
     }
 
     const [result] = await db.query(
-      'UPDATE requirement_user_assignments SET HasUploaded = 1 WHERE RequirementID = ? AND UserID = ?',
+      'UPDATE requirement_user_assignments SET HasUploaded = TRUE WHERE RequirementID = ? AND UserID = ?',
       [requirementId, userId]
     );
 

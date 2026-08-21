@@ -123,7 +123,7 @@ router.get('/area/:areaId', async (req, res) => {
                 CreatedAt,
                 UpdatedAt
             FROM criteria
-            WHERE AreaID = ? AND IsActive = 1
+            WHERE AreaID = ? AND IsActive = TRUE
             ORDER BY CriteriaCode ASC
         `, [areaId]);
 

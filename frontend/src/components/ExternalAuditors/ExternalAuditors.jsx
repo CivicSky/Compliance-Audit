@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Header from "../Header/header";
 import Pagination from "../Pagination/Pagination";
+import { CardListSkeleton } from "../UI/Skeleton";
 import AssignAreaModal from "./AssignAreaModal";
 import AuditorDetailsModal from "./AuditorDetailsModal";
 import { API_BASE_URL } from "../../utils/apiBase";
@@ -349,9 +350,8 @@ export default function ExternalAuditors() {
                 {/* Main Content Area */}
                 <div className="flex-1 overflow-y-auto min-h-0 [contain:content]">
                     {loading ? (
-                        <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-                            <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent mb-2" />
-                            <span className="text-xs font-medium">Loading external auditors...</span>
+                        <div className="w-full">
+                            <CardListSkeleton count={6} />
                         </div>
                     ) : visibleAuditors.length === 0 ? (
                         <div className="rounded-2xl border border-dashed border-slate-300/80 bg-white p-12 text-center text-slate-500">

@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { usersAPI } from "../../utils/api";
+import { DashboardSkeleton, CardListSkeleton } from "../UI/Skeleton";
 
 export default function RoleProtectedRoute({ allowedRoles = [], forbiddenRoles = [], children }) {
+    const location = useLocation();
     const [currentUser, setCurrentUser] = useState(null);
     const [loading, setLoading] = useState(true);
 
@@ -25,9 +27,10 @@ export default function RoleProtectedRoute({ allowedRoles = [], forbiddenRoles =
     }, []);
 
     if (loading) {
+        const isDashboard = location.pathname === '/home' || location.pathname === '/home/';
         return (
-            <div className="flex h-screen w-full items-center justify-center bg-slate-50">
-                <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+            <div className="w-full p-6">
+                {isDashboard ? <DashboardSkeleton /> : <CardListSkeleton count={4} />}
             </div>
         );
     }

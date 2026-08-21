@@ -133,10 +133,10 @@ app.use('/api/masterlist', masterlistRoutes);
 const db = require('./db');
 async function ensureRoles() {
   try {
-    const [rows] = await db.query("SELECT RoleName FROM roles WHERE RoleName IN ('Admin','User','Personnel')");
+    const [rows] = await db.query('SELECT "RoleName" FROM roles WHERE "RoleName" IN (\'Admin\',\'User\',\'Personnel\')');
     const existing = rows.map(r => r.RoleName);
     if (!existing.includes('Personnel')) {
-      await db.query("INSERT INTO roles (RoleName, Description) VALUES (?, ?)", ['Personnel', 'Personnel role']);
+      await db.query('INSERT INTO roles ("RoleName", "Description") VALUES (?, ?)', ['Personnel', 'Personnel role']);
       console.log('Inserted missing role: Personnel');
     }
   } catch (err) {
@@ -148,33 +148,18 @@ const complianceStatusOfficesRoutes = require('./routes/ComplianceStatusOffices'
 const officeDocumentsRoutes = require('./routes/officedocuments');
 app.use('/api/compliancestatusoffices', complianceStatusOfficesRoutes);
 app.use('/api/officedocuments', officeDocumentsRoutes);
-/*app.use('/roles', rolesRoutes);
-app.use('/requirements', requirementsRoutes);
-app.use('/officetypes', officetypesRoutes);
-app.use('/offices', officesRoutes);
-app.use('/logs', logsRoutes);
-app.use('/headofoffice', headofofficeRoutes);
-app.use('/compliancestatusoffices', complinancestatusofficesRoutes);
-app.use('/compliancestatus', complinancestatusRoutes);*/
-
-// Catch-all error handler (always return JSON)
 
 async function relaxLogUserLink() {
   try {
     const [rows] = await db.query(`
-      SELECT CONSTRAINT_NAME
-      FROM information_schema.KEY_COLUMN_USAGE
-      WHERE TABLE_SCHEMA = DATABASE()
-        AND TABLE_NAME = 'logs'
-        AND COLUMN_NAME = 'UserID'
-        AND REFERENCED_TABLE_NAME = 'users'
-      LIMIT 1
+      SELECT conname
+      FROM pg_constraint
+      WHERE conrelid = 'logs'::regclass AND conname = 'logs_ibfk_1'
     `);
 
-    const constraintName = rows[0]?.CONSTRAINT_NAME;
-    if (constraintName) {
-      await db.query(`ALTER TABLE logs DROP FOREIGN KEY ${constraintName}`);
-      console.log(`Dropped logs foreign key: ${constraintName}`);
+    if (rows.length > 0) {
+      await db.query('ALTER TABLE logs DROP CONSTRAINT logs_ibfk_1');
+      console.log('Dropped logs foreign key: logs_ibfk_1');
     }
   } catch (err) {
     console.warn('Could not relax logs-user link:', err.message || err);

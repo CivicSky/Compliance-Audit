@@ -270,7 +270,7 @@ exports.getAllHeads = async (req, res) => {
         h.ContactInfo,
         u.ProfilePic,
         MIN(oha.OfficeID) AS OfficeID,
-        GROUP_CONCAT(DISTINCT oha.OfficeID ORDER BY oha.OfficeID) AS OfficeIDs
+        string_agg(DISTINCT oha.OfficeID::text, ',' ORDER BY oha.OfficeID::text) AS OfficeIDs
       FROM headofoffice h
       LEFT JOIN users u ON h.UserID = u.UserID
       LEFT JOIN office_head_assignments oha ON oha.HeadID = h.HeadID
@@ -319,7 +319,7 @@ exports.getHeadById = async (req, res) => {
         h.ContactInfo,
         u.ProfilePic,
         MIN(oha.OfficeID) AS OfficeID,
-        GROUP_CONCAT(DISTINCT oha.OfficeID ORDER BY oha.OfficeID) AS OfficeIDs
+        string_agg(DISTINCT oha.OfficeID::text, ',' ORDER BY oha.OfficeID::text) AS OfficeIDs
       FROM headofoffice h
       LEFT JOIN users u ON h.UserID = u.UserID
       LEFT JOIN office_head_assignments oha ON oha.HeadID = h.HeadID

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from "react";
 import { requirementsAPI } from "../../utils/api";
+import { CardListSkeleton } from "../UI/Skeleton";
 
 const RequirementsP = forwardRef(
   (
@@ -173,12 +174,7 @@ const RequirementsP = forwardRef(
     if (loading) {
       return (
         <div className="mt-6 w-full">
-          <div className="bg-white rounded-md p-4 shadow-lg border-2 border-gray-200">
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <span className="ml-3 text-gray-600">Loading requirements...</span>
-            </div>
-          </div>
+          <CardListSkeleton count={4} />
         </div>
       );
     }

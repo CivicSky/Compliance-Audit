@@ -33,7 +33,7 @@ export function ToastProvider({ children }) {
     <ToastContext.Provider value={{ toast }}>
       {children}
       {typeof document !== 'undefined' && createPortal(
-        <div className="fixed top-20 right-4 z-[20011] flex flex-col items-end gap-2 pointer-events-none">
+        <div className="fixed top-20 right-4 z-[999999] flex flex-col items-end gap-2 pointer-events-none">
           {toasts.map(t => (
             <ToastItem key={t.id} toast={t} onDismiss={() => dismiss(t.id)} />
           ))}

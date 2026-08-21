@@ -3,6 +3,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { buildNotificationRedirect, getDisplayMessage } from '../../utils/notificationMeta';
 import { API_BASE_URL } from '../../utils/apiBase';
+import { CardListSkeleton } from "../UI/Skeleton";
 
 export default function NotificationPopup({ onClose }) {
 	const [notifications, setNotifications] = useState([]);
@@ -224,8 +225,8 @@ export default function NotificationPopup({ onClose }) {
 
 			<div className="notif-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain">
 				{loading ? (
-					<div className="flex h-32 items-center justify-center">
-						<div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+					<div className="p-3">
+						<CardListSkeleton count={3} />
 					</div>
 				) : notifications.length === 0 ? (
 					<div className="flex h-32 flex-col items-center justify-center text-stone-500">

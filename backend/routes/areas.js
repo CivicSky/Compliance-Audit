@@ -10,13 +10,13 @@ const ensureAssignmentsTable = async () => {
     try {
         await db.query(`
             CREATE TABLE IF NOT EXISTS auditor_area_assignments (
-                id INT AUTO_INCREMENT PRIMARY KEY,
+                id SERIAL PRIMARY KEY,
                 auditor_user_id INT NOT NULL,
                 area_id INT NOT NULL,
                 assigned_by INT DEFAULT NULL,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE KEY unique_auditor_area (auditor_user_id, area_id)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT unique_auditor_area UNIQUE (auditor_user_id, area_id)
+            )
         `);
     } catch (e) {
         console.error('Error creating auditor_area_assignments table:', e);
@@ -142,7 +142,7 @@ router.put('/:areaId', auth, restrictAuditor, async (req, res) => {
             [result] = await db.query(
                 `UPDATE areas
                  SET AreaCode = ?, AreaName = ?, Description = ?, UpdatedAt = NOW()
-                 WHERE AreaID = ? AND IsActive = 1`,
+                 WHERE AreaID = ? AND IsActive = TRUE`,
                 [AreaCode, AreaName, Description || null, areaId]
             );
         } catch (updateErr) {
@@ -150,7 +150,7 @@ router.put('/:areaId', auth, restrictAuditor, async (req, res) => {
             [result] = await db.query(
                 `UPDATE areas
                  SET AreaCode = ?, AreaName = ?, Description = ?
-                 WHERE AreaID = ? AND IsActive = 1`,
+                 WHERE AreaID = ? AND IsActive = TRUE`,
                 [AreaCode, AreaName, Description || null, areaId]
             );
         }
@@ -203,7 +203,7 @@ router.get('/', async (req, res) => {
                 CreatedAt,
                 UpdatedAt
             FROM areas
-            WHERE IsActive = 1
+            WHERE IsActive = TRUE
             ORDER BY SortOrder ASC
         `);
         res.json({
@@ -235,7 +235,7 @@ router.get('/event/:eventId', async (req, res) => {
                 CreatedAt,
                 UpdatedAt
             FROM areas
-            WHERE EventID = ? AND IsActive = 1
+            WHERE EventID = ? AND IsActive = TRUE
             ORDER BY SortOrder ASC, AreaCode ASC
         `, [eventId]);
 
@@ -268,7 +268,7 @@ router.get('/:areaId', async (req, res) => {
                 CreatedAt,
                 UpdatedAt
             FROM areas
-            WHERE AreaID = ? AND IsActive = 1
+            WHERE AreaID = ? AND IsActive = TRUE
         `, [areaId]);
 
         if (areas.length === 0) {

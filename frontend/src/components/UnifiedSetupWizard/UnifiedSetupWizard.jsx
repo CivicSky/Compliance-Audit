@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronRight, ChevronLeft, X, Check, Plus, Wand2 } from 'lucide-react';
 import { API_BASE_URL } from '../../utils/apiBase';
+import { useToast } from '../UI/Toast';
 
 export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
+    const { toast } = useToast();
     const [currentStep, setCurrentStep] = useState(0);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
@@ -256,17 +258,18 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
 
             if (response.success) {
                 setCreatedIds(prev => ({ ...prev, eventId: response.data.id || response.data.EventID }));
+                toast({ title: 'Success', description: 'Event created successfully', variant: 'success' });
                 setSuccessMessage(`✓ Event created`);
                 setTimeout(() => {
                     setSuccessMessage('');
                     setCurrentStep(2);
                 }, 1000);
             } else {
-                alert(response.message || 'Failed to add event');
+                toast({ title: 'Error', description: response.message || 'Failed to add event', variant: 'error' });
             }
         } catch (error) {
             console.error('Error:', error);
-            alert('An error occurred');
+            toast({ title: 'Error', description: 'An error occurred', variant: 'error' });
         } finally {
             setIsSubmitting(false);
         }
@@ -289,17 +292,18 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                 const areaId = response.data.id || response.data.AreaID;
                 setCreatedIds(prev => ({ ...prev, areaId }));
                 setCriteriaData(prev => ({ ...prev, AreaID: areaId }));
+                toast({ title: 'Success', description: 'Area created successfully', variant: 'success' });
                 setSuccessMessage(`✓ Area created`);
                 setTimeout(() => {
                     setSuccessMessage('');
                     setCurrentStep(3);
                 }, 1000);
             } else {
-                alert(response.message || 'Failed to add area');
+                toast({ title: 'Error', description: response.message || 'Failed to add area', variant: 'error' });
             }
         } catch (error) {
             console.error('Error:', error);
-            alert('An error occurred');
+            toast({ title: 'Error', description: 'An error occurred', variant: 'error' });
         } finally {
             setIsSubmitting(false);
         }
@@ -322,17 +326,18 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
 
             if (response.success) {
                 setCreatedIds(prev => ({ ...prev, criteriaId: response.data.id || response.data.CriteriaID }));
+                toast({ title: 'Success', description: 'Criteria created successfully', variant: 'success' });
                 setSuccessMessage(`✓ Criteria created`);
                 setTimeout(() => {
                     setSuccessMessage('');
                     setCurrentStep(4);
                 }, 1000);
             } else {
-                alert(response.message || 'Failed to add criteria');
+                toast({ title: 'Error', description: response.message || 'Failed to add criteria', variant: 'error' });
             }
         } catch (error) {
             console.error('Error:', error);
-            alert('An error occurred');
+            toast({ title: 'Error', description: 'An error occurred', variant: 'error' });
         } finally {
             setIsSubmitting(false);
         }
@@ -342,12 +347,12 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
         if (!validateRequirement()) return;
 
         if (!createdIds.criteriaId && !criteriaData.CriteriaID) {
-            alert('Please select a criteria first');
+            toast({ title: 'Warning', description: 'Please select a criteria first', variant: 'warning' });
             return;
         }
 
         if (!requirementData.Description?.trim()) {
-            alert('Please provide a description');
+            toast({ title: 'Warning', description: 'Please provide a description', variant: 'warning' });
             return;
         }
 
@@ -364,17 +369,18 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
 
             if (response.success) {
                 setCreatedIds(prev => ({ ...prev, requirementId: response.data.id || response.data.RequirementID }));
+                toast({ title: 'Success', description: 'Requirement created successfully', variant: 'success' });
                 setSuccessMessage(`✓ Requirement created`);
                 setTimeout(() => {
                     setSuccessMessage('');
                     setCurrentStep(5);
                 }, 1000);
             } else {
-                alert(response.message || 'Failed to add requirement');
+                toast({ title: 'Error', description: response.message || 'Failed to add requirement', variant: 'error' });
             }
         } catch (error) {
             console.error('Error:', error);
-            alert('An error occurred');
+            toast({ title: 'Error', description: 'An error occurred', variant: 'error' });
         } finally {
             setIsSubmitting(false);
         }
@@ -386,7 +392,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                 handleAddEvent();
             } else if (eventMode === 'select') {
                 if (!createdIds.eventId) {
-                    alert('Please select an event');
+                    toast({ title: 'Warning', description: 'Please select an event', variant: 'warning' });
                     return;
                 }
                 setCurrentStep(2);
@@ -396,7 +402,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                 handleAddArea();
             } else if (areaMode === 'select') {
                 if (!createdIds.areaId) {
-                    alert('Please select an area');
+                    toast({ title: 'Warning', description: 'Please select an area', variant: 'warning' });
                     return;
                 }
                 setCurrentStep(3);
@@ -408,7 +414,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                 handleAddCriteria();
             } else if (criteriaMode === 'select') {
                 if (!criteriaData.CriteriaCode) {
-                    alert('Please select a criteria');
+                    toast({ title: 'Warning', description: 'Please select a criteria', variant: 'warning' });
                     return;
                 }
                 setCreatedIds(prev => ({ ...prev, criteriaId: criteriaData.CriteriaID }));

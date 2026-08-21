@@ -8,6 +8,7 @@ import AddCriteriaForm from './AddAreaPop/AddCriteriaForm';
 import AddRequirementForm from './AddAreaPop/AddRequirementForm';
 import AssignPanel from './AddAreaPop/AssignPanel';
 import { saveButtonClass } from './AddAreaPop/formStyles';
+import { useToast } from '../UI/Toast';
 
 export default function AddAreaPop({
 	isOpen,
@@ -21,6 +22,7 @@ export default function AddAreaPop({
 	onLoadRequirementsByCriteria,
 	onEditArea
 }) {
+	const { toast } = useToast();
 	const [mainMode, setMainMode] = useState('add');
 	const [mode, setMode] = useState('add-area'); // for backward compatibility, will be used for add sub-tabs
 	const [saving, setSaving] = useState(false);
@@ -345,6 +347,9 @@ export default function AddAreaPop({
 		setError('');
 		setToastVisible(true);
 
+		// Trigger standard floating toast slide-in from right
+		toast({ title: 'Success', description: msg, variant: 'success' });
+
 		// fade out after 2.5s, then clear string shortly after
 		toastTimerRef.current = setTimeout(() => {
 			setToastVisible(false);
@@ -364,6 +369,9 @@ export default function AddAreaPop({
 		setError(msg);
 		setSuccess('');
 		setToastVisible(true);
+
+		// Trigger standard floating toast slide-in from right
+		toast({ title: 'Error', description: msg, variant: 'error' });
 
 		toastTimerRef.current = setTimeout(() => {
 			setToastVisible(false);
