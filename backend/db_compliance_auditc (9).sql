@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1:3306
--- Generation Time: Aug 14, 2026 at 06:02 PM
+-- Generation Time: Aug 21, 2026 at 08:08 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -20,6 +20,28 @@ SET time_zone = "+00:00";
 --
 -- Database: `db_compliance_auditc`
 --
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `accreditation_levels`
+--
+
+CREATE TABLE `accreditation_levels` (
+  `id` int(11) NOT NULL,
+  `level_name` varchar(50) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `accreditation_levels`
+--
+
+INSERT INTO `accreditation_levels` (`id`, `level_name`) VALUES
+(1, 'Level I'),
+(2, 'Level II'),
+(3, 'Level III'),
+(4, 'Level IV'),
+(5, 'N/A');
 
 -- --------------------------------------------------------
 
@@ -175,12 +197,12 @@ INSERT INTO `compliancestatusoffices` (`CSOfficeID`, `OfficeID`, `DocumentProof`
 (4798, 159, NULL, '2026-08-06 14:05:23', 2554, 3, NULL, NULL),
 (4799, 159, NULL, '2026-08-06 14:05:23', 2555, 3, NULL, NULL),
 (4800, 159, NULL, '2026-08-06 14:05:23', 2556, 3, NULL, NULL),
-(4801, 159, NULL, '2026-08-06 14:05:23', 2485, 3, NULL, NULL),
+(4801, 159, NULL, '2026-08-15 01:00:52', 2485, 3, NULL, 'asdsds'),
 (4802, 159, NULL, '2026-08-06 14:05:23', 2486, 3, NULL, NULL),
 (4803, 159, NULL, '2026-08-06 14:05:23', 2487, 3, NULL, NULL),
 (4804, 159, NULL, '2026-08-06 14:05:23', 2488, 3, NULL, NULL),
 (4805, 159, NULL, '2026-08-06 14:05:23', 2522, 3, NULL, NULL),
-(4806, 159, NULL, '2026-08-06 14:05:23', 2523, 3, NULL, NULL),
+(4806, 159, NULL, '2026-08-15 00:57:48', 2523, 3, NULL, 'sad'),
 (4807, 160, NULL, '2026-08-09 18:57:10', 2524, 3, NULL, NULL),
 (4808, 160, NULL, '2026-08-09 18:57:10', 2525, 3, NULL, NULL),
 (4809, 160, NULL, '2026-08-09 18:57:10', 2526, 3, NULL, NULL),
@@ -359,30 +381,6 @@ INSERT INTO `departments` (`id`, `name`) VALUES
 -- --------------------------------------------------------
 
 --
--- Table structure for table `accreditation_levels`
---
-
-CREATE TABLE `accreditation_levels` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `level_name` varchar(50) COLLATE utf8mb4_general_ci NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `level_name` (`level_name`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `accreditation_levels`
---
-
-INSERT INTO `accreditation_levels` (`id`, `level_name`) VALUES
-(1, 'Level I'),
-(2, 'Level II'),
-(3, 'Level III'),
-(4, 'Level IV'),
-(5, 'N/A');
-
--- --------------------------------------------------------
-
---
 -- Table structure for table `events`
 --
 
@@ -394,7 +392,7 @@ CREATE TABLE `events` (
   `CreatedAt` datetime DEFAULT current_timestamp(),
   `status` enum('active','inactive') NOT NULL DEFAULT 'active',
   `UpdatedAt` datetime DEFAULT NULL,
-  `accreditation_level` varchar(50) COLLATE utf8mb4_general_ci DEFAULT 'N/A'
+  `accreditation_level` varchar(50) DEFAULT 'N/A'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -405,7 +403,7 @@ INSERT INTO `events` (`EventID`, `EventCode`, `EventName`, `Description`, `Creat
 (180, 'PAASCU', 'Philippine Accrediting Association of Schools, Colleges and Universities', 'asdasdasdas', '2026-04-08 12:49:12', 'active', '2026-07-27 13:49:00', 'N/A'),
 (185, 'PACUCOA', 'Philippine Association of Colleges and Universities Commission on Accreditation', 'PACUCOA', '2026-04-22 00:21:04', 'inactive', '2026-07-27 13:49:00', 'N/A'),
 (189, 'PACUCOA 2026', 'Philippine Association of Colleges and Universities Commission on Accreditation', 'asdasdasdas', '2026-06-30 00:23:12', 'active', '2026-07-27 13:49:00', 'N/A'),
-(190, 'RQAT', 'CHED RQAT', 'Commission on Higher Education', '2026-06-30 13:54:44', 'active', '2026-07-27 13:49:00', 'N/A');
+(190, 'RQAT', 'CHED RQAT', 'Commission on Higher Education', '2026-06-30 13:54:44', 'active', '2026-08-15 00:43:12', 'Level IV');
 
 -- --------------------------------------------------------
 
@@ -1604,7 +1602,71 @@ INSERT INTO `logs` (`LogID`, `UserID`, `Action`, `Timestamp`, `Details`) VALUES
 (3232, 57, 'RequirementFileUploaded', '2026-08-13 17:40:11', '{\"RequirementID\":2489,\"RequirementCode\":\"N.1\",\"RequirementDescription\":\"As avenue of implementation of the institutional vision, mission, goals and core values, each college/department translates the institutional vision, mission, and goals, in accordance with the specific requirements of the college/department and the needs of graduates in their professional and workplace practice. The following are the statements of college/department vision, mission, and objectives:\",\"OfficeID\":159,\"OfficeName\":\"BSIT\",\"EventName\":\"Philippine Accrediting Association of Schools, Colleges and Universities\",\"CriteriaName\":\"Statement of College/Department Mission, Vision, and Objectives\",\"FileName\":\"PAASCU.AREA.1.N.N.1.VJ.JAVELLANA_597107638_800118132986844_7142523110770082654_n_jp.jpg\",\"DisplayName\":\"597107638_800118132986844_7142523110770082654_n.jpg\",\"Comment\":\"\",\"UploadedByUserID\":57,\"UploadedByName\":\"VJ JAVELLANA\"}'),
 (3233, 57, 'POST /api/requirements/user-upload', '2026-08-13 17:40:11', '{\"status\":200,\"body\":{\"userId\":\"57\",\"requirementId\":\"2489\",\"displayName\":\"597107638_800118132986844_7142523110770082654_n.jpg\",\"officeId\":\"159\"}}'),
 (3234, 57, 'POST /api/requirements/mark-uploaded', '2026-08-13 17:40:11', '{\"status\":404,\"body\":{\"requirementId\":2489,\"userId\":57}}'),
-(3235, 7, 'Login', '2026-08-13 17:44:31', 'User Admin@gmail.com logged in');
+(3235, 7, 'Login', '2026-08-13 17:44:31', 'User Admin@gmail.com logged in'),
+(3236, 7, 'Login', '2026-08-15 00:35:19', 'User Admin@gmail.com logged in'),
+(3237, 7, 'POST /api/user/registration-invite', '2026-08-15 00:36:25', '{\"status\":200,\"body\":{\"roleId\":4}}'),
+(3238, 7, 'MasterListItemDeleted', '2026-08-15 00:37:28', '{\"id\":\"11\",\"name\":\"erw\"}'),
+(3239, 7, 'DELETE /api/masterlist/11', '2026-08-15 00:37:28', '{\"status\":200,\"body\":null}'),
+(3240, 7, 'PUT /api/events/update/190', '2026-08-15 00:43:12', '{\"status\":200,\"body\":{\"EventName\":\"CHED RQAT\",\"EventCode\":\"RQAT\",\"Description\":\"Commission on Higher Education\",\"status\":\"active\",\"accreditation_level\":\"Level IV\"}}'),
+(3241, 7, 'EventUpdated', '2026-08-15 00:43:12', '{\"EventID\":\"190\",\"EventName\":\"CHED RQAT\",\"EventCode\":\"RQAT\"}'),
+(3242, 7, 'EventCopied', '2026-08-15 00:43:46', '{\"sourceEventId\":190,\"sourceEventName\":\"CHED RQAT\",\"newEventId\":195,\"newEventName\":\"CHED RQAT (Copy)\",\"newEventCode\":\"RQAT-COPY\"}'),
+(3243, 7, 'POST /api/events/copy', '2026-08-15 00:43:46', '{\"status\":200,\"body\":{\"sourceEventId\":190,\"newEventName\":\"CHED RQAT (Copy)\",\"newEventCode\":\"RQAT-COPY\",\"newDescription\":\"Commission on Higher Education\"}}'),
+(3244, 7, 'PUT /api/notifications/2560/read', '2026-08-15 01:20:53', '{\"status\":200,\"body\":{}}'),
+(3245, 57, 'Login', '2026-08-15 02:26:04', 'User javellanavja@gmail.com logged in'),
+(3246, 7, 'Login', '2026-08-19 15:40:09', 'User Admin@gmail.com logged in'),
+(3247, 7, 'EventDeleted', '2026-08-19 15:44:10', '{\"eventIds\":[195],\"deletedNames\":[\"CHED RQAT (Copy)\"]}'),
+(3248, 7, 'POST /api/events/delete', '2026-08-19 15:44:10', '{\"status\":200,\"body\":{\"eventIds\":[195]}}'),
+(3249, 7, 'Login', '2026-08-20 11:12:19', 'User Admin@gmail.com logged in'),
+(3250, 7, 'MasterListItemAdded', '2026-08-20 11:17:00', '{\"id\":13,\"name\":\"Registrar\"}'),
+(3251, 7, 'POST /api/masterlist/add', '2026-08-20 11:17:00', '{\"status\":200,\"body\":{\"name\":\"Registrar\",\"type\":\"Non-Academic Office\",\"entityTypeId\":2,\"departmentId\":null}}'),
+(3252, 7, 'POST /api/offices', '2026-08-20 11:17:15', '{\"status\":200,\"body\":{\"master_list_id\":13,\"OfficeName\":\"Registrar\",\"OfficeTypeID\":1,\"HeadIDs\":[],\"EventID\":180}}'),
+(3253, 7, 'OfficeAdded', '2026-08-20 11:17:15', '{\"OfficeName\":\"Registrar\",\"OfficeType\":\"Non Academic\",\"EventName\":\"Philippine Accrediting Association of Schools, Colleges and Universities\",\"HeadNames\":[],\"HeadCount\":0}'),
+(3254, 7, 'POST /api/offices', '2026-08-20 11:17:22', '{\"status\":200,\"body\":{\"master_list_id\":3,\"OfficeName\":\"BLIS\",\"OfficeTypeID\":2,\"HeadIDs\":[],\"EventID\":180}}'),
+(3255, 7, 'OfficeAdded', '2026-08-20 11:17:22', '{\"OfficeName\":\"BLIS\",\"OfficeType\":\"Academic\",\"EventName\":\"Philippine Accrediting Association of Schools, Colleges and Universities\",\"HeadNames\":[],\"HeadCount\":0}'),
+(3256, 7, 'Login', '2026-08-20 11:28:04', 'User Admin@gmail.com logged in'),
+(3257, 34, 'Login', '2026-08-20 11:28:17', 'User lenuelbetita@gmail.com logged in'),
+(3258, 34, 'RequirementFileUploaded', '2026-08-20 11:29:10', '{\"RequirementID\":2485,\"RequirementCode\":\"A.1\",\"RequirementDescription\":\"The institution has a statement of vision, mission, goals, and core values recorded in an official form or document, which is available to any interested party.\",\"OfficeID\":159,\"OfficeName\":\"BSIT\",\"EventName\":\"Philippine Accrediting Association of Schools, Colleges and Universities\",\"CriteriaName\":\"Statement of Vision, Mission, Goals and Core Values of the Institution\",\"FileName\":\"PAASCU.AREA.1.Z.A.1.Lenuel.Betita_users__2__png.png\",\"DisplayName\":\"users (2).png\",\"Comment\":\"\",\"UploadedByUserID\":34,\"UploadedByName\":\"Lenuel Betita\"}'),
+(3259, 34, 'POST /api/requirements/user-upload', '2026-08-20 11:29:10', '{\"status\":200,\"body\":{\"userId\":\"34\",\"requirementId\":\"2485\",\"displayName\":\"users (2).png\",\"officeId\":\"159\"}}'),
+(3260, 34, 'RequirementFileUploaded', '2026-08-20 11:29:10', '{\"RequirementID\":2485,\"RequirementCode\":\"A.1\",\"RequirementDescription\":\"The institution has a statement of vision, mission, goals, and core values recorded in an official form or document, which is available to any interested party.\",\"OfficeID\":159,\"OfficeName\":\"BSIT\",\"EventName\":\"Philippine Accrediting Association of Schools, Colleges and Universities\",\"CriteriaName\":\"Statement of Vision, Mission, Goals and Core Values of the Institution\",\"FileName\":\"PAASCU.AREA.1.Z.A.1.Lenuel.Betita_Untitled__3__jpg.jpg\",\"DisplayName\":\"Untitled (3).jpg\",\"Comment\":\"\",\"UploadedByUserID\":34,\"UploadedByName\":\"Lenuel Betita\"}'),
+(3261, 34, 'POST /api/requirements/user-upload', '2026-08-20 11:29:10', '{\"status\":200,\"body\":{\"userId\":\"34\",\"requirementId\":\"2485\",\"displayName\":\"Untitled (3).jpg\",\"officeId\":\"159\"}}'),
+(3262, 34, 'RequirementFileUploaded', '2026-08-20 11:29:13', '{\"RequirementID\":2485,\"RequirementCode\":\"A.1\",\"RequirementDescription\":\"The institution has a statement of vision, mission, goals, and core values recorded in an official form or document, which is available to any interested party.\",\"OfficeID\":159,\"OfficeName\":\"BSIT\",\"EventName\":\"Philippine Accrediting Association of Schools, Colleges and Universities\",\"CriteriaName\":\"Statement of Vision, Mission, Goals and Core Values of the Institution\",\"FileName\":\"PAASCU.AREA.1.Z.A.1.Lenuel.Betita_AIHamsterLushLifeDancememe_GreenScreen__mp4.mp4\",\"DisplayName\":\"AIHamsterLushLifeDancememe(GreenScreen).mp4\",\"Comment\":\"\",\"UploadedByUserID\":34,\"UploadedByName\":\"Lenuel Betita\"}'),
+(3263, 34, 'POST /api/requirements/user-upload', '2026-08-20 11:29:13', '{\"status\":200,\"body\":{\"userId\":\"34\",\"requirementId\":\"2485\",\"displayName\":\"AIHamsterLushLifeDancememe(GreenScreen).mp4\",\"officeId\":\"159\"}}'),
+(3264, 34, 'RequirementFileUploaded', '2026-08-20 11:29:13', '{\"RequirementID\":2485,\"RequirementCode\":\"A.1\",\"RequirementDescription\":\"The institution has a statement of vision, mission, goals, and core values recorded in an official form or document, which is available to any interested party.\",\"OfficeID\":159,\"OfficeName\":\"BSIT\",\"EventName\":\"Philippine Accrediting Association of Schools, Colleges and Universities\",\"CriteriaName\":\"Statement of Vision, Mission, Goals and Core Values of the Institution\",\"FileName\":\"PAASCU.AREA.1.Z.A.1.Lenuel.Betita_Untitled__2__jpg.jpg\",\"DisplayName\":\"Untitled (2).jpg\",\"Comment\":\"\",\"UploadedByUserID\":34,\"UploadedByName\":\"Lenuel Betita\"}'),
+(3265, 34, 'POST /api/requirements/user-upload', '2026-08-20 11:29:13', '{\"status\":200,\"body\":{\"userId\":\"34\",\"requirementId\":\"2485\",\"displayName\":\"Untitled (2).jpg\",\"officeId\":\"159\"}}'),
+(3266, 34, 'RequirementFileUploaded', '2026-08-20 11:29:13', '{\"RequirementID\":2485,\"RequirementCode\":\"A.1\",\"RequirementDescription\":\"The institution has a statement of vision, mission, goals, and core values recorded in an official form or document, which is available to any interested party.\",\"OfficeID\":159,\"OfficeName\":\"BSIT\",\"EventName\":\"Philippine Accrediting Association of Schools, Colleges and Universities\",\"CriteriaName\":\"Statement of Vision, Mission, Goals and Core Values of the Institution\",\"FileName\":\"PAASCU.AREA.1.Z.A.1.Lenuel.Betita_Homer_Simpson_Dancing_Sticker_gif.gif\",\"DisplayName\":\"Homer Simpson Dancing Sticker.gif\",\"Comment\":\"\",\"UploadedByUserID\":34,\"UploadedByName\":\"Lenuel Betita\"}'),
+(3267, 34, 'POST /api/requirements/user-upload', '2026-08-20 11:29:13', '{\"status\":200,\"body\":{\"userId\":\"34\",\"requirementId\":\"2485\",\"displayName\":\"Homer Simpson Dancing Sticker.gif\",\"officeId\":\"159\"}}'),
+(3268, 34, 'RequirementFileUploaded', '2026-08-20 11:29:13', '{\"RequirementID\":2485,\"RequirementCode\":\"A.1\",\"RequirementDescription\":\"The institution has a statement of vision, mission, goals, and core values recorded in an official form or document, which is available to any interested party.\",\"OfficeID\":159,\"OfficeName\":\"BSIT\",\"EventName\":\"Philippine Accrediting Association of Schools, Colleges and Universities\",\"CriteriaName\":\"Statement of Vision, Mission, Goals and Core Values of the Institution\",\"FileName\":\"PAASCU.AREA.1.Z.A.1.Lenuel.Betita_Untitled__1__jpg.jpg\",\"DisplayName\":\"Untitled (1).jpg\",\"Comment\":\"\",\"UploadedByUserID\":34,\"UploadedByName\":\"Lenuel Betita\"}'),
+(3269, 34, 'POST /api/requirements/user-upload', '2026-08-20 11:29:13', '{\"status\":200,\"body\":{\"userId\":\"34\",\"requirementId\":\"2485\",\"displayName\":\"Untitled (1).jpg\",\"officeId\":\"159\"}}'),
+(3270, 34, 'RequirementFileUploaded', '2026-08-20 11:29:13', '{\"RequirementID\":2485,\"RequirementCode\":\"A.1\",\"RequirementDescription\":\"The institution has a statement of vision, mission, goals, and core values recorded in an official form or document, which is available to any interested party.\",\"OfficeID\":159,\"OfficeName\":\"BSIT\",\"EventName\":\"Philippine Accrediting Association of Schools, Colleges and Universities\",\"CriteriaName\":\"Statement of Vision, Mission, Goals and Core Values of the Institution\",\"FileName\":\"PAASCU.AREA.1.Z.A.1.Lenuel.Betita_Untitled_jpg.jpg\",\"DisplayName\":\"Untitled.jpg\",\"Comment\":\"\",\"UploadedByUserID\":34,\"UploadedByName\":\"Lenuel Betita\"}'),
+(3271, 34, 'POST /api/requirements/user-upload', '2026-08-20 11:29:13', '{\"status\":200,\"body\":{\"userId\":\"34\",\"requirementId\":\"2485\",\"displayName\":\"Untitled.jpg\",\"officeId\":\"159\"}}'),
+(3272, 34, 'RequirementFileUploaded', '2026-08-20 11:29:14', '{\"RequirementID\":2485,\"RequirementCode\":\"A.1\",\"RequirementDescription\":\"The institution has a statement of vision, mission, goals, and core values recorded in an official form or document, which is available to any interested party.\",\"OfficeID\":159,\"OfficeName\":\"BSIT\",\"EventName\":\"Philippine Accrediting Association of Schools, Colleges and Universities\",\"CriteriaName\":\"Statement of Vision, Mission, Goals and Core Values of the Institution\",\"FileName\":\"PAASCU.AREA.1.Z.A.1.Lenuel.Betita_Sexy_Baby_Dancing_Sticker_by_claudiamate_gif.gif\",\"DisplayName\":\"Sexy Baby Dancing Sticker by claudiamate.gif\",\"Comment\":\"\",\"UploadedByUserID\":34,\"UploadedByName\":\"Lenuel Betita\"}'),
+(3273, 34, 'POST /api/requirements/user-upload', '2026-08-20 11:29:14', '{\"status\":200,\"body\":{\"userId\":\"34\",\"requirementId\":\"2485\",\"displayName\":\"Sexy Baby Dancing Sticker by claudiamate.gif\",\"officeId\":\"159\"}}'),
+(3274, 34, 'RequirementFileUploaded', '2026-08-20 11:29:14', '{\"RequirementID\":2485,\"RequirementCode\":\"A.1\",\"RequirementDescription\":\"The institution has a statement of vision, mission, goals, and core values recorded in an official form or document, which is available to any interested party.\",\"OfficeID\":159,\"OfficeName\":\"BSIT\",\"EventName\":\"Philippine Accrediting Association of Schools, Colleges and Universities\",\"CriteriaName\":\"Statement of Vision, Mission, Goals and Core Values of the Institution\",\"FileName\":\"PAASCU.AREA.1.Z.A.1.Lenuel.Betita_https_file_garden_aoVl-M0-p1TyFay4_Dance_20Love_20.png\",\"DisplayName\":\"https_file_garden_aoVl-M0-p1TyFay4_Dance_20Love_20Sticker_gif.png\",\"Comment\":\"\",\"UploadedByUserID\":34,\"UploadedByName\":\"Lenuel Betita\"}'),
+(3275, 34, 'POST /api/requirements/user-upload', '2026-08-20 11:29:14', '{\"status\":200,\"body\":{\"userId\":\"34\",\"requirementId\":\"2485\",\"displayName\":\"https_file_garden_aoVl-M0-p1TyFay4_Dance_20Love_20Sticker_gif.png\",\"officeId\":\"159\"}}'),
+(3276, 34, 'RequirementFileUploaded', '2026-08-20 11:29:14', '{\"RequirementID\":2485,\"RequirementCode\":\"A.1\",\"RequirementDescription\":\"The institution has a statement of vision, mission, goals, and core values recorded in an official form or document, which is available to any interested party.\",\"OfficeID\":159,\"OfficeName\":\"BSIT\",\"EventName\":\"Philippine Accrediting Association of Schools, Colleges and Universities\",\"CriteriaName\":\"Statement of Vision, Mission, Goals and Core Values of the Institution\",\"FileName\":\"PAASCU.AREA.1.Z.A.1.Lenuel.Betita_Dance_Love_Sticker_gif.gif\",\"DisplayName\":\"Dance Love Sticker.gif\",\"Comment\":\"\",\"UploadedByUserID\":34,\"UploadedByName\":\"Lenuel Betita\"}'),
+(3277, 34, 'POST /api/requirements/user-upload', '2026-08-20 11:29:14', '{\"status\":200,\"body\":{\"userId\":\"34\",\"requirementId\":\"2485\",\"displayName\":\"Dance Love Sticker.gif\",\"officeId\":\"159\"}}'),
+(3278, 34, 'RequirementFileUploaded', '2026-08-20 11:29:14', '{\"RequirementID\":2485,\"RequirementCode\":\"A.1\",\"RequirementDescription\":\"The institution has a statement of vision, mission, goals, and core values recorded in an official form or document, which is available to any interested party.\",\"OfficeID\":159,\"OfficeName\":\"BSIT\",\"EventName\":\"Philippine Accrediting Association of Schools, Colleges and Universities\",\"CriteriaName\":\"Statement of Vision, Mission, Goals and Core Values of the Institution\",\"FileName\":\"PAASCU.AREA.1.Z.A.1.Lenuel.Betita_users__1__png.png\",\"DisplayName\":\"users (1).png\",\"Comment\":\"\",\"UploadedByUserID\":34,\"UploadedByName\":\"Lenuel Betita\"}'),
+(3279, 34, 'POST /api/requirements/user-upload', '2026-08-20 11:29:14', '{\"status\":200,\"body\":{\"userId\":\"34\",\"requirementId\":\"2485\",\"displayName\":\"users (1).png\",\"officeId\":\"159\"}}'),
+(3280, 34, 'RequirementFileUploaded', '2026-08-20 11:29:14', '{\"RequirementID\":2485,\"RequirementCode\":\"A.1\",\"RequirementDescription\":\"The institution has a statement of vision, mission, goals, and core values recorded in an official form or document, which is available to any interested party.\",\"OfficeID\":159,\"OfficeName\":\"BSIT\",\"EventName\":\"Philippine Accrediting Association of Schools, Colleges and Universities\",\"CriteriaName\":\"Statement of Vision, Mission, Goals and Core Values of the Institution\",\"FileName\":\"PAASCU.AREA.1.Z.A.1.Lenuel.Betita_Copy_of_Blank_diagram__3__png.png\",\"DisplayName\":\"Copy of Blank diagram (3).png\",\"Comment\":\"\",\"UploadedByUserID\":34,\"UploadedByName\":\"Lenuel Betita\"}'),
+(3281, 34, 'POST /api/requirements/user-upload', '2026-08-20 11:29:14', '{\"status\":200,\"body\":{\"userId\":\"34\",\"requirementId\":\"2485\",\"displayName\":\"Copy of Blank diagram (3).png\",\"officeId\":\"159\"}}'),
+(3282, 34, 'RequirementFileUploaded', '2026-08-20 11:29:14', '{\"RequirementID\":2485,\"RequirementCode\":\"A.1\",\"RequirementDescription\":\"The institution has a statement of vision, mission, goals, and core values recorded in an official form or document, which is available to any interested party.\",\"OfficeID\":159,\"OfficeName\":\"BSIT\",\"EventName\":\"Philippine Accrediting Association of Schools, Colleges and Universities\",\"CriteriaName\":\"Statement of Vision, Mission, Goals and Core Values of the Institution\",\"FileName\":\"PAASCU.AREA.1.Z.A.1.Lenuel.Betita_Copy_of_Blank_diagram__2__png.png\",\"DisplayName\":\"Copy of Blank diagram (2).png\",\"Comment\":\"\",\"UploadedByUserID\":34,\"UploadedByName\":\"Lenuel Betita\"}'),
+(3283, 34, 'POST /api/requirements/user-upload', '2026-08-20 11:29:14', '{\"status\":200,\"body\":{\"userId\":\"34\",\"requirementId\":\"2485\",\"displayName\":\"Copy of Blank diagram (2).png\",\"officeId\":\"159\"}}'),
+(3284, 34, 'RequirementFileUploaded', '2026-08-20 11:29:14', '{\"RequirementID\":2485,\"RequirementCode\":\"A.1\",\"RequirementDescription\":\"The institution has a statement of vision, mission, goals, and core values recorded in an official form or document, which is available to any interested party.\",\"OfficeID\":159,\"OfficeName\":\"BSIT\",\"EventName\":\"Philippine Accrediting Association of Schools, Colleges and Universities\",\"CriteriaName\":\"Statement of Vision, Mission, Goals and Core Values of the Institution\",\"FileName\":\"PAASCU.AREA.1.Z.A.1.Lenuel.Betita_all__6__png.png\",\"DisplayName\":\"all (6).png\",\"Comment\":\"\",\"UploadedByUserID\":34,\"UploadedByName\":\"Lenuel Betita\"}'),
+(3285, 34, 'POST /api/requirements/user-upload', '2026-08-20 11:29:14', '{\"status\":200,\"body\":{\"userId\":\"34\",\"requirementId\":\"2485\",\"displayName\":\"all (6).png\",\"officeId\":\"159\"}}'),
+(3286, 34, 'RequirementFileUploaded', '2026-08-20 11:29:14', '{\"RequirementID\":2485,\"RequirementCode\":\"A.1\",\"RequirementDescription\":\"The institution has a statement of vision, mission, goals, and core values recorded in an official form or document, which is available to any interested party.\",\"OfficeID\":159,\"OfficeName\":\"BSIT\",\"EventName\":\"Philippine Accrediting Association of Schools, Colleges and Universities\",\"CriteriaName\":\"Statement of Vision, Mission, Goals and Core Values of the Institution\",\"FileName\":\"PAASCU.AREA.1.Z.A.1.Lenuel.Betita_all__5__png.png\",\"DisplayName\":\"all (5).png\",\"Comment\":\"\",\"UploadedByUserID\":34,\"UploadedByName\":\"Lenuel Betita\"}'),
+(3287, 34, 'POST /api/requirements/user-upload', '2026-08-20 11:29:14', '{\"status\":200,\"body\":{\"userId\":\"34\",\"requirementId\":\"2485\",\"displayName\":\"all (5).png\",\"officeId\":\"159\"}}'),
+(3288, 34, 'RequirementFileUploaded', '2026-08-20 11:29:15', '{\"RequirementID\":2485,\"RequirementCode\":\"A.1\",\"RequirementDescription\":\"The institution has a statement of vision, mission, goals, and core values recorded in an official form or document, which is available to any interested party.\",\"OfficeID\":159,\"OfficeName\":\"BSIT\",\"EventName\":\"Philippine Accrediting Association of Schools, Colleges and Universities\",\"CriteriaName\":\"Statement of Vision, Mission, Goals and Core Values of the Institution\",\"FileName\":\"PAASCU.AREA.1.Z.A.1.Lenuel.Betita_all__4__png.png\",\"DisplayName\":\"all (4).png\",\"Comment\":\"\",\"UploadedByUserID\":34,\"UploadedByName\":\"Lenuel Betita\"}'),
+(3289, 34, 'POST /api/requirements/user-upload', '2026-08-20 11:29:15', '{\"status\":200,\"body\":{\"userId\":\"34\",\"requirementId\":\"2485\",\"displayName\":\"all (4).png\",\"officeId\":\"159\"}}'),
+(3290, 34, 'RequirementFileUploaded', '2026-08-20 11:29:15', '{\"RequirementID\":2485,\"RequirementCode\":\"A.1\",\"RequirementDescription\":\"The institution has a statement of vision, mission, goals, and core values recorded in an official form or document, which is available to any interested party.\",\"OfficeID\":159,\"OfficeName\":\"BSIT\",\"EventName\":\"Philippine Accrediting Association of Schools, Colleges and Universities\",\"CriteriaName\":\"Statement of Vision, Mission, Goals and Core Values of the Institution\",\"FileName\":\"PAASCU.AREA.1.Z.A.1.Lenuel.Betita_all__3__png.png\",\"DisplayName\":\"all (3).png\",\"Comment\":\"\",\"UploadedByUserID\":34,\"UploadedByName\":\"Lenuel Betita\"}'),
+(3291, 34, 'POST /api/requirements/user-upload', '2026-08-20 11:29:15', '{\"status\":200,\"body\":{\"userId\":\"34\",\"requirementId\":\"2485\",\"displayName\":\"all (3).png\",\"officeId\":\"159\"}}'),
+(3292, 34, 'RequirementFileUploaded', '2026-08-20 11:29:15', '{\"RequirementID\":2485,\"RequirementCode\":\"A.1\",\"RequirementDescription\":\"The institution has a statement of vision, mission, goals, and core values recorded in an official form or document, which is available to any interested party.\",\"OfficeID\":159,\"OfficeName\":\"BSIT\",\"EventName\":\"Philippine Accrediting Association of Schools, Colleges and Universities\",\"CriteriaName\":\"Statement of Vision, Mission, Goals and Core Values of the Institution\",\"FileName\":\"PAASCU.AREA.1.Z.A.1.Lenuel.Betita_all__2__png.png\",\"DisplayName\":\"all (2).png\",\"Comment\":\"\",\"UploadedByUserID\":34,\"UploadedByName\":\"Lenuel Betita\"}'),
+(3293, 34, 'POST /api/requirements/user-upload', '2026-08-20 11:29:15', '{\"status\":200,\"body\":{\"userId\":\"34\",\"requirementId\":\"2485\",\"displayName\":\"all (2).png\",\"officeId\":\"159\"}}'),
+(3294, 34, 'RequirementFileUploaded', '2026-08-20 11:29:15', '{\"RequirementID\":2485,\"RequirementCode\":\"A.1\",\"RequirementDescription\":\"The institution has a statement of vision, mission, goals, and core values recorded in an official form or document, which is available to any interested party.\",\"OfficeID\":159,\"OfficeName\":\"BSIT\",\"EventName\":\"Philippine Accrediting Association of Schools, Colleges and Universities\",\"CriteriaName\":\"Statement of Vision, Mission, Goals and Core Values of the Institution\",\"FileName\":\"PAASCU.AREA.1.Z.A.1.Lenuel.Betita_AUDITRACK__COMPLIANCE_AND_AUDIT_SYSTEM__2__pdf.pdf\",\"DisplayName\":\"AUDITRACK_ COMPLIANCE AND AUDIT SYSTEM (2).pdf\",\"Comment\":\"\",\"UploadedByUserID\":34,\"UploadedByName\":\"Lenuel Betita\"}'),
+(3295, 34, 'POST /api/requirements/user-upload', '2026-08-20 11:29:15', '{\"status\":200,\"body\":{\"userId\":\"34\",\"requirementId\":\"2485\",\"displayName\":\"AUDITRACK_ COMPLIANCE AND AUDIT SYSTEM (2).pdf\",\"officeId\":\"159\"}}'),
+(3296, 34, 'RequirementFileUploaded', '2026-08-20 11:29:15', '{\"RequirementID\":2485,\"RequirementCode\":\"A.1\",\"RequirementDescription\":\"The institution has a statement of vision, mission, goals, and core values recorded in an official form or document, which is available to any interested party.\",\"OfficeID\":159,\"OfficeName\":\"BSIT\",\"EventName\":\"Philippine Accrediting Association of Schools, Colleges and Universities\",\"CriteriaName\":\"Statement of Vision, Mission, Goals and Core Values of the Institution\",\"FileName\":\"PAASCU.AREA.1.Z.A.1.Lenuel.Betita_AUDITRACK__COMPLIANCE_AND_AUDIT_SYSTEM__1__pdf.pdf\",\"DisplayName\":\"AUDITRACK_ COMPLIANCE AND AUDIT SYSTEM (1).pdf\",\"Comment\":\"\",\"UploadedByUserID\":34,\"UploadedByName\":\"Lenuel Betita\"}'),
+(3297, 34, 'POST /api/requirements/user-upload', '2026-08-20 11:29:15', '{\"status\":200,\"body\":{\"userId\":\"34\",\"requirementId\":\"2485\",\"displayName\":\"AUDITRACK_ COMPLIANCE AND AUDIT SYSTEM (1).pdf\",\"officeId\":\"159\"}}'),
+(3298, 34, 'POST /api/requirements/mark-uploaded', '2026-08-20 11:29:15', '{\"status\":200,\"body\":{\"requirementId\":2485,\"userId\":34}}'),
+(3299, 7, 'Login', '2026-08-20 11:29:57', 'User Admin@gmail.com logged in');
 
 -- --------------------------------------------------------
 
@@ -1634,8 +1696,8 @@ INSERT INTO `master_list` (`id`, `entity_name`, `entity_type_id`, `department_id
 (8, 'BEED', 1, 4, '2026-08-05 16:52:09', '2026-08-05 16:52:09'),
 (9, 'ddasd', 1, 5, '2026-08-06 20:05:57', '2026-08-06 20:05:57'),
 (10, 'qweq', 1, 3, '2026-08-06 20:06:06', '2026-08-06 20:06:06'),
-(11, 'erw', 2, NULL, '2026-08-09 11:07:19', '2026-08-09 11:07:19'),
-(12, 'sda', 1, 1, '2026-08-09 11:11:52', '2026-08-09 11:11:52');
+(12, 'sda', 1, 1, '2026-08-09 11:11:52', '2026-08-09 11:11:52'),
+(13, 'Registrar', 2, NULL, '2026-08-20 03:17:00', '2026-08-20 03:17:00');
 
 -- --------------------------------------------------------
 
@@ -2499,7 +2561,7 @@ INSERT INTO `notifications` (`NotificationID`, `UserID`, `AdminID`, `Title`, `Me
 (2557, 7, 57, 'New evidence uploaded', 'VJ JAVELLANA uploaded evidence for N.1 in BSIT.\n[[meta:{\"officeId\":159,\"requirementId\":2489,\"viewUserId\":57,\"openSubmission\":true}]]', 'info', 'requirement_file_upload', 159, 0, '2026-08-13 17:40:10', NULL),
 (2558, 7, 57, 'New evidence uploaded', 'VJ JAVELLANA uploaded evidence for N.1 in BSIT.\n[[meta:{\"officeId\":159,\"requirementId\":2489,\"viewUserId\":57,\"openSubmission\":true}]]', 'info', 'requirement_file_upload', 159, 0, '2026-08-13 17:40:11', NULL),
 (2559, 7, 57, 'New evidence uploaded', 'VJ JAVELLANA uploaded evidence for N.1 in BSIT.\n[[meta:{\"officeId\":159,\"requirementId\":2489,\"viewUserId\":57,\"openSubmission\":true}]]', 'info', 'requirement_file_upload', 159, 0, '2026-08-13 17:40:11', NULL),
-(2560, 7, 57, 'New evidence uploaded', 'VJ JAVELLANA uploaded evidence for N.1 in BSIT.\n[[meta:{\"officeId\":159,\"requirementId\":2489,\"viewUserId\":57,\"openSubmission\":true}]]', 'info', 'requirement_file_upload', 159, 0, '2026-08-13 17:40:11', NULL),
+(2560, 7, 57, 'New evidence uploaded', 'VJ JAVELLANA uploaded evidence for N.1 in BSIT.\n[[meta:{\"officeId\":159,\"requirementId\":2489,\"viewUserId\":57,\"openSubmission\":true}]]', 'info', 'requirement_file_upload', 159, 1, '2026-08-13 17:40:11', '2026-08-15 01:20:53'),
 (2561, 7, 57, 'New evidence uploaded', 'VJ JAVELLANA uploaded evidence for N.1 in BSIT.\n[[meta:{\"officeId\":159,\"requirementId\":2489,\"viewUserId\":57,\"openSubmission\":true}]]', 'info', 'requirement_file_upload', 159, 0, '2026-08-13 17:40:11', NULL),
 (2562, 7, 57, 'New evidence uploaded', 'VJ JAVELLANA uploaded evidence for N.1 in BSIT.\n[[meta:{\"officeId\":159,\"requirementId\":2489,\"viewUserId\":57,\"openSubmission\":true}]]', 'info', 'requirement_file_upload', 159, 0, '2026-08-13 17:40:11', NULL),
 (2563, 7, 57, 'New evidence uploaded', 'VJ JAVELLANA uploaded evidence for N.1 in BSIT.\n[[meta:{\"officeId\":159,\"requirementId\":2489,\"viewUserId\":57,\"openSubmission\":true}]]', 'info', 'requirement_file_upload', 159, 0, '2026-08-13 17:40:11', NULL),
@@ -2530,7 +2592,27 @@ INSERT INTO `notifications` (`NotificationID`, `UserID`, `AdminID`, `Title`, `Me
 (2588, 7, 57, 'New evidence uploaded', 'VJ JAVELLANA uploaded evidence for N.1 in BSIT.\n[[meta:{\"officeId\":159,\"requirementId\":2489,\"viewUserId\":57,\"openSubmission\":true}]]', 'info', 'requirement_file_upload', 159, 0, '2026-08-13 17:40:11', NULL),
 (2589, 7, 57, 'New evidence uploaded', 'VJ JAVELLANA uploaded evidence for N.1 in BSIT.\n[[meta:{\"officeId\":159,\"requirementId\":2489,\"viewUserId\":57,\"openSubmission\":true}]]', 'info', 'requirement_file_upload', 159, 0, '2026-08-13 17:40:11', NULL),
 (2590, 7, 57, 'New evidence uploaded', 'VJ JAVELLANA uploaded evidence for N.1 in BSIT.\n[[meta:{\"officeId\":159,\"requirementId\":2489,\"viewUserId\":57,\"openSubmission\":true}]]', 'info', 'requirement_file_upload', 159, 0, '2026-08-13 17:40:11', NULL),
-(2591, 7, 57, 'New evidence uploaded', 'VJ JAVELLANA uploaded evidence for N.1 in BSIT.\n[[meta:{\"officeId\":159,\"requirementId\":2489,\"viewUserId\":57,\"openSubmission\":true}]]', 'info', 'requirement_file_upload', 159, 0, '2026-08-13 17:40:11', NULL);
+(2591, 7, 57, 'New evidence uploaded', 'VJ JAVELLANA uploaded evidence for N.1 in BSIT.\n[[meta:{\"officeId\":159,\"requirementId\":2489,\"viewUserId\":57,\"openSubmission\":true}]]', 'info', 'requirement_file_upload', 159, 0, '2026-08-13 17:40:11', NULL),
+(2592, 7, 34, 'New evidence uploaded', 'Lenuel Betita uploaded evidence for A.1 in BSIT.\n[[meta:{\"officeId\":159,\"requirementId\":2485,\"viewUserId\":34,\"openSubmission\":true}]]', 'info', 'requirement_file_upload', 159, 0, '2026-08-20 11:29:10', NULL),
+(2593, 7, 34, 'New evidence uploaded', 'Lenuel Betita uploaded evidence for A.1 in BSIT.\n[[meta:{\"officeId\":159,\"requirementId\":2485,\"viewUserId\":34,\"openSubmission\":true}]]', 'info', 'requirement_file_upload', 159, 0, '2026-08-20 11:29:10', NULL),
+(2594, 7, 34, 'New evidence uploaded', 'Lenuel Betita uploaded evidence for A.1 in BSIT.\n[[meta:{\"officeId\":159,\"requirementId\":2485,\"viewUserId\":34,\"openSubmission\":true}]]', 'info', 'requirement_file_upload', 159, 0, '2026-08-20 11:29:13', NULL),
+(2595, 7, 34, 'New evidence uploaded', 'Lenuel Betita uploaded evidence for A.1 in BSIT.\n[[meta:{\"officeId\":159,\"requirementId\":2485,\"viewUserId\":34,\"openSubmission\":true}]]', 'info', 'requirement_file_upload', 159, 0, '2026-08-20 11:29:13', NULL),
+(2596, 7, 34, 'New evidence uploaded', 'Lenuel Betita uploaded evidence for A.1 in BSIT.\n[[meta:{\"officeId\":159,\"requirementId\":2485,\"viewUserId\":34,\"openSubmission\":true}]]', 'info', 'requirement_file_upload', 159, 0, '2026-08-20 11:29:13', NULL),
+(2597, 7, 34, 'New evidence uploaded', 'Lenuel Betita uploaded evidence for A.1 in BSIT.\n[[meta:{\"officeId\":159,\"requirementId\":2485,\"viewUserId\":34,\"openSubmission\":true}]]', 'info', 'requirement_file_upload', 159, 0, '2026-08-20 11:29:13', NULL),
+(2598, 7, 34, 'New evidence uploaded', 'Lenuel Betita uploaded evidence for A.1 in BSIT.\n[[meta:{\"officeId\":159,\"requirementId\":2485,\"viewUserId\":34,\"openSubmission\":true}]]', 'info', 'requirement_file_upload', 159, 0, '2026-08-20 11:29:13', NULL),
+(2599, 7, 34, 'New evidence uploaded', 'Lenuel Betita uploaded evidence for A.1 in BSIT.\n[[meta:{\"officeId\":159,\"requirementId\":2485,\"viewUserId\":34,\"openSubmission\":true}]]', 'info', 'requirement_file_upload', 159, 0, '2026-08-20 11:29:14', NULL),
+(2600, 7, 34, 'New evidence uploaded', 'Lenuel Betita uploaded evidence for A.1 in BSIT.\n[[meta:{\"officeId\":159,\"requirementId\":2485,\"viewUserId\":34,\"openSubmission\":true}]]', 'info', 'requirement_file_upload', 159, 0, '2026-08-20 11:29:14', NULL),
+(2601, 7, 34, 'New evidence uploaded', 'Lenuel Betita uploaded evidence for A.1 in BSIT.\n[[meta:{\"officeId\":159,\"requirementId\":2485,\"viewUserId\":34,\"openSubmission\":true}]]', 'info', 'requirement_file_upload', 159, 0, '2026-08-20 11:29:14', NULL),
+(2602, 7, 34, 'New evidence uploaded', 'Lenuel Betita uploaded evidence for A.1 in BSIT.\n[[meta:{\"officeId\":159,\"requirementId\":2485,\"viewUserId\":34,\"openSubmission\":true}]]', 'info', 'requirement_file_upload', 159, 0, '2026-08-20 11:29:14', NULL),
+(2603, 7, 34, 'New evidence uploaded', 'Lenuel Betita uploaded evidence for A.1 in BSIT.\n[[meta:{\"officeId\":159,\"requirementId\":2485,\"viewUserId\":34,\"openSubmission\":true}]]', 'info', 'requirement_file_upload', 159, 0, '2026-08-20 11:29:14', NULL),
+(2604, 7, 34, 'New evidence uploaded', 'Lenuel Betita uploaded evidence for A.1 in BSIT.\n[[meta:{\"officeId\":159,\"requirementId\":2485,\"viewUserId\":34,\"openSubmission\":true}]]', 'info', 'requirement_file_upload', 159, 0, '2026-08-20 11:29:14', NULL),
+(2605, 7, 34, 'New evidence uploaded', 'Lenuel Betita uploaded evidence for A.1 in BSIT.\n[[meta:{\"officeId\":159,\"requirementId\":2485,\"viewUserId\":34,\"openSubmission\":true}]]', 'info', 'requirement_file_upload', 159, 0, '2026-08-20 11:29:14', NULL),
+(2606, 7, 34, 'New evidence uploaded', 'Lenuel Betita uploaded evidence for A.1 in BSIT.\n[[meta:{\"officeId\":159,\"requirementId\":2485,\"viewUserId\":34,\"openSubmission\":true}]]', 'info', 'requirement_file_upload', 159, 0, '2026-08-20 11:29:14', NULL),
+(2607, 7, 34, 'New evidence uploaded', 'Lenuel Betita uploaded evidence for A.1 in BSIT.\n[[meta:{\"officeId\":159,\"requirementId\":2485,\"viewUserId\":34,\"openSubmission\":true}]]', 'info', 'requirement_file_upload', 159, 0, '2026-08-20 11:29:15', NULL),
+(2608, 7, 34, 'New evidence uploaded', 'Lenuel Betita uploaded evidence for A.1 in BSIT.\n[[meta:{\"officeId\":159,\"requirementId\":2485,\"viewUserId\":34,\"openSubmission\":true}]]', 'info', 'requirement_file_upload', 159, 0, '2026-08-20 11:29:15', NULL),
+(2609, 7, 34, 'New evidence uploaded', 'Lenuel Betita uploaded evidence for A.1 in BSIT.\n[[meta:{\"officeId\":159,\"requirementId\":2485,\"viewUserId\":34,\"openSubmission\":true}]]', 'info', 'requirement_file_upload', 159, 0, '2026-08-20 11:29:15', NULL),
+(2610, 7, 34, 'New evidence uploaded', 'Lenuel Betita uploaded evidence for A.1 in BSIT.\n[[meta:{\"officeId\":159,\"requirementId\":2485,\"viewUserId\":34,\"openSubmission\":true}]]', 'info', 'requirement_file_upload', 159, 0, '2026-08-20 11:29:15', NULL),
+(2611, 7, 34, 'New evidence uploaded', 'Lenuel Betita uploaded evidence for A.1 in BSIT.\n[[meta:{\"officeId\":159,\"requirementId\":2485,\"viewUserId\":34,\"openSubmission\":true}]]', 'info', 'requirement_file_upload', 159, 0, '2026-08-20 11:29:15', NULL);
 
 -- --------------------------------------------------------
 
@@ -2561,12 +2643,14 @@ INSERT INTO `offices` (`OfficeID`, `OfficeName`, `OfficeTypeID`, `master_list_id
 (161, 'BS Psych', 2, 7, 180, '2026-08-06 19:49:27', '2026-08-06 19:49:27'),
 (162, 'BSBA', 2, 2, 180, '2026-08-06 19:49:42', '2026-08-06 19:49:42'),
 (163, 'BSEMC', 2, 6, 180, '2026-08-06 19:51:36', '2026-08-06 19:51:36'),
-(164, 'erw', 1, 11, 180, '2026-08-09 11:07:39', '2026-08-09 11:07:39'),
+(164, 'erw', 1, NULL, 180, '2026-08-09 11:07:39', '2026-08-09 11:07:39'),
 (165, 'BEED', 2, 8, 190, '2026-08-10 17:17:57', '2026-08-10 17:17:57'),
 (166, 'BEED', 2, 8, 189, '2026-08-10 17:17:59', '2026-08-10 17:17:59'),
 (167, 'BS Psych', 2, 7, 189, '2026-08-10 17:18:00', '2026-08-10 17:18:00'),
 (168, 'BSIT', 2, 1, 189, '2026-08-10 17:18:05', '2026-08-10 17:18:05'),
-(169, 'BSIT', 2, 1, 190, '2026-08-10 17:18:08', '2026-08-10 17:18:08');
+(169, 'BSIT', 2, 1, 190, '2026-08-10 17:18:08', '2026-08-10 17:18:08'),
+(170, 'Registrar', 1, 13, 180, '2026-08-20 03:17:15', '2026-08-20 03:17:15'),
+(171, 'BLIS', 2, 3, 180, '2026-08-20 03:17:22', '2026-08-20 03:17:22');
 
 -- --------------------------------------------------------
 
@@ -2796,7 +2880,27 @@ INSERT INTO `office_proof_documents` (`id`, `office_id`, `uploaded_by`, `require
 (313, 159, 57, 2489, 'PAASCU.AREA.1.N.N.1.VJ.JAVELLANA_20b3572793400cc7f266c2a171bd9011_jpg.jpg', '20b3572793400cc7f266c2a171bd9011.jpg', '', '/uploads/events/PAASCU/PAASCU.AREA.1.N.N.1.VJ.JAVELLANA_20b3572793400cc7f266c2a171bd9011_jpg.jpg', '2026-08-13 17:40:11', 0),
 (314, 159, 57, 2489, 'PAASCU.AREA.1.N.N.1.VJ.JAVELLANA_vj_logo_orig_ssscopy_-_Copy_png.png', 'vj logo orig ssscopy - Copy.png', '', '/uploads/events/PAASCU/PAASCU.AREA.1.N.N.1.VJ.JAVELLANA_vj_logo_orig_ssscopy_-_Copy_png.png', '2026-08-13 17:40:11', 0),
 (315, 159, 57, 2489, 'PAASCU.AREA.1.N.N.1.VJ.JAVELLANA_vj_logo_orig_ssscopy_png.png', 'vj logo orig ssscopy.png', '', '/uploads/events/PAASCU/PAASCU.AREA.1.N.N.1.VJ.JAVELLANA_vj_logo_orig_ssscopy_png.png', '2026-08-13 17:40:11', 0),
-(316, 159, 57, 2489, 'PAASCU.AREA.1.N.N.1.VJ.JAVELLANA_597107638_800118132986844_7142523110770082654_n_jp.jpg', '597107638_800118132986844_7142523110770082654_n.jpg', '', '/uploads/events/PAASCU/PAASCU.AREA.1.N.N.1.VJ.JAVELLANA_597107638_800118132986844_7142523110770082654_n_jp.jpg', '2026-08-13 17:40:11', 0);
+(316, 159, 57, 2489, 'PAASCU.AREA.1.N.N.1.VJ.JAVELLANA_597107638_800118132986844_7142523110770082654_n_jp.jpg', '597107638_800118132986844_7142523110770082654_n.jpg', '', '/uploads/events/PAASCU/PAASCU.AREA.1.N.N.1.VJ.JAVELLANA_597107638_800118132986844_7142523110770082654_n_jp.jpg', '2026-08-13 17:40:11', 0),
+(317, 159, 34, 2485, 'PAASCU.AREA.1.Z.A.1.Lenuel.Betita_users__2__png.png', 'users (2).png', '', '/uploads/events/PAASCU/PAASCU.AREA.1.Z.A.1.Lenuel.Betita_users__2__png.png', '2026-08-20 11:29:10', 0),
+(318, 159, 34, 2485, 'PAASCU.AREA.1.Z.A.1.Lenuel.Betita_Untitled__3__jpg.jpg', 'Untitled (3).jpg', '', '/uploads/events/PAASCU/PAASCU.AREA.1.Z.A.1.Lenuel.Betita_Untitled__3__jpg.jpg', '2026-08-20 11:29:10', 0),
+(319, 159, 34, 2485, 'PAASCU.AREA.1.Z.A.1.Lenuel.Betita_AIHamsterLushLifeDancememe_GreenScreen__mp4.mp4', 'AIHamsterLushLifeDancememe(GreenScreen).mp4', '', '/uploads/events/PAASCU/PAASCU.AREA.1.Z.A.1.Lenuel.Betita_AIHamsterLushLifeDancememe_GreenScreen__mp4.mp4', '2026-08-20 11:29:13', 0),
+(320, 159, 34, 2485, 'PAASCU.AREA.1.Z.A.1.Lenuel.Betita_Untitled__2__jpg.jpg', 'Untitled (2).jpg', '', '/uploads/events/PAASCU/PAASCU.AREA.1.Z.A.1.Lenuel.Betita_Untitled__2__jpg.jpg', '2026-08-20 11:29:13', 0),
+(321, 159, 34, 2485, 'PAASCU.AREA.1.Z.A.1.Lenuel.Betita_Homer_Simpson_Dancing_Sticker_gif.gif', 'Homer Simpson Dancing Sticker.gif', '', '/uploads/events/PAASCU/PAASCU.AREA.1.Z.A.1.Lenuel.Betita_Homer_Simpson_Dancing_Sticker_gif.gif', '2026-08-20 11:29:13', 0),
+(322, 159, 34, 2485, 'PAASCU.AREA.1.Z.A.1.Lenuel.Betita_Untitled__1__jpg.jpg', 'Untitled (1).jpg', '', '/uploads/events/PAASCU/PAASCU.AREA.1.Z.A.1.Lenuel.Betita_Untitled__1__jpg.jpg', '2026-08-20 11:29:13', 0),
+(323, 159, 34, 2485, 'PAASCU.AREA.1.Z.A.1.Lenuel.Betita_Untitled_jpg.jpg', 'Untitled.jpg', '', '/uploads/events/PAASCU/PAASCU.AREA.1.Z.A.1.Lenuel.Betita_Untitled_jpg.jpg', '2026-08-20 11:29:13', 0),
+(324, 159, 34, 2485, 'PAASCU.AREA.1.Z.A.1.Lenuel.Betita_Sexy_Baby_Dancing_Sticker_by_claudiamate_gif.gif', 'Sexy Baby Dancing Sticker by claudiamate.gif', '', '/uploads/events/PAASCU/PAASCU.AREA.1.Z.A.1.Lenuel.Betita_Sexy_Baby_Dancing_Sticker_by_claudiamate_gif.gif', '2026-08-20 11:29:14', 0),
+(325, 159, 34, 2485, 'PAASCU.AREA.1.Z.A.1.Lenuel.Betita_https_file_garden_aoVl-M0-p1TyFay4_Dance_20Love_20.png', 'https_file_garden_aoVl-M0-p1TyFay4_Dance_20Love_20Sticker_gif.png', '', '/uploads/events/PAASCU/PAASCU.AREA.1.Z.A.1.Lenuel.Betita_https_file_garden_aoVl-M0-p1TyFay4_Dance_20Love_20.png', '2026-08-20 11:29:14', 0),
+(326, 159, 34, 2485, 'PAASCU.AREA.1.Z.A.1.Lenuel.Betita_Dance_Love_Sticker_gif.gif', 'Dance Love Sticker.gif', '', '/uploads/events/PAASCU/PAASCU.AREA.1.Z.A.1.Lenuel.Betita_Dance_Love_Sticker_gif.gif', '2026-08-20 11:29:14', 0),
+(327, 159, 34, 2485, 'PAASCU.AREA.1.Z.A.1.Lenuel.Betita_users__1__png.png', 'users (1).png', '', '/uploads/events/PAASCU/PAASCU.AREA.1.Z.A.1.Lenuel.Betita_users__1__png.png', '2026-08-20 11:29:14', 0),
+(328, 159, 34, 2485, 'PAASCU.AREA.1.Z.A.1.Lenuel.Betita_Copy_of_Blank_diagram__3__png.png', 'Copy of Blank diagram (3).png', '', '/uploads/events/PAASCU/PAASCU.AREA.1.Z.A.1.Lenuel.Betita_Copy_of_Blank_diagram__3__png.png', '2026-08-20 11:29:14', 0),
+(329, 159, 34, 2485, 'PAASCU.AREA.1.Z.A.1.Lenuel.Betita_Copy_of_Blank_diagram__2__png.png', 'Copy of Blank diagram (2).png', '', '/uploads/events/PAASCU/PAASCU.AREA.1.Z.A.1.Lenuel.Betita_Copy_of_Blank_diagram__2__png.png', '2026-08-20 11:29:14', 0),
+(330, 159, 34, 2485, 'PAASCU.AREA.1.Z.A.1.Lenuel.Betita_all__6__png.png', 'all (6).png', '', '/uploads/events/PAASCU/PAASCU.AREA.1.Z.A.1.Lenuel.Betita_all__6__png.png', '2026-08-20 11:29:14', 0),
+(331, 159, 34, 2485, 'PAASCU.AREA.1.Z.A.1.Lenuel.Betita_all__5__png.png', 'all (5).png', '', '/uploads/events/PAASCU/PAASCU.AREA.1.Z.A.1.Lenuel.Betita_all__5__png.png', '2026-08-20 11:29:14', 0),
+(332, 159, 34, 2485, 'PAASCU.AREA.1.Z.A.1.Lenuel.Betita_all__4__png.png', 'all (4).png', '', '/uploads/events/PAASCU/PAASCU.AREA.1.Z.A.1.Lenuel.Betita_all__4__png.png', '2026-08-20 11:29:14', 0),
+(333, 159, 34, 2485, 'PAASCU.AREA.1.Z.A.1.Lenuel.Betita_all__3__png.png', 'all (3).png', '', '/uploads/events/PAASCU/PAASCU.AREA.1.Z.A.1.Lenuel.Betita_all__3__png.png', '2026-08-20 11:29:15', 0),
+(334, 159, 34, 2485, 'PAASCU.AREA.1.Z.A.1.Lenuel.Betita_all__2__png.png', 'all (2).png', '', '/uploads/events/PAASCU/PAASCU.AREA.1.Z.A.1.Lenuel.Betita_all__2__png.png', '2026-08-20 11:29:15', 0),
+(335, 159, 34, 2485, 'PAASCU.AREA.1.Z.A.1.Lenuel.Betita_AUDITRACK__COMPLIANCE_AND_AUDIT_SYSTEM__2__pdf.pdf', 'AUDITRACK_ COMPLIANCE AND AUDIT SYSTEM (2).pdf', '', '/uploads/events/PAASCU/PAASCU.AREA.1.Z.A.1.Lenuel.Betita_AUDITRACK__COMPLIANCE_AND_AUDIT_SYSTEM__2__pdf.pdf', '2026-08-20 11:29:15', 0),
+(336, 159, 34, 2485, 'PAASCU.AREA.1.Z.A.1.Lenuel.Betita_AUDITRACK__COMPLIANCE_AND_AUDIT_SYSTEM__1__pdf.pdf', 'AUDITRACK_ COMPLIANCE AND AUDIT SYSTEM (1).pdf', '', '/uploads/events/PAASCU/PAASCU.AREA.1.Z.A.1.Lenuel.Betita_AUDITRACK__COMPLIANCE_AND_AUDIT_SYSTEM__1__pdf.pdf', '2026-08-20 11:29:15', 0);
 
 -- --------------------------------------------------------
 
@@ -2945,7 +3049,7 @@ INSERT INTO `overallofficestatus` (`OverallStatusID`, `OfficeID`, `CompliedCount
 (1181, 156, 0, 0, 0, 0, 0.00, 'Not Complied', '2026-08-06 00:33:52'),
 (1182, 157, 0, 0, 4, 4, 0.00, 'Partially Complied', '2026-08-06 00:46:52'),
 (1184, 158, 0, 0, 0, 0, 0.00, 'Not Complied', '2026-08-06 01:07:12'),
-(1185, 159, 0, 0, 66, 66, 0.00, 'Partially Complied', '2026-08-09 18:57:18'),
+(1185, 159, 0, 0, 66, 66, 0.00, 'Partially Complied', '2026-08-15 01:00:52'),
 (1195, 160, 0, 0, 33, 33, 0.00, 'Partially Complied', '2026-08-09 18:57:18'),
 (1196, 161, 0, 0, 0, 0, 0.00, 'Not Complied', '2026-08-07 03:49:27'),
 (1197, 162, 0, 0, 0, 0, 0.00, 'Not Complied', '2026-08-07 03:49:42'),
@@ -2955,7 +3059,9 @@ INSERT INTO `overallofficestatus` (`OverallStatusID`, `OfficeID`, `CompliedCount
 (1220, 166, 0, 0, 0, 0, 0.00, 'Not Complied', '2026-08-11 01:17:59'),
 (1221, 167, 0, 0, 0, 0, 0.00, 'Not Complied', '2026-08-11 01:18:00'),
 (1222, 168, 0, 0, 0, 0, 0.00, 'Not Complied', '2026-08-11 01:18:05'),
-(1223, 169, 0, 0, 0, 0, 0.00, 'Not Complied', '2026-08-11 01:18:08');
+(1223, 169, 0, 0, 0, 0, 0.00, 'Not Complied', '2026-08-11 01:18:08'),
+(1226, 170, 0, 0, 0, 0, 0.00, 'Not Complied', '2026-08-20 11:17:15'),
+(1227, 171, 0, 0, 0, 0, 0.00, 'Not Complied', '2026-08-20 11:17:22');
 
 -- --------------------------------------------------------
 
@@ -3207,7 +3313,11 @@ INSERT INTO `requirements` (`RequirementID`, `RequirementCode`, `Description`, `
 (2697, '1.3', 'zxc', 836, NULL, NULL, '2026-07-27 18:12:07', '2026-07-27 18:12:07'),
 (2698, '1.4', 'zxc', 836, NULL, NULL, '2026-07-27 18:12:08', '2026-07-27 18:12:08'),
 (2699, '1.5', 'zxc', 836, NULL, NULL, '2026-07-27 18:12:09', '2026-07-27 18:12:09'),
-(2700, '1.6', 'zxc', 836, NULL, NULL, '2026-07-27 18:12:11', '2026-07-27 18:12:11');
+(2700, '1.6', 'zxc', 836, NULL, NULL, '2026-07-27 18:12:11', '2026-07-27 18:12:11'),
+(2701, '1.1', 'Educational Qualification', 839, NULL, NULL, '2026-08-15 00:43:46', '2026-08-15 00:43:46'),
+(2702, '2.1', 'Educational Qualification', 840, NULL, NULL, '2026-08-15 00:43:46', '2026-08-15 00:43:46'),
+(2703, 'A.1', 'Educational Qualification', 841, NULL, NULL, '2026-08-15 00:43:46', '2026-08-15 00:43:46'),
+(2704, 'A.2', 'Trainings', 841, NULL, NULL, '2026-08-15 00:43:46', '2026-08-15 00:43:46');
 
 -- --------------------------------------------------------
 
@@ -3416,6 +3526,13 @@ CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW 
 --
 
 --
+-- Indexes for table `accreditation_levels`
+--
+ALTER TABLE `accreditation_levels`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `level_name` (`level_name`);
+
+--
 -- Indexes for table `areas`
 --
 ALTER TABLE `areas`
@@ -3478,7 +3595,8 @@ ALTER TABLE `departments`
 --
 ALTER TABLE `events`
   ADD PRIMARY KEY (`EventID`),
-  ADD UNIQUE KEY `EventCode` (`EventCode`);
+  ADD UNIQUE KEY `EventCode` (`EventCode`),
+  ADD KEY `fk_events_accreditation_level` (`accreditation_level`);
 
 --
 -- Indexes for table `headofoffice`
@@ -3602,10 +3720,16 @@ ALTER TABLE `users`
 --
 
 --
+-- AUTO_INCREMENT for table `accreditation_levels`
+--
+ALTER TABLE `accreditation_levels`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+
+--
 -- AUTO_INCREMENT for table `areas`
 --
 ALTER TABLE `areas`
-  MODIFY `AreaID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=362;
+  MODIFY `AreaID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=365;
 
 --
 -- AUTO_INCREMENT for table `auditor_area_assignments`
@@ -3617,7 +3741,7 @@ ALTER TABLE `auditor_area_assignments`
 -- AUTO_INCREMENT for table `compliancestatusoffices`
 --
 ALTER TABLE `compliancestatusoffices`
-  MODIFY `CSOfficeID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4841;
+  MODIFY `CSOfficeID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4843;
 
 --
 -- AUTO_INCREMENT for table `compliancestatustypes`
@@ -3629,7 +3753,7 @@ ALTER TABLE `compliancestatustypes`
 -- AUTO_INCREMENT for table `criteria`
 --
 ALTER TABLE `criteria`
-  MODIFY `CriteriaID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=839;
+  MODIFY `CriteriaID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=843;
 
 --
 -- AUTO_INCREMENT for table `criteria_comments_offices`
@@ -3647,7 +3771,7 @@ ALTER TABLE `departments`
 -- AUTO_INCREMENT for table `events`
 --
 ALTER TABLE `events`
-  MODIFY `EventID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=195;
+  MODIFY `EventID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=196;
 
 --
 -- AUTO_INCREMENT for table `headofoffice`
@@ -3659,25 +3783,25 @@ ALTER TABLE `headofoffice`
 -- AUTO_INCREMENT for table `logs`
 --
 ALTER TABLE `logs`
-  MODIFY `LogID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3236;
+  MODIFY `LogID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3300;
 
 --
 -- AUTO_INCREMENT for table `master_list`
 --
 ALTER TABLE `master_list`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
 
 --
 -- AUTO_INCREMENT for table `notifications`
 --
 ALTER TABLE `notifications`
-  MODIFY `NotificationID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2592;
+  MODIFY `NotificationID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2612;
 
 --
 -- AUTO_INCREMENT for table `offices`
 --
 ALTER TABLE `offices`
-  MODIFY `OfficeID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=170;
+  MODIFY `OfficeID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=172;
 
 --
 -- AUTO_INCREMENT for table `officetypes`
@@ -3695,13 +3819,13 @@ ALTER TABLE `office_head_assignments`
 -- AUTO_INCREMENT for table `office_proof_documents`
 --
 ALTER TABLE `office_proof_documents`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=317;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=337;
 
 --
 -- AUTO_INCREMENT for table `overallofficestatus`
 --
 ALTER TABLE `overallofficestatus`
-  MODIFY `OverallStatusID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1224;
+  MODIFY `OverallStatusID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1228;
 
 --
 -- AUTO_INCREMENT for table `program_types`
@@ -3713,7 +3837,7 @@ ALTER TABLE `program_types`
 -- AUTO_INCREMENT for table `requirements`
 --
 ALTER TABLE `requirements`
-  MODIFY `RequirementID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2701;
+  MODIFY `RequirementID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2705;
 
 --
 -- AUTO_INCREMENT for table `requirement_user_assignments`
@@ -3775,6 +3899,12 @@ ALTER TABLE `criteria_comments_offices`
   ADD CONSTRAINT `criteria_comments_offices_ibfk_1` FOREIGN KEY (`OfficeID`) REFERENCES `offices` (`OfficeID`) ON DELETE CASCADE,
   ADD CONSTRAINT `criteria_comments_offices_ibfk_2` FOREIGN KEY (`CriteriaID`) REFERENCES `criteria` (`CriteriaID`) ON DELETE CASCADE,
   ADD CONSTRAINT `criteria_comments_offices_ibfk_3` FOREIGN KEY (`CreatedBy`) REFERENCES `users` (`UserID`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `events`
+--
+ALTER TABLE `events`
+  ADD CONSTRAINT `fk_events_accreditation_level` FOREIGN KEY (`accreditation_level`) REFERENCES `accreditation_levels` (`level_name`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
 -- Constraints for table `master_list`
