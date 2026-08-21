@@ -1,0 +1,14 @@
+# Environment variables
+.env
+.env.*
+*.env
+
+# Dependencies
+node_modules/
+
+# Uploads
+uploads/*
+!uploads/.gitkeep
+
+# Logs
+*.log
