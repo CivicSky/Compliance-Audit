@@ -77,7 +77,8 @@ const createPendingRegistration = async (registrationData) => {
     return { success: false, status: 400, message: 'First name, last name, email, and password are required' };
   }
 
-  if (!isCompanyEmail(email)) {
+  const isAuditor = Number(roleId) === 4;
+  if (!isCompanyEmail(email) && !isAuditor) {
     return { success: false, status: 400, message: `Only ${COMPANY_EMAIL_DOMAIN} email addresses can register` };
   }
 
@@ -114,8 +115,8 @@ const sendOtpEmail = async (email, otp) => {
     return { sent: false, reason: 'nodemailer missing' };
   }
 
-  const host = process.env.SMTP_HOST;
-  const port = Number(process.env.SMTP_PORT || 587);
+  const host = process.env.SMTP_HOST || 'smtp.gmail.com';
+  const port = Number(process.env.SMTP_PORT || 465);
   const user = process.env.SMTP_USER || process.env.GMAIL_USER;
   const pass = String(process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD || '').replace(/\s+/g, '');
 
@@ -123,21 +124,17 @@ const sendOtpEmail = async (email, otp) => {
     return { sent: false, reason: 'SMTP is not configured' };
   }
 
-  const transporter = host
-    ? nodemailer.createTransport({
-        host,
-        port,
-        secure: port === 465,
-        auth: { user, pass },
-      })
-    : nodemailer.createTransport({
-        service: 'gmail',
-        auth: { user, pass },
-      });
+  const transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: { user, pass },
+    tls: { rejectUnauthorized: false },
+  });
 
   try {
     await transporter.sendMail({
-      from: process.env.SMTP_FROM || user,
+      from: process.env.SMTP_FROM || `"Auditrack Compliance" <${user}>`,
       to: email,
       subject: 'Your Auditrack registration OTP',
       text: `Your Auditrack registration one-time PIN is ${otp}. It expires in 10 minutes.`,
@@ -145,8 +142,17 @@ const sendOtpEmail = async (email, otp) => {
     });
     return { sent: true };
   } catch (error) {
-    console.warn(`[OTP] Email send failed for ${email}:`, error?.message || error);
-    return { sent: false, reason: error?.message || 'Failed to send email' };
+    const errorMsg = error?.message || String(error);
+    console.warn(`[OTP] Email send failed for ${email}:`, errorMsg);
+
+    if (errorMsg.includes('534-5.7.9') || errorMsg.includes('Invalid login') || errorMsg.includes('WebLoginRequired')) {
+      return {
+        sent: false,
+        reason: 'Gmail SMTP Authentication Failed (534-5.7.9). Please update the GMAIL_APP_PASSWORD in backend/.env with a valid 16-character Google App Password.',
+      };
+    }
+
+    return { sent: false, reason: errorMsg || 'Failed to send email' };
   }
 };
 
@@ -165,7 +171,8 @@ exports.sendRegistrationOtp = async (req, res) => {
       });
     }
 
-    if (!isCompanyEmail(email)) {
+    const isAuditor = Number(body.roleId) === 4;
+    if (!isCompanyEmail(email) && !isAuditor) {
       return res.status(400).json({
         success: false,
         message: `Only ${COMPANY_EMAIL_DOMAIN} email addresses can register`,
@@ -326,7 +333,7 @@ exports.createRegistrationInvite = async (req, res) => {
     const email = normalizeEmail(req.body?.email);
     const roleId = Number.parseInt(req.body?.roleId, 10) || 3;
 
-    if (email && !isCompanyEmail(email)) {
+    if (email && !isCompanyEmail(email) && roleId !== 4) {
       return res.status(400).json({
         success: false,
         message: `Only ${COMPANY_EMAIL_DOMAIN} email addresses can register`,
@@ -346,7 +353,8 @@ exports.createRegistrationInvite = async (req, res) => {
     const requestOrigin = req.get('origin');
     const fallbackFrontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     const frontendUrl = String(requestOrigin || fallbackFrontendUrl).replace(/\/$/, '');
-    const inviteUrl = `${frontendUrl}/register?invite=${encodeURIComponent(token)}`;
+    const registerPath = roleId === 4 ? '/register-auditor' : '/register';
+    const inviteUrl = `${frontendUrl}${registerPath}?invite=${encodeURIComponent(token)}`;
 
     res.json({
       success: true,
@@ -460,7 +468,7 @@ exports.loginUser = async (req, res) => {
     }
 
     const token = jwt.sign(
-      { userId: user.UserID },
+      { userId: user.UserID, roleId: user.RoleID },
       "MY_SECRET_KEY",
       { expiresIn: "8h" }
     );
@@ -589,7 +597,8 @@ exports.getUsers = async (req, res) => {
          u.approval_status,
          r.RoleName,
          reqOff.AssignedOffices AS RequirementAssignedOffices,
-         perOff.AssignedOffices AS PersonnelAssignedOffices
+         perOff.AssignedOffices AS PersonnelAssignedOffices,
+         audAreas.AssignedAreas AS assignedArea
        FROM users u
        LEFT JOIN roles r ON u.RoleID = r.RoleID
        LEFT JOIN (
@@ -608,12 +617,21 @@ exports.getUsers = async (req, res) => {
          LEFT JOIN office_head_assignments oha ON oha.HeadID = h.HeadID
          LEFT JOIN offices o ON o.OfficeID = oha.OfficeID
          GROUP BY h.UserID
-       ) perOff ON perOff.UserID = u.UserID`
+       ) perOff ON perOff.UserID = u.UserID
+       LEFT JOIN (
+         SELECT
+           aaa.auditor_user_id AS UserID,
+           GROUP_CONCAT(DISTINCT CONCAT(ar.AreaCode, ': ', ar.AreaName) ORDER BY ar.AreaCode SEPARATOR ', ') AS AssignedAreas
+         FROM auditor_area_assignments aaa
+         JOIN areas ar ON aaa.area_id = ar.AreaID
+         GROUP BY aaa.auditor_user_id
+       ) audAreas ON audAreas.UserID = u.UserID`
     );
 
     const usersWithFullName = users.map((user) => ({
       ...user,
       FullName: `${user.FirstName}${user.MiddleInitial ? " " + user.MiddleInitial + "." : ""} ${user.LastName}`,
+      assignedArea: user.assignedArea || null,
       AssignedOffices: Array.from(
         new Set([
           ...String(user.RequirementAssignedOffices || '').split('||').filter(Boolean),
@@ -641,7 +659,10 @@ exports.getLoggedInUser = async (req, res) => {
     const userId = req.user.userId; // from decoded token
 
     const [rows] = await db.query(
-      "SELECT UserID, FirstName, MiddleInitial, LastName, Email, RoleID, ProfilePic, approval_status FROM users WHERE UserID = ?",
+      `SELECT u.UserID, u.FirstName, u.MiddleInitial, u.LastName, u.Email, u.RoleID, u.ProfilePic, u.approval_status, r.RoleName
+       FROM users u
+       LEFT JOIN roles r ON u.RoleID = r.RoleID
+       WHERE u.UserID = ?`,
       [userId]
     );
 

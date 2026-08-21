@@ -265,12 +265,20 @@ export default function Login() {
                             {loading ? "Signing in..." : blockedMs > 0 ? `Locked (${Math.ceil(blockedMs/1000)}s)` : "Sign in"}
                         </button>
 
-                        <p className="text-center text-sm">
-                            Don't have an account?{" "}
-                            <Link to="/register" className="text-blue-600">
-                                Sign up
-                            </Link>
-                        </p>
+                        <div className="flex flex-col items-center gap-1.5 text-xs text-slate-600">
+                            <div>
+                                Don't have an account?{" "}
+                                <Link to="/register" className="text-blue-600 font-semibold hover:underline">
+                                    Sign up
+                                </Link>
+                            </div>
+                            <div>
+                                External Auditor?{" "}
+                                <Link to="/register-auditor" className="text-sky-600 font-semibold hover:underline">
+                                    Sign up as Auditor
+                                </Link>
+                            </div>
+                        </div>
                     </form>
                 </div>
             </div>

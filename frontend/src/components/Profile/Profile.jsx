@@ -44,9 +44,19 @@ export default function Profile() {
 
 	const getRoleName = (u) => {
 		if (!u) return '';
-		if (u.RoleID === 1) return 'Administrator';
-		if (u.RoleID === 3) return 'Office Head';
-		if (u.RoleID === 2) return 'Office Personnel';
+		// If backend provides RoleName, prefer that (normalized)
+		if (u.RoleName) {
+			const rn = String(u.RoleName || '').toLowerCase();
+			if (rn === 'admin' || rn === 'administrator') return 'Administrator';
+			if (rn === 'personnel' || rn.includes('personnel') || rn === 'office head') return 'Office Personnel';
+			if (rn === 'user') return 'User';
+			return u.RoleName;
+		}
+
+		// Fallback to RoleID mapping (matches backend roles table)
+		if (Number(u.RoleID) === 1) return 'Administrator';
+		if (Number(u.RoleID) === 3) return 'Office Personnel';
+		if (Number(u.RoleID) === 2) return 'User';
 		return 'User';
 	};
 

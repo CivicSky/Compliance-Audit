@@ -37,12 +37,47 @@ function ALL() {
         };
 
 
+    const [auditorAssignments, setAuditorAssignments] = useState({ areaIds: new Set(), eventIds: new Set(), rawList: [] });
+
+    const isAuditor = currentUser?.RoleID === 4 || 
+                      String(currentUser?.RoleName || '').toLowerCase().includes('auditor') || 
+                      currentUser?.isExternalAuditor;
+
+    useEffect(() => {
+        if (!currentUser || !isAuditor) return;
+        const fetchAuditorAssignments = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${API_BASE_URL}/api/areas/assignments/${currentUser.UserID}`, {
+                    headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+                });
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    const list = data.assignments || [];
+                    const areaIds = new Set(list.map(a => Number(a.area_id)));
+                    const eventIds = new Set(list.map(a => Number(a.EventID)));
+                    setAuditorAssignments({ areaIds, eventIds, rawList: list });
+                }
+            } catch (err) {
+                console.error('Error fetching auditor assignments in ALL:', err);
+            }
+        };
+        fetchAuditorAssignments();
+    }, [currentUser, isAuditor]);
+
     // Filter by search and status
     const filteredEvents = events.filter(event => {
         // Status filter (normalize backend field variants)
         const eventStatus = String(event.status || event.Status || '').toLowerCase().trim();
-        if (sortStatus === 'active' && eventStatus !== 'active') return false;
+        if (sortStatus === 'active' && eventStatus === 'inactive') return false;
         if (sortStatus === 'inactive' && eventStatus !== 'inactive') return false;
+        
+        // Auditor Scoping filter: only show events containing areas assigned to this auditor!
+        if (isAuditor) {
+            const isEventAssigned = auditorAssignments.eventIds.has(Number(event.EventID));
+            if (!isEventAssigned) return false;
+        }
+
         // Search filter
         if (!searchTerm.trim()) return true;
         const searchLower = searchTerm.toLowerCase();
@@ -675,11 +710,14 @@ function ALL() {
 
             {/* Events Grid 2x2 */}
             <div className="grid grid-cols-2 gap-6 mb-8">
-                {visibleEvents.map((event) => (
-                    <EventCard
-                        key={event.EventID}
-                        event={event}
-                        onClick={() => {
+                {visibleEvents.map((event) => {
+                    const eventAssignments = (auditorAssignments?.rawList || []).filter(a => Number(a.EventID) === Number(event.EventID));
+                    return (
+                        <EventCard
+                            key={event.EventID}
+                            event={event}
+                            assignedAreas={eventAssignments}
+                            onClick={() => {
                             if (deleteMode) {
                                 // toggle selection when clicking card in delete mode
                                 setSelectedEventIdsForDelete(prev => {
@@ -733,16 +771,15 @@ function ALL() {
                             });
                         }}
                     />
-                ))}
+                )})}
                 {/* Edit Event Popup */}
                 <EditEventPopup
                     open={editPopup.open}
                     event={editPopup.event}
                     onCancel={() => {
                         setEditPopup({ open: false, event: null });
-                        setSelectedEvent(null);
                     }}
-                    onConfirm={async ({ EventName, EventCode, Description, status, EventID }) => {
+                    onConfirm={async ({ EventName, EventCode, Description, status, accreditation_level, EventID }) => {
                         const eventId = EventID || editPopup.event?.EventID;
                         if (!eventId) return;
                         try {
@@ -750,11 +787,19 @@ function ALL() {
                                 EventName,
                                 EventCode,
                                 Description,
-                                status
+                                status,
+                                accreditation_level
                             });
                             await fetchEvents();
                             setEditPopup({ open: false, event: null });
-                            setSelectedEvent(null);
+                            setSelectedEvent(prev => prev && (prev.EventID === eventId || prev.EventID === Number(eventId)) ? {
+                                ...prev,
+                                EventName,
+                                EventCode,
+                                Description,
+                                status,
+                                accreditation_level
+                            } : prev);
                             alert('Event updated successfully!');
                         } catch (err) {
                             alert('Failed to update event: ' + (err?.response?.data?.message || err.message));
@@ -823,6 +868,9 @@ function ALL() {
                     onEditArea={editArea}
                     onEditCriteria={editCriteria}
                     onBulkDelete={bulkDeleteHierarchy}
+                    onEditEvent={(evt) => setEditPopup({ open: true, event: evt })}
+                    onCopyEvent={(evt) => setCopyPopup({ open: true, event: evt })}
+                    isAdmin={isAdmin}
                 />
             )}
             {/* Copy Event Popup */}

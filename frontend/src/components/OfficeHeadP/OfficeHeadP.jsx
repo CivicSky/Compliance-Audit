@@ -785,7 +785,7 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                         onMouseDown={(e) => e.stopPropagation()}
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="overflow-hidden rounded-lg border border-gray-100 bg-white py-1 shadow-lg">
+                        <div className="w-48 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl animate-in fade-in zoom-in-95 duration-100">
                             <button
                                 type="button"
                                 onClick={(e) => {
@@ -794,12 +794,12 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                                     setActionMenuAnchorRect(null);
                                     openEdit(menuPerson);
                                 }}
-                                className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-xs text-slate-700 transition hover:bg-indigo-50 whitespace-nowrap"
+                                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition whitespace-nowrap"
                             >
-                                <svg className="h-4 w-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="h-4 w-4 text-blue-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                 </svg>
-                                <span>Edit</span>
+                                <span>Edit Personnel</span>
                             </button>
                             <button
                                 type="button"
@@ -809,12 +809,12 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                                     setActionMenuAnchorRect(null);
                                     await handleDeleteHead(menuPerson);
                                 }}
-                                className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-xs text-red-600 transition hover:bg-red-50 whitespace-nowrap"
+                                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50 transition whitespace-nowrap"
                             >
-                                <svg className="h-4 w-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="h-4 w-4 text-rose-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
                                 </svg>
-                                <span>Delete</span>
+                                <span>Delete Personnel</span>
                             </button>
                         </div>
                     </div>,

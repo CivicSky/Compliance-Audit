@@ -58,7 +58,8 @@ export default function AddEventModal({ isOpen, onClose, onSuccess }) {
             const response = await eventsAPI.addEvent({
                 EventCode: formData.EventCode,
                 EventName: formData.EventName,
-                Description: formData.Description || null
+                Description: formData.Description || null,
+                accreditation_level: formData.accreditation_level || 'N/A'
             });
 
             if (response.success) {
@@ -68,7 +69,8 @@ export default function AddEventModal({ isOpen, onClose, onSuccess }) {
                 setFormData({
                     EventCode: '',
                     EventName: '',
-                    Description: ''
+                    Description: '',
+                    accreditation_level: 'N/A'
                 });
                 
                 // Call onSuccess callback if provided
@@ -166,6 +168,27 @@ export default function AddEventModal({ isOpen, onClose, onSuccess }) {
                         {errors.EventName && (
                             <p className="text-red-500 text-sm mt-1">{errors.EventName}</p>
                         )}
+                    </div>
+
+                    {/* Accreditation Level */}
+                    <div className="mb-6">
+                        <label htmlFor="accreditation_level" className="block text-sm font-medium text-gray-700 mb-2">
+                            Accreditation Level
+                        </label>
+                        <select
+                            id="accreditation_level"
+                            name="accreditation_level"
+                            value={formData.accreditation_level || 'N/A'}
+                            onChange={handleInputChange}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                            disabled={isSubmitting}
+                        >
+                            <option value="Level I">Level I</option>
+                            <option value="Level II">Level II</option>
+                            <option value="Level III">Level III</option>
+                            <option value="Level IV">Level IV</option>
+                            <option value="N/A">N/A</option>
+                        </select>
                     </div>
 
                     {/* Description */}

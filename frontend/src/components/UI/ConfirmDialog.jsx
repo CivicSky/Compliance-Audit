@@ -62,34 +62,25 @@ export default function ConfirmDialog({
     : 'bg-[var(--info-600,#2563eb)] hover:bg-[var(--info-700,#1d4ed8)] text-white focus:ring-[var(--info-500,#3b82f6)]';
 
   return createPortal(
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[20010] flex items-center justify-center bg-black/50 px-4">
       <div 
-        className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+        className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl animate-in fade-in zoom-in-95 duration-150"
         role="dialog"
         aria-modal="true"
         aria-labelledby="dialog-title"
       >
-        <div className="p-6">
-          <div className="flex items-start gap-4">
-            <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${iconColorClass}`}>
-              <Icon className="w-5 h-5" />
-            </div>
-            <div className="flex-1 pt-1">
-              <h3 id="dialog-title" className="text-lg font-semibold text-gray-900 mb-2">
-                {title}
-              </h3>
-              <p className="text-sm text-gray-500">
-                {message}
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-gray-50 px-6 py-4 flex justify-end gap-3 rounded-b-xl border-t border-gray-100">
+        <h3 id="dialog-title" className="text-lg font-bold text-slate-900">
+          {title || 'Confirm'}
+        </h3>
+        <p className="mt-2 text-sm text-slate-600 leading-relaxed">
+          {message}
+        </p>
+        <div className="mt-6 flex justify-end gap-3">
           <button
             type="button"
             onClick={onCancel}
             disabled={loading}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--brand-500,#3b82f6)] disabled:opacity-50 transition-colors"
+            className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-100 disabled:opacity-50 focus:outline-none"
           >
             {cancelText}
           </button>
@@ -98,12 +89,12 @@ export default function ConfirmDialog({
             type="button"
             onClick={onConfirm}
             disabled={loading}
-            className={`px-4 py-2 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 flex items-center justify-center min-w-[80px] transition-colors ${confirmBtnClass}`}
+            className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50 focus:outline-none flex items-center justify-center min-w-[60px]"
           >
             {loading ? (
               <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
             ) : (
-              confirmText
+              confirmText === 'Confirm' ? 'OK' : confirmText
             )}
           </button>
         </div>

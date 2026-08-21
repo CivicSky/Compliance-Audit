@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import { Navigate } from "react-router-dom";
 // Use the EventsProfile implementation (exports EventsP) so the page shows the detailed events
 import EventsP from "../EventsProfile/EventsProfle";
 import AddEventModal from "../AddEvent/AddEventModal";
@@ -22,6 +23,10 @@ export default function Events() {
     // Default to admin (show features) until we confirm otherwise
     const isAdmin = !!(currentUser && (currentUser.RoleName === 'admin' || currentUser.RoleID === 1));
 
+    const isAuditor = currentUser?.RoleID === 4 || 
+                      String(currentUser?.RoleName || '').toLowerCase().includes('auditor') || 
+                      currentUser?.isExternalAuditor;
+
     // Fetch current user on mount
     useEffect(() => {
         const fetchCurrentUser = async () => {
@@ -34,6 +39,11 @@ export default function Events() {
         };
         fetchCurrentUser();
     }, []);
+
+    // Redirect Auditors away from Downloads page
+    if (currentUser && isAuditor) {
+        return <Navigate to="/home" replace />;
+    }
 
     // Reset all states when component unmounts or navigation happens
     useEffect(() => {

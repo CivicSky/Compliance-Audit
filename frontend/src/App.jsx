@@ -4,6 +4,7 @@ import { createBrowserRouter, RouterProvider, Navigate } from "react-router-dom"
 
 import Login from './components/Login/login.jsx'
 import Register from './components/Register/register.jsx'
+import RegisterAuditor from './components/Register/registerauditor.jsx'
 import Otp from './components/Register/otp.jsx'
 import Home from './components/Home/home.jsx'
 import AppLayout from './AppLayout/AppLayout.jsx'
@@ -19,8 +20,10 @@ import AuditLogs from './components/AuditLogs/AuditLogs.jsx'
 import Area from './components/Area/Area.jsx'
 import ALLC from './components/ALLC/ALL.jsx'
 import MasterList from './components/MasterList/MasterList.jsx'
+import ExternalAuditors from './components/ExternalAuditors/ExternalAuditors.jsx'
 
 import ProtectedRoute from "./components/ProtectedRoute/ProtectedRoute.jsx";
+import RoleProtectedRoute from "./components/ProtectedRoute/RoleProtectedRoute.jsx";
 import PublicRoute from "./components/ProtectedRoute/PublicRoute.jsx";
 import NotFound from './components/UI/NotFound'
 
@@ -39,6 +42,14 @@ export default function App() {
       element: (
         <PublicRoute>
           <Register />
+        </PublicRoute>
+      ),
+    },
+    {
+      path: "/register-auditor",
+      element: (
+        <PublicRoute>
+          <RegisterAuditor />
         </PublicRoute>
       ),
     },
@@ -62,16 +73,17 @@ export default function App() {
         { path: "organizations", element: <Organization /> },
         { path: "audit", element: <Audit /> },
         { path: "requirements", element: <Requirements /> },
-        { path: "officehead", element: <OfficeHead /> },
-        { path: "users", element: <Users /> },
-        { path: "events", element: <Events /> },
+        { path: "officehead", element: <RoleProtectedRoute allowedRoles={[1, 'admin']}><OfficeHead /></RoleProtectedRoute> },
+        { path: "users", element: <RoleProtectedRoute allowedRoles={[1, 'admin']}><Users /></RoleProtectedRoute> },
+        { path: "events", element: <RoleProtectedRoute forbiddenRoles={['auditor', 4]}><Events /></RoleProtectedRoute> },
         { path: "criteria", element: <Criteria /> },
-        { path: "audit-logs", element: <AuditLogs /> },
+        { path: "audit-logs", element: <RoleProtectedRoute allowedRoles={[1, 'admin']}><AuditLogs /></RoleProtectedRoute> },
         { path: "profile", element: <Profile /> },
         { path: "area", element: <Area /> },
         { path: "setup", element: <ALLC /> },
         { path: "allc", element: <ALLC /> },
         { path: "master-list", element: <MasterList /> },
+        { path: "external-auditors", element: <RoleProtectedRoute allowedRoles={[1, 'admin']}><ExternalAuditors /></RoleProtectedRoute> },
       ],
     },
   

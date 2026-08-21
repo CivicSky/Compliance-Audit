@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import StatusBadge from './StatusBadge';
 import { API_BASE_URL } from '../../utils/apiBase';
+import { useModal } from '../UI/ModalProvider';
 
 export default function RequirementsTree({
     loading,
@@ -36,29 +37,98 @@ export default function RequirementsTree({
     onViewSubmission,
     onViewMySubmission,
 }) {
+    const { showAlert } = useModal();
     const commentLabel = isAdmin ? 'Comment' : 'Private comment';
+
+    const [auditorAssignedAreaIds, setAuditorAssignedAreaIds] = useState(new Set());
+
+    const isAuditor = currentUser?.RoleID === 4 || 
+                      String(currentUser?.RoleName || '').toLowerCase().includes('auditor') || 
+                      currentUser?.isExternalAuditor;
+
+    useEffect(() => {
+        if (!currentUser || !isAuditor) return;
+        let mounted = true;
+        const fetchAssignments = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${API_BASE_URL}/api/areas/assignments/${currentUser.UserID}`, {
+                    headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+                });
+                const data = await res.json();
+                if (mounted && res.ok && data.success) {
+                    const ids = new Set((data.assignments || []).map(a => Number(a.area_id)));
+                    setAuditorAssignedAreaIds(ids);
+                }
+            } catch (e) {}
+        };
+        fetchAssignments();
+        return () => { mounted = false; };
+    }, [currentUser, isAuditor]);
+
+    const effectiveRequirements = isAuditor 
+        ? (requirements || []).filter(req => auditorAssignedAreaIds.has(Number(req.AreaID)))
+        : (requirements || []);
 
     return (
         <div className="flex-1 overflow-y-auto bg-app px-4 py-4 sm:px-5">
             {loading ? (
-                <div className="flex items-center justify-center py-16">
-                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+                <div className="space-y-6 animate-pulse py-2">
+                    {[1, 2].map((i) => (
+                        <div key={i} className="space-y-4">
+                            {/* Skeleton Area Header */}
+                            <div className="h-10 w-full rounded-xl bg-slate-200/80" />
+                            
+                            {/* Skeleton Criteria Header */}
+                            <div className="ml-4 h-9 w-[95%] rounded-xl bg-slate-200/50" />
+                            
+                            {/* Skeleton Requirement Cards */}
+                            <div className="ml-8 space-y-3">
+                                {[1, 2].map((j) => (
+                                    <div key={j} className="border border-slate-200/50 rounded-xl p-4 flex gap-4 bg-white/70">
+                                        {/* Status bullet placeholder */}
+                                        <div className="w-24 space-y-2.5 shrink-0">
+                                            <div className="h-3 w-16 rounded bg-slate-200/80" />
+                                            <div className="h-3 w-20 rounded bg-slate-200/50" />
+                                            <div className="h-3 w-14 rounded bg-slate-200/50" />
+                                        </div>
+                                        
+                                        {/* Details placeholder */}
+                                        <div className="flex-1 space-y-2">
+                                            <div className="h-3.5 w-12 rounded bg-slate-200/80" />
+                                            <div className="h-3 w-full rounded bg-slate-200/50" />
+                                            <div className="h-3 w-4/5 rounded bg-slate-200/50" />
+                                            
+                                            {/* Comment input box placeholder */}
+                                            <div className="h-8 w-full rounded-lg bg-slate-100/50 mt-3" />
+                                        </div>
+                                        
+                                        {/* Action buttons placeholder */}
+                                        <div className="w-16 flex flex-col items-end gap-2 shrink-0">
+                                            <div className="h-3 w-10 rounded bg-slate-200/80" />
+                                            <div className="h-7 w-12 rounded bg-slate-200/50 mt-1" />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ))}
                 </div>
-            ) : requirements.length === 0 ? (
+            ) : effectiveRequirements.length === 0 ? (
                 <div className="py-16 text-center">
                     <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/80">
                         <svg className="h-7 w-7 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
                     </div>
-                    <p className="text-sm font-medium text-slate-700">No requirements assigned yet</p>
-                    <p className="mt-1 text-xs text-slate-500">Requirements will appear here once added to this office.</p>
+                    <p className="text-sm font-medium text-slate-700">No requirements assigned to your area</p>
+                    <p className="mt-1 text-xs text-slate-500">Requirements will appear here once added to your assigned area.</p>
                 </div>
             ) : (
                 <div className="space-y-5">
                     {(() => {
                         // Build areas with criteria nodes (includes ParentCriteriaID provided by backend)
-                        const groupedByArea = requirements.reduce((areaGroups, req) => {
+                        const groupedByArea = effectiveRequirements.reduce((areaGroups, req) => {
                             const areaKey = req.AreaCode || `Area_${req.AreaID || 'NoArea'}`;
                             if (!areaGroups[areaKey]) {
                                 areaGroups[areaKey] = {
@@ -149,21 +219,21 @@ export default function RequirementsTree({
                                             const isAssignedToMe = isUserAssignedToRequirement(req.RequirementID);
                                             const isOfficePersonnel = currentUser?.RoleID === 2;
                                             const hasUploadedFile = hasUserUploadedForRequirement(req.RequirementID);
-                                            const canOpenSubmission = !!((isAdmin && onViewSubmission) || (isOfficeHead && onViewMySubmission));
+                                            const canOpenSubmission = !!((isAdmin && onViewSubmission) || (isOfficeHead && onViewMySubmission) || (isAuditor && onViewSubmission));
                                             return (
                                                 <div
                                                     key={req.RequirementID}
                                                     className={`p-4 transition-colors ${isAssignedToMe ? 'bg-cyan-100/50 ring-1 ring-inset ring-cyan-300/50' : 'hover:bg-slate-200/40'} ${canOpenSubmission ? 'cursor-pointer hover:shadow-sm' : ''}`}
                                                     onClick={() => {
                                                         if (!canOpenSubmission) return;
-                                                        if (isAdmin) onViewSubmission?.(req);
+                                                        if (isAdmin || isAuditor) onViewSubmission?.(req);
                                                         else if (isOfficeHead) onViewMySubmission?.(req);
                                                     }}
                                                     onKeyDown={(e) => {
                                                         if (!canOpenSubmission) return;
                                                         if (e.key === 'Enter' || e.key === ' ') {
                                                             e.preventDefault();
-                                                            if (isAdmin) onViewSubmission?.(req);
+                                                            if (isAdmin || isAuditor) onViewSubmission?.(req);
                                                             else if (isOfficeHead) onViewMySubmission?.(req);
                                                         }
                                                 }}
@@ -174,41 +244,62 @@ export default function RequirementsTree({
                                                     <div className="flex items-start gap-3">
                                                         <div className="min-w-[90px]">
                                                             {isAdmin ? (
-                                                                <div className="space-y-2 rounded-xl border border-slate-300/40 bg-slate-200/50 p-2">
-                                                                    {[
-                                                                        { id: 5, label: 'Complied', color: 'emerald' },
-                                                                        { id: 4, label: 'Partially Complied', color: 'amber' },
-                                                                        { id: 3, label: 'Not Complied', color: 'rose' },
-                                                                    ].map((option) => (
-                                                                        <label
-                                                                            key={option.id}
-                                                                            className="flex w-40 cursor-pointer items-center gap-2 whitespace-nowrap rounded-lg px-1 py-0.5 text-xs transition hover:bg-white/80"
-                                                                            title={option.label}
-                                                                            onClick={(e) => e.stopPropagation()}
+                                                                (() => {
+                                                                    const reqUsers = assignedUsersMap[req.RequirementID] || [];
+                                                                    const hasUploadedEvidence = reqUsers.some(u => u?.HasUploaded === 1 || u?.HasUploaded === true) ||
+                                                                        Boolean(req.DocumentProof || req.ProofDocument || req.hasProof || req.has_proof || req.file_url);
+
+                                                                    return (
+                                                                        <div 
+                                                                            className={`space-y-2 rounded-xl border border-slate-300/40 bg-slate-200/50 p-2 ${!hasUploadedEvidence ? 'opacity-50' : ''}`}
+                                                                            title={!hasUploadedEvidence ? "Upload evidence or proof document before selecting compliance status" : ""}
                                                                         >
-                                                                            <input
-                                                                                type="radio"
-                                                                                name={`status-${req.RequirementID}`}
-                                                                                checked={req.ComplianceStatusID === option.id}
-                                                                                onChange={(e) => {
-                                                                                e.stopPropagation();
-                                                                                handleStatusChange(req.RequirementID, option.id);
-                                                                            }}
-                                                                                className={`w-3 h-3 text-${option.color}-600 border-${option.color}-300 focus:ring-${option.color}-500 focus:ring-2`}
-                                                                            />
-                                                                            <span
-                                                                                className={`font-medium ${option.color === 'emerald'
-                                                                                    ? 'text-emerald-700'
-                                                                                    : option.color === 'amber'
-                                                                                        ? 'text-amber-700'
-                                                                                        : 'text-rose-700'
-                                                                                    }`}
-                                                                            >
-                                                                                {option.label}
-                                                                            </span>
-                                                                        </label>
-                                                                    ))}
-                                                                </div>
+                                                                            {[
+                                                                                { id: 5, label: 'Complied', color: 'emerald' },
+                                                                                { id: 4, label: 'Partially Complied', color: 'amber' },
+                                                                                { id: 3, label: 'Not Complied', color: 'rose' },
+                                                                            ].map((option) => (
+                                                                                <label
+                                                                                    key={option.id}
+                                                                                    className={`flex w-40 items-center gap-2 whitespace-nowrap rounded-lg px-1 py-0.5 text-xs transition ${hasUploadedEvidence ? 'cursor-pointer hover:bg-white/80' : 'cursor-not-allowed opacity-60'}`}
+                                                                                    title={!hasUploadedEvidence ? "Evidence / proof document required" : option.label}
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        if (!hasUploadedEvidence) {
+                                                                                            showAlert('Cannot change compliance status: No evidence or proof document has been uploaded for this requirement yet.');
+                                                                                        }
+                                                                                    }}
+                                                                                >
+                                                                                    <input
+                                                                                        type="radio"
+                                                                                        name={`status-${req.RequirementID}`}
+                                                                                        checked={req.ComplianceStatusID === option.id}
+                                                                                        disabled={!hasUploadedEvidence}
+                                                                                        onChange={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            if (!hasUploadedEvidence) {
+                                                                                                showAlert('Cannot change compliance status: No evidence or proof document has been uploaded for this requirement yet.');
+                                                                                                return;
+                                                                                            }
+                                                                                            handleStatusChange(req.RequirementID, option.id);
+                                                                                        }}
+                                                                                        className={`w-3 h-3 text-${option.color}-600 border-${option.color}-300 focus:ring-${option.color}-500 focus:ring-2 disabled:cursor-not-allowed`}
+                                                                                    />
+                                                                                    <span
+                                                                                        className={`font-medium ${option.color === 'emerald'
+                                                                                            ? 'text-emerald-700'
+                                                                                            : option.color === 'amber'
+                                                                                                ? 'text-amber-700'
+                                                                                                : 'text-rose-700'
+                                                                                            }`}
+                                                                                    >
+                                                                                        {option.label}
+                                                                                    </span>
+                                                                                </label>
+                                                                            ))}
+                                                                        </div>
+                                                                    );
+                                                                })()
                                                             ) : (
                                                                 <StatusBadge statusId={req.ComplianceStatusID} />
                                                             )}

@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { downloadFileFromUrl, fileNameFromUrl } from '../../utils/downloadFile';
+import { usersAPI } from '../../utils/api';
 
 export default function UserFileViewerModal({
     show,
@@ -15,6 +17,17 @@ export default function UserFileViewerModal({
     onClose,
 }) {
     const [downloading, setDownloading] = useState(false);
+    const [currentUser, setCurrentUser] = useState(null);
+
+    useEffect(() => {
+        usersAPI.getLoggedInUser().then(res => {
+            if (res?.success) setCurrentUser(res.user);
+        }).catch(() => {});
+    }, []);
+
+    const isAuditor = currentUser?.RoleID === 4 || 
+                      String(currentUser?.RoleName || '').toLowerCase().includes('auditor') || 
+                      currentUser?.isExternalAuditor;
 
     if (!show || !selectedUserFile) return null;
 
@@ -35,32 +48,34 @@ export default function UserFileViewerModal({
         }
     };
     const isImage = url.match(/\.(jpg|jpeg|png|gif|bmp|webp|avif)$/i);
+    const isVideo = url.match(/\.(mp4|webm|ogg|mov|avi|mkv)$/i);
     const isPdf = url.match(/\.(pdf)$/i);
     const isExcel = url.match(/\.(xlsx|xls)$/i);
     const isDocx = url.match(/\.(docx)$/i);
     const isOfficeEmbed = url.match(/\.(pptx|doc)$/i);
 
-    return (
+    const modalContent = (
         <div
-            className="fixed inset-0 z-[131] bg-black/70"
-
+            className="fixed inset-0 z-[10000] bg-black/75 flex items-center justify-center p-4 animate-in fade-in duration-150"
             onClick={onClose}
             role="presentation"
         >
             <div className="fixed top-4 right-4 z-[132] flex items-center gap-2">
-                <button
-                    type="button"
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-white/30 bg-black/40 px-3 py-1.5 text-sm font-medium text-white hover:bg-black/60 disabled:opacity-50"
-                    onClick={handleDownload}
-                    disabled={downloading || !url}
-                    aria-label="Download file"
-                    title="Download"
-                >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4" />
-                    </svg>
-                    {downloading ? 'Downloading...' : 'Download'}
-                </button>
+                {!isAuditor && (
+                    <button
+                        type="button"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-white/30 bg-black/40 px-3 py-1.5 text-sm font-medium text-white hover:bg-black/60 disabled:opacity-50"
+                        onClick={handleDownload}
+                        disabled={downloading || !url}
+                        aria-label="Download file"
+                        title="Download"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4" />
+                        </svg>
+                        {downloading ? 'Downloading...' : 'Download'}
+                    </button>
+                )}
                 <button
                     type="button"
                     className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/30 bg-black/40 text-white/80 hover:bg-black/60 hover:text-white"
@@ -79,7 +94,11 @@ export default function UserFileViewerModal({
 
             <div className="w-full h-full flex items-center justify-center p-4" onClick={(e) => e.stopPropagation()}>
                 <div className="w-[94vw] max-w-[1600px] h-[94vh] max-h-[94vh]">
-                    {isImage ? (
+                    {isVideo ? (
+                        <div className="w-full h-full flex items-center justify-center bg-black/60 rounded-xl overflow-hidden p-2">
+                            <video controls autoPlay src={url} className="max-h-full max-w-full object-contain rounded-lg shadow-2xl" />
+                        </div>
+                    ) : isImage ? (
                         <div className="w-full h-full flex items-center justify-center">
                             <img src={url} alt="Document Preview" className="max-h-full max-w-full object-contain" />
                         </div>
@@ -176,4 +195,6 @@ export default function UserFileViewerModal({
             </div>
         </div>
     );
+
+    return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : null;
 }

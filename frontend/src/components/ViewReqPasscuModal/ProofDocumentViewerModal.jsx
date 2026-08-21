@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { downloadFileFromUrl, fileNameFromUrl } from '../../utils/downloadFile';
+import { usersAPI } from '../../utils/api';
 
 export default function ProofDocumentViewerModal({
     show,
@@ -16,6 +17,17 @@ export default function ProofDocumentViewerModal({
     onClose,
 }) {
     const [downloading, setDownloading] = useState(false);
+    const [currentUser, setCurrentUser] = useState(null);
+
+    useEffect(() => {
+        usersAPI.getLoggedInUser().then(res => {
+            if (res?.success) setCurrentUser(res.user);
+        }).catch(() => {});
+    }, []);
+
+    const isAuditor = currentUser?.RoleID === 4 || 
+                      String(currentUser?.RoleName || '').toLowerCase().includes('auditor') || 
+                      currentUser?.isExternalAuditor;
 
     if (!show || !proofFileUrl) return null;
 
@@ -49,19 +61,21 @@ export default function ProofDocumentViewerModal({
             role="presentation"
         >
             <div className="fixed top-4 right-4 z-[131] flex items-center gap-2">
-                <button
-                    type="button"
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-white/30 bg-black/40 px-3 py-1.5 text-sm font-medium text-white hover:bg-black/60 disabled:opacity-50"
-                    onClick={handleDownload}
-                    disabled={downloading || !url}
-                    aria-label="Download file"
-                    title="Download"
-                >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4" />
-                    </svg>
-                    {downloading ? 'Downloading...' : 'Download'}
-                </button>
+                {!isAuditor && (
+                    <button
+                        type="button"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-white/30 bg-black/40 px-3 py-1.5 text-sm font-medium text-white hover:bg-black/60 disabled:opacity-50"
+                        onClick={handleDownload}
+                        disabled={downloading || !url}
+                        aria-label="Download file"
+                        title="Download"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4" />
+                        </svg>
+                        {downloading ? 'Downloading...' : 'Download'}
+                    </button>
+                )}
                 <button
                     type="button"
                     className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/30 bg-black/40 text-white/80 hover:bg-black/60 hover:text-white"

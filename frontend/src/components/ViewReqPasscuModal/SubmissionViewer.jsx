@@ -4,6 +4,7 @@ import mammoth from 'mammoth/mammoth.browser';
 import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import pdfWorkerSrc from 'pdfjs-dist/legacy/build/pdf.worker.mjs?url';
 import YourWorkFileUpload from './YourWorkFileUpload';
+import { useToast } from '../UI/Toast';
 import { useModal } from '../UI/ModalProvider';
 import { API_BASE_URL } from '../../utils/apiBase';
 
@@ -106,6 +107,25 @@ const renderXlsxThumbSvg = (fileName, workbook) => {
 </svg>`);
 };
 
+const getExtension = (fileNameOrUrl) => {
+    const s = String(fileNameOrUrl || '');
+    const clean = s.split('?')[0].split('#')[0];
+    const dot = clean.lastIndexOf('.');
+    return dot >= 0 ? clean.slice(dot + 1).toLowerCase() : '';
+};
+
+const getFileTypeLabel = (ext) => {
+    if (['doc', 'docx'].includes(ext)) return 'Microsoft Word';
+    if (['xls', 'xlsx'].includes(ext)) return 'Microsoft Excel';
+    if (ext === 'pdf') return 'PDF Document';
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) return 'Image File';
+    if (['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'].includes(ext)) return 'Video File';
+    return ext ? ext.toUpperCase() : 'File';
+};
+
+const isImageExt = (ext) => ['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif'].includes(ext);
+const isVideoExt = (ext) => ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'].includes(ext);
+
 export default function SubmissionViewer({
 	show,
 	leftStyle,
@@ -116,34 +136,66 @@ export default function SubmissionViewer({
 	onCommentSaved,
 	currentUser,
 	onViewUserFile,
+	onViewUserFilesModal,
 	showPrivateComments = true,
 	canEditPrivateComments = true,
 	allowWorkActions = false,
 	viewerRoleId = 0,
 	onFileUpload,
 	onFileUnsubmit,
+	onFileRename,
+	onFileUpdateComment,
 	uploadingFile = false,
 	unsubmittingFile = false,
 }) {
-	const requirementId = requirement?.RequirementID;
-	const title = requirement?.RequirementTitle || requirement?.Title || requirement?.RequirementCode || 'Submission';
 	const { showConfirm } = useModal();
 
-	const assignedCount = users.length;
-	const turnedInCount = users.reduce(
+	const [active, setActive] = useState(false);
+	const [shouldRender, setShouldRender] = useState(false);
+	const [cachedRequirement, setCachedRequirement] = useState(null);
+	const [cachedUsers, setCachedUsers] = useState([]);
+
+	useEffect(() => {
+		if (show) {
+			setShouldRender(true);
+			const timer = setTimeout(() => setActive(true), 20);
+			return () => clearTimeout(timer);
+		} else {
+			setActive(false);
+			const timer = setTimeout(() => setShouldRender(false), 300);
+			return () => clearTimeout(timer);
+		}
+	}, [show]);
+
+	useEffect(() => {
+		if (show && requirement) {
+			setCachedRequirement(requirement);
+			setCachedUsers(users);
+		}
+	}, [show, requirement, users]);
+
+	const activeRequirement = show ? requirement : cachedRequirement;
+	const activeUsers = show ? users : cachedUsers;
+
+	const requirementId = activeRequirement?.RequirementID;
+	const title = activeRequirement?.RequirementTitle || activeRequirement?.Title || activeRequirement?.RequirementCode || 'Submission';
+
+	const assignedCount = activeUsers.length;
+	const turnedInCount = activeUsers.reduce(
 		(acc, u) => acc + ((u?.HasUploaded === 1 || u?.HasUploaded === true) ? 1 : 0),
 		0
 	);
 
 	const uploadedUserIds = useMemo(() => {
-		return (users || [])
+		return (activeUsers || [])
 			.filter((u) => (u?.HasUploaded === 1 || u?.HasUploaded === true) && u?.UserID)
 			.map((u) => Number(u.UserID))
 			.filter((id) => Number.isFinite(id) && id > 0);
-	}, [users]);
+	}, [activeUsers]);
 	const uploadedUserIdsKey = uploadedUserIds.join(',');
 
 	const [fileByUserId, setFileByUserId] = useState({});
+	const [filesByUserId, setFilesByUserId] = useState({});
 	const [loadingByUserId, setLoadingByUserId] = useState({});
 	const [thumbByUserId, setThumbByUserId] = useState({});
 	const [thumbLoadingByUserId, setThumbLoadingByUserId] = useState({});
@@ -156,6 +208,8 @@ export default function SubmissionViewer({
 	const thumbByUserIdRef = useRef({});
 	const thumbLoadingByUserIdRef = useRef({});
 	const shouldRenderPrivateCommentSection = !!(showPrivateComments && (canEditPrivateComments || String(savedComment || '').trim()));
+
+	const { toast } = useToast();
 
 	useEffect(() => {
 		if (!show) return;
@@ -175,6 +229,7 @@ export default function SubmissionViewer({
 	useEffect(() => {
 		if (!show || !requirementId || uploadedUserIds.length === 0) {
 			setFileByUserId({});
+			setFilesByUserId({});
 			setLoadingByUserId({});
 			setThumbByUserId({});
 			setThumbLoadingByUserId({});
@@ -185,6 +240,7 @@ export default function SubmissionViewer({
 		const controller = new AbortController();
 
 		setFileByUserId({});
+		setFilesByUserId({});
 		setLoadingByUserId(
 			uploadedUserIds.reduce((acc, id) => {
 				acc[id] = true;
@@ -209,8 +265,14 @@ export default function SubmissionViewer({
 				}
 				const data = await res.json();
 				if (cancelled) return;
-				if (data?.success && data?.file) {
-					setFileByUserId((prev) => ({ ...prev, [userId]: data.file }));
+				if (data?.success) {
+					const list = Array.isArray(data.files) && data.files.length > 0 
+						? data.files 
+						: (data.file ? [data.file] : []);
+					setFilesByUserId((prev) => ({ ...prev, [userId]: list }));
+					if (data.file || list.length > 0) {
+						setFileByUserId((prev) => ({ ...prev, [userId]: data.file || list[list.length - 1] }));
+					}
 				}
 			} catch (e) {
 				// ignore
@@ -269,6 +331,12 @@ export default function SubmissionViewer({
 			setSavedCommentAt(new Date());
 			setCommentInput('');
 			onCommentSaved?.(next);
+			toast?.({
+				title: 'Comment Saved',
+				description: 'Your comment has been saved successfully.',
+				variant: 'success',
+				duration: 2500
+			});
 		} catch (e) {
 			setCommentStatus('Failed to save');
 		} finally {
@@ -305,6 +373,12 @@ export default function SubmissionViewer({
 			setSavedCommentAt(null);
 			setCommentInput('');
 			onCommentSaved?.('');
+			toast?.({
+				title: 'Comment Cleared',
+				description: 'The comment has been removed.',
+				variant: 'info',
+				duration: 2500
+			});
 		} catch (e) {
 			setCommentStatus('Failed to clear');
 		} finally {
@@ -312,12 +386,16 @@ export default function SubmissionViewer({
 		}
 	};
 
+	// 'Your Work' view only when there's exactly one assigned user and viewer is not admin.
 	const isYourWorkView = !canEditPrivateComments && users.length === 1;
-	const isReadOnlyWorkView = isYourWorkView && !allowWorkActions;
-	const workUser = isYourWorkView ? users[0] : null;
+	const isReadOnlyWorkView = false;
+	const workUser = isYourWorkView
+		? (users.length === 1 ? users[0] : users.find(u => Number(u?.UserID) === Number(currentUser?.UserID)))
+		: null;
 	const workUserId = workUser?.UserID ? Number(workUser.UserID) : null;
 	const workHasUploaded = workUser?.HasUploaded === 1 || workUser?.HasUploaded === true;
 	const workFile = workUserId ? fileByUserId[workUserId] : null;
+	const workFiles = workUserId ? (filesByUserId[workUserId] || (workFile ? [workFile] : [])) : [];
 	const workThumb = workUserId ? thumbByUserId[workUserId] : null;
 	const workLoadingFile = workUserId ? loadingByUserId[workUserId] : false;
 	const workLoadingThumb = workUserId ? thumbLoadingByUserId[workUserId] : false;
@@ -356,6 +434,35 @@ export default function SubmissionViewer({
 		if (isDocxExt(ext) || ext === 'doc') return 'Document';
 		if (isXlsxExt(ext) || ext === 'csv') return 'Spreadsheet';
 		return ext ? ext.toUpperCase() : 'File';
+	};
+
+	// Upload then refresh files for the current user so UI updates immediately
+	const handleUploadAndRefresh = async (e) => {
+		if (!onFileUpload || !currentUser) return;
+		try {
+			await onFileUpload(e, requirementId);
+		} catch (err) {
+			console.error('Upload handler error', err);
+			toast?.({ title: 'Upload failed', description: err?.message || 'Failed to upload files', variant: 'error', duration: 2500 });
+		}
+		// After upload completes, fetch the user's files for this requirement
+		try {
+			const userId = Number(currentUser.UserID);
+			if (!userId) return;
+			const token = localStorage.getItem('token');
+			const headers = token ? { Authorization: `Bearer ${token}` } : {};
+			const res = await fetch(`${API_BASE_URL}/api/requirements/${requirementId}/user-file/${userId}`, { headers });
+			if (!res.ok) return;
+			const data = await res.json();
+			if (data?.success) {
+				const list = Array.isArray(data.files) && data.files.length > 0 ? data.files : (data.file ? [data.file] : []);
+				setFilesByUserId((prev) => ({ ...prev, [userId]: list }));
+				if (list.length > 0) setFileByUserId((prev) => ({ ...prev, [userId]: list[list.length - 1] }));
+				toast?.({ title: 'Upload complete', description: 'Your files are now available', variant: 'success', duration: 1800 });
+			}
+		} catch (err) {
+			console.error('Failed to refresh files after upload', err);
+		}
 	};
 
 	useEffect(() => {
@@ -463,11 +570,13 @@ export default function SubmissionViewer({
 		};
 	}, [show, requirementId, uploadedUserIdsKey, fileByUserIdKey]);
 
-	if (!show) return null;
+	if (!shouldRender) return null;
 
 	return (
 		<div
-			className="fixed inset-0 z-[130]"
+			className={`fixed inset-0 z-[130] bg-slate-900/10 backdrop-blur-[0.5px] transition-opacity duration-300 ease-out ${
+				active ? 'opacity-100' : 'opacity-0 pointer-events-none'
+			}`}
 			style={leftStyle}
 			onClick={(e) => {
 				e.stopPropagation();
@@ -476,12 +585,14 @@ export default function SubmissionViewer({
 			role="presentation"
 		>
 			<div
-				className="relative ml-auto flex h-full w-[28%] min-w-[340px] flex-col border-l border-stone-200/90 bg-app-surface shadow-2xl shadow-slate-900/10"
+				className={`relative ml-auto flex h-full w-[34%] min-w-[420px] flex-col border-l border-slate-200 bg-white shadow-2xl transition-transform duration-300 ease-out ${
+					active ? 'translate-x-0' : 'translate-x-full'
+				}`}
 				onClick={(e) => e.stopPropagation()}
 				role="dialog"
 				aria-label="Submission"
 			>
-				<div className="relative flex h-14 shrink-0 items-center justify-between border-b border-stone-200/90 bg-app-surface px-4">
+				<div className="relative flex h-14 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4">
 					<div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-indigo-500 to-violet-500" />
 					<div className="min-w-0">
 						<div className="truncate text-base font-semibold tracking-tight text-slate-900">{title}</div>
@@ -492,32 +603,25 @@ export default function SubmissionViewer({
 							e.stopPropagation();
 							onClose?.();
 						}}
-						className="rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+						className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-100"
+						aria-label="Close"
 					>
-						Close
+						<svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+						</svg>
 					</button>
 				</div>
 
 				<div className="min-h-0 flex-1 overflow-y-auto bg-app">
 					<div className="flex min-h-full flex-col p-4">
-						{!isYourWorkView && (
-							<div className="mb-3 flex gap-3">
-								<div className="flex-1 rounded-xl border border-slate-200/80 bg-white px-3 py-2.5 shadow-sm">
-									<div className="text-lg font-bold tabular-nums leading-none text-slate-900">{assignedCount}</div>
-									<div className="mt-0.5 text-[11px] font-medium uppercase tracking-wide text-slate-500">Assigned</div>
-								</div>
-								<div className="flex-1 rounded-xl border border-emerald-200/60 bg-emerald-50/50 px-3 py-2.5 shadow-sm">
-									<div className="text-lg font-bold tabular-nums leading-none text-emerald-800">{turnedInCount}</div>
-									<div className="mt-0.5 text-[11px] font-medium uppercase tracking-wide text-emerald-600/90">Submitted</div>
-								</div>
-							</div>
-						)}
+
 
 						{isYourWorkView && (
 							<YourWorkFileUpload
 								requirementId={requirementId}
 								hasUploaded={workHasUploaded}
 								file={workFile}
+								files={workFiles}
 								thumb={workThumb}
 								isLoadingFile={workLoadingFile}
 								isLoadingThumb={workLoadingThumb}
@@ -525,144 +629,141 @@ export default function SubmissionViewer({
 								unsubmitting={unsubmittingFile}
 								onUpload={onFileUpload}
 								onUnsubmit={onFileUnsubmit}
+								onRename={(reqId, fileId, newDisplayName) => {
+									if (workUserId) {
+										setFilesByUserId((prev) => ({
+											...prev,
+											[workUserId]: (prev[workUserId] || []).map((f) =>
+												((f.id && fileId && f.id === fileId) || f.fileName === fileId)
+													? { ...f, displayName: newDisplayName }
+													: f
+											)
+										}));
+										setFileByUserId((prev) => {
+											const curr = prev[workUserId];
+											if (curr && ((curr.id && fileId && curr.id === fileId) || curr.fileName === fileId)) {
+												return { ...prev, [workUserId]: { ...curr, displayName: newDisplayName } };
+											}
+											return prev;
+										});
+									}
+									onFileRename?.(reqId, fileId, newDisplayName);
+								}}
+								onUpdateComment={(reqId, fileId, newComment) => {
+									if (workUserId) {
+										setFilesByUserId((prev) => ({
+											...prev,
+											[workUserId]: (prev[workUserId] || []).map((f) =>
+												((f.id && fileId && f.id === fileId) || f.fileName === fileId)
+													? { ...f, comment: newComment }
+													: f
+											)
+										}));
+									}
+									onFileUpdateComment?.(reqId, fileId, newComment);
+								}}
 								onViewFile={
 									workHasUploaded && onViewUserFile && workUser
-										? () => onViewUserFile(workUser, requirementId)
+										? (item) => onViewUserFile(workUser, requirementId, item)
 										: undefined
 								}
 								readOnly={isReadOnlyWorkView}
+								isAdmin={canEditPrivateComments}
 								viewerRoleId={viewerRoleId}
 							/>
 						)}
 
 						{!isYourWorkView && (
-						<div className="mt-3 pr-1">
-							<div className="grid grid-cols-1 gap-3">
-								{users.map((u) => {
-									const displayName = `${u?.FirstName || ''}${u?.LastName ? ' ' + u.LastName : ''}`.trim() || u?.Username || 'User';
-									const hasUploaded = u?.HasUploaded === 1 || u?.HasUploaded === true;
-									const userId = u?.UserID ? Number(u.UserID) : null;
-									const canOpen = !!(onViewUserFile && requirementId && hasUploaded && userId);
-									const avatarSrc = u?.ProfilePic
-										? `${API_BASE_URL}/uploads/profile-pics/${u.ProfilePic}`
-										: '/src/assets/images/user.svg';
-									const file = userId ? fileByUserId[userId] : null;
-									const isLoadingFile = userId ? loadingByUserId[userId] : false;
-									const thumb = userId ? thumbByUserId[userId] : null;
-									const isLoadingThumb = userId ? thumbLoadingByUserId[userId] : false;
-									const ext = getExtension(file?.fileName || file?.url);
+							<div className="mt-3 pr-1">
+								<div className="flex flex-col gap-3">
+									{users.map((u) => {
+										const displayName = `${u?.FirstName || ''}${u?.LastName ? ' ' + u.LastName : ''}`.trim() || u?.Username || 'User';
+										const userId = u?.UserID ? Number(u.UserID) : null;
+										const userFiles = userId ? (filesByUserId[userId] || (fileByUserId[userId] ? [fileByUserId[userId]] : [])) : [];
+										const hasUploaded = u?.HasUploaded === 1 || u?.HasUploaded === true || userFiles.length > 0;
+										const avatarSrc = u?.ProfilePic
+											? `${API_BASE_URL}/uploads/profile-pics/${u.ProfilePic}`
+											: '/src/assets/images/user.svg';
 
-									return (
-										<div
-											key={u?.UserID || displayName}
-											className={`w-full min-h-[142px] overflow-hidden rounded-xl border border-slate-300/50 bg-slate-100/90 shadow-sm ${canOpen ? 'cursor-pointer transition hover:border-indigo-300/60 hover:shadow-md' : ''}`}
-											onClick={() => {
-												if (!canOpen) return;
-												onViewUserFile?.(u, requirementId);
-											}}
-											onKeyDown={(e) => {
-												if (!canOpen) return;
-												if (e.key === 'Enter' || e.key === ' ') {
-													e.preventDefault();
-													onViewUserFile?.(u, requirementId);
-												}
-										}}
-											role={canOpen ? 'button' : undefined}
-											tabIndex={canOpen ? 0 : undefined}
-										>
-											<div className="p-3 h-full flex flex-col min-h-0">
-												<div className="flex items-center gap-3">
-													<div className="relative">
-														<img
-															src={avatarSrc}
-															alt={displayName}
-															title={displayName}
-															onError={(e) => {
-															e.target.src = '/src/assets/images/user.svg';
-														}}
-														className={`h-11 w-11 rounded-full object-cover border-2 ring-1 ring-slate-200/50 ${hasUploaded ? 'border-emerald-500' : 'border-slate-200'}`}
-													/>
-													{hasUploaded && (
-														<span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-emerald-500 text-[11px] font-bold text-white">
-															✓
-														</span>
-													)}
-												</div>
-													<div className="min-w-0">
-														<div className="truncate text-[12px] font-semibold text-slate-800">{displayName}</div>
-													</div>
-												</div>
-
-												<div className="mt-3 min-h-0 flex-1">
-													<div className="h-[74px] overflow-hidden rounded-xl border border-slate-200 bg-white">
-														<div className="h-full w-full flex items-stretch">
-															<div className="min-w-0 flex-1 px-3 py-2.5">
-																{(!hasUploaded && !isLoadingFile && !isLoadingThumb) ? (
-																	<>
-																		<div className="truncate text-sm font-medium text-slate-500">No attachment submitted</div>
-																		<div className="mt-0.5 text-[13px] text-slate-400">File</div>
-																	</>
-																) : isLoadingFile ? (
-																	<>
-																		<div className="truncate text-sm font-medium text-slate-500">Loading preview...</div>
-																		<div className="mt-0.5 text-[13px] text-slate-400">File</div>
-																	</>
-																) : isLoadingThumb ? (
-																	<>
-																		<div className="truncate text-sm font-medium text-slate-500">Preparing preview...</div>
-																		<div className="mt-0.5 text-[13px] text-slate-400">File</div>
-																	</>
-																) : (file?.fileName || file?.url) ? (
-																	<>
-																		<div className="truncate text-[17px] font-medium text-blue-700 underline decoration-blue-300/80 underline-offset-2">{String(file?.fileName || file?.url).split('/').pop()}</div>
-																		<div className="mt-0.5 text-[13px] text-slate-500">{getFileTypeLabel(ext)}</div>
-																	</>
-																) : (
-																	<>
-																		<div className="truncate text-sm font-medium text-slate-500">Attachment</div>
-																		<div className="mt-0.5 text-[13px] text-slate-400">File</div>
-																	</>
-																)}
-															</div>
-
-															<div className="w-28 shrink-0 border-l border-slate-200 bg-white">
-																<div className="h-full w-full flex items-center justify-center p-2">
-																	{(!hasUploaded && !isLoadingFile && !isLoadingThumb) ? (
-																		<div className="h-full w-full rounded-lg bg-slate-50 border border-slate-200/70 flex items-center justify-center text-gray-300">
-																			<svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-																				<path d="M7 7h6l4 4v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z" stroke="#CBD5E1" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-																				<path d="M13 7v4h4" stroke="#E2E8F0" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-																			</svg>
-																		</div>
-																	) : isLoadingFile || isLoadingThumb ? (
-																		<div className="h-full w-full rounded-lg bg-slate-50 border border-slate-200/70 flex items-center justify-center text-slate-400 text-sm">...</div>
-																	) : file?.url && isImageExt(ext) ? (
-																		<img src={file.url} alt="thumb" className="h-full w-full object-cover rounded-lg" />
-																	) : thumb ? (
-																		<img src={thumb} alt="thumb" className="h-full w-full object-cover rounded-lg bg-white" />
-																	) : (
-																		<div className="h-full w-full rounded-lg bg-slate-50 border border-slate-200/70 flex items-center justify-center text-xs font-semibold text-slate-500">{(ext || 'FILE').toUpperCase()}</div>
-																	)}
-																</div>
+										return (
+											<div
+												key={u?.UserID || displayName}
+												className="w-full overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xs cursor-pointer transition hover:border-blue-400 hover:shadow-md hover:bg-blue-50/20"
+												onClick={() => {
+													if (onViewUserFilesModal) {
+														onViewUserFilesModal(u, requirementId, userFiles);
+													} else {
+														onViewUserFile?.(u, requirementId);
+													}
+												}}
+												role="button"
+												tabIndex={0}
+											>
+												<div className="flex items-center justify-between">
+													<div className="flex items-center gap-3 min-w-0">
+														<div className="relative shrink-0">
+															<img
+																src={avatarSrc}
+																alt={displayName}
+																onError={(e) => { e.target.src = '/src/assets/images/user.svg'; }}
+																className={`h-11 w-11 rounded-full object-cover border-2 ${hasUploaded ? 'border-emerald-500' : 'border-slate-200'}`}
+															/>
+															{hasUploaded && (
+																<span className="absolute -bottom-0.5 -right-0.5 flex h-[18px] w-[18px] min-w-[18px] min-h-[18px] shrink-0 items-center justify-center rounded-full border-2 border-white bg-emerald-500 text-white shadow-2xs">
+																	<svg className="w-2.5 h-2.5 stroke-white" fill="none" viewBox="0 0 24 24" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+																		<polyline points="20 6 9 17 4 12" />
+																	</svg>
+																</span>
+															)}
+														</div>
+														<div className="min-w-0">
+															<div className="truncate text-xs font-bold text-slate-800">{displayName}</div>
+															<div className="mt-0.5 truncate text-[11px] font-medium text-slate-500">
+																{hasUploaded ? `${userFiles.length} evidence file(s) uploaded` : 'Assigned (Pending upload)'}
 															</div>
 														</div>
 													</div>
-												</div>
 
-												<div className={`mt-2 text-[11px] font-semibold ${hasUploaded ? 'text-emerald-600' : 'text-slate-400'}`}>
-													{hasUploaded ? 'Submitted' : 'Assigned'}
+													<div className="flex items-center gap-2">
+														<span className={`shrink-0 rounded-full px-3 py-1 text-[11px] font-bold ${hasUploaded ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+															{hasUploaded ? 'Submitted' : 'Assigned'}
+														</span>
+													</div>
 												</div>
 											</div>
+										);
+									})}
+
+									{/* Single upload control placed below the user list for auditors to add files */}
+									{currentUser && onFileUpload && users.some((uu) => Number(uu?.UserID) === Number(currentUser?.UserID)) && (
+										<div className="mt-2 px-0">
+											<input
+												id={`user-upload-${requirementId}-${currentUser?.UserID}`}
+												type="file"
+												accept=".pdf,.doc,.docx,.xlsx,.xls,.jpg,.jpeg,.png,.gif,.mp4,.webm,.ogg,.mov,.avi,.mkv"
+												multiple
+												className="hidden"
+												onChange={handleUploadAndRefresh}
+											/>
+											<label
+												htmlFor={`user-upload-${requirementId}-${currentUser?.UserID}`}
+												onClick={(e) => e.stopPropagation()}
+												className="mx-3 w-full cursor-pointer items-center justify-center rounded-xl border border-dashed border-blue-300 bg-blue-50/50 font-semibold text-blue-700 hover:border-blue-400 hover:bg-blue-100/60 transition-all flex px-4 py-2.5 text-xs gap-2"
+											>
+												<svg className="h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+													<path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+												</svg>
+												<span>+ Add More Evidence Files</span>
+											</label>
 										</div>
-									);
-								})}
-								{users.length === 0 && (
-									<div className="rounded-xl border border-dashed border-slate-300/60 bg-slate-100/80 py-8 text-center text-sm text-slate-500">
-										No assigned users.
-									</div>
-								)}
+									)}
+									{users.length === 0 && (
+										<div className="rounded-xl border border-dashed border-slate-300/60 bg-slate-100/80 py-8 text-center text-sm text-slate-500">
+											No assigned users.
+										</div>
+									)}
+								</div>
 							</div>
-						</div>
 						)}
 
 						{isYourWorkView && <div className="flex-1 min-h-2" />}

@@ -1,15 +1,15 @@
 const navBtn = (active) =>
-	`flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition ${
+	`flex w-full items-center gap-2.5 rounded-xl px-3.5 py-3 text-left text-xs font-bold uppercase tracking-wider transition-all duration-150 ${
 		active
-			? 'bg-blue-600 text-white shadow-sm'
-			: 'text-slate-600 hover:bg-blue-50 hover:text-blue-900'
+			? 'bg-blue-50/80 text-blue-700 ring-1 ring-blue-200/50 shadow-sm'
+			: 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
 	}`;
 
 const subNavBtn = (active) =>
-	`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[13px] transition ${
+	`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[11px] font-bold uppercase tracking-wider transition ${
 		active
-			? 'bg-blue-50 text-blue-700 font-semibold shadow-sm ring-1 ring-blue-200/80'
-			: 'text-slate-600 hover:bg-blue-50/60 hover:text-slate-900'
+			? 'bg-blue-50/50 text-blue-600'
+			: 'text-slate-400 hover:bg-slate-50/80 hover:text-slate-800'
 	}`;
 
 export default function EventStructureSidebar({
@@ -22,7 +22,7 @@ export default function EventStructureSidebar({
 	onSelectAddRequirement,
 }) {
 	return (
-		<aside className="flex w-[220px] shrink-0 flex-col border-r border-blue-100 bg-app-surface px-3 py-3">
+		<aside className="flex w-[220px] shrink-0 flex-col border-r border-slate-200/60 bg-white px-3 py-3">
 			<nav className="flex flex-1 flex-col gap-2 p-3">
 				<button type="button" onClick={onSelectAdd} className={navBtn(mainMode === 'add')}>
 					<svg className="h-4 w-4 shrink-0 opacity-90" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -32,7 +32,7 @@ export default function EventStructureSidebar({
 				</button>
 
 				{mainMode === 'add' && (
-					<div className="ml-1 space-y-0.5 border-l-2 border-blue-200/60 pl-2">
+					<div className="ml-1 space-y-0.5 border-l-2 border-slate-200 pl-2">
 						<button type="button" onClick={onSelectAddArea} className={subNavBtn(mode === 'add-area')}>
 							Area
 						</button>
@@ -53,7 +53,7 @@ export default function EventStructureSidebar({
 				</button>
 			</nav>
 
-			<div className="border-t border-blue-100 p-3">
+			<div className="border-t border-slate-100 p-3">
 				<p className="text-[11px] leading-relaxed text-slate-500">
 					{mainMode === 'assign'
 						? 'Pick offices on the left, then requirements on the right.'

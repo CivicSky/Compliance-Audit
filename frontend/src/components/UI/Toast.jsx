@@ -33,7 +33,7 @@ export function ToastProvider({ children }) {
     <ToastContext.Provider value={{ toast }}>
       {children}
       {typeof document !== 'undefined' && createPortal(
-        <div className="fixed top-20 right-4 z-[100] flex flex-col items-end gap-2 pointer-events-none">
+        <div className="fixed top-20 right-4 z-[20011] flex flex-col items-end gap-2 pointer-events-none">
           {toasts.map(t => (
             <ToastItem key={t.id} toast={t} onDismiss={() => dismiss(t.id)} />
           ))}
@@ -65,13 +65,52 @@ function ToastItem({ toast, onDismiss }) {
   const messageText = toast.description || (typeof toast.title === 'string' && toast.title !== 'Notice' ? toast.title : '');
   const displayTitle = toast.description ? (toast.title || 'Notice') : 'Notice';
 
+  const variantStyles = {
+    error: {
+      container: 'border-rose-200 bg-rose-50 text-rose-900 shadow-rose-100/80',
+      title: 'text-rose-950',
+      text: 'text-rose-800',
+      button: 'text-rose-600 hover:text-rose-900 hover:bg-rose-100',
+      Icon: XCircle,
+      iconColor: 'text-rose-600'
+    },
+    success: {
+      container: 'border-emerald-200 bg-emerald-50 text-emerald-900 shadow-emerald-100/80',
+      title: 'text-emerald-950',
+      text: 'text-emerald-800',
+      button: 'text-emerald-600 hover:text-emerald-900 hover:bg-emerald-100',
+      Icon: CheckCircle,
+      iconColor: 'text-emerald-600'
+    },
+    warning: {
+      container: 'border-amber-200 bg-amber-50 text-amber-900 shadow-amber-100/80',
+      title: 'text-amber-950',
+      text: 'text-amber-800',
+      button: 'text-amber-600 hover:text-amber-900 hover:bg-amber-100',
+      Icon: AlertTriangle,
+      iconColor: 'text-amber-600'
+    },
+    info: {
+      container: 'border-blue-200 bg-blue-50 text-blue-900 shadow-blue-100/80',
+      title: 'text-blue-950',
+      text: 'text-blue-800',
+      button: 'text-blue-600 hover:text-blue-900 hover:bg-blue-100',
+      Icon: Info,
+      iconColor: 'text-blue-600'
+    }
+  };
+
+  const currentVariant = variantStyles[toast.variant] || variantStyles.info;
+  const VariantIcon = currentVariant.Icon;
+
   return (
-    <div className={`pointer-events-auto inline-flex items-center gap-2.5 max-w-full rounded-full border border-cyan-200 bg-cyan-50 px-4 py-2 text-sm text-cyan-800 shadow-md shadow-cyan-100/80 transition-all duration-300 ease-out ${isMounted ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'}`}>
-      <span className="font-semibold text-cyan-900 whitespace-nowrap">{displayTitle}:</span>
-      <span className="text-cyan-800">{messageText}</span>
+    <div className={`pointer-events-auto inline-flex items-center gap-2.5 max-w-full rounded-full border px-4 py-2.5 text-sm shadow-md transition-all duration-300 ease-out ${currentVariant.container} ${isMounted ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'}`}>
+      <VariantIcon className={`w-4 h-4 shrink-0 ${currentVariant.iconColor}`} />
+      <span className={`font-semibold whitespace-nowrap ${currentVariant.title}`}>{displayTitle}:</span>
+      <span className={currentVariant.text}>{messageText}</span>
       <button 
         onClick={() => { setIsMounted(false); setTimeout(onDismiss, 300); }} 
-        className="ml-1 text-cyan-600 hover:text-cyan-900 transition-colors p-0.5 rounded-full hover:bg-cyan-100"
+        className={`ml-1 transition-colors p-0.5 rounded-full ${currentVariant.button}`}
         aria-label="Close"
       >
         <X className="w-3.5 h-3.5" />

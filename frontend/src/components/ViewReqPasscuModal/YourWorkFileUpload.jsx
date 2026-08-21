@@ -1,4 +1,7 @@
-import React from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { API_BASE_URL } from '../../utils/apiBase';
+import { useToast } from '../UI/Toast';
+import RenameInline from './RenameInline';
 
 const getExtension = (fileNameOrUrl) => {
     const s = String(fileNameOrUrl || '');
@@ -10,122 +13,372 @@ const getExtension = (fileNameOrUrl) => {
 const getFileTypeLabel = (ext) => {
     if (['doc', 'docx'].includes(ext)) return 'Microsoft Word';
     if (['xls', 'xlsx'].includes(ext)) return 'Microsoft Excel';
-    if (ext === 'pdf') return 'PDF';
-    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) return 'Image';
+    if (ext === 'pdf') return 'PDF Document';
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) return 'Image File';
+    if (['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'].includes(ext)) return 'Video File';
     return ext ? ext.toUpperCase() : 'File';
 };
 
 const isImageExt = (ext) => ['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif'].includes(ext);
+const isVideoExt = (ext) => ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'].includes(ext);
 
 export default function YourWorkFileUpload({
     requirementId,
-    hasUploaded,
-    file,
-    thumb,
+    hasUploaded = false,
+    file = null,
+    files = [],
     isLoadingFile = false,
-    isLoadingThumb = false,
     uploading = false,
     unsubmitting = false,
     onUpload,
     onUnsubmit,
+    onRename,
+    onUpdateComment,
     onViewFile,
     showHeader = true,
     compact = false,
+    readOnly = false,
+    isAdmin = false
 }) {
+    const { toast } = useToast();
     const inputId = `your-work-file-${requirementId}`;
-    const ext = getExtension(file?.fileName || file?.url);
-    const fileName = String(file?.fileName || '').trim() || 'Uploaded file';
-    const workStatus = hasUploaded ? 'Submitted' : 'Assigned';
+    const [editingFileId, setEditingFileId] = useState(null);
+    const [titleInput, setTitleInput] = useState('');
+    const [expandedComments, setExpandedComments] = useState({});
 
-    const handleCardClick = () => {
-        if (hasUploaded && onViewFile) onViewFile();
+    // Normalize files list: support either files array or single file prop
+    const rawFileList = useMemo(() => {
+        return Array.isArray(files) && files.length > 0 
+            ? files 
+            : (file ? [file] : []);
+    }, [files, file]);
+
+    const [localFiles, setLocalFiles] = useState(rawFileList);
+    const [draggedIdx, setDraggedIdx] = useState(null);
+    const [dragOverIdx, setDragOverIdx] = useState(null);
+
+    useEffect(() => {
+        setLocalFiles(rawFileList);
+    }, [rawFileList]);
+
+    const isSubmitted = hasUploaded || localFiles.length > 0;
+    const workStatus = isSubmitted ? 'Submitted' : 'Assigned';
+
+    const handleDragStart = (e, index) => {
+        setDraggedIdx(index);
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', String(index));
+    };
+
+    const handleDragOver = (e, index) => {
+        e.preventDefault();
+        if (draggedIdx === null || draggedIdx === index) return;
+        setDragOverIdx(index);
+    };
+
+    const handleDrop = async (e, targetIdx) => {
+        e.preventDefault();
+        if (draggedIdx === null || draggedIdx === targetIdx) {
+            setDraggedIdx(null);
+            setDragOverIdx(null);
+            return;
+        }
+
+        const updated = [...localFiles];
+        const [movedItem] = updated.splice(draggedIdx, 1);
+        updated.splice(targetIdx, 0, movedItem);
+
+        setLocalFiles(updated);
+        setDraggedIdx(null);
+        setDragOverIdx(null);
+
+        const targetUserId = movedItem.uploaded_by || movedItem.userId;
+        const orderedIds = updated.map(f => f.id).filter(Boolean);
+
+        if (orderedIds.length > 0 && targetUserId && requirementId) {
+            try {
+                await fetch(`${API_BASE_URL}/api/requirements/${requirementId}/user-file/${targetUserId}/reorder`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ orderedIds })
+                });
+                toast?.({
+                    title: 'Order Saved',
+                    description: 'Reordered evidence file sequence',
+                    variant: 'success',
+                    duration: 2000
+                });
+            } catch (err) {
+                console.error('Failed to save file order:', err);
+            }
+        }
+    };
+
+    const handleDragEnd = () => {
+        setDraggedIdx(null);
+        setDragOverIdx(null);
+    };
+
+    const handleStartRename = (e, item) => {
+        e?.stopPropagation();
+        if (readOnly) return;
+        setEditingFileId(item.id || item.fileName);
+        setTitleInput(item.displayName || item.fileName || '');
+    };
+
+    const handleSaveRename = (item) => {
+        if (!editingFileId) return;
+        const trimmed = titleInput.trim();
+        if (trimmed && trimmed !== (item.displayName || item.fileName)) {
+            setLocalFiles(prev => prev.map(f => (
+                ((f.id && item.id && f.id === item.id) || f.fileName === item.fileName)
+                    ? { ...f, displayName: trimmed }
+                    : f
+            )));
+            onRename?.(requirementId, item.id, trimmed);
+            toast?.({
+                title: 'Title Updated',
+                description: `Renamed to "${trimmed}"`,
+                variant: 'success',
+                duration: 2000
+            });
+        }
+        setEditingFileId(null);
+    };
+
+    const handleSaveRenameInline = (item, newTitle) => {
+        const trimmed = String(newTitle || '').trim();
+        if (!trimmed) return;
+        if (trimmed !== (item.displayName || item.fileName)) {
+            setLocalFiles(prev => prev.map(f => (
+                ((f.id && item.id && f.id === item.id) || f.fileName === item.fileName)
+                    ? { ...f, displayName: trimmed }
+                    : f
+            )));
+            onRename?.(requirementId, item.id, trimmed);
+            toast?.({ title: 'Title Updated', description: 'Renamed file', variant: 'success', duration: 2000 });
+        }
+        setEditingFileId(null);
+    };
+
+    const handleSaveComment = (item, newCommentVal) => {
+        const val = newCommentVal.trim();
+        if (val !== (item.comment || '')) {
+            setLocalFiles(prev => prev.map(f => (
+                ((f.id && item.id && f.id === item.id) || f.fileName === item.fileName)
+                    ? { ...f, comment: val }
+                    : f
+            )));
+            onUpdateComment?.(requirementId, item.id, val);
+            toast?.({
+                title: 'Comment Saved',
+                description: 'Updated file feedback comment',
+                variant: 'success',
+                duration: 2000
+            });
+        }
+    };
+
+    const toggleExpandComment = (e, itemId) => {
+        e.stopPropagation();
+        setExpandedComments(prev => ({ ...prev, [itemId]: !prev[itemId] }));
     };
 
     return (
         <div className={compact ? '' : 'mt-3'} onClick={(e) => e.stopPropagation()}>
             {showHeader && (
-                <div className="mb-2 flex items-center justify-between">
-                    <div className="text-sm font-semibold text-gray-800">Evidence</div>
-                    <div className={`text-xs font-medium ${hasUploaded ? 'text-emerald-600' : 'text-gray-500'}`}>
+                <div className="mb-2.5 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-slate-800">Evidence Files</span>
+                        {localFiles.length > 0 && (
+                            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700">
+                                {localFiles.length} uploaded
+                            </span>
+                        )}
+                    </div>
+                    <div className={`text-xs font-semibold ${isSubmitted ? 'text-emerald-600' : 'text-slate-400'}`}>
                         {workStatus}
                     </div>
                 </div>
             )}
 
-            {!hasUploaded ? (
+            {/* Evidence List */}
+            {localFiles.length > 0 && (
+                <div className="space-y-3 mb-3">
+                    {localFiles.map((item, index) => {
+                        const fileUrl = item.url || item.file_path || '';
+                        const ext = getExtension(item.fileName || fileUrl);
+                        const displayTitle = item.displayName || item.fileName || `Document ${index + 1}`;
+                        const isEditingThis = editingFileId === (item.id || item.fileName);
+                        const fileIdKey = item.id || item.fileName || index;
+                        const isExpanded = !!expandedComments[fileIdKey];
+                        const commentText = String(item.comment || '');
+                        const isLongComment = commentText.length > 130 || commentText.split('\n').length > 2;
+
+                        return (
+                            <div
+                                key={fileIdKey}
+                                draggable={!readOnly && !editingFileId && localFiles.length > 1}
+                                onDragStart={(e) => handleDragStart(e, index)}
+                                onDragOver={(e) => handleDragOver(e, index)}
+                                onDrop={(e) => handleDrop(e, index)}
+                                onDragEnd={handleDragEnd}
+                                onClick={() => onViewFile?.(item)}
+                                className={`group/card cursor-pointer flex flex-col gap-2.5 rounded-xl border bg-white p-3.5 shadow-2xs transition-all ${
+                                    draggedIdx === index ? 'opacity-40 scale-[0.98] border-dashed border-blue-400 bg-blue-50/20' : 
+                                    dragOverIdx === index ? 'border-blue-500 ring-2 ring-blue-400/50 shadow-md scale-[1.01]' : 
+                                    'border-slate-200/90 hover:border-blue-400 hover:shadow-md hover:bg-blue-50/20'
+                                } ${compact ? 'text-xs' : ''}`}
+                            >
+                                <div className="flex items-center justify-between gap-3">
+                                    {!readOnly && localFiles.length > 1 && (
+                                        <div 
+                                            className="cursor-grab active:cursor-grabbing text-slate-300 group-hover/card:text-slate-500 flex items-center justify-center pt-3 shrink-0 transition-colors"
+                                            title="Drag up/down to reorder file"
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M8 9h.01M8 15h.01M16 9h.01M16 15h.01" />
+                                            </svg>
+                                        </div>
+                                    )}
+                                    <div className="min-w-0 flex-1 flex items-start gap-3">
+                                        <div className="h-11 w-11 shrink-0 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden shadow-2xs group-hover/card:border-blue-300">
+                                            {isImageExt(ext) && fileUrl ? (
+                                                <img src={fileUrl} alt="" className="h-full w-full object-cover" />
+                                            ) : isVideoExt(ext) ? (
+                                                <div className="h-full w-full bg-slate-900 flex items-center justify-center text-white">
+                                                    <svg className="w-5 h-5 text-indigo-400 fill-current" viewBox="0 0 24 24">
+                                                        <path d="M8 5v14l11-7z"/>
+                                                    </svg>
+                                                </div>
+                                            ) : (
+                                                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                                                    {(ext || '').slice(0, 4) || 'FILE'}
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        <div className="min-w-0 flex-1">
+                                            {/* Title: hide while editing so only the inline form shows */}
+                                            {!isEditingThis && (
+                                                <div className="font-bold text-slate-900 text-xs truncate group-hover/card:text-blue-600 transition-colors" title={displayTitle}>
+                                                    {displayTitle}
+                                                </div>
+                                            )}
+
+                                            <div className="mt-1 flex items-center gap-2 text-[10px] font-medium text-slate-500">
+                                                <span className="rounded bg-slate-100 px-1.5 py-0.5 text-slate-600">{getFileTypeLabel(ext)}</span>
+                                                <span>•</span>
+                                                <span className="truncate max-w-[260px] text-slate-400">{item.fileName || 'file'}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-1">
+                                        {!readOnly && (
+                                            <div onClick={(e) => e.stopPropagation()}>
+                                                <RenameInline
+                                                    item={item}
+                                                    forceEditing={isEditingThis}
+                                                    onRename={(newTitle) => handleSaveRenameInline(item, newTitle)}
+                                                    onCancel={() => setEditingFileId(null)}
+                                                    onStart={() => setEditingFileId(item.id || item.fileName)}
+                                                />
+                                            </div>
+                                        )}
+
+                                        {!readOnly && (
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onUnsubmit?.(requirementId, item.id);
+                                                }}
+                                                disabled={unsubmitting}
+                                                className="h-7 w-7 shrink-0 rounded-md border border-slate-200 bg-white text-slate-400 hover:border-red-200 hover:bg-red-50 hover:text-red-600 flex items-center justify-center transition-colors disabled:opacity-50"
+                                                title="Remove this file"
+                                            >
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                                                    <path d="M18 6 6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                                </svg>
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Dedicated Multi-Line Per-File Comment Section */}
+                                <div 
+                                    className="mt-1.5 pt-2 border-t border-slate-100 flex flex-col gap-1"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    <div className="flex items-center justify-between text-[11px] font-semibold text-slate-700">
+                                        <span>Comment:</span>
+                                        {isLongComment && !isAdmin && (
+                                            <button
+                                                type="button"
+                                                onClick={(e) => toggleExpandComment(e, fileIdKey)}
+                                                className="text-[10px] font-medium text-blue-600 hover:underline"
+                                            >
+                                                {isExpanded ? 'Show less' : 'Show more'}
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {isAdmin ? (
+                                        <textarea
+                                            rows={2}
+                                            defaultValue={commentText}
+                                            onBlur={(e) => handleSaveComment(item, e.target.value)}
+                                            placeholder="Add auditor feedback comment (supports multiple lines)..."
+                                            className="w-full rounded-lg border border-slate-200 bg-slate-50/80 p-2 text-xs font-medium text-slate-800 shadow-2xs focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder:text-slate-400 resize-y min-h-[54px]"
+                                        />
+                                    ) : (
+                                        <div className="w-full rounded-lg border border-slate-100 bg-slate-50/90 p-2.5 text-xs text-slate-700 font-medium break-words whitespace-pre-wrap leading-relaxed">
+                                            {commentText ? (
+                                                <span className={!isExpanded && isLongComment ? 'line-clamp-2' : ''}>
+                                                    {commentText}
+                                                </span>
+                                            ) : (
+                                                <span className="italic text-slate-400 font-normal">No comment from auditor</span>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+
+            {/* Upload Button */}
+            {!readOnly && (
                 <>
                     <input
                         id={inputId}
                         type="file"
-                        accept=".pdf,.doc,.docx,.xlsx,.xls,.jpg,.jpeg,.png"
+                        accept=".pdf,.doc,.docx,.xlsx,.xls,.jpg,.jpeg,.png,.gif,.mp4,.webm,.ogg,.mov,.avi,.mkv"
+                        multiple
                         onChange={(e) => onUpload?.(e, requirementId)}
                         className="hidden"
                         disabled={uploading}
                     />
                     <label
                         htmlFor={inputId}
-                        className={`w-full max-w-[520px] cursor-pointer items-center justify-center rounded-full border border-gray-300 bg-white font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-50 ${compact ? 'inline-flex px-3 py-1.5 text-[11px]' : 'flex px-5 py-2.5 text-sm'}`}
+                        className={`w-full cursor-pointer items-center justify-center rounded-xl border border-dashed border-blue-300 bg-blue-50/50 font-semibold text-blue-700 hover:border-blue-400 hover:bg-blue-100/60 transition-all ${compact ? 'inline-flex px-3 py-1.5 text-[11px]' : 'flex px-4 py-2.5 text-xs gap-2'}`}
                     >
-                        {uploading ? 'Uploading...' : '+ Select file'}
+                        {uploading ? (
+                            <span>Uploading files...</span>
+                        ) : (
+                            <>
+                                <svg className="h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                                </svg>
+                                <span>{localFiles.length > 0 ? '+ Add More Evidence Files' : '+ Select Evidence File(s)'}</span>
+                            </>
+                        )}
                     </label>
                 </>
-            ) : (
-                <div className={`flex items-stretch gap-2 ${compact ? 'flex-col' : ''}`}>
-                    <div
-                        role={onViewFile ? 'button' : undefined}
-                        tabIndex={onViewFile ? 0 : undefined}
-                        onClick={handleCardClick}
-                        onKeyDown={(e) => {
-                            if (!onViewFile) return;
-                            if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
-                                onViewFile();
-                            }
-                        }}
-                        className={`flex min-w-0 flex-1 items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3 ${onViewFile ? 'cursor-pointer hover:border-gray-300 hover:bg-gray-100/80' : ''}`}
-                    >
-                        <div className="min-w-0 flex-1">
-                            <div className={`font-medium text-gray-900 truncate ${compact ? 'text-[11px]' : 'text-sm'}`}>
-                                {isLoadingFile ? 'Loading...' : fileName}
-                            </div>
-                            <div className={`text-gray-500 ${compact ? 'text-[10px]' : 'text-xs'}`}>
-                                {getFileTypeLabel(ext)}
-                            </div>
-                        </div>
-                        <div className={`shrink-0 overflow-hidden rounded-md border border-gray-200 bg-white ${compact ? 'h-10 w-14' : 'h-14 w-[72px]'}`}>
-                            {isLoadingFile || isLoadingThumb ? (
-                                <div className="flex h-full w-full items-center justify-center text-[9px] text-gray-400">...</div>
-                            ) : file?.url && isImageExt(ext) ? (
-                                <img src={file.url} alt="" className="h-full w-full object-cover" />
-                            ) : thumb ? (
-                                <img src={thumb} alt="" className="h-full w-full object-cover bg-white" />
-                            ) : (
-                                <div className="flex h-full w-full flex-col items-center justify-center px-1 text-center">
-                                    <div className="text-[10px] font-semibold text-gray-600">{(ext || 'file').toUpperCase()}</div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                    <button
-                        type="button"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onUnsubmit?.(requirementId);
-                        }}
-                        disabled={unsubmitting}
-                        className={`flex shrink-0 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-700 disabled:opacity-50 ${compact ? 'h-8 w-8 self-center' : 'h-10 w-10 self-center'}`}
-                        aria-label="Remove file"
-                        title="Remove file"
-                    >
-                        {unsubmitting ? (
-                            <span className="text-xs">...</span>
-                        ) : (
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                <path d="M18 6 6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                            </svg>
-                        )}
-                    </button>
-                </div>
             )}
         </div>
     );

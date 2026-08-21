@@ -47,8 +47,32 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json());
-app.use('/uploads', express.static('uploads')); // Serve all uploaded files
-app.use('/uploads/profile-pics', express.static('uploads/profile-pics')); // Explicitly serve profile-pics for user/office head
+app.use(express.urlencoded({ extended: true }));
+const jwt = require('jsonwebtoken');
+app.use('/uploads', (req, res, next) => {
+    if (req.path.startsWith('/profile-pics')) return next();
+
+    const authHeader = req.headers.authorization || (req.query.token ? `Bearer ${req.query.token}` : null);
+    if (authHeader) {
+        try {
+            const token = authHeader.split(" ")[1];
+            const decoded = jwt.verify(token, "MY_SECRET_KEY");
+            const roleId = Number(decoded.roleId);
+            
+            if (roleId === 4) {
+                const isDownloadRequest = req.headers['sec-fetch-dest'] === 'download' || 
+                                         req.query.download === '1' || 
+                                         req.query.attachment === '1' ||
+                                         (req.headers.accept && req.headers.accept.includes('application/octet-stream'));
+                if (isDownloadRequest) {
+                    return res.status(403).json({ success: false, message: "Forbidden: File downloading is restricted for Auditors." });
+                }
+            }
+        } catch (e) {}
+    }
+    next();
+}, express.static('uploads'));
+app.use('/uploads/profile-pics', express.static('uploads/profile-pics'));
 /*const rolesRoutes = require('./routes/roles');
 const requirementsRoutes = require('./routes/requirements');
 const officetypesRoutes = require('./routes/officetypes');

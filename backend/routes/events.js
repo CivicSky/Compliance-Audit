@@ -1,31 +1,31 @@
 const express = require('express');
 const router = express.Router();
 const eventsController = require('../controllers/EventsController');
-const auth = require('../middleware/auth');
-
-// Get all events (rate limited for pagination/touch endpoints)
+const { auth, restrictAuditor, restrictAuditorDownloads } = require('../middleware/auth');
 const rateLimit = require('../middleware/rateLimit');
-router.get('/', rateLimit({ windowMs: 60 * 1000, max: 30 }), eventsController.getAllEvents);
+
+// Get all events
+router.get('/', eventsController.getAllEvents);
+
+// Get accreditation levels
+router.get('/accreditation-levels', eventsController.getAccreditationLevels);
 
 // Add new event
-router.post('/add', auth, eventsController.addEvent);
+router.post('/add', auth, restrictAuditor, eventsController.addEvent);
 
 // Delete multiple events
-router.post('/delete', auth, eventsController.deleteEvents);
+router.post('/delete', auth, restrictAuditor, eventsController.deleteEvents);
 
 // Update event
-router.put('/update/:id', auth, eventsController.updateEvent);
-
-// Update only event status
-// router.put('/update-status/:id', eventsController.updateEventStatus);
+router.put('/update/:id', auth, restrictAuditor, eventsController.updateEvent);
 
 // Get downloadable folders
-router.get('/downloadable-folders', eventsController.getDownloadableFolders);
+router.get('/downloadable-folders', auth, restrictAuditorDownloads, eventsController.getDownloadableFolders);
 
-// Download event folder as zip
-router.get('/download/:eventName', eventsController.downloadEventZip);
+// Download event folder as zip (blocked for Auditors)
+router.get('/download/:eventName', auth, restrictAuditorDownloads, eventsController.downloadEventZip);
 
 // Copy event
-router.post('/copy', auth, eventsController.copyEvent);
+router.post('/copy', auth, restrictAuditor, eventsController.copyEvent);
 
 module.exports = router;

@@ -3,7 +3,7 @@ import AddMasterListModal from './AddMasterListModal';
 import EditMasterListModal from './EditMasterListModal';
 import Pagination from '../Pagination/Pagination';
 import NotificationToast from '../Notification/NotificationToast';
-import { departmentsAPI, masterlistAPI } from '../../utils/api';
+import { departmentsAPI, masterlistAPI, usersAPI } from '../../utils/api';
 import { formatDateTime } from '../../utils/formatDateTime';
 
 const DEFAULT_DEPARTMENTS = [];
@@ -31,6 +31,29 @@ export default function MasterList() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const dotBtnRefs = useRef({});
+
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const stored = localStorage.getItem('user');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        const response = await usersAPI.getLoggedInUser();
+        if (response?.success) setCurrentUser(response.user);
+      } catch (error) {
+        console.error('Error fetching current user:', error);
+      }
+    };
+    fetchCurrentUser();
+  }, []);
+
+  const isAdmin = currentUser?.RoleName === 'admin' || currentUser?.RoleID === 1;
 
   useEffect(() => {
     const updateContentHeight = () => {
@@ -122,17 +145,22 @@ export default function MasterList() {
   const paginatedItems = filteredItems.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   const renderItemIcon = (type) => {
-    if (type === 'Academic Program') {
+    const isAcademic = type === 'Academic Program';
+    if (isAcademic) {
       return (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 7 4 10l8 4 8-4-8-3zM4 10v5c0 1.5 1.25 2.5 3 3s3 0 3 0 1.25 1 3 0 3 0 3-3v-5" />
-        </svg>
+        <div className="h-9 w-9 rounded-full bg-cyan-50 text-cyan-600 flex items-center justify-center shrink-0 border border-cyan-100">
+          <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.436 60.436 0 00-.491 6.347A48.62 48.62 0 0112 20.904a48.62 48.62 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.57 50.57 0 00-2.658-.813A59.905 59.905 0 0112 3.493a59.902 59.902 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0112 13.489a50.702 50.702 0 017.74-3.342M6.75 15a.75.75 0 100-1.5.75.75 0 000 1.5zm0 0v-3.675A57.778 57.778 0 0012 13.5" />
+          </svg>
+        </div>
       );
     }
     return (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21V8l9-5 9 5v13H3zm6-8h6m-6 4h6M9 3v4" />
-      </svg>
+      <div className="h-9 w-9 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
+        <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 16.5h1.5m3 0H15M9 21v-3a1 1 0 011-1h4a1 1 0 011 1v3" />
+        </svg>
+      </div>
     );
   };
 
@@ -198,41 +226,43 @@ export default function MasterList() {
             <h1 className="text-2xl font-bold text-gray-800 mb-1">Master List</h1>
             <p className="text-xs text-gray-600">{deleteMode ? ' ' : 'Manage your reusable academic programs and non-academic offices.'}</p>
           </div>
-          <div className="flex items-center gap-1 pt-0.5">
-            {deleteMode && (
+          {isAdmin && (
+            <div className="flex items-center gap-1 pt-0.5">
+              {deleteMode && (
+                <button
+                  type="button"
+                  className="ml-2 inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-red-400 bg-red-600 text-white hover:bg-red-700"
+                >
+                  Delete Selected (0)
+                </button>
+              )}
               <button
                 type="button"
-                className="ml-2 inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-red-400 bg-red-600 text-white hover:bg-red-700"
+                onClick={() => {
+                  if (deleteMode) {
+                    setDeleteMode(false);
+                    return;
+                  }
+                  setDeleteMode(true);
+                }}
+                className={`inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-red-400 ${
+                  deleteMode
+                    ? 'border-red-300 bg-red-100 text-red-700 hover:bg-red-200'
+                    : 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100'
+                }`}
               >
-                Delete Selected (0)
+                {deleteMode ? 'Cancel Delete' : 'Delete'}
               </button>
-            )}
-            <button
-              type="button"
-              onClick={() => {
-                if (deleteMode) {
-                  setDeleteMode(false);
-                  return;
-                }
-                setDeleteMode(true);
-              }}
-              className={`inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-red-400 ${
-                deleteMode
-                  ? 'border-red-300 bg-red-100 text-red-700 hover:bg-red-200'
-                  : 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100'
-              }`}
-            >
-              {deleteMode ? 'Cancel Delete' : 'Delete'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowAddModal(true)}
-              className="inline-flex h-8 items-center gap-1 rounded-lg bg-emerald-600 px-3 text-[11px] font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
-            >
-              <span className="text-sm leading-none">+</span>
-              Add
-            </button>
-          </div>
+              <button
+                type="button"
+                onClick={() => setShowAddModal(true)}
+                className="inline-flex h-8 items-center gap-1 rounded-lg bg-emerald-600 px-3 text-[11px] font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
+              >
+                <span className="text-sm leading-none">+</span>
+                Add
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="flex w-full items-center justify-between gap-1 mt-2">
@@ -348,9 +378,7 @@ export default function MasterList() {
                         <div className="grid grid-cols-[minmax(140px,1fr)_180px_180px_120px] items-center gap-6 px-5 py-2">
                           <div className="min-w-0">
                             <div className="flex items-center gap-3">
-                              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-cyan-100 text-cyan-700">
-                                {renderItemIcon(item.type)}
-                              </span>
+                              {renderItemIcon(item.type)}
                               <div className="min-w-0">
                                 <div className="text-sm font-semibold text-slate-900 truncate">{item.name}</div>
                               </div>
@@ -391,52 +419,53 @@ export default function MasterList() {
               ) : (
                 paginatedItems.map((item) => (
                   <div key={item.id} className="relative rounded-2xl border border-slate-200 bg-white px-4 py-5 shadow-sm transition hover:shadow-md min-h-[175px] flex flex-col justify-between">
-                    {/* 3-dot button */}
-                    <button
-                      ref={(el) => { dotBtnRefs.current[item.id] = el; }}
-                      type="button"
-                      className="absolute top-3 right-3 inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-100 focus:outline-none"
-                      onClick={(e) => { e.stopPropagation(); setOpenMenuId((prev) => (prev === item.id ? null : item.id)); }}
-                      aria-label="More options"
-                    >
-                      <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24">
-                        <circle cx="12" cy="5" r="1.5" />
-                        <circle cx="12" cy="12" r="1.5" />
-                        <circle cx="12" cy="19" r="1.5" />
-                      </svg>
-                    </button>
+                    {/* 3-dot button & options popup (Admin only) */}
+                    {isAdmin && (
+                      <>
+                        <button
+                          ref={(el) => { dotBtnRefs.current[item.id] = el; }}
+                          type="button"
+                          className="absolute top-3 right-3 inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-100 focus:outline-none"
+                          onClick={(e) => { e.stopPropagation(); setOpenMenuId((prev) => (prev === item.id ? null : item.id)); }}
+                          aria-label="More options"
+                        >
+                          <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24">
+                            <circle cx="12" cy="5" r="1.5" />
+                            <circle cx="12" cy="12" r="1.5" />
+                            <circle cx="12" cy="19" r="1.5" />
+                          </svg>
+                        </button>
 
-                    {/* Options popup */}
-                    {openMenuId === item.id && (
-                      <div
-                        className="absolute right-3 top-11 z-50 w-[180px] overflow-hidden rounded-lg border border-gray-100 bg-white py-1 shadow-lg"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <button
-                          className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-xs text-slate-700 transition hover:bg-blue-50"
-                          onClick={() => { setEditItem(item); setOpenMenuId(null); }}
-                        >
-                          <svg className="h-4 w-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                          <span>Edit</span>
-                        </button>
-                        <button
-                          className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-xs text-red-600 transition hover:bg-red-50"
-                          onClick={() => { setDeleteTarget(item); setOpenMenuId(null); }}
-                        >
-                          <svg className="h-4 w-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
-                          </svg>
-                          <span>Delete</span>
-                        </button>
-                      </div>
+                        {openMenuId === item.id && (
+                          <div
+                            className="absolute right-3 top-11 z-50 w-48 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl animate-in fade-in zoom-in-95 duration-100"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition whitespace-nowrap"
+                              onClick={() => { setEditItem(item); setOpenMenuId(null); }}
+                            >
+                              <svg className="h-4 w-4 text-blue-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                              <span>Edit Item</span>
+                            </button>
+                            <button
+                              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50 transition whitespace-nowrap"
+                              onClick={() => { setDeleteTarget(item); setOpenMenuId(null); }}
+                            >
+                              <svg className="h-4 w-4 text-rose-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
+                              </svg>
+                              <span>Delete Item</span>
+                            </button>
+                          </div>
+                        )}
+                      </>
                     )}
 
                     <div className="flex items-start gap-3 pr-8">
-                      <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-cyan-100 text-cyan-700">
                         {renderItemIcon(item.type)}
-                      </span>
                       <div className="min-w-0">
                         <h3 className="text-sm font-semibold text-slate-800 truncate">{item.name}</h3>
                         <p className="mt-1 text-[11px] text-slate-500 truncate">{item.department ?? 'Institution-wide'}</p>

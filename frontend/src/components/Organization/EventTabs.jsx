@@ -1,30 +1,53 @@
 import React, { useEffect, useState } from 'react';
-import { eventsAPI } from '../../utils/api';
+import { eventsAPI, usersAPI } from '../../utils/api';
+import { API_BASE_URL } from '../../utils/apiBase';
 
 export default function EventTabs({ selectedEventId, onChange }) {
   const [events, setEvents] = useState([]);
-  const [showingAll, setShowingAll] = useState(false);
 
   useEffect(() => {
     let mounted = true;
     const load = async () => {
       try {
+        const userRes = await usersAPI.getLoggedInUser().catch(() => null);
+        const currentUser = userRes?.user || userRes?.data || userRes;
+        const isAuditor = Number(currentUser?.RoleID) === 4 || 
+                          String(currentUser?.RoleName || '').toLowerCase().includes('auditor') || 
+                          Boolean(currentUser?.isExternalAuditor);
+
+        let assignedEventIds = null;
+        if (isAuditor && currentUser?.UserID) {
+          const token = localStorage.getItem('token');
+          const assignRes = await fetch(`${API_BASE_URL}/api/areas/assignments/${currentUser.UserID}`, {
+            headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+          }).then(r => r.json()).catch(() => null);
+          if (assignRes?.success && Array.isArray(assignRes.assignments)) {
+            assignedEventIds = new Set(assignRes.assignments.map(a => Number(a.EventID)));
+          }
+        }
+
         const res = await eventsAPI.getAllEvents();
-        const list = (res && res.data) ? res.data : (Array.isArray(res) ? res : []);
-        // filter active events (show only active; do not fallback to all)
-        const active = list.filter(e => {
-          const status = String(e.Status || e.status || '').toLowerCase();
-          // consider 'compiled' as active for compatibility with backend values
-          return e.IsActive === true || e.active === true || e.Active === true || status === 'active' || status === 'compiled';
+        const list = Array.isArray(res) ? res : (res?.data || res?.events || []);
+        
+        // Filter active events (exclude only explicitly inactive events)
+        let active = list.filter(e => {
+          const status = String(e.Status || e.status || '').toLowerCase().trim();
+          return status !== 'inactive';
         });
+
+        // Auditor Scoping: if user is auditor, only show events they are assigned to!
+        if (isAuditor && assignedEventIds) {
+          active = active.filter(e => assignedEventIds.has(Number(e.EventID || e.id)));
+        }
+
         const toShow = Array.isArray(active) ? active : [];
         if (mounted) setEvents(toShow);
-        if (mounted) setShowingAll(false);
-        // If no selectedEventId provided, pick first available and emit
-        if ((!selectedEventId || selectedEventId === '') && toShow.length > 0 && typeof onChange === 'function') {
+
+        // If current selectedEventId is not in toShow list (or empty), pick first available
+        const currentValid = toShow.some(e => String(e.EventID || e.id) === String(selectedEventId));
+        if (!currentValid && toShow.length > 0 && typeof onChange === 'function') {
           onChange(toShow[0].EventID || toShow[0].id || '');
         }
-        console.debug('EventTabs: fetched events', { all: list, activeCount: active.length });
       } catch (err) {
         console.error('Failed to load events for tabs', err);
         if (mounted) setEvents([]);
@@ -32,7 +55,7 @@ export default function EventTabs({ selectedEventId, onChange }) {
     };
     load();
     return () => { mounted = false; };
-  }, [onChange, selectedEventId]);
+  }, []);
 
   const handleSelect = (ev) => {
     const id = ev.EventID || ev.id || ev.EventCode || ev.EventName || ev.name || '';
@@ -42,7 +65,7 @@ export default function EventTabs({ selectedEventId, onChange }) {
   if (events.length === 0) {
     return (
       <div className="w-full border-b-2 border-slate-300 px-1">
-        <div className="text-xs text-slate-500">No events available</div>
+        <div className="text-xs text-slate-500 py-1 italic">No assigned accreditation events</div>
       </div>
     );
   }

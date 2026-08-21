@@ -1,11 +1,11 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import Sortoffice from "./sortoffice";
 import EventsAddDelete from "../ALLC/eventsadddelete";
 import EventTabs from "./EventTabs";
 import OfficeAddDelete from "./officeadddelete";
 import AddEventModal from "../AddEvent/AddEventModal";
-import { officesAPI, officeHeadsAPI, officetypesAPI, eventsAPI, usersAPI } from "../../utils/api";
+import { officesAPI, officeHeadsAPI, officetypesAPI, eventsAPI, usersAPI, masterlistAPI } from "../../utils/api";
 import OfficesP from "../../components/OfficesP/OfficesP";
 import AddOfficeModal from "../../components/AddOffice/AddOfficeModal";
 import EditOfficeModal from "../../components/EditOffice/EditOfficeModal";
@@ -53,7 +53,15 @@ export default function Organization() {
     const [selectedIds, setSelectedIds] = useState([]);
     const [selectedEventType, setSelectedEventType] = useState(''); // will hold EventID
     const [events, setEvents] = useState([]);
-    const [currentUser, setCurrentUser] = useState(null);
+    const [currentUser, setCurrentUser] = useState(() => {
+        try {
+            const stored = localStorage.getItem('user');
+            return stored ? JSON.parse(stored) : null;
+        } catch {
+            return null;
+        }
+    });
+    const isAdmin = currentUser?.RoleName === 'admin' || currentUser?.RoleID === 1;
     const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
 
     const officesPRef = useRef();
@@ -189,6 +197,7 @@ export default function Organization() {
         if (officesPRef.current?.refresh) {
             officesPRef.current.refresh();
         }
+        fetchAvailableMasterList(selectedEventType);
     };
 
     const handleOfficeClick = (office) => {
@@ -370,6 +379,105 @@ export default function Organization() {
 
     const { showAlert, showConfirm } = useModal();
 
+    // Draggable categories (Master List) sidebar states
+    const [masterListItems, setMasterListItems] = useState([]);
+    const [masterListLoading, setMasterListLoading] = useState(false);
+    const [categorySearchTerm, setCategorySearchTerm] = useState("");
+    const [activeCategoryTab, setActiveCategoryTab] = useState("All");
+    const [isDraggingOver, setIsDraggingOver] = useState(false);
+    const [showAddSidebar, setShowAddSidebar] = useState(false);
+    const [draggedItem, setDraggedItem] = useState(null);
+
+    useEffect(() => {
+        if (!selectedEventType) {
+            setShowAddSidebar(false);
+        }
+    }, [selectedEventType]);
+
+    const fetchAvailableMasterList = useCallback(async (eventId) => {
+        if (!eventId) {
+            setMasterListItems([]);
+            return;
+        }
+        setMasterListLoading(true);
+        try {
+            const res = await masterlistAPI.getAvailableForEvent(eventId);
+            const items = Array.isArray(res) ? res : (res.data || []);
+            setMasterListItems(items);
+        } catch (err) {
+            console.error("Failed to fetch available master list items:", err);
+            setMasterListItems([]);
+        } finally {
+            setMasterListLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchAvailableMasterList(selectedEventType);
+    }, [selectedEventType, fetchAvailableMasterList]);
+
+    const filteredMasterListItems = useMemo(() => {
+        let items = masterListItems;
+
+        if (activeCategoryTab === "Programs") {
+            items = items.filter(item => item.entityTypeId === 1 || item.type === 'Academic Program');
+        } else if (activeCategoryTab === "Offices") {
+            items = items.filter(item => item.entityTypeId !== 1 && item.type !== 'Academic Program');
+        }
+
+        const query = categorySearchTerm.trim().toLowerCase();
+        if (!query) return items;
+
+        return items.filter((item) => {
+            const name = String(item.name || "").toLowerCase();
+            const type = String(item.type || "").toLowerCase();
+            const dept = String(item.department || "").toLowerCase();
+            return name.includes(query) || type.includes(query) || dept.includes(query);
+        });
+    }, [masterListItems, categorySearchTerm, activeCategoryTab]);
+
+    const handleInstantAddCategory = async (item) => {
+        if (!selectedEventType) return;
+        try {
+            const isAcademic = item.entityTypeId === 1 || item.type === 'Academic Program';
+            const matchedType = officeTypes.find(t => {
+                const name = String(t.TypeName || t.name || '').toLowerCase();
+                if (isAcademic) {
+                    return name.includes('academic') && !name.includes('non');
+                } else {
+                    return name.includes('non');
+                }
+            });
+            const typeId = matchedType ? (matchedType.OfficeTypeID || matchedType.id) : (isAcademic ? 2 : 1);
+
+            const payload = {
+                master_list_id: parseInt(item.id),
+                OfficeName: item.name || "",
+                OfficeTypeID: parseInt(typeId),
+                HeadIDs: [],
+                EventID: parseInt(selectedEventType)
+            };
+
+            const res = await officesAPI.createOffice(payload);
+            const success = res?.success === true || res?.data?.success === true || res?.office || res?.OfficeID || res?.id;
+
+            if (success) {
+                await showAlert(`Successfully added "${item.name}" to the audit event!`);
+                if (officesPRef.current?.refresh) {
+                    officesPRef.current.refresh();
+                }
+                fetchAvailableMasterList(selectedEventType);
+            } else {
+                const errorMsg = res?.details || res?.error || res?.message || 'Failed to add category';
+                await showAlert(`Error adding category: ${errorMsg}`);
+            }
+        } catch (err) {
+            console.error("Failed to add category:", err);
+            const errorMsg = err.response?.data?.details || err.response?.data?.error || err.message || "Failed to add category.";
+            await showAlert(`Database error: ${errorMsg}`);
+        }
+    };
+
     // Ensure selection is cleared in OfficesP when deleteMode is turned off
     useEffect(() => {
         if (!deleteMode && officesPRef.current && officesPRef.current.clearSelection) {
@@ -394,55 +502,67 @@ export default function Organization() {
                         <h1 className="text-2xl font-bold text-gray-800 mb-1">Category Management</h1>
                         <p className="text-xs text-gray-600 ">{deleteMode ? '\u00A0' : 'Manage your Categories.'}</p>
                     </div>
-                    <div className="flex items-center gap-1 pt-0.5">
-                        {deleteMode && (
+                    {isAdmin && (
+                        <div className="flex items-center gap-1 pt-0.5">
+                            {deleteMode && (
+                                <button
+                                    onClick={async () => {
+                                        if (selectedCount === 0) return;
+                                        const confirmed = await showConfirm(`Delete ${selectedCount} selected item(s)? This cannot be undone.`);
+                                        if (!confirmed) return;
+                                        try {
+                                            await handleDeleteSelected();
+                                        } catch (err) {
+                                            console.error(err);
+                                        }
+                                    }}
+                                    className={`ml-2 inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-red-400 bg-red-600 text-white hover:bg-red-700 ${selectedCount === 0 ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                    disabled={selectedCount === 0}
+                                >
+                                    Delete Selected ({selectedCount})
+                                </button>
+                            )}
                             <button
-                                onClick={async () => {
-                                    if (selectedCount === 0) return;
-                                    const confirmed = await showConfirm(`Delete ${selectedCount} selected item(s)? This cannot be undone.`);
-                                    if (!confirmed) return;
-                                    try {
-                                        await handleDeleteSelected();
-                                    } catch (err) {
-                                        console.error(err);
+                                type="button"
+                                onClick={() => {
+                                    if (deleteMode) {
+                                        setDeleteMode(false);
+                                        setSelectedCount(0);
+                                        setSelectedIds([]);
+                                        return;
                                     }
-                                }}
-                                className={`ml-2 inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-red-400 bg-red-600 text-white hover:bg-red-700 ${selectedCount === 0 ? 'opacity-60 cursor-not-allowed' : ''}`}
-                                disabled={selectedCount === 0}
-                            >
-                                Delete Selected ({selectedCount})
-                            </button>
-                        )}
-                        <button
-                            type="button"
-                            onClick={() => {
-                                if (deleteMode) {
-                                    setDeleteMode(false);
+                                    setDeleteMode(true);
                                     setSelectedCount(0);
                                     setSelectedIds([]);
-                                    return;
-                                }
-                                setDeleteMode(true);
-                                setSelectedCount(0);
-                                setSelectedIds([]);
-                            }}
-                            className={`inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-red-400 ${
-                                deleteMode
-                                    ? 'border-red-300 bg-red-100 text-red-700 hover:bg-red-200'
-                                    : 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100'
-                            }`}
-                        >
-                            {deleteMode ? 'Cancel Delete' : 'Delete'}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setIsModalOpen(true)}
-                            className="inline-flex h-8 items-center gap-1 rounded-lg bg-emerald-600 px-3 text-[11px] font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                        >
-                            <span className="text-sm leading-none">+</span>
-                            Add
-                        </button>
-                    </div>
+                                }}
+                                className={`inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-red-400 ${
+                                    deleteMode
+                                        ? 'border-red-300 bg-red-100 text-red-700 hover:bg-red-200'
+                                        : 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100'
+                                }`}
+                            >
+                                {deleteMode ? 'Cancel Delete' : 'Delete'}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (!selectedEventType) {
+                                        showAlert("Please select an Event tab first (e.g. RQAT, PACUCOA 2026) to add categories.");
+                                        return;
+                                    }
+                                    setShowAddSidebar(prev => !prev);
+                                }}
+                                className={`inline-flex h-8 items-center gap-1 rounded-lg px-3 text-[11px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-brand-500 ${
+                                    showAddSidebar
+                                        ? 'bg-slate-200 text-slate-700 hover:bg-slate-350'
+                                        : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                                }`}
+                            >
+                                <span className="text-sm leading-none">+</span>
+                                {showAddSidebar ? 'Close Panel' : 'Add'}
+                            </button>
+                        </div>
+                    )}
                 </div>
                 <div className="flex w-full items-center justify-between gap-1 mt-2">
                     <div className="relative w-full max-w-sm">
@@ -542,7 +662,7 @@ export default function Organization() {
             </div>
 
             {/* Event Tabs (replaces dropdown) */}
-            <div className="px-4 mb-4 -mt-1">
+            <div className="px-4 mb-4 mt-1">
                 <EventTabs selectedEventId={selectedEventType} onChange={setSelectedEventType} />
             </div>
 
@@ -560,41 +680,175 @@ export default function Organization() {
                 </div>
             )}
 
-            {/* Scrollable card/container area - fixed height to prevent whole-page scrolling */}
-            <div
-                className="flex-1 min-h-0 px-4 pb-6 overflow-y-auto"
+            {/* Split layout: Left Available Categories (Drag Sources) + Right Scrollable Grid/List */}
+            <div 
+                className="flex-1 min-h-0 px-4 pb-6 flex gap-6"
                 style={{ marginTop: 0, height: contentHeight ? `${contentHeight}px` : undefined }}
             >
-                <div className="relative z-10">
-                    <div className="w-full">
-                    {/* Debug logs to verify data passed to OfficesP */}
-                    {console.log('Selected Event Type:', selectedEventType)}
-                    {console.log('Office Types:', officeTypes)}
-                    {console.log('Heads:', heads)}
-                    {console.log('Sort Status:', sortStatus)}
+                {/* Left Panel: Available Master List Categories (collapsible/persistent sidebar) */}
+                {isAdmin && selectedEventType && showAddSidebar && (
+                    <div className="w-72 bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col p-4 shrink-0 h-full min-h-0">
+                        {/* Header */}
+                        <div className="flex items-center justify-between mb-2 shrink-0">
+                            <h3 className="text-xs font-bold text-slate-800">
+                                Available for {events.find(e => String(e.EventID) === String(selectedEventType))?.EventCode || 'Event'}
+                            </h3>
+                            <button
+                                type="button"
+                                onClick={() => setShowAddSidebar(false)}
+                                className="text-slate-400 hover:text-slate-600 transition"
+                            >
+                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        
+                        {/* Search Category */}
+                        <div className="mb-2 shrink-0">
+                            <input
+                                type="text"
+                                placeholder="Search available..."
+                                value={categorySearchTerm}
+                                onChange={(e) => setCategorySearchTerm(e.target.value)}
+                                className="h-8 w-full rounded-md border border-slate-200 px-3 text-[10px] text-gray-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                                disabled={masterListLoading}
+                            />
+                        </div>
+                        
+                        {/* Category Type Filter Tabs */}
+                        <div className="flex border-b border-slate-200 mb-2 shrink-0">
+                            {["All", "Programs", "Offices"].map((tab) => {
+                                const isSelected = activeCategoryTab === tab;
+                                return (
+                                    <button
+                                        key={tab}
+                                        type="button"
+                                        onClick={() => setActiveCategoryTab(tab)}
+                                        className={`pb-1 px-2.5 text-[10px] font-semibold transition-all border-b-2 -mb-[1px] ${
+                                            isSelected 
+                                                ? 'border-blue-600 text-blue-600' 
+                                                : 'border-transparent text-slate-500 hover:text-slate-800'
+                                        }`}
+                                    >
+                                        {tab}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        
+                        {/* Draggable Category List */}
+                        <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 min-h-0">
+                            {masterListLoading ? (
+                                <div className="flex h-32 items-center justify-center text-center text-xs text-slate-400">
+                                    Loading categories...
+                                </div>
+                            ) : filteredMasterListItems.length === 0 ? (
+                                <div className="flex h-32 items-center justify-center text-center text-xs text-slate-400 p-4 border border-dashed border-slate-100 rounded-lg">
+                                    No available categories found
+                                </div>
+                            ) : (
+                                filteredMasterListItems.map((item) => (
+                                    <div
+                                        key={item.id}
+                                        draggable
+                                        onDragStart={(e) => {
+                                            e.dataTransfer.setData("text/plain", item.id);
+                                            e.dataTransfer.effectAllowed = "move";
+                                            setDraggedItem(item);
+                                        }}
+                                        onDragEnd={() => setDraggedItem(null)}
+                                        onClick={() => handleInstantAddCategory(item)}
+                                        className="flex flex-col gap-0.5 p-2 bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 rounded-lg text-[10px] cursor-grab select-none transition-all duration-150 group relative animate-fadeIn"
+                                        title="Drag to right grid, or click to add instantly"
+                                    >
+                                        <div className="font-semibold text-slate-800 flex items-center justify-between">
+                                            <span className="truncate pr-1">{item.name}</span>
+                                            <span className="opacity-0 group-hover:opacity-100 text-blue-600 text-[9px] font-bold shrink-0 transition-opacity">
+                                                + Add
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 mt-0.5">
+                                            <span className={`px-1 rounded-[3px] text-[8px] font-semibold border ${
+                                                item.entityTypeId === 1 || item.type === 'Academic Program'
+                                                    ? 'bg-blue-50/50 text-blue-700 border-blue-100'
+                                                    : 'bg-emerald-50/50 text-emerald-700 border-emerald-100'
+                                            }`}>
+                                                {item.type === 'Academic Program' ? 'Program' : 'Office'}
+                                            </span>
+                                            {item.department && (
+                                                <span className="text-[9px] text-slate-400 truncate">
+                                                    {item.department}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                )}
 
+                {/* Right Panel: Scrollable Grid / List of assigned categories */}
+                <div
+                    onDragOver={(e) => {
+                        if (isAdmin && selectedEventType) {
+                            e.preventDefault();
+                            setIsDraggingOver(true);
+                        }
+                    }}
+                    onDragLeave={() => setIsDraggingOver(false)}
+                    onDrop={async (e) => {
+                        if (!isAdmin || !selectedEventType) return;
+                        e.preventDefault();
+                        setIsDraggingOver(false);
+                        const categoryId = e.dataTransfer.getData("text/plain");
+                        const item = draggedItem || masterListItems.find(i => String(i.id) === String(categoryId));
+                        if (item) {
+                            await handleInstantAddCategory(item);
+                        }
+                    }}
+                    className={`flex-1 ${viewMode === 'grid' ? 'overflow-hidden' : 'overflow-y-auto'} transition-all duration-300 rounded-xl relative border-2 ${
+                        isDraggingOver 
+                            ? 'border-dashed border-blue-500 bg-blue-50/10 shadow-inner' 
+                            : 'border-transparent'
+                    }`}
+                >
+                    {isDraggingOver && (
+                        <div className="absolute inset-0 z-[20] flex items-center justify-center bg-blue-500/10 pointer-events-none rounded-xl backdrop-blur-[1px]">
+                            <div className="bg-white border-2 border-blue-500 shadow-xl px-6 py-4 rounded-xl flex flex-col items-center gap-2 max-w-sm text-center">
+                                <svg className="h-8 w-8 text-blue-500 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                                </svg>
+                                <p className="text-sm font-bold text-slate-800">Drop here to assign to current event</p>
+                                <p className="text-[10px] text-slate-400">Instantly assigns category with 0 heads (heads can be assigned later)</p>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="relative z-10 w-full">
                         <OfficesP
-                        ref={officesPRef}
-                        searchTerm={searchTerm}
-                        deleteMode={deleteMode}
-                        onSelectionChange={handleSelectionChange}
-                        onOfficeClick={handleOfficeClick}
-                        eventType={selectedEventType}
-                        events={events}
-                        viewMode={viewMode}
-                        sortStatus={sortStatus}
-                        officeTypes={officeTypes}   
-                        heads={heads}
-                        departmentFilter={selectedDepartmentFilter}
-                        programTypeFilter={selectedProgramTypeFilter}
-                        officeTypeFilter={selectedOfficeTypeFilter}
-                        onEditOffice={handleEditOffice}
-                        onAddRequirements={handleAddRequirements}
-                        onDeleteOffice={handleDeleteOffice}
-                        hideHeader={viewMode === 'list'}
+                            ref={officesPRef}
+                            searchTerm={searchTerm}
+                            deleteMode={deleteMode}
+                            onSelectionChange={handleSelectionChange}
+                            onOfficeClick={handleOfficeClick}
+                            eventType={selectedEventType}
+                            events={events}
+                            viewMode={viewMode}
+                            sortStatus={sortStatus}
+                            officeTypes={officeTypes}   
+                            heads={heads}
+                            departmentFilter={selectedDepartmentFilter}
+                            programTypeFilter={selectedProgramTypeFilter}
+                            officeTypeFilter={selectedOfficeTypeFilter}
+                            onEditOffice={handleEditOffice}
+                            onAddRequirements={handleAddRequirements}
+                            onDeleteOffice={handleDeleteOffice}
+                            hideHeader={viewMode === 'list'}
                         />
-                                {/* spacer so last card can be scrolled into view */}
-                                <div className="h-6 md:h-12" aria-hidden="true" />
+                        {/* spacer so last card can be scrolled into view */}
+                        <div className="h-6 md:h-12" aria-hidden="true" />
                     </div>
                 </div>
             </div>

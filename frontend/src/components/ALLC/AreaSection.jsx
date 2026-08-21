@@ -10,6 +10,8 @@ export default function AreaSection({
     onToggleSelect,
     onMenuClick,
     onDeleteClick,
+    isAssigned,
+    isAuditor,
     children
 }) {
     return (
@@ -24,6 +26,8 @@ export default function AreaSection({
                 onToggleSelect={onToggleSelect}
                 onMenuClick={onMenuClick}
                 onDeleteClick={onDeleteClick}
+                isAssigned={isAssigned}
+                isAuditor={isAuditor}
             />
             {isExpanded && children}
         </div>

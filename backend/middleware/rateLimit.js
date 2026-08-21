@@ -8,7 +8,7 @@ function makeKey(ip, route) {
 
 module.exports = function rateLimit(options = {}) {
   const windowMs = options.windowMs || 60 * 1000; // default 1 minute
-  const max = options.max || 30; // default 30 requests per window
+  const max = options.max || 500; // default 500 requests per window for smooth UI operation
 
   return (req, res, next) => {
     try {

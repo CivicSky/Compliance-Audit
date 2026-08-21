@@ -1,6 +1,5 @@
 import React from "react";
 
-
 export default function Pagination({ currentPage, totalPages, onPageChange, fixed = true, showWhenSinglePage = false }) {
     if (totalPages <= 0) return null;
     if (totalPages <= 1 && !showWhenSinglePage) return null;
@@ -27,90 +26,90 @@ export default function Pagination({ currentPage, totalPages, onPageChange, fixe
     }
 
     const containerClass = fixed
-        ? 'fixed bottom-6 left-1/2 lg:left-[calc((100%+var(--sidebar-width))/2)] -translate-x-1/2 z-[40] flex justify-center items-center gap-3 px-6 py-2.5 bg-white/95 backdrop-blur border border-slate-200 shadow-xl rounded-full'
-        : 'w-full flex justify-center gap-3 mt-4 mb-8';
+        ? 'fixed bottom-2 left-1/2 lg:left-[calc((100%+var(--sidebar-width))/2)] -translate-x-1/2 z-[40] flex justify-center items-center gap-1.5 px-2 py-1'
+        : 'w-full flex justify-center items-center gap-1.5 mt-2 mb-4';
 
     return (
         <>
             <div className={containerClass}>
-            <button
-                onClick={() => onPageChange(1)}
-                disabled={currentPage === 1}
-                className="px-2 py-1 bg-blue-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-700"
-                title="First Page"
-            >
-                {'<<'}
-            </button>
-            <button
-                onClick={() => onPageChange(currentPage - 1)}
-                disabled={currentPage === 1}
-                className="px-2 py-1 bg-blue-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-700"
-                title="Previous Page"
-            >
-                {'<'}
-            </button>
-            <div className="flex items-center gap-2">
-                {startPage > 1 && (
-                    <>
+                <button
+                    onClick={() => onPageChange(1)}
+                    disabled={currentPage === 1}
+                    className="h-7 px-2 text-xs font-semibold bg-blue-600 text-white rounded-md disabled:opacity-40 disabled:cursor-not-allowed hover:bg-blue-700 transition"
+                    title="First Page"
+                >
+                    {'<<'}
+                </button>
+                <button
+                    onClick={() => onPageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="h-7 px-2 text-xs font-semibold bg-blue-600 text-white rounded-md disabled:opacity-40 disabled:cursor-not-allowed hover:bg-blue-700 transition"
+                    title="Previous Page"
+                >
+                    {'<'}
+                </button>
+                <div className="flex items-center gap-1.5">
+                    {startPage > 1 && (
+                        <>
+                            <button
+                                onClick={() => onPageChange(1)}
+                                className="rounded-md bg-gray-200/80 text-gray-800 text-xs font-medium hover:bg-gray-300/80 transition"
+                                style={{ width: '28px', height: '28px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontVariantNumeric: 'tabular-nums' }}
+                            >
+                                1
+                            </button>
+                            {startPage > 2 && (
+                                <span className="rounded-md bg-gray-100 text-gray-400 text-xs flex items-center justify-center select-none" style={{ width: '28px', height: '28px', display: 'inline-flex', fontVariantNumeric: 'tabular-nums' }}>...</span>
+                            )}
+                        </>
+                    )}
+                    {pageNumbers.map((page) => (
                         <button
-                            onClick={() => onPageChange(1)}
-                            className="rounded bg-gray-200 text-gray-800 hover:bg-gray-300"
-                            style={{ width: '32px', height: '32px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontVariantNumeric: 'tabular-nums' }}
+                            key={page}
+                            onClick={() => onPageChange(page)}
+                            className={`rounded-md text-xs font-medium transition ${
+                                currentPage === page
+                                    ? 'bg-blue-600 text-white shadow-sm'
+                                    : 'bg-gray-200/80 text-gray-800 hover:bg-gray-300/80'
+                            }`}
+                            style={{ width: '28px', height: '28px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontVariantNumeric: 'tabular-nums' }}
                         >
-                            1
+                            {page}
                         </button>
-                        {startPage > 2 && (
-                            <span className="rounded bg-gray-200 text-gray-400 flex items-center justify-center select-none" style={{ width: '32px', height: '32px', display: 'inline-flex', fontVariantNumeric: 'tabular-nums' }}>...</span>
-                        )}
-                    </>
-                )}
-                {pageNumbers.map((page) => (
-                    <button
-                        key={page}
-                        onClick={() => onPageChange(page)}
-                        className={`rounded ${
-                            currentPage === page
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-                        }`}
-                        style={{ width: '32px', height: '32px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontVariantNumeric: 'tabular-nums' }}
-                    >
-                        {page}
-                    </button>
-                ))}
-                {endPage < totalPages && (
-                    <>
-                        {endPage < totalPages - 1 && (
-                            <span className="rounded bg-gray-200 text-gray-400 flex items-center justify-center select-none" style={{ width: '32px', height: '32px', display: 'inline-flex', fontVariantNumeric: 'tabular-nums' }}>...</span>
-                        )}
-                        <button
-                            onClick={() => onPageChange(totalPages)}
-                            className="rounded bg-gray-200 text-gray-800 hover:bg-gray-300"
-                            style={{ width: '32px', height: '32px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontVariantNumeric: 'tabular-nums' }}
-                        >
-                            {totalPages}
-                        </button>
-                    </>
-                )}
+                    ))}
+                    {endPage < totalPages && (
+                        <>
+                            {endPage < totalPages - 1 && (
+                                <span className="rounded-md bg-gray-100 text-gray-400 text-xs flex items-center justify-center select-none" style={{ width: '28px', height: '28px', display: 'inline-flex', fontVariantNumeric: 'tabular-nums' }}>...</span>
+                            )}
+                            <button
+                                onClick={() => onPageChange(totalPages)}
+                                className="rounded-md bg-gray-200/80 text-gray-800 text-xs font-medium hover:bg-gray-300/80 transition"
+                                style={{ width: '28px', height: '28px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontVariantNumeric: 'tabular-nums' }}
+                            >
+                                {totalPages}
+                            </button>
+                        </>
+                    )}
+                </div>
+                <button
+                    onClick={() => onPageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="h-7 px-2 text-xs font-semibold bg-blue-600 text-white rounded-md disabled:opacity-40 disabled:cursor-not-allowed hover:bg-blue-700 transition"
+                    title="Next Page"
+                >
+                    {'>'}
+                </button>
+                <button
+                    onClick={() => onPageChange(totalPages)}
+                    disabled={currentPage === totalPages}
+                    className="h-7 px-2 text-xs font-semibold bg-blue-600 text-white rounded-md disabled:opacity-40 disabled:cursor-not-allowed hover:bg-blue-700 transition"
+                    title="Last Page"
+                >
+                    {'>>'}
+                </button>
             </div>
-            <button
-                onClick={() => onPageChange(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                className="px-2 py-1 bg-blue-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-700"
-                title="Next Page"
-            >
-                {'>'}
-            </button>
-            <button
-                onClick={() => onPageChange(totalPages)}
-                disabled={currentPage === totalPages}
-                className="px-2 py-1 bg-blue-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-700"
-                title="Last Page"
-            >
-                {'>>'}
-            </button>
-        </div>
-        {fixed && <div className="h-16 w-full pointer-events-none shrink-0" aria-hidden="true" />}
-    </>
-  );
+            {fixed && <div className="h-10 w-full pointer-events-none shrink-0" aria-hidden="true" />}
+        </>
+    );
 }

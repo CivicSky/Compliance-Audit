@@ -131,6 +131,8 @@ const OfficesController = {
           o.EventID,
           m.entity_type_id,
           m.department_id,
+          COALESCE(o.created_at, m.created_at) AS created_at,
+          COALESCE(o.updated_at, m.updated_at, o.created_at, m.created_at) AS updated_at,
           COALESCE(d.name, NULL) AS department_name,
           CASE m.entity_type_id
             WHEN 1 THEN 'Academic Program'
@@ -231,6 +233,8 @@ const OfficesController = {
           office_name: r.OfficeName,
           OfficeName: r.OfficeName,
           master_list_id: r.master_list_id || null,
+          created_at: r.created_at || null,
+          updated_at: r.updated_at || null,
           office_type_id: r.OfficeTypeID,
           office_type_name: r.TypeName || "Unknown Type",
           department_id: r.department_id || null,
@@ -282,6 +286,8 @@ const OfficesController = {
           o.EventID,
           m.entity_type_id,
           m.department_id,
+          COALESCE(o.created_at, m.created_at) AS created_at,
+          COALESCE(o.updated_at, m.updated_at, o.created_at, m.created_at) AS updated_at,
           COALESCE(d.name, NULL) AS department_name,
           CASE m.entity_type_id
             WHEN 1 THEN 'Academic Program'
@@ -371,6 +377,8 @@ const OfficesController = {
         OfficeID: r.OfficeID,
         OfficeName: r.OfficeName,
         master_list_id: r.master_list_id || null,
+        created_at: r.created_at || null,
+        updated_at: r.updated_at || null,
         OfficeTypeID: r.OfficeTypeID,
         TypeName: r.TypeName || "Unknown Type",
         DepartmentID: r.department_id || null,
@@ -1332,6 +1340,41 @@ const OfficesController = {
     }
 
     try {
+      // Check existing status to see if statusId is changing or being set
+      const [existingStatusRows] = await db.query(
+        `SELECT Status FROM compliancestatusoffices WHERE OfficeID = ? AND RequirementID = ?`,
+        [officeId, requirementId]
+      );
+      const currentStatus = existingStatusRows[0]?.Status;
+
+      // If status is being set or changed, ensure evidence exists
+      if (statusId && Number(statusId) !== Number(currentStatus)) {
+        const [userUploads] = await db.query(
+          `SELECT COUNT(*) as cnt FROM requirement_user_assignments 
+           WHERE OfficeID = ? AND RequirementID = ? AND (HasUploaded = 1 OR HasUploaded = true)`,
+          [officeId, requirementId]
+        );
+        const [userFiles] = await db.query(
+          `SELECT COUNT(*) as cnt FROM user_uploaded_files 
+           WHERE office_id = ? AND requirement_id = ?`,
+          [officeId, requirementId]
+        );
+        const [proofDocs] = await db.query(
+          `SELECT COUNT(*) as cnt FROM office_proof_documents 
+           WHERE office_id = ? AND (requirement_id = ? OR requirement_id IS NULL)`,
+          [officeId, requirementId]
+        );
+
+        const hasEvidence = (userUploads[0]?.cnt > 0) || (userFiles[0]?.cnt > 0) || (proofDocs[0]?.cnt > 0);
+
+        if (!hasEvidence) {
+          return res.status(400).json({
+            success: false,
+            message: "Cannot change compliance status: No evidence or proof document has been uploaded for this requirement yet."
+          });
+        }
+      }
+
       // Use INSERT ... ON DUPLICATE KEY UPDATE to handle both insert and update, including comments
       await db.query(
         `INSERT INTO compliancestatusoffices (OfficeID, RequirementID, Status, comments)

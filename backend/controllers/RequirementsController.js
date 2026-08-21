@@ -912,28 +912,44 @@ const getAssignedUsers = async (req, res) => {
 
     let query = `
       SELECT 
-        rua.AssignmentID,
+        MAX(rua.AssignmentID) AS AssignmentID,
         rua.RequirementID,
         rua.OfficeID,
         rua.UserID,
-        rua.AssignedAt,
-        rua.AssignedBy,
-        rua.HasUploaded,
+        MIN(rua.AssignedAt) AS AssignedAt,
+        MAX(rua.AssignedBy) AS AssignedBy,
+        MAX(rua.HasUploaded) AS HasUploaded,
         u.FirstName,
         u.MiddleInitial,
         u.LastName,
         u.Email,
         u.ProfilePic
-      FROM requirement_user_assignments rua
+      FROM (
+        SELECT 
+          AssignmentID, RequirementID, OfficeID, UserID, AssignedAt, AssignedBy, HasUploaded
+        FROM requirement_user_assignments
+        WHERE RequirementID = ?
+        UNION
+        SELECT 
+          NULL AS AssignmentID, 
+          requirement_id AS RequirementID, 
+          office_id AS OfficeID, 
+          uploaded_by AS UserID, 
+          uploaded_at AS AssignedAt, 
+          NULL AS AssignedBy, 
+          1 AS HasUploaded
+        FROM office_proof_documents
+        WHERE requirement_id = ?
+      ) rua
       JOIN users u ON rua.UserID = u.UserID
-      WHERE rua.RequirementID = ?
     `;
-    const params = [requirementId];
+    const params = [requirementId, requirementId];
     if (officeId) {
-      query += ' AND rua.OfficeID = ?';
+      query += ' WHERE rua.OfficeID = ?';
       params.push(officeId);
     }
-    query += ' ORDER BY rua.AssignedAt DESC';
+    query += ' GROUP BY rua.UserID, rua.RequirementID, rua.OfficeID, u.FirstName, u.MiddleInitial, u.LastName, u.Email, u.ProfilePic';
+    query += ' ORDER BY AssignedAt DESC';
 
     const [assignments] = await db.query(query, params);
 

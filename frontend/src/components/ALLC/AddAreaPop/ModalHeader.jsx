@@ -5,24 +5,26 @@ export default function ModalHeader({ event, onClose, mainMode }) {
 			: 'Create and organize areas, criteria, and requirements.';
 
 	return (
-		<header className="flex shrink-0 items-start justify-between gap-4 border-b border-blue-100 bg-app-surface px-5 py-4">
+		<header className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200/60 bg-white px-6 py-5">
 			<div className="min-w-0">
-				<h2 className="text-xl font-semibold tracking-tight text-slate-900">Manage event structure</h2>
-				<p className="mt-1 text-sm text-slate-500">{subtitle}</p>
+				<h2 className="text-lg font-bold tracking-tight text-slate-900 leading-normal">Manage event structure</h2>
+				<p className="mt-0.5 text-xs text-slate-500 leading-normal">{subtitle}</p>
 				{event && (
-					<span className="mt-2 inline-flex items-center rounded-full border border-blue-200/80 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-800">
-						{event.EventCode || event.EventName}
-					</span>
+					<div className="mt-1.5">
+						<span className="inline-flex items-center rounded-[6px] border border-blue-150 bg-blue-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-blue-700 shadow-sm">
+							{event.EventCode || event.EventName}
+						</span>
+					</div>
 				)}
 			</div>
 			<button
 				type="button"
 				onClick={onClose}
-				className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-blue-200/70 bg-blue-50 text-blue-600 transition hover:bg-blue-100"
+				className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 shadow-sm"
 				aria-label="Close"
 			>
-				<svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-					<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+				<svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
+					<path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
 				</svg>
 			</button>
 		</header>

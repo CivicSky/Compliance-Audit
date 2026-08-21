@@ -15,29 +15,32 @@ export default function RequirementsToolbar({
     searchTerm,
     setSearchTerm,
 }) {
-    const activeLabel = FILTER_OPTIONS.find((o) => o.value === statusFilter)?.label || 'All statuses';
+    const activeOption = FILTER_OPTIONS.find((o) => o.value === statusFilter) || FILTER_OPTIONS[0];
 
     return (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-200/90 bg-app-surface px-5 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/70 bg-white px-5 py-3">
             <div>
-                <h3 className="text-sm font-semibold text-slate-800">Requirements</h3>
-                <p className="text-[11px] text-slate-500">Browse areas, criteria, and compliance items</p>
+                <h3 className="text-sm font-bold text-slate-800">Requirements</h3>
+                <p className="text-[11px] text-slate-400">Browse areas, criteria, and compliance items</p>
             </div>
+
             <div className="flex items-center gap-2">
+                {/* Status filter */}
                 <div className="relative status-dropdown">
                     <button
                         type="button"
                         onClick={() => setShowStatusDropdown(!showStatusDropdown)}
-                        className="flex items-center gap-2 rounded-xl border border-slate-300/70 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700 shadow-sm transition hover:border-slate-400 hover:bg-slate-200/50"
+                        className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-white"
                     >
-                        <span>{activeLabel}</span>
+                        <span className={`h-1.5 w-1.5 rounded-full ${activeOption.dot}`} />
+                        <span>{activeOption.label}</span>
                         <svg className="h-3.5 w-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                         </svg>
                     </button>
 
                     {showStatusDropdown && (
-                        <div className="absolute right-0 top-full z-20 mt-1.5 w-44 overflow-hidden rounded-xl border border-slate-300/70 bg-slate-100 py-1 shadow-xl shadow-slate-400/30">
+                        <div className="absolute right-0 top-full z-20 mt-1.5 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl shadow-slate-200/60">
                             {FILTER_OPTIONS.map((option) => (
                                 <button
                                     key={option.value}
@@ -47,7 +50,9 @@ export default function RequirementsToolbar({
                                         setShowStatusDropdown(false);
                                     }}
                                     className={`flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-xs transition hover:bg-slate-50 ${
-                                        statusFilter === option.value ? 'bg-indigo-50/80 font-medium text-indigo-800' : 'text-slate-700'
+                                        statusFilter === option.value
+                                            ? 'bg-indigo-50/80 font-semibold text-indigo-700'
+                                            : 'text-slate-700'
                                     }`}
                                 >
                                     <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${option.dot}`} />
@@ -58,17 +63,18 @@ export default function RequirementsToolbar({
                     )}
                 </div>
 
+                {/* Search */}
                 <div className="relative">
+                    <svg className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
                     <input
                         type="search"
                         placeholder="Search requirements..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-52 rounded-xl border border-slate-300/70 bg-slate-200/40 py-2 pl-9 pr-3 text-xs text-slate-800 placeholder:text-slate-500 transition focus:border-indigo-400 focus:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                        className="w-52 rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-xs text-slate-800 shadow-sm placeholder:text-slate-400 transition focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400/20"
                     />
-                    <svg className="pointer-events-none absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
                 </div>
             </div>
         </div>

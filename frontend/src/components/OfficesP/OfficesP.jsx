@@ -5,6 +5,39 @@ import { useModal } from "../UI/ModalProvider";
 import userIcon from "../../assets/images/user.svg";
 import Pagination from "../Pagination/Pagination";
 import { API_BASE_URL } from '../../utils/apiBase';
+import { formatDateTime } from '../../utils/formatDateTime';
+
+const renderOfficeIcon = (office, deleteMode = false) => {
+    const isAcademic = office.entity_type_id === 1 || String(office.category_name || office.TypeName || office.office_type_name || office.office_type || "").toLowerCase().includes("academic program") || String(office.category_name || office.TypeName || office.office_type_name || office.office_type || "").toLowerCase().includes("program");
+
+    const transformStyle = {
+        transform: deleteMode ? 'translateX(1.75rem)' : 'translateX(0)',
+        transition: 'transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1)'
+    };
+
+    if (isAcademic) {
+        return (
+            <div 
+                style={transformStyle}
+                className="h-9 w-9 rounded-full bg-cyan-50 text-cyan-600 flex items-center justify-center shrink-0 border border-cyan-100"
+            >
+                <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.436 60.436 0 00-.491 6.347A48.62 48.62 0 0112 20.904a48.62 48.62 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.57 50.57 0 00-2.658-.813A59.905 59.905 0 0112 3.493a59.902 59.902 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0112 13.489a50.702 50.702 0 017.74-3.342M6.75 15a.75.75 0 100-1.5.75.75 0 000 1.5zm0 0v-3.675A57.778 57.778 0 0012 13.5" />
+                </svg>
+            </div>
+        );
+    }
+    return (
+        <div 
+            style={transformStyle}
+            className="h-9 w-9 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100"
+        >
+            <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 16.5h1.5m3 0H15M9 21v-3a1 1 0 011-1h4a1 1 0 011 1v3" />
+            </svg>
+        </div>
+    );
+};
 
 const OfficesP = forwardRef(
     ({ searchTerm, deleteMode, onSelectionChange, onOfficeClick, onEditOffice, onAddRequirements, onDeleteOffice, eventType, officeTypes, heads, events = [], viewMode = 'grid', sortStatus, highlightOfficeId = null, hideHeader = false, departmentFilter = '', programTypeFilter = '', officeTypeFilter = '' }, ref) => {
@@ -327,7 +360,7 @@ const OfficesP = forwardRef(
                 {/* Grid View */}
                 {viewMode === 'grid' && (
                     <>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-2">
                         {paginated.map((office) => {
                             const officeId = String(office?.id ?? office?.OfficeID ?? '');
                             const officeHeads = office.heads || [];
@@ -350,7 +383,7 @@ const OfficesP = forwardRef(
                                     key={office.id}
                                     onClick={() => !deleteMode && onOfficeClick(office)}
                                     className={`
-                                        relative min-h-[267px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all duration-200
+                                        relative min-h-[250px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all duration-200
                                         ${deleteMode 
                                             ? 'hover:border-gray-300' 
                                             : 'hover:border-cyan-200 hover:shadow-md cursor-pointer'
@@ -395,11 +428,7 @@ const OfficesP = forwardRef(
                                                             transition: 'transform 220ms cubic-bezier(0.2,0.8,0.2,1)'
                                                         }}
                                                     > 
-                                                        <div className="mt-1 h-7 w-7 flex-shrink-0 rounded-lg bg-cyan-100 text-cyan-700 flex items-center justify-center">
-                                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                                                            </svg>
-                                                        </div>
+                                                        {renderOfficeIcon(office, false)}
                                                         <div className="min-w-0">
                                                             <h3 className={`text-[15px] font-semibold text-slate-900 truncate`}>
                                                                 {office.office_name}
@@ -446,6 +475,18 @@ const OfficesP = forwardRef(
                                             </div>
                                         </div>
 
+                                         {/* Created & Updated Timestamps */}
+                                         <div className="mt-1.5 mb-1.5 flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100 pt-1.5 px-0.5">
+                                             <div className="truncate">
+                                                 <span className="font-semibold uppercase text-slate-400 text-[10px]">Created: </span>
+                                                 <span className="font-medium text-slate-700">{formatDateTime(office.created_at)}</span>
+                                             </div>
+                                             <div className="truncate text-right">
+                                                 <span className="font-semibold uppercase text-slate-400 text-[10px]">Updated: </span>
+                                                 <span className="font-medium text-slate-700">{formatDateTime(office.updated_at || office.created_at)}</span>
+                                             </div>
+                                         </div>
+
                                         {/* Requirement and status */}
                                         <div className="rounded-xl border border-slate-200 bg-white/80 px-2.5 py-1 mb-1">
                                             <div className="flex items-center justify-between">
@@ -453,15 +494,15 @@ const OfficesP = forwardRef(
                                                     {office.total_requirements || 0} requirements
                                                 </span>
                                                 <span className={`
-                                                    inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full border
+                                                    inline-flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-medium rounded-full border
                                                     ${getStatusStyle(office.overall_status)}
                                                 `}>
                                                     <span className={`w-1.5 h-1.5 rounded-full ${getStatusDot(office.overall_status)}`}></span>
                                                     {statusLabel}
                                                 </span>
                                             </div>
-                                            <div className="mt-2">
-                                                <div className="flex items-center justify-between text-[11px] text-slate-500 mb-1">
+                                            <div className="mt-1.5">
+                                                <div className="flex items-center justify-between text-[11px] text-slate-500 mb-0.5">
                                                     <span>Compliance</span>
                                                     <span className="font-semibold text-slate-700">{compliancePercent.toFixed(0)}%</span>
                                                 </div>
@@ -476,7 +517,7 @@ const OfficesP = forwardRef(
 
                                         {/* Personnel Section */}
                                         <div className="mt-auto border-t border-gray-100 pt-1">
-                                            <p className="text-xs font-semibold text-slate-600 mb-2">Personnel</p>
+                                            <p className="text-xs font-semibold text-slate-600 mb-1.5">Personnel</p>
                                             
                                             {officeHeads.length === 0 ? (
                                                 <div className="flex items-center gap-2">
@@ -588,17 +629,7 @@ const OfficesP = forwardRef(
                                                     />
                                                 </div>
 
-                                                <div
-                                                    className={`flex-shrink-0 h-8 w-8 flex items-center justify-center rounded-lg bg-indigo-50 text-indigo-600`}
-                                                    style={{
-                                                        transform: deleteMode ? 'translateX(1.75rem)' : 'translateX(0)',
-                                                        transition: 'transform 220ms cubic-bezier(0.2,0.8,0.2,1)'
-                                                    }}
-                                                > 
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                                                    </svg>
-                                                </div>
+                                                {renderOfficeIcon(office, deleteMode)}
 
                                                 <div className="min-w-0">
                                                     <div className="text-sm font-semibold text-slate-900 truncate">{office.office_name}</div>
@@ -606,6 +637,9 @@ const OfficesP = forwardRef(
                                                     {(office.department_name || office.program_type_name) && (
                                                         <div className="text-xs text-slate-400 truncate">{office.department_name ? office.department_name : ''}{office.department_name && office.program_type_name ? ' • ' : ''}{office.program_type_name ? office.program_type_name : ''}</div>
                                                     )}
+                                                    <div className="text-[10px] text-slate-400 truncate mt-0.5">
+                                                        <span className="font-semibold text-slate-400 uppercase">Created:</span> {formatDateTime(office.created_at)} • <span className="font-semibold text-slate-400 uppercase">Updated:</span> {formatDateTime(office.updated_at || office.created_at)}
+                                                    </div>
                                                 </div>
                                             </div>
 
@@ -695,38 +729,54 @@ const OfficesP = forwardRef(
                     try {
                         const menuOffice = offices.find(o => String(o.id ?? o.OfficeID ?? '') === String(openMenuOfficeId));
                         if (!menuOffice) return null;
-                        const menuWidth = 220;
+                        const menuWidth = 192; // 12rem = 192px (w-48)
                         const viewportRight = window.innerWidth - 8;
                         const left = Math.min((openMenuAnchorRect.right || 0) - menuWidth + window.scrollX, viewportRight - menuWidth);
-                        const top = (openMenuAnchorRect.bottom || 0) + window.scrollY + 8;
+                        const top = (openMenuAnchorRect.bottom || 0) + window.scrollY + 4;
 
                         return createPortal(
                             <div
                                 className="office-card-actions-menu"
                                 style={{ position: 'fixed', top: top, left: Math.max(8, left), width: menuWidth, zIndex: 9999 }}
                             >
-                                <div className="overflow-hidden rounded-lg border border-gray-100 bg-white py-1 shadow-lg">
-                                    <button type="button" onClick={(e) => { e.stopPropagation(); setOpenMenuOfficeId(null); setOpenMenuAnchorRect(null); onEditOffice?.(menuOffice); }} className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-xs text-slate-700 transition hover:bg-indigo-50 whitespace-nowrap">
-                                        <svg className="h-4 w-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <div className="w-48 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl animate-in fade-in zoom-in-95 duration-100">
+                                    <button 
+                                        type="button" 
+                                        onClick={(e) => { e.stopPropagation(); setOpenMenuOfficeId(null); setOpenMenuAnchorRect(null); onEditOffice?.(menuOffice); }} 
+                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition whitespace-nowrap"
+                                    >
+                                        <svg className="h-4 w-4 text-blue-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                         </svg>
                                         <span>Edit Office Info</span>
                                     </button>
-                                    <button type="button" onClick={(e) => { e.stopPropagation(); setOpenMenuOfficeId(null); setOpenMenuAnchorRect(null); onAddRequirements?.(menuOffice); }} className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-xs text-slate-700 transition hover:bg-emerald-50 whitespace-nowrap">
-                                        <svg className="h-4 w-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <button 
+                                        type="button" 
+                                        onClick={(e) => { e.stopPropagation(); setOpenMenuOfficeId(null); setOpenMenuAnchorRect(null); onAddRequirements?.(menuOffice); }} 
+                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 transition whitespace-nowrap"
+                                    >
+                                        <svg className="h-4 w-4 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                                         </svg>
                                         <span>Add Requirements</span>
                                     </button>
-                                    <button type="button" onClick={async (e) => { e.stopPropagation(); setOpenMenuOfficeId(null); setOpenMenuAnchorRect(null); await handleExportOffice(menuOffice); }} className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-xs text-slate-700 transition hover:bg-gray-50 whitespace-nowrap">
-                                        <svg className="h-4 w-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <button 
+                                        type="button" 
+                                        onClick={async (e) => { e.stopPropagation(); setOpenMenuOfficeId(null); setOpenMenuAnchorRect(null); await handleExportOffice(menuOffice); }} 
+                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 transition whitespace-nowrap"
+                                    >
+                                        <svg className="h-4 w-4 text-indigo-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 16V6m0 0l-4 4m4-4 4 4" />
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21H3" />
                                         </svg>
                                         <span>Export Excel</span>
                                     </button>
-                                    <button type="button" onClick={async (e) => { e.stopPropagation(); setOpenMenuOfficeId(null); setOpenMenuAnchorRect(null); await onDeleteOffice?.(menuOffice); }} className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-xs text-red-600 transition hover:bg-red-50 whitespace-nowrap">
-                                        <svg className="h-4 w-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <button 
+                                        type="button" 
+                                        onClick={async (e) => { e.stopPropagation(); setOpenMenuOfficeId(null); setOpenMenuAnchorRect(null); await onDeleteOffice?.(menuOffice); }} 
+                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50 transition whitespace-nowrap"
+                                    >
+                                        <svg className="h-4 w-4 text-rose-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
                                         </svg>
                                         <span>Delete Office</span>

@@ -1,6 +1,8 @@
 import axios from 'axios';
 import { API_BASE_URL } from './apiBase';
 
+export { API_BASE_URL };
+
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -189,6 +191,7 @@ export const usersAPI = {
 // ========================
 export const eventsAPI = {
   getAllEvents: async () => (await api.get('/api/events')).data,
+  getAccreditationLevels: async () => (await api.get('/api/events/accreditation-levels')).data,
   addEvent: async (eventData) => (await api.post('/api/events/add', eventData)).data,
   updateEvent: async (eventId, eventData) => (await api.put(`/api/events/update/${eventId}`, eventData)).data,
   deleteEvents: async (eventIds) => (await api.post('/api/events/delete', { eventIds })).data,

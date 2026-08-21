@@ -1,5 +1,6 @@
 import RowActionMenu from './RowActionMenu';
 import { formatDateTime } from '../../utils/formatDateTime';
+import { ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
 
 export default function AreaItem({
     area,
@@ -8,11 +9,12 @@ export default function AreaItem({
     loading,
     showCheckbox = false,
     isChecked = false,
-    onToggleSelect
-    ,
+    onToggleSelect,
     onMenuClick,
     onDeleteClick,
-    onEditClick
+    onEditClick,
+    isAssigned,
+    isAuditor
 }) {
     const handleEdit = onEditClick || onMenuClick;
     return (
@@ -29,17 +31,28 @@ export default function AreaItem({
                     className="h-4 w-4 accent-white"
                 />
             )}
-            <span className="text-lg">{isExpanded ? '▼' : '▶'}</span>
+            {isExpanded ? (
+                <ChevronDown className="h-5 w-5 shrink-0 text-white transition-transform" />
+            ) : (
+                <ChevronRight className="h-5 w-5 shrink-0 text-white transition-transform" />
+            )}
             <div className="flex-1 min-w-0">
-                <span className="font-medium truncate block">
-                    {`${area.AreaCode || ''}: ${area.AreaName || ''}`}
-                </span>
+                <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium truncate block">
+                        {`${area.AreaCode || ''}: ${area.AreaName || ''}`}
+                    </span>
+                    {isAssigned && (
+                        <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-600/90 px-2 py-0.5 text-[9px] font-bold text-white border border-emerald-500/30 shadow-2xs whitespace-nowrap">
+                            ✓ Assigned to you
+                        </span>
+                    )}
+                </div>
                 <div className="mt-1 flex flex-wrap gap-2 text-[10px] text-blue-100">
                     <span>Created: {formatDateTime(area.CreatedAt)}</span>
                     <span>Updated: {formatDateTime(area.UpdatedAt || area.CreatedAt)}</span>
                 </div>
             </div>
-            {loading && <span className="text-xs opacity-75">⏳</span>}
+            {loading && <Loader2 className="h-4 w-4 animate-spin text-white opacity-75" />}
             <RowActionMenu
                 onEdit={handleEdit ? () => handleEdit(area) : undefined}
                 onDelete={onDeleteClick ? () => onDeleteClick(area) : undefined}

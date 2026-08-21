@@ -1,8 +1,8 @@
-﻿import { useState, useRef } from "react";
+import { useState, useRef } from "react";
 import EventOptionsPopup from "./eventsoptions";
 import { formatDateTime } from "../../utils/formatDateTime";
 
-export default function EventCard({ event, onClick, onEdit, onCopy, onDelete, showCheckbox = false, isChecked = false, onToggleSelect, isAdmin = false }) {
+export default function EventCard({ event, onClick, onEdit, onCopy, onDelete, showCheckbox = false, isChecked = false, onToggleSelect, isAdmin = false, assignedAreas = [] }) {
     const [showOptions, setShowOptions] = useState(false);
     const dotBtnRef = useRef(null);
 
@@ -76,10 +76,15 @@ export default function EventCard({ event, onClick, onEdit, onCopy, onDelete, sh
                     )}
                 </div>
 
-                <div className="mt-3">
+                <div className="mt-3 flex flex-wrap items-center gap-1.5">
                     <span className="inline-flex max-w-full items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 truncate">
                         {event.EventName}
                     </span>
+                    {event.accreditation_level && event.accreditation_level.toUpperCase() !== 'N/A' && (
+                        <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                            {event.accreditation_level}
+                        </span>
+                    )}
                 </div>
 
                 <div className="mt-4 grid grid-cols-2 gap-3 text-[11px] text-slate-500">
@@ -93,6 +98,19 @@ export default function EventCard({ event, onClick, onEdit, onCopy, onDelete, sh
                     </div>
                 </div>
 
+                {assignedAreas && assignedAreas.length > 0 && (
+                    <div className="mt-4 border-t border-slate-200/60 pt-2.5">
+                        <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-400">Your Assigned Areas</span>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                            {assignedAreas.map(a => (
+                                <span key={a.id} className="inline-flex items-center gap-0.5 rounded bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 text-[9px] font-semibold text-emerald-700 shadow-2xs whitespace-nowrap">
+                                    ✓ {a.AreaCode || a.AreaName}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 <div className="mt-auto border-t border-slate-200 pt-2.5">
                     <p className="flex items-center justify-between text-xs font-medium text-slate-600">
                         <span>Open structure</span>
@@ -103,4 +121,3 @@ export default function EventCard({ event, onClick, onEdit, onCopy, onDelete, sh
         </div>
     );
 }
-

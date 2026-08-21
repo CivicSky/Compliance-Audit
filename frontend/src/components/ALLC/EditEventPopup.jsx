@@ -5,6 +5,7 @@ export default function EditEventPopup({ open, event, onCancel, onConfirm }) {
     const [eventCode, setEventCode] = useState("");
     const [description, setDescription] = useState("");
     const [status, setStatus] = useState("active");
+    const [accreditationLevel, setAccreditationLevel] = useState("N/A");
 
     // When event changes or popup opens, update fields
     useEffect(() => {
@@ -13,6 +14,7 @@ export default function EditEventPopup({ open, event, onCancel, onConfirm }) {
             setEventCode(event.EventCode || "");
             setDescription(event.Description || "");
             setStatus(event.status || "active");
+            setAccreditationLevel(event.accreditation_level || "N/A");
         }
     }, [event, open]);
 
@@ -47,6 +49,25 @@ export default function EditEventPopup({ open, event, onCancel, onConfirm }) {
                             value={eventCode}
                             onChange={e => setEventCode(e.target.value)}
                         />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-semibold text-gray-800 mb-1">Accreditation Level</label>
+                        <div className="relative">
+                            <select
+                                className="h-10 w-full appearance-none rounded-md border border-slate-200 bg-white px-3 pr-9 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                                value={accreditationLevel}
+                                onChange={e => setAccreditationLevel(e.target.value)}
+                            >
+                                <option value="Level I">Level I</option>
+                                <option value="Level II">Level II</option>
+                                <option value="Level III">Level III</option>
+                                <option value="Level IV">Level IV</option>
+                                <option value="N/A">N/A</option>
+                            </select>
+                            <svg xmlns="http://www.w3.org/2000/svg" className="pointer-events-none absolute right-3 top-1/2 h-2.5 w-2.5 -translate-y-1/2 text-slate-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
+                            </svg>
+                        </div>
                     </div>
                     <div>
                         <label className="block text-sm font-semibold text-gray-800 mb-1">Description</label>
@@ -84,8 +105,8 @@ export default function EditEventPopup({ open, event, onCancel, onConfirm }) {
                     <button
                         className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-green-700"
                         onClick={() => {
-                            console.log('EditEventPopup onConfirm:', { EventName: eventName, EventCode: eventCode, Description: description, status });
-                            onConfirm({ EventName: eventName, EventCode: eventCode, Description: description, status });
+                            console.log('EditEventPopup onConfirm:', { EventName: eventName, EventCode: eventCode, Description: description, status, accreditation_level: accreditationLevel });
+                            onConfirm({ EventName: eventName, EventCode: eventCode, Description: description, status, accreditation_level: accreditationLevel });
                         }}
                     >
                         Save

@@ -153,7 +153,7 @@ const sanitizeFolderName = (name) => {
 // Add new event
 const addEvent = async (req, res) => {
   try {
-    const { EventName, EventCode, Description } = req.body;
+    const { EventName, EventCode, Description, accreditation_level } = req.body;
 
     // Validate required fields
     if (!EventName || !EventCode) {
@@ -165,8 +165,8 @@ const addEvent = async (req, res) => {
 
     // Insert new event
     const [result] = await db.query(
-      'INSERT INTO Events (EventName, EventCode, Description, CreatedAt, UpdatedAt) VALUES (?, ?, ?, NOW(), NOW())',
-      [EventName, EventCode, Description || null]
+      'INSERT INTO Events (EventName, EventCode, Description, CreatedAt, UpdatedAt, accreditation_level) VALUES (?, ?, ?, NOW(), NOW(), ?)',
+      [EventName, EventCode, Description || null, accreditation_level || 'N/A']
     );
 
     // Create folder for the event inside uploads/events using EventCode (preferred for shorter, stable folder names)
@@ -193,6 +193,7 @@ const addEvent = async (req, res) => {
         EventName,
         EventCode,
         Description,
+        accreditation_level: accreditation_level || 'N/A',
         FolderPath: sanitizedName
       }
     });
@@ -300,10 +301,10 @@ const deleteEvents = async (req, res) => {
 const updateEvent = async (req, res) => {
   try {
     const { id } = req.params;
-    const { EventName, EventCode, Description, status } = req.body;
+    const { EventName, EventCode, Description, status, accreditation_level } = req.body;
 
     // Debug logging
-    console.log('updateEvent called with:', { id, EventName, EventCode, Description });
+    console.log('updateEvent called with:', { id, EventName, EventCode, Description, accreditation_level });
 
     // Validate required fields
     if (!EventName || !EventCode) {
@@ -326,10 +327,10 @@ const updateEvent = async (req, res) => {
       console.warn('Could not fetch existing event name/code for folder rename check:', err.message || err);
     }
 
-    // Update event, including status (do not touch CreatedAt)
+    // Update event, including status and accreditation_level (do not touch CreatedAt)
     const [result] = await db.query(
-      'UPDATE Events SET EventName = ?, EventCode = ?, Description = ?, status = ?, UpdatedAt = NOW() WHERE EventID = ?',
-      [EventName, EventCode, Description || null, status, id]
+      'UPDATE Events SET EventName = ?, EventCode = ?, Description = ?, status = ?, accreditation_level = ?, UpdatedAt = NOW() WHERE EventID = ?',
+      [EventName, EventCode, Description || null, status || 'active', accreditation_level || 'N/A', id]
     );
 
     if (result.affectedRows === 0) {
@@ -523,6 +524,29 @@ const downloadEventZip = async (req, res) => {
   }
 };
 
+// Get accreditation levels
+const getAccreditationLevels = async (req, res) => {
+  try {
+    const [rows] = await db.query('SELECT * FROM accreditation_levels ORDER BY id ASC');
+    res.json({
+      success: true,
+      data: rows
+    });
+  } catch (error) {
+    console.error('Error fetching accreditation levels:', error);
+    res.json({
+      success: true,
+      data: [
+        { id: 1, level_name: 'Level I' },
+        { id: 2, level_name: 'Level II' },
+        { id: 3, level_name: 'Level III' },
+        { id: 4, level_name: 'Level IV' },
+        { id: 5, level_name: 'N/A' }
+      ]
+    });
+  }
+};
+
 module.exports = {
   getAllEvents,
   addEvent,
@@ -530,5 +554,6 @@ module.exports = {
   updateEvent,
   getDownloadableFolders,
   downloadEventZip,
-  copyEvent
+  copyEvent,
+  getAccreditationLevels
 };

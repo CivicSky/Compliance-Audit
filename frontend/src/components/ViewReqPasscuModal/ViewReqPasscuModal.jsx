@@ -6,6 +6,7 @@ import { usersAPI, requirementsAPI, officesAPI } from '../../utils/api';
 import { API_BASE_URL } from '../../utils/apiBase';
 
 import { useModal } from "../UI/ModalProvider";
+import { useToast } from '../UI/Toast';
 import ModalHeader from './ModalHeader';
 import OfficeInfoBar from './OfficeInfoBar';
 import RequirementsToolbar from './RequirementsToolbar';
@@ -16,6 +17,7 @@ import UserFileViewerModal from './UserFileViewerModal';
 import AvatarPopupMenu from './AvatarPopupMenu';
 import SendNotificationModal from './SendNotificationModal';
 import SubmissionViewer from './SubmissionViewer';
+import UserFilesGridModal from './UserFilesGridModal';
 
 export default function ViewReqPASSCUModal({
     isOpen,
@@ -27,6 +29,7 @@ export default function ViewReqPASSCUModal({
     onAddRequirements,
     onDeleteOffice,
 }) {
+    const { toast } = useToast();
     const [showMenu, setShowMenu] = useState(false);
     const [requirements, setRequirements] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -72,6 +75,43 @@ export default function ViewReqPASSCUModal({
     const [unsubmittingProof, setUnsubmittingProof] = useState(false);
     const [removingReqId, setRemovingReqId] = useState(null);
     const [expandedReqs, setExpandedReqs] = useState([]);
+    const [gridModalData, setGridModalData] = useState(null);
+
+    const handleOpenUserFilesGridModal = async (user, requirementId, initialFiles) => {
+        const req = requirements.find((r) => Number(r.RequirementID) === Number(requirementId)) || selectedSubmissionRequirement;
+        if (Array.isArray(initialFiles) && initialFiles.length > 0) {
+            setGridModalData({ user, requirement: req, files: initialFiles });
+            return;
+        }
+        try {
+            const res = await axios.get(`${API_BASE_URL}/api/requirements/${requirementId}/user-file/${user.UserID}`);
+            if (res.data && res.data.success && res.data.files) {
+                setGridModalData({ user, requirement: req, files: res.data.files });
+            } else if (res.data && res.data.success && res.data.file) {
+                setGridModalData({ user, requirement: req, files: [res.data.file] });
+            } else {
+                await showAlert('No files found for this user.');
+            }
+        } catch (err) {
+            console.error('Error fetching user files:', err);
+            await showAlert('Error fetching user files.');
+        }
+    };
+
+    // If the currently logged-in user is an auditor and is present in the provided users list,
+    // open the files grid modal for them automatically after opening the submission viewer.
+    const openOwnGridIfAuditor = (usersList, requirementId) => {
+        try {
+            if (!currentUser || !isAuditor || !Array.isArray(usersList)) return;
+            const found = usersList.find((u) => Number(u?.UserID) === Number(currentUser?.UserID));
+            if (found) {
+                // open grid modal for current user
+                handleOpenUserFilesGridModal(found, requirementId);
+            }
+        } catch (e) {
+            // silent
+        }
+    };
     const [submissionViewerUsers, setSubmissionViewerUsers] = useState(null);
     const deepLinkAppliedRef = useRef(false);
 
@@ -88,6 +128,9 @@ export default function ViewReqPASSCUModal({
     const isAdmin = currentRoleId === 1;
     const isOfficeHead = currentRoleId === 3;
     const isStandardUser = currentRoleId === 2;
+    const isAuditor = currentRoleId === 4 || 
+                      String(currentUser?.RoleName || '').toLowerCase().includes('auditor') || 
+                      currentUser?.isExternalAuditor;
 
     useEffect(() => {
         const fetchCurrentUser = async () => {
@@ -233,17 +276,20 @@ export default function ViewReqPASSCUModal({
     };
 
     // Unsubmit (delete) user-uploaded file for a requirement
-    const handleUnsubmitUserFile = async (requirementId) => {
+    const handleUnsubmitUserFile = async (requirementId, fileId = null) => {
         if (!currentUser || !currentUser.UserID) {
             await showAlert('No user information available. Please reload and try again.');
             return;
         }
-        const ok = await showConfirm('Are you sure you want to unsubmit (delete) your uploaded file? This cannot be undone.');
+        const ok = await showConfirm('Are you sure you want to delete this evidence file?');
         if (!ok) return;
         setUnsubmittingReqId(requirementId);
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch(`${API_BASE_URL}/api/requirements/${requirementId}/file/${currentUser.UserID}`, {
+            const url = fileId 
+                ? `${API_BASE_URL}/api/requirements/${requirementId}/file/${currentUser.UserID}?fileId=${fileId}`
+                : `${API_BASE_URL}/api/requirements/${requirementId}/file/${currentUser.UserID}`;
+            const res = await fetch(url, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -253,9 +299,15 @@ export default function ViewReqPASSCUModal({
             let data = {};
             try { data = await res.json(); } catch (e) { /* ignore JSON parse errors */ }
             if (res.ok && data.success) {
-                await showAlert('File deleted. You can now re-upload.');
+                // refresh assigned users map
+                const assignedRes = await requirementsAPI.getAssignedUsers(requirementId);
+                if (assignedRes?.success) {
+                    setAssignedUsersMap(prev => ({
+                        ...prev,
+                        [requirementId]: assignedRes.users
+                    }));
+                }
             } else if (res.status === 404) {
-                // No file found — still refresh UI so upload button becomes available
                 console.warn('Unsubmit: file not found on server');
             } else {
                 console.warn('Unsubmit: server returned error', res.status, data);
@@ -271,6 +323,16 @@ export default function ViewReqPASSCUModal({
     };
 
     const handleStatusChange = async (reqId, newStatusId) => {
+        const reqUsers = assignedUsersMap[reqId] || [];
+        const hasUserUploaded = reqUsers.some(u => u?.HasUploaded === 1 || u?.HasUploaded === true);
+        const currentReq = (requirements || []).find(r => r.RequirementID === reqId);
+        const hasProofDoc = currentReq && Boolean(currentReq.DocumentProof || currentReq.ProofDocument || currentReq.hasProof || currentReq.has_proof || currentReq.file_url);
+
+        if (!hasUserUploaded && !hasProofDoc) {
+            await showAlert('Cannot change compliance status: Evidence or proof document must be uploaded for this requirement first.');
+            return;
+        }
+
         try {
             await axios.put(`${API_BASE_URL}/api/offices/${office.id}/requirements/${reqId}/status`, {
                 statusId: newStatusId
@@ -319,6 +381,12 @@ export default function ViewReqPASSCUModal({
             });
             await fetchOfficeRequirements();
             setEditingCommentId(null);
+            toast?.({
+                title: 'Comment Saved',
+                description: 'Your comment has been saved successfully.',
+                variant: 'success',
+                duration: 2500
+            });
         } catch (error) {
             await showAlert('Failed to save comment');
         } finally {
@@ -343,6 +411,12 @@ export default function ViewReqPASSCUModal({
             setSelectedSubmissionRequirement((prev) => (
                 prev && prev.RequirementID === req.RequirementID ? { ...prev, comments: '' } : prev
             ));
+            toast?.({
+                title: 'Comment Cleared',
+                description: 'The comment has been removed.',
+                variant: 'info',
+                duration: 2500
+            });
         } catch (error) {
             await showAlert('Failed to clear comment');
         } finally {
@@ -356,50 +430,98 @@ export default function ViewReqPASSCUModal({
     };
 
     const handleUserReqFileUpload = async (e, requirementId) => {
-        const file = e.target.files?.[0];
-        if (!file || !currentUser) return;
+        const fileList = Array.from(e.target.files || []);
+        if (fileList.length === 0 || !currentUser) return;
         
         setUserUploadingReqId(requirementId);
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('userId', currentUser.UserID);
-        formData.append('requirementId', requirementId);
-        
         const token = localStorage.getItem('token');
+        let successCount = 0;
         
-        try {
-            const res = await fetch(`${API_BASE_URL}/api/requirements/user-upload`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                },
-                body: formData
-            });
-            const data = await res.json();
+        for (const file of fileList) {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('userId', currentUser.UserID);
+            formData.append('requirementId', requirementId);
+            formData.append('displayName', file.name);
+            if (office?.id) {
+                formData.append('officeId', office.id);
+            }
             
-            if (data.success) {
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/requirements/user-upload`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.success) {
+                    successCount++;
+                }
+            } catch (err) {
+                console.error('Upload error for file:', file.name, err);
+            }
+        }
+        
+        if (successCount > 0) {
+            try {
                 await requirementsAPI.markUserAsUploaded(requirementId, currentUser.UserID);
                 const assignedRes = await requirementsAPI.getAssignedUsers(requirementId);
-                if (assignedRes.success) {
+                if (assignedRes?.success) {
                     setAssignedUsersMap(prev => ({
                         ...prev,
                         [requirementId]: assignedRes.users
                     }));
                 }
                 await fetchOfficeRequirements();
-                await showAlert('File uploaded successfully!');
-            } else {
-                await showAlert(data.message || 'Failed to upload file');
+            } catch (rErr) {
+                console.warn('Post-upload refresh warning:', rErr);
             }
+        } else {
+            await showAlert('Failed to upload file(s)');
+        }
+        
+        setUserUploadingReqId(null);
+        if (e?.target) e.target.value = '';
+        if (userReqFileInputRef.current) {
+            userReqFileInputRef.current.value = '';
+        }
+    };
+
+    const handleRenameUserFile = async (requirementId, fileId, newDisplayName) => {
+        if (!fileId || !newDisplayName) return;
+        try {
+            const token = localStorage.getItem('token');
+            await fetch(`${API_BASE_URL}/api/requirements/${requirementId}/file/${fileId}/rename`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { Authorization: `Bearer ${token}` } : {})
+                },
+                body: JSON.stringify({ displayName: newDisplayName })
+            });
+            await fetchOfficeRequirements();
         } catch (err) {
-            console.error('Upload error:', err);
-            await showAlert('Failed to upload file');
-        } finally {
-            setUserUploadingReqId(null);
-            if (e?.target) e.target.value = '';
-            if (userReqFileInputRef.current) {
-                userReqFileInputRef.current.value = '';
-            }
+            console.error('Failed to rename file title:', err);
+        }
+    };
+
+    const handleUpdateUserFileComment = async (requirementId, fileId, newComment) => {
+        if (!fileId) return;
+        try {
+            const token = localStorage.getItem('token');
+            await fetch(`${API_BASE_URL}/api/requirements/${requirementId}/file/${fileId}/comment`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { Authorization: `Bearer ${token}` } : {})
+                },
+                body: JSON.stringify({ comment: newComment })
+            });
+            await fetchOfficeRequirements();
+        } catch (err) {
+            console.error('Failed to update file comment:', err);
         }
     };
 
@@ -562,7 +684,7 @@ export default function ViewReqPASSCUModal({
     };
 
     const handleUserAvatarClick = (e, user, requirementId) => {
-        if (!isAdmin) return;
+        if (!isAdmin && !isOfficeHead && !isAuditor) return;
         // Toggle popup: if already open for same user, close it
         if (avatarPopup && avatarPopup.user.UserID === user.UserID && avatarPopup.requirementId === requirementId) {
             setAvatarPopup(null);
@@ -572,8 +694,16 @@ export default function ViewReqPASSCUModal({
         }
     };
 
-    const handleViewUserFile = async (user, requirementId) => {
+    const handleViewUserFile = async (user, requirementId, specificFile) => {
         setAvatarPopup(null);
+        if (specificFile && (specificFile.url || specificFile.fileName)) {
+            setExcelHtml(null);
+            setExcelPreviewError(null);
+            setExcelHtmlLoading(false);
+            setSelectedUserFile(specificFile);
+            setShowUserFileViewer(true);
+            return;
+        }
         try {
             const res = await axios.get(`${API_BASE_URL}/api/requirements/${requirementId}/user-file/${user.UserID}`);
             if (res.data && res.data.success && res.data.file) {
@@ -849,13 +979,15 @@ export default function ViewReqPASSCUModal({
                     handleViewUserFile={handleViewUserFile}
                     handleDownloadUserFile={handleDownloadUserFile}
                     handleUnsubmitUserFile={handleUnsubmitUserFile}
+                    handleRenameUserFile={handleRenameUserFile}
                     unsubmittingReqId={unsubmittingReqId}
                     removingReqId={removingReqId}
                     handleRemoveRequirement={handleRemoveRequirement}
                     handleUserAvatarClick={handleUserAvatarClick}
                     onViewSubmission={(req) => {
                         setSelectedSubmissionRequirement(req);
-                        setSubmissionViewerUsers(assignedUsersMap?.[req.RequirementID] || []);
+                        const usersForReq = assignedUsersMap?.[req.RequirementID] || [];
+                        setSubmissionViewerUsers(usersForReq);
                         setShowSubmissionViewer(true);
                     }}
                     onViewMySubmission={(req) => {
@@ -866,7 +998,8 @@ export default function ViewReqPASSCUModal({
                         const hasUploaded = hasUserUploadedForRequirement(reqId);
                         const userEntry = userFromMap ? { ...userFromMap, HasUploaded: hasUploaded } : { ...currentUser, HasUploaded: hasUploaded };
                         setSelectedSubmissionRequirement(req);
-                        setSubmissionViewerUsers([userEntry]);
+                        const usersForReq = [userEntry];
+                        setSubmissionViewerUsers(usersForReq);
                         setShowSubmissionViewer(true);
                     }}
                 />
@@ -942,6 +1075,8 @@ export default function ViewReqPASSCUModal({
             {/* Avatar Popup Menu - rendered as fixed overlay via portal */}
             <AvatarPopupMenu
                 isAdmin={isAdmin}
+                isOfficeHead={isOfficeHead}
+                isAuditor={isAuditor}
                 avatarPopup={avatarPopup}
                 onClose={() => setAvatarPopup(null)}
                 onViewUserFile={handleViewUserFile}
@@ -982,19 +1117,34 @@ export default function ViewReqPASSCUModal({
                                 : { ...currentUser, HasUploaded: hasUploaded };
                             return [entry];
                         })()
-                        : (submissionViewerUsers || (selectedSubmissionRequirement ? (assignedUsersMap?.[selectedSubmissionRequirement.RequirementID] || []) : []))
+                        : (() => {
+                            const baseUsers = submissionViewerUsers || (selectedSubmissionRequirement ? (assignedUsersMap?.[selectedSubmissionRequirement.RequirementID] || []) : []);
+                            if (isAuditor && currentUser && selectedSubmissionRequirement) {
+                                const hasAuditor = baseUsers.some(u => u.UserID === currentUser.UserID);
+                                if (!hasAuditor) {
+                                    const reqId = selectedSubmissionRequirement.RequirementID;
+                                    const hasUploaded = hasUserUploadedForRequirement(reqId);
+                                    const auditorEntry = { ...currentUser, HasUploaded: hasUploaded };
+                                    return [auditorEntry, ...baseUsers];
+                                }
+                            }
+                            return baseUsers;
+                        })()
                 }
                 officeId={office?.id}
                 currentUser={currentUser}
                 showPrivateComments={!!(isAdmin || isOfficeHead)}
                 canEditPrivateComments={!!isAdmin}
-                allowWorkActions={!!isAdmin}
+                allowWorkActions={true}
                 viewerRoleId={currentRoleId}
                 onFileUpload={handleUserReqFileUpload}
                 onFileUnsubmit={handleUnsubmitUserFile}
+                onFileRename={handleRenameUserFile}
+                onFileUpdateComment={handleUpdateUserFileComment}
                 uploadingFile={userUploadingReqId === selectedSubmissionRequirement?.RequirementID}
                 unsubmittingFile={unsubmittingReqId === selectedSubmissionRequirement?.RequirementID}
                 onViewUserFile={handleViewUserFile}
+                onViewUserFilesModal={handleOpenUserFilesGridModal}
                 onCommentSaved={async (newComment) => {
                     setSelectedSubmissionRequirement((prev) => (prev ? { ...prev, comments: newComment } : prev));
                     try {
@@ -1008,6 +1158,62 @@ export default function ViewReqPASSCUModal({
                     setSelectedSubmissionRequirement(null);
                     setSubmissionViewerUsers(null);
                 }}
+            />
+
+            <UserFilesGridModal
+                show={!!gridModalData}
+                user={gridModalData?.user}
+                requirement={gridModalData?.requirement}
+                files={gridModalData?.files || []}
+                onClose={() => setGridModalData(null)}
+                onViewFile={(fileItem) => {
+                    if (gridModalData?.user && gridModalData?.requirement) {
+                        handleViewUserFile(gridModalData.user, gridModalData.requirement.RequirementID, fileItem);
+                    }
+                }}
+                onUpdateComment={async (reqId, fileId, newComment) => {
+                    await handleUpdateUserFileComment(reqId, fileId, newComment);
+                    setGridModalData(prev => prev ? {
+                        ...prev,
+                        files: prev.files.map(f => f.id === fileId ? { ...f, comment: newComment } : f)
+                    } : null);
+                }}
+                onRename={handleRenameUserFile}
+                onReorderFiles={(reqId, newFiles) => {
+                    setGridModalData(prev => prev ? { ...prev, files: newFiles } : null);
+                }}
+                isAdmin={isAdmin}
+                currentUser={currentUser}
+                viewerRoleId={currentRoleId}
+                onUpload={async (e, reqId) => {
+                    await handleUserReqFileUpload(e, reqId);
+                    try {
+                        const res = await axios.get(`${API_BASE_URL}/api/requirements/${reqId}/user-file/${currentUser.UserID}`);
+                        if (res.data && res.data.success) {
+                            const newFiles = res.data.files || (res.data.file ? [res.data.file] : []);
+                            setGridModalData(prev => prev ? { ...prev, files: newFiles } : null);
+                        }
+                    } catch (err) {
+                        console.error('Error refreshing files in grid modal:', err);
+                    }
+                }}
+                onUnsubmit={async (fileId) => {
+                    const reqId = gridModalData?.requirement?.RequirementID;
+                    if (!reqId) return;
+                    await handleUnsubmitUserFile(reqId, fileId);
+                    try {
+                        const res = await axios.get(`${API_BASE_URL}/api/requirements/${reqId}/user-file/${currentUser.UserID}`);
+                        if (res.data && res.data.success) {
+                            const newFiles = res.data.files || (res.data.file ? [res.data.file] : []);
+                            setGridModalData(prev => prev ? { ...prev, files: newFiles } : null);
+                        } else {
+                            setGridModalData(prev => prev ? { ...prev, files: [] } : null);
+                        }
+                    } catch (err) {
+                        setGridModalData(prev => prev ? { ...prev, files: [] } : null);
+                    }
+                }}
+                uploading={userUploadingReqId === gridModalData?.requirement?.RequirementID}
             />
         </div>
     );

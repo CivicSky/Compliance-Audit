@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import AreaSection from './AreaSection';
 import CriteriaSection from './CriteriaSection';
 import RequirementsSection from './RequirementsSection';
@@ -8,7 +9,7 @@ import EditCriteriaModal from '../EditCriteria/EditCriteriaModal';
 import EditRequirementsModal from '../EditRequirements/EditRequirementsModal';
 import { usersAPI, officesAPI } from '../../utils/api';
 import { useModal } from "../UI/ModalProvider";
-import { useEffect } from 'react';
+
 import { formatDateTime } from '../../utils/formatDateTime';
 
 export default function EventPopup({
@@ -37,7 +38,10 @@ export default function EventPopup({
     onPrepareStructureData,
     onEditArea,
     onEditCriteria,
-    onBulkDelete
+    onBulkDelete,
+    onEditEvent,
+    onCopyEvent,
+    isAdmin: isAdminProp
 }) {
     const { showConfirm, showAlert } = useModal();
 
@@ -60,7 +64,54 @@ export default function EventPopup({
     const [offices, setOffices] = useState([]);
     const [loadingOffices, setLoadingOffices] = useState(false);
     const [officeSearch, setOfficeSearch] = useState('');
+    const [activeOfficeTab, setActiveOfficeTab] = useState("All");
+
+    const formatDateString = (dateStr) => {
+        if (!dateStr) return "N/A";
+        try {
+            const date = new Date(dateStr);
+            if (isNaN(date.getTime())) return "N/A";
+            return date.toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+                year: "numeric"
+            });
+        } catch {
+            return "N/A";
+        }
+    };
+
+    const filteredOffices = useMemo(() => {
+        let list = offices || [];
+        
+        // Filter by tab
+        if (activeOfficeTab === "Programs") {
+            list = list.filter(o => o.entity_type_id === 1 || String(o.category_name || o.TypeName || "").toLowerCase().includes("academic program") || String(o.category_name || o.TypeName || "").toLowerCase().includes("program"));
+        } else if (activeOfficeTab === "Offices") {
+            list = list.filter(o => o.entity_type_id === 2 || String(o.category_name || o.TypeName || "").toLowerCase().includes("non-academic") || String(o.category_name || o.TypeName || "").toLowerCase().includes("office"));
+        }
+
+        // Filter by search query
+        const query = officeSearch.trim().toLowerCase();
+        if (!query) return list;
+
+        return list.filter(o => {
+            const name = String(o.OfficeName || o.office_name || "").toLowerCase();
+            const dept = String(o.department_name || "").toLowerCase();
+            return name.includes(query) || dept.includes(query);
+        });
+    }, [offices, officeSearch, activeOfficeTab]);
+
     const [selectedOfficeIdsLocal, setSelectedOfficeIdsLocal] = useState(new Set());
+    const [assignedAreaIds, setAssignedAreaIds] = useState(new Set());
+
+    const isAuditor = currentUser?.RoleID === 4 || 
+                      String(currentUser?.RoleName || '').toLowerCase().includes('auditor') || 
+                      currentUser?.isExternalAuditor;
+
+    const isAdmin = isAdminProp !== undefined 
+        ? isAdminProp 
+        : (currentUser?.RoleID === 1 || String(currentUser?.RoleName || '').toLowerCase() === 'admin');
 
     useEffect(() => {
         let mounted = true;
@@ -75,6 +126,27 @@ export default function EventPopup({
         fetchCurrentUser();
         return () => { mounted = false; };
     }, []);
+
+    useEffect(() => {
+        if (!currentUser || !isAuditor) return;
+        let mounted = true;
+        const fetchAssignments = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`/api/areas/assignments/${currentUser.UserID}`, {
+                    headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+                });
+                const data = await res.json();
+                if (mounted && res.ok && data.success) {
+                    const ids = new Set((data.assignments || []).map(a => Number(a.area_id)));
+                    setAssignedAreaIds(ids);
+                }
+            } catch (e) {}
+        };
+        fetchAssignments();
+        return () => { mounted = false; };
+    }, [currentUser, isAuditor]);
+
     // load offices for the selected event
     useEffect(() => {
         let mounted = true;
@@ -132,6 +204,12 @@ export default function EventPopup({
         return aCode.localeCompare(bCode, undefined, { numeric: true, sensitivity: 'base' });
     });
     const visibleAreas = allAreasForEvent.filter(area => {
+        // Scoping for Auditors: only show assigned area(s)
+        if (isAuditor) {
+            const isAssigned = assignedAreaIds.has(Number(area.AreaID));
+            if (!isAssigned) return false;
+        }
+
         if (!hasSearch) return true;
         const matchingCriteria = getFilteredCriteria(criteriaData[area.AreaID] || []);
         return (
@@ -141,7 +219,7 @@ export default function EventPopup({
     });
 
     const noAreaCriteriaAll = noAreaCriteriaData[selectedEvent.EventID] || [];
-    const visibleNoAreaCriteria = getFilteredCriteria(noAreaCriteriaAll);
+    const visibleNoAreaCriteria = isAuditor ? [] : getFilteredCriteria(noAreaCriteriaAll);
     const hasAnyVisibleResults = visibleAreas.length > 0 || visibleNoAreaCriteria.length > 0;
 
     const resetSelection = () => {
@@ -291,47 +369,89 @@ export default function EventPopup({
                         <div>
                             <h2 className="text-4xl font-bold tracking-tight text-slate-900">{selectedEvent.EventCode || selectedEvent.EventName}</h2>
                             <p className="text-slate-600 mt-1">{selectedEvent.EventName || selectedEvent.EventCode}</p>
-                            <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-500">
+                            <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
                                 <span className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1">
                                     Created: <span className="font-semibold text-slate-700">{formatDateTime(selectedEvent.CreatedAt)}</span>
                                 </span>
                                 <span className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1">
                                     Updated: <span className="font-semibold text-slate-700">{formatDateTime(selectedEvent.UpdatedAt || selectedEvent.CreatedAt)}</span>
                                 </span>
+                                {selectedEvent.accreditation_level && selectedEvent.accreditation_level.toUpperCase() !== 'N/A' && (
+                                    <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 font-semibold text-emerald-700">
+                                        {selectedEvent.accreditation_level}
+                                    </span>
+                                )}
                             </div>
                         </div>
                         <div className="relative flex items-center gap-2 ml-4">
-                            <button
-                                onClick={() => setIsActionMenuOpen(prev => !prev)}
-                                className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
-                                title="More actions"
-                                aria-label="More actions"
-                            >
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                                    <circle cx="12" cy="5" r="1.5" fill="currentColor" stroke="none" />
-                                    <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
-                                    <circle cx="12" cy="19" r="1.5" fill="currentColor" stroke="none" />
-                                </svg>
-                            </button>
-                            {isActionMenuOpen && (
-                                <div className="absolute right-12 top-11 z-20 bg-white border border-slate-200 rounded-xl shadow-lg min-w-[190px] py-1">
+                            {isAdmin && (
+                                <>
                                     <button
-                                        onClick={() => {
-                                            onPrepareStructureData?.();
-                                            setIsActionOpen(true);
-                                            setIsActionMenuOpen(false);
-                                        }}
-                                        className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-100"
+                                        onClick={() => setIsActionMenuOpen(prev => !prev)}
+                                        className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
+                                        title="More actions"
+                                        aria-label="More actions"
                                     >
-                                        Manage Structure
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                                            <circle cx="12" cy="5" r="1.5" fill="currentColor" stroke="none" />
+                                            <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+                                            <circle cx="12" cy="19" r="1.5" fill="currentColor" stroke="none" />
+                                        </svg>
                                     </button>
-                                    <button
-                                        onClick={enterDeleteMode}
-                                        className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                                    >
-                                        Delete Items
-                                    </button>
-                                </div>
+                                    {isActionMenuOpen && (
+                                        <div className="absolute right-12 top-11 z-50 bg-white border border-slate-200 rounded-xl shadow-lg min-w-[170px] py-1" onClick={(e) => e.stopPropagation()}>
+                                            <button
+                                                onClick={() => {
+                                                    onEditEvent?.(selectedEvent);
+                                                    setIsActionMenuOpen(false);
+                                                }}
+                                                className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-xs text-slate-700 transition hover:bg-slate-50 whitespace-nowrap"
+                                            >
+                                                <svg className="h-4 w-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                </svg>
+                                                <span>Edit Event</span>
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    onCopyEvent?.(selectedEvent);
+                                                    setIsActionMenuOpen(false);
+                                                }}
+                                                className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-xs text-slate-700 transition hover:bg-slate-50 whitespace-nowrap"
+                                            >
+                                                <svg className="h-4 w-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                                </svg>
+                                                <span>Copy Event</span>
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    onPrepareStructureData?.();
+                                                    setIsActionOpen(true);
+                                                    setIsActionMenuOpen(false);
+                                                }}
+                                                className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-xs text-slate-700 transition hover:bg-blue-50 whitespace-nowrap"
+                                            >
+                                                <svg className="h-4 w-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4zM14 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2v-4z" />
+                                                </svg>
+                                                <span>Manage Structure</span>
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    enterDeleteMode();
+                                                    setIsActionMenuOpen(false);
+                                                }}
+                                                className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-xs text-red-600 transition hover:bg-red-50 whitespace-nowrap"
+                                            >
+                                                <svg className="h-4 w-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
+                                                </svg>
+                                                <span>Delete Items</span>
+                                            </button>
+                                        </div>
+                                    )}
+                                </>
                             )}
                             <button
                                 onClick={onClose}
@@ -409,8 +529,10 @@ export default function EventPopup({
                                                     showCheckbox={deleteMode}
                                                     isChecked={selectedAreaIds.has(Number(area.AreaID))}
                                                     onToggleSelect={(checked) => toggleAreaSelect(area, checked)}
-                                                    onMenuClick={(item) => { setEditAreaData(item); setIsEditAreaOpen(true); }}
-                                                    onDeleteClick={(item) => handleSingleDelete({ areaIds: [Number(item.AreaID)] })}
+                                                    onMenuClick={isAuditor ? undefined : (item) => { setEditAreaData(item); setIsEditAreaOpen(true); }}
+                                                    onDeleteClick={isAuditor ? undefined : (item) => handleSingleDelete({ areaIds: [Number(item.AreaID)] })}
+                                                    isAssigned={assignedAreaIds.has(Number(area.AreaID))}
+                                                    isAuditor={isAuditor}
                                                 >
                                                     {loadingCriteria.has(area.AreaID) ? (
                                                         <p className="text-xs text-gray-500 ml-4 mt-2">Loading criteria...</p>
@@ -453,8 +575,8 @@ export default function EventPopup({
                                                                             showCheckbox={deleteMode}
                                                                             isChecked={selectedCriteriaIds.has(Number(node.CriteriaID))}
                                                                             onToggleSelect={(checked) => toggleCriteriaSelect(node, checked)}
-                                                                            onMenuClick={(c) => { setEditCriteriaData(c); setIsEditCriteriaOpen(true); }}
-                                                                            onDeleteClick={(c) => handleSingleDelete({ criteriaIds: [Number(c.CriteriaID)] })}
+                                                                            onMenuClick={isAuditor ? undefined : (c) => { setEditCriteriaData(c); setIsEditCriteriaOpen(true); }}
+                                                                            onDeleteClick={isAuditor ? undefined : (c) => handleSingleDelete({ criteriaIds: [Number(c.CriteriaID)] })}
                                                                         >
                                                                             <div className="ml-6 space-y-2">
                                                                                 {node.children && node.children.map(child => renderNode(child, depth + 1))}
@@ -464,8 +586,8 @@ export default function EventPopup({
                                                                                     showCheckbox={deleteMode}
                                                                                     selectedRequirementIds={selectedRequirementIds}
                                                                                     onToggleRequirement={toggleRequirementSelect}
-                                                                                    onMenuClick={(req) => { setEditRequirementData(req); setIsEditRequirementOpen(true); }}
-                                                                                    onDeleteClick={(req) => handleSingleDelete({ requirementIds: [Number(req.RequirementID)] })}
+                                                                                    onMenuClick={isAuditor ? undefined : (req) => { setEditRequirementData(req); setIsEditRequirementOpen(true); }}
+                                                                                    onDeleteClick={isAuditor ? undefined : (req) => handleSingleDelete({ requirementIds: [Number(req.RequirementID)] })}
                                                                                 />
                                                                             </div>
                                                                         </CriteriaSection>
@@ -487,7 +609,11 @@ export default function EventPopup({
                                             >
                                                 <div>
                                                     <h3 className="font-semibold flex items-center gap-2">
-                                                        <span>{expandedNoArea.has(selectedEvent.EventID) ? '▼' : '▶'}</span>
+                                                        {expandedNoArea.has(selectedEvent.EventID) ? (
+                                                            <ChevronDown className="h-4 w-4 shrink-0 text-white" />
+                                                        ) : (
+                                                            <ChevronRight className="h-4 w-4 shrink-0 text-white" />
+                                                        )}
                                                         <span>No Area Assigned</span>
                                                     </h3>
                                                     <p className="text-xs text-slate-200 mt-1">Criteria without area assignment</p>
@@ -566,33 +692,128 @@ export default function EventPopup({
                             </div>
                         </div>
 
-                        <div className="w-1/3 pl-4 overflow-y-auto">
-                            <div className="py-2">
-                                <div className="sticky top-0 z-10 bg-white pt-2 pb-2">
-                                    <h4 className="text-sm font-semibold text-slate-700 mb-2">Offices</h4>
+                        <div className="w-1/3 pl-4 overflow-y-auto flex flex-col h-full min-h-0">
+                            <div className="py-2 flex-1 flex flex-col min-h-0">
+                                <div className="sticky top-0 z-10 bg-white pt-2 pb-3 shrink-0 flex flex-col gap-2">
+                                    <h4 className="text-sm font-bold text-slate-800">Programs and Offices</h4>
                                     <input
                                         type="text"
                                         value={officeSearch}
                                         onChange={(e) => setOfficeSearch(e.target.value)}
-                                        placeholder="Search offices..."
-                                        className="h-9 w-full rounded-md border border-slate-200 px-2 text-sm text-slate-700 shadow-sm focus:outline-none"
+                                        placeholder="Search programs and offices..."
+                                        className="h-9 w-full rounded-md border border-slate-200 px-3 text-xs text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-slate-100/50 focus:bg-white transition-all shadow-sm"
                                     />
+                                    
+                                    {/* Programs & Offices Filtering Tabs */}
+                                    <div className="flex border-b border-slate-200 mt-1">
+                                        {["All", "Programs", "Offices"].map((tab) => {
+                                            const isSelected = activeOfficeTab === tab;
+                                            return (
+                                                <button
+                                                    key={tab}
+                                                    type="button"
+                                                    onClick={() => setActiveOfficeTab(tab)}
+                                                    className={`pb-1.5 px-3 text-[11px] font-semibold transition-all border-b-2 -mb-[1.5px] ${
+                                                        isSelected 
+                                                            ? 'border-blue-600 text-blue-600' 
+                                                            : 'border-transparent text-slate-500 hover:text-slate-800'
+                                                    }`}
+                                                >
+                                                    {tab}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
 
-                                <div className="mt-3 space-y-2 pt-2">
+                                <div className="flex-1 overflow-y-auto space-y-3 pr-1 pt-1 min-h-0">
                                     {loadingOffices ? (
-                                        <div className="text-sm text-gray-500">Loading offices...</div>
-                                    ) : offices.length === 0 ? (
-                                        <div className="text-sm text-gray-500">No offices for this event</div>
+                                        <div className="text-xs text-slate-400 text-center py-4">Loading programs and offices...</div>
+                                    ) : filteredOffices.length === 0 ? (
+                                        <div className="text-xs text-slate-400 text-center py-4 border border-dashed border-slate-100 rounded-lg">
+                                            {officeSearch ? "No matching records found" : "No programs or offices assigned"}
+                                        </div>
                                     ) : (
-                                        (offices || []).filter(o => String(o.office_name || o.OfficeName || o.office_name || '').toLowerCase().includes(officeSearch.trim().toLowerCase())).map((office) => (
-                                            <div
-                                                key={office.id || office.OfficeID || office.office_id}
-                                                className="flex items-center gap-2 rounded-lg border px-2.5 py-2 text-sm transition border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
-                                            >
-                                                <span className="truncate">{office.office_name || office.OfficeName || office.office_name}</span>
-                                            </div>
-                                        ))
+                                        filteredOffices.map((office) => {
+                                            const isAcademic = office.entity_type_id === 1 || String(office.category_name || office.TypeName || "").toLowerCase().includes("academic program") || String(office.category_name || office.TypeName || "").toLowerCase().includes("program");
+                                            return (
+                                                <div
+                                                    key={office.id || office.OfficeID || office.office_id}
+                                                    className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm hover:shadow-md transition-shadow relative flex flex-col gap-2.5 animate-fadeIn"
+                                                >
+                                                    {/* Header with Icon, Name, and Actions */}
+                                                    <div className="flex items-start justify-between gap-2.5">
+                                                        <div className="flex items-center gap-2.5 min-w-0">
+                                                            {/* Icon */}
+                                                            {isAcademic ? (
+                                                                <div className="h-9 w-9 rounded-full bg-cyan-50 text-cyan-600 flex items-center justify-center shrink-0 border border-cyan-100">
+                                                                    <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.436 60.436 0 00-.491 6.347A48.62 48.62 0 0112 20.904a48.62 48.62 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.57 50.57 0 00-2.658-.813A59.905 59.905 0 0112 3.493a59.902 59.902 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0112 13.489a50.702 50.702 0 017.74-3.342M6.75 15a.75.75 0 100-1.5.75.75 0 000 1.5zm0 0v-3.675A57.778 57.778 0 0012 13.5" />
+                                                                    </svg>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="h-9 w-9 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
+                                                                    <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 16.5h1.5m3 0H15M9 21v-3a1 1 0 011-1h4a1 1 0 011 1v3" />
+                                                                    </svg>
+                                                                </div>
+                                                            )}
+                                                            
+                                                            {/* Name and Subtitle */}
+                                                            <div className="min-w-0">
+                                                                <h5 className="text-xs font-bold text-slate-800 truncate leading-snug">
+                                                                    {office.OfficeName || office.office_name}
+                                                                </h5>
+                                                                <p className="text-[10px] text-slate-500 truncate mt-0.5 leading-normal">
+                                                                    {office.department_name || 'Institution-wide'}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        {/* Static visual 3-dot dropdown for matching look */}
+                                                        {!isAuditor && (
+                                                            <div className="shrink-0">
+                                                                <button
+                                                                    type="button"
+                                                                    className="h-6 w-6 rounded-md hover:bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-550 transition"
+                                                                >
+                                                                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 12.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 18.75a.75.75 0 110-1.5.75.75 0 010 1.5z" />
+                                                                    </svg>
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Timestamps Grid */}
+                                                    <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-2.5 text-[9px] text-slate-400 font-semibold tracking-wider">
+                                                        <div>
+                                                            <p className="uppercase text-slate-400 font-bold mb-0.5">Created</p>
+                                                            <p className="text-slate-655 font-bold">{formatDateString(office.created_at)}</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="uppercase text-slate-400 font-bold mb-0.5">Updated</p>
+                                                            <p className="text-slate-655 font-bold">{formatDateString(office.updated_at)}</p>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Bottom Badges Row */}
+                                                    <div className="flex items-center justify-between mt-1 pt-1 border-t border-slate-50">
+                                                        <span className={`px-1.5 py-0.5 rounded-[4px] text-[9px] font-bold border ${
+                                                            isAcademic
+                                                                ? 'bg-blue-50 text-blue-700 border-blue-150'
+                                                                : 'bg-emerald-50 text-emerald-700 border-emerald-150'
+                                                        }`}>
+                                                            {isAcademic ? 'Academic Program' : 'Non-Academic Office'}
+                                                        </span>
+                                                        
+                                                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                                                            {office.department_name || 'Institution-wide'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
                                     )}
                                 </div>
                             </div>

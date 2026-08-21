@@ -746,8 +746,8 @@ export default function AddAreaPop({
 	if (!isOpen || !event) return null;
 
 	return (
-		<div className="fixed top-0 right-0 bottom-0 z-[50] flex bg-slate-900/50 backdrop-blur-[2px]" style={{ left: 'calc(var(--sidebar-width, 0px) + 12px)' }}>
-			<div className="relative flex h-full w-full flex-col overflow-hidden rounded-none border border-blue-100 bg-app-muted shadow-2xl">
+		<div className="fixed top-4 right-4 bottom-4 z-[50] flex bg-transparent" style={{ left: 'calc(var(--sidebar-width, 0px) + 28px)' }}>
+			<div className="relative flex h-full w-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-2xl">
 				<ModalHeader event={event} onClose={resetAndClose} mainMode={mainMode} />
 				<div className="flex min-h-0 flex-1 gap-4">
 					<EventStructureSidebar
@@ -784,7 +784,7 @@ export default function AddAreaPop({
 						}}
 					/>
 
-				<div className="relative flex min-w-0 flex-1 flex-col bg-app-bg">
+				<div className="relative flex min-w-0 flex-1 flex-col bg-slate-50/50">
 
 
 						<div

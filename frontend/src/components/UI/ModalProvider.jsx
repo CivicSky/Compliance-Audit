@@ -8,10 +8,21 @@ export function ModalProvider({ children }) {
   const [modal, setModal] = useState({ open: false })
   const { toast } = useToast()
 
-  const showAlert = useCallback((message, title = 'Notice') => {
-    toast({ title, description: message, variant: 'info', duration: 1500 })
-    return Promise.resolve(true)
-  }, [toast])
+  const showAlert = useCallback((message, titleOrVariant = 'Notice', variantParam = 'info') => {
+    let title = 'Notice';
+    let variant = 'info';
+
+    if (['error', 'success', 'warning', 'info'].includes(titleOrVariant)) {
+      variant = titleOrVariant;
+      title = titleOrVariant === 'error' ? 'Error' : titleOrVariant === 'success' ? 'Success' : 'Notice';
+    } else {
+      title = titleOrVariant;
+      variant = variantParam;
+    }
+
+    toast({ title, description: message, variant, duration: 3000 });
+    return Promise.resolve(true);
+  }, [toast]);
 
   const showConfirm = useCallback((message, title = 'Confirm') => {
     return new Promise((resolve) => {
@@ -55,23 +66,25 @@ function ModalRoot({ type, title, message, onConfirm, onCancel }) {
   if (type === 'alert') return null
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-lg shadow-lg w-96 max-w-full p-6">
-        <div className="mb-4">
-          <h3 className="text-lg font-semibold">{title}</h3>
-        </div>
-        <div className="mb-6 text-sm text-gray-700">{message}</div>
-        <div className="flex justify-end space-x-3">
+    <div className="fixed inset-0 z-[20012] flex items-center justify-center bg-black/50 px-4">
+      <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl animate-in fade-in zoom-in-95 duration-150">
+        <h3 className="text-lg font-bold text-slate-900">{title || 'Confirm'}</h3>
+        <p className="mt-2 text-sm text-slate-600 leading-relaxed">
+          {message}
+        </p>
+        <div className="mt-6 flex justify-end gap-3">
           {type === 'confirm' && (
             <button
-              className="px-4 py-2 rounded bg-red-50 text-red-700 hover:bg-red-100"
+              type="button"
+              className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-100 focus:outline-none"
               onClick={onCancel}
             >
               Cancel
             </button>
           )}
           <button
-            className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700"
+            type="button"
+            className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 focus:outline-none"
             onClick={onConfirm}
           >
             OK

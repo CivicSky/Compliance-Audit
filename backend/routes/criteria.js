@@ -3,7 +3,7 @@ const router = express.Router();
 const db = require('../db');
 const CriteriaController = require('../controllers/CriteriaController');
 const { recordLog } = require('../controllers/logsController');
-const auth = require('../middleware/auth');
+const { auth, restrictAuditor } = require('../middleware/auth');
 
 // GET all criteria
 router.get('/', CriteriaController.getAllCriteria);
@@ -12,11 +12,10 @@ router.get('/', CriteriaController.getAllCriteria);
 router.get('/event/:eventId', CriteriaController.getCriteriaByEvent);
 
 // UPDATE criteria by ID
-router.put('/:id', auth, async (req, res) => {
+router.put('/:id', auth, restrictAuditor, async (req, res) => {
     try {
         const { id } = req.params;
         let { CriteriaCode, CriteriaName, Description, AreaID, ParentCriteriaID, EventID } = req.body;
-
 
         const [existingRows] = await db.query(
             `SELECT c.CriteriaID, c.CriteriaCode, c.CriteriaName, c.Description, c.AreaID, c.ParentCriteriaID, c.EventID, e.EventName
@@ -43,80 +42,58 @@ router.put('/:id', auth, async (req, res) => {
         // Ensure AreaID, ParentCriteriaID, and Description are normalized
         if (AreaID === '' || AreaID === 'null' || AreaID === undefined) AreaID = null;
         if (ParentCriteriaID === '' || ParentCriteriaID === 'null' || ParentCriteriaID === undefined) ParentCriteriaID = null;
-        if (EventID === '' || EventID === 'null' || EventID === undefined) EventID = existing.EventID;
-        if (Description === '' || Description === 'null' || Description === undefined) Description = null;
+        const safeDescription = Description && String(Description).trim() !== '' ? Description : null;
 
-        // Validate required fields: CriteriaName always required; CriteriaCode required only for top-level criteria
-        if (!CriteriaName || (ParentCriteriaID == null && !CriteriaCode)) {
-            return res.status(400).json({
-                success: false,
-                message: ParentCriteriaID == null ? 'Criteria code and name are required.' : 'Criteria name is required.'
-            });
-        }
-
-        // Enforce uniqueness of CriteriaCode within the same Event (case-insensitive) only if CriteriaCode provided
-        if (CriteriaCode) {
-            const [dupRows] = await db.query(
+        // Check duplicate code if modified and provided
+        if (CriteriaCode && CriteriaCode !== String(existing.CriteriaCode).toUpperCase()) {
+            const targetEventId = EventID || existing.EventID;
+            const [dup] = await db.query(
                 `SELECT CriteriaID FROM criteria WHERE EventID = ? AND LOWER(CriteriaCode) = LOWER(?) AND CriteriaID != ? LIMIT 1`,
-                [EventID || existing.EventID, CriteriaCode, id]
+                [targetEventId, CriteriaCode, id]
             );
-            if (dupRows.length > 0) {
+            if (dup.length > 0) {
                 return res.status(400).json({ success: false, message: 'A criteria with this code already exists for the selected event.' });
             }
         }
 
-        const [result] = await db.query(
-            `UPDATE criteria SET CriteriaCode = ?, CriteriaName = ?, Description = ?, AreaID = ?, ParentCriteriaID = ?, EventID = ?, UpdatedAt = NOW() WHERE CriteriaID = ?`,
-            [CriteriaCode, CriteriaName, Description, AreaID, ParentCriteriaID, EventID, id]
+        await db.query(
+            `UPDATE criteria
+             SET EventID = COALESCE(?, EventID),
+                 AreaID = ?,
+                 ParentCriteriaID = ?,
+                 CriteriaCode = COALESCE(?, CriteriaCode),
+                 CriteriaName = COALESCE(?, CriteriaName),
+                 Description = ?
+             WHERE CriteriaID = ?`,
+            [EventID || null, AreaID, ParentCriteriaID, CriteriaCode || null, CriteriaName || null, safeDescription, id]
         );
-        if (result.affectedRows === 0) {
-            return res.status(404).json({
-                success: false,
-                message: 'Criteria not found.'
-            });
+
+        const [updatedRows] = await db.query(
+            `SELECT c.CriteriaID, c.CriteriaCode, c.CriteriaName, c.Description, c.AreaID, c.ParentCriteriaID, c.EventID, e.EventName
+             FROM criteria c
+             LEFT JOIN Events e ON c.EventID = e.EventID
+             WHERE c.CriteriaID = ?
+             LIMIT 1`,
+            [id]
+        );
+
+        if (req.user && req.user.userId) {
+            try {
+                recordLog(req.user.userId, 'CriteriaUpdated', {
+                    CriteriaID: id,
+                    CriteriaCode: CriteriaCode || existing.CriteriaCode,
+                    CriteriaName: CriteriaName || existing.CriteriaName,
+                    EventID: EventID || existing.EventID,
+                    EventName: existing.EventName
+                });
+            } catch (e) {}
         }
+
         res.json({
             success: true,
-            message: 'Criteria updated successfully.'
+            message: 'Criteria updated successfully',
+            data: updatedRows[0]
         });
-                if (req.user && req.user.userId) {
-                    const changes = {};
-                    const addChange = (field, beforeValue, afterValue) => {
-                        const beforeNorm = beforeValue === undefined ? null : beforeValue;
-                        const afterNorm = afterValue === undefined ? null : afterValue;
-                        if (String(beforeNorm ?? '') !== String(afterNorm ?? '')) {
-                            changes[field] = { from: beforeNorm, to: afterNorm };
-                        }
-                    };
-
-                    addChange('CriteriaCode', existing.CriteriaCode, CriteriaCode);
-                    addChange('CriteriaName', existing.CriteriaName, CriteriaName);
-                    addChange('Description', existing.Description, Description);
-                    addChange('AreaID', existing.AreaID, AreaID);
-                    addChange('ParentCriteriaID', existing.ParentCriteriaID, ParentCriteriaID);
-                    addChange('EventID', existing.EventID, EventID);
-
-                    let eventName = existing.EventName || null;
-                    try {
-                        if (EventID && String(existing.EventID ?? '') !== String(EventID)) {
-                            const [eventRows] = await db.query('SELECT EventName FROM Events WHERE EventID = ? LIMIT 1', [EventID]);
-                            eventName = eventRows[0]?.EventName || eventName;
-                        }
-                    } catch (e) {
-                        // keep existing event name as fallback
-                    }
-
-                    try {
-                        recordLog(req.user.userId, 'CriteriaUpdated', {
-                            CriteriaID: Number(id),
-                            CriteriaCode: CriteriaCode || null,
-                            CriteriaName: CriteriaName || null,
-                            EventID: EventID || null,
-                            EventName: eventName,
-                            changes
-                        });
-                    } catch (e) {}
-                }
     } catch (error) {
         console.error('Error updating criteria:', error);
         res.status(500).json({
@@ -127,7 +104,7 @@ router.put('/:id', auth, async (req, res) => {
 });
 
 // DELETE criteria (bulk)
-router.delete('/delete', auth, CriteriaController.deleteCriteria);
+router.delete('/delete', auth, restrictAuditor, CriteriaController.deleteCriteria);
 
 // GET criteria by area
 router.get('/area/:areaId', async (req, res) => {
@@ -165,25 +142,20 @@ router.get('/area/:areaId', async (req, res) => {
 });
 
 // POST add new criteria (AreaID optional)
-router.post('/add', auth, async (req, res) => {
+router.post('/add', auth, restrictAuditor, async (req, res) => {
     try {
         let { EventID, AreaID, CriteriaCode, CriteriaName, Description, ParentCriteriaID } = req.body;
-        // normalize CriteriaCode to uppercase and trim
         if (CriteriaCode !== undefined && CriteriaCode !== null) {
             CriteriaCode = String(CriteriaCode).trim().toUpperCase();
         }
-        // Normalize ParentCriteriaID
         if (ParentCriteriaID === '' || ParentCriteriaID === 'null' || ParentCriteriaID === undefined) ParentCriteriaID = null;
-        // Validate required fields: EventID and CriteriaName required; CriteriaCode required only if no ParentCriteriaID
         if (!EventID || !CriteriaName || (ParentCriteriaID == null && !CriteriaCode)) {
             return res.status(400).json({
                 success: false,
                 message: ParentCriteriaID == null ? 'Event, Criteria Code, and Name are required.' : 'Event and Criteria Name are required.'
             });
         }
-        // Insert criteria, AreaID, ParentCriteriaID, and Description can be null
         const safeDescription = Description && String(Description).trim() !== '' ? Description : null;
-        // Enforce uniqueness of CriteriaCode within the same Event (case-insensitive) only if CriteriaCode provided
         if (CriteriaCode) {
             const [existingDup] = await db.query(
                 `SELECT CriteriaID FROM criteria WHERE EventID = ? AND LOWER(CriteriaCode) = LOWER(?) LIMIT 1`,
@@ -193,9 +165,11 @@ router.post('/add', auth, async (req, res) => {
                 return res.status(400).json({ success: false, message: 'A criteria with this code already exists for the selected event.' });
             }
         }
+
         const [result] = await db.query(
-            `INSERT INTO criteria (EventID, AreaID, CriteriaCode, CriteriaName, Description, ParentCriteriaID, IsActive, CreatedAt, UpdatedAt) VALUES (?, ?, ?, ?, ?, ?, 1, NOW(), NOW())`,
-            [EventID, AreaID || null, CriteriaCode, CriteriaName, safeDescription, ParentCriteriaID || null]
+            `INSERT INTO criteria (EventID, AreaID, CriteriaCode, CriteriaName, Description, ParentCriteriaID)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [EventID, AreaID || null, CriteriaCode || null, CriteriaName, safeDescription, ParentCriteriaID]
         );
 
         let eventName = null;
@@ -222,17 +196,17 @@ router.post('/add', auth, async (req, res) => {
                 ParentCriteriaID: ParentCriteriaID || null
             }
         });
-                if (req.user && req.user.userId) {
-                    try {
-                        recordLog(req.user.userId, 'CriteriaAdded', {
-                            CriteriaID: result.insertId,
-                            CriteriaCode,
-                            CriteriaName,
-                            EventID,
-                            EventName: eventName
-                        });
-                    } catch (e) {}
-                }
+        if (req.user && req.user.userId) {
+            try {
+                recordLog(req.user.userId, 'CriteriaAdded', {
+                    CriteriaID: result.insertId,
+                    CriteriaCode,
+                    CriteriaName,
+                    EventID,
+                    EventName: eventName
+                });
+            } catch (e) {}
+        }
     } catch (error) {
         console.error('Error adding criteria:', error);
         res.status(500).json({

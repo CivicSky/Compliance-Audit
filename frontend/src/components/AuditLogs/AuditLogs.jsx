@@ -3,26 +3,88 @@ import Pagination from "../Pagination/Pagination";
 import Header from "../Header/header";
 
 export default function AuditLogs() {
-
     const [logs, setLogs] = useState([]);
     const [loading, setloading] = useState(true);
-    const [criteriaLookup, setCriteriaLookup] = useState({});
+
+    // Comprehensive Lookups
     const [eventLookup, setEventLookup] = useState({});
+    const [areaLookup, setAreaLookup] = useState({});
+    const [criteriaLookup, setCriteriaLookup] = useState({});
+    const [requirementLookup, setRequirementLookup] = useState({});
+    const [officeLookup, setOfficeLookup] = useState({});
     const [userLookup, setUserLookup] = useState({});
+
     const [searchTerm, setSearchTerm] = useState("");
     const [actionFilter, setActionFilter] = useState("all");
     const [currentPage, setCurrentPage] = useState(1);
+    const [expandedLogId, setExpandedLogId] = useState(null);
     const itemsPerPage = 30;
 
-
-    const statusColorMap = {
-        Created: "bg-green-100 text-green-700 border-green-300",
-        Updated: "bg-blue-100 text-blue-700 border-blue-300",
-        Deleted: "bg-red-100 text-red-700 border-red-300",
-        Viewed: "bg-amber-100 text-amber-700 border-amber-300",
-        Login: "bg-purple-100 text-purple-700 border-purple-300",
-        Logout: "bg-red-100 text-red-700 border-red-300",
-        default: "bg-gray-100 text-gray-700 border-gray-300",
+    const actionStyles = {
+        Created: {
+            badge: "bg-emerald-100/90 text-emerald-800 border-emerald-300/80",
+            iconBg: "bg-emerald-500 text-white",
+            icon: (
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+            )
+        },
+        Updated: {
+            badge: "bg-indigo-100/90 text-indigo-800 border-indigo-300/80",
+            iconBg: "bg-indigo-500 text-white",
+            icon: (
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" />
+                </svg>
+            )
+        },
+        Deleted: {
+            badge: "bg-rose-100/90 text-rose-800 border-rose-300/80",
+            iconBg: "bg-rose-500 text-white",
+            icon: (
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                </svg>
+            )
+        },
+        Viewed: {
+            badge: "bg-sky-100/90 text-sky-800 border-sky-300/80",
+            iconBg: "bg-sky-500 text-white",
+            icon: (
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+            )
+        },
+        Login: {
+            badge: "bg-violet-100/90 text-violet-800 border-violet-300/80",
+            iconBg: "bg-violet-500 text-white",
+            icon: (
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l3 3m0 0l-3 3m3-3H2.25" />
+                </svg>
+            )
+        },
+        Logout: {
+            badge: "bg-amber-100/90 text-amber-800 border-amber-300/80",
+            iconBg: "bg-amber-500 text-white",
+            icon: (
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+                </svg>
+            )
+        },
+        default: {
+            badge: "bg-slate-100 text-slate-800 border-slate-300",
+            iconBg: "bg-slate-500 text-white",
+            icon: (
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            )
+        }
     };
 
     const verbToCrud = {
@@ -31,22 +93,6 @@ export default function AuditLogs() {
         PATCH: "Updated",
         DELETE: "Deleted",
         GET: "Viewed",
-    };
-
-    const entityAliases = {
-        events: "Event",
-        areas: "Area",
-        criteria: "Criteria",
-        requirements: "Requirement",
-        offices: "Office",
-        officeheads: "Office Personnel",
-        users: "User",
-        user: "User",
-        notif: "Notification",
-        notifications: "Notification",
-        logs: "Audit Log",
-        officedocuments: "Office Document",
-        compliancestatusoffices: "Compliance Status",
     };
 
     const toTitle = (value) => {
@@ -58,24 +104,16 @@ export default function AuditLogs() {
             .replace(/\b\w/g, (c) => c.toUpperCase());
     };
 
-    const singularize = (word) => {
-        if (!word) return "";
-        if (word.toLowerCase() === "criteria") return "criteria";
-        if (word.endsWith("ies")) return `${word.slice(0, -3)}y`;
-        if (word.endsWith("s") && !word.endsWith("ss")) return word.slice(0, -1);
-        return word;
-    };
-
-    const getEntityFromPath = (path) => {
-        const cleaned = String(path || "").split("?")[0].replace(/^\/+|\/+$/g, "");
-        const noApi = cleaned.replace(/^api\//i, "");
-        const segments = noApi
-            .split("/")
-            .filter((seg) => seg && !/^\d+$/.test(seg) && !seg.startsWith(":"));
-
-        const base = segments[0] || "record";
-        if (entityAliases[base]) return entityAliases[base];
-        return toTitle(singularize(base));
+    const toArrayPayload = (payload) => {
+        if (Array.isArray(payload)) return payload;
+        if (Array.isArray(payload?.data)) return payload.data;
+        if (Array.isArray(payload?.events)) return payload.events;
+        if (Array.isArray(payload?.areas)) return payload.areas;
+        if (Array.isArray(payload?.criteria)) return payload.criteria;
+        if (Array.isArray(payload?.requirements)) return payload.requirements;
+        if (Array.isArray(payload?.offices)) return payload.offices;
+        if (Array.isArray(payload?.logs)) return payload.logs;
+        return [];
     };
 
     const tryParseJson = (value) => {
@@ -89,123 +127,12 @@ export default function AuditLogs() {
         }
     };
 
-    const summarizeDetails = (detailsValue) => {
-        const parsed = typeof detailsValue === "object" ? detailsValue : tryParseJson(detailsValue);
-        if (!parsed) return String(detailsValue || "").trim();
-
-        const body = parsed.body || parsed;
-        if (!body || typeof body !== "object") return "";
-
-        const keys = ["EventName", "AreaName", "CriteriaName", "RequirementCode", "OfficeName", "deletedCount"];
-        for (const key of keys) {
-            if (body[key] !== undefined && body[key] !== null && String(body[key]).trim()) {
-                return String(body[key]).trim();
-            }
-        }
-
-        const preview = Object.entries(body)
-            .slice(0, 3)
-            .map(([k, v]) => `${toTitle(k)}: ${typeof v === "object" ? "..." : String(v)}`)
-            .join(" | ");
-        return preview;
-    };
-
-    const toArrayPayload = (payload) => {
-        if (Array.isArray(payload)) return payload;
-        if (Array.isArray(payload?.data)) return payload.data;
-        if (Array.isArray(payload?.events)) return payload.events;
-        if (Array.isArray(payload?.logs)) return payload.logs;
-        return [];
-    };
-
-    const formatCriteriaCodeName = (code, name) => {
-        const c = String(code || "").trim().replace(/\.$/, "");
-        const n = String(name || "").trim();
-        if (c && n) return `${c}. ${n}`;
-        return c || n || "";
-    };
-
-    const getCriteriaLabel = (details) => {
-        if (!details || typeof details !== "object") return "";
-
-        let code = details.CriteriaCode;
-        let name = details.CriteriaName;
-
-        if ((!code || !name) && details.CriteriaID !== undefined && details.CriteriaID !== null) {
-            const fallback = criteriaLookup[String(details.CriteriaID)];
-            if (fallback) {
-                code = code || fallback.CriteriaCode;
-                name = name || fallback.CriteriaName;
-            }
-        }
-
-        return formatCriteriaCodeName(code, name);
-    };
-
-    const getEventLabel = (details) => {
-        if (!details || typeof details !== "object") return "";
-        if (details.EventName) return String(details.EventName).trim();
-        if (details.EventID !== undefined && details.EventID !== null) {
-            return eventLookup[String(details.EventID)] || "";
-        }
-        return "";
-    };
-
     const roleIdToName = (value) => {
         const normalized = String(value ?? "").trim().toLowerCase();
         if (!normalized) return "";
         if (normalized === "1" || normalized === "admin") return "Admin";
         if (normalized === "2" || normalized === "user") return "User";
         return toTitle(normalized);
-    };
-
-    const extractLegacyUserId = (text) => {
-        const match = String(text || "").match(/user\s*#?\s*(\d+)/i);
-        return match ? match[1] : "";
-    };
-
-    const getUserLabel = (details, fallbackText = "") => {
-        const explicitName = String(details?.userName || details?.FullName || "").trim();
-        if (explicitName) return explicitName;
-
-        const idFromDetails = details?.userId ?? details?.UserID ?? details?.targetUserId ?? details?.TargetUserID;
-        const resolvedId = idFromDetails !== undefined && idFromDetails !== null
-            ? String(idFromDetails)
-            : extractLegacyUserId(fallbackText);
-
-        if (resolvedId && userLookup[resolvedId]) return userLookup[resolvedId];
-        return "User";
-    };
-
-    const buildUserFieldSummary = (details) => {
-        if (!details || typeof details !== "object") return "";
-
-        const changes = details.changes && typeof details.changes === "object" ? details.changes : null;
-        if (changes) {
-            const parts = Object.entries(changes)
-                .map(([field, change]) => {
-                    if (!change || typeof change !== "object") return "";
-                    const fromRaw = change.from;
-                    const toRaw = change.to;
-                    const isRoleField = /role/i.test(field);
-                    const fromVal = isRoleField ? roleIdToName(fromRaw) : String(fromRaw ?? "(empty)");
-                    const toVal = isRoleField ? roleIdToName(toRaw) : String(toRaw ?? "(empty)");
-                    const label = toTitle(field.replace(/_/g, " "));
-                    return `Changed ${label}: ${fromVal || "(empty)"} -> ${toVal || "(empty)"}`;
-                })
-                .filter(Boolean);
-            return parts.join(" | ");
-        }
-
-        const roleValue = details.roleName || details.RoleName || details.roleId || details.RoleID;
-        if (roleValue !== undefined && roleValue !== null && String(roleValue).trim()) {
-            return `Role to ${roleIdToName(roleValue)}`;
-        }
-
-        const approvalValue = details.approval_status || details.approvalStatus;
-        if (approvalValue) return `Approval to ${toTitle(approvalValue)}`;
-
-        return "";
     };
 
     const normalizeActionLabel = (rawAction) => {
@@ -222,99 +149,176 @@ export default function AuditLogs() {
         return "Updated";
     };
 
-    const buildReadableMessage = (log, actionLabel) => {
-        const rawAction = String(log.Action || "").trim();
-        const httpMatch = rawAction.match(/^(GET|POST|PUT|PATCH|DELETE)\s+(\/\S*)/i);
+    // Deep context resolver walking up the accreditation tree
+    const resolveLogContext = (log) => {
         const detailsSource = log.DetailsParsed || tryParseJson(log.Details) || null;
-        const details = detailsSource && typeof detailsSource === "object"
+        const d = detailsSource && typeof detailsSource === "object"
             ? (detailsSource.body && typeof detailsSource.body === "object" ? detailsSource.body : detailsSource)
-            : null;
-        const detailsText = String(log.Details || "").trim();
+            : {};
 
-        if (actionLabel === "Login") return "User logged in";
-        if (actionLabel === "Logout") return "User logged out";
+        // 1. Office / Program
+        const officeId = d.OfficeID || d.officeId;
+        const officeObj = officeId ? officeLookup[String(officeId)] : null;
+        const officeName = d.OfficeName || d.officeName || d.office_name || d.OfficeCode || officeObj?.OfficeName || officeObj?.OfficeCode || "";
 
-        if (/^User(RoleUpdated|ApprovalUpdated|Updated)$/i.test(rawAction)) {
-            const userLabel = getUserLabel(details, `${detailsText} ${log.Message || ""}`);
-            const userSummary = buildUserFieldSummary(details);
+        // 2. Requirement
+        const reqId = d.RequirementID || d.requirementId;
+        const reqObj = reqId ? requirementLookup[String(reqId)] : null;
+        const reqCode = d.RequirementCode || d.requirementCode || reqObj?.RequirementCode || (reqId ? `REQ-${reqId}` : "");
+        const reqDesc = d.RequirementDescription || d.Description || d.description || reqObj?.Description || "";
 
-            if (userSummary) return `Updated ${userLabel} - ${userSummary}`;
+        // 3. Criteria
+        const critId = d.CriteriaID || d.criteriaId || reqObj?.CriteriaID;
+        const critObj = critId ? criteriaLookup[String(critId)] : null;
+        const critCode = d.CriteriaCode || d.criteriaCode || critObj?.CriteriaCode || "";
+        const critName = d.CriteriaName || d.criteriaName || critObj?.CriteriaName || "";
+        const critLabel = critCode && critName ? `${critCode}. ${critName}` : (critCode || critName);
 
-            const roleMatch = detailsText.match(/role\s*(?:set to|changed to)?\s*:?\s*([A-Za-z0-9_]+)/i);
-            if (roleMatch && roleMatch[1]) {
-                return `Updated ${userLabel} - Role to ${roleIdToName(roleMatch[1])}`;
+        // 4. Area
+        const areaId = d.AreaID || d.areaId || critObj?.AreaID;
+        const areaObj = areaId ? areaLookup[String(areaId)] : null;
+        const areaName = d.AreaName || d.areaName || areaObj?.AreaName || "";
+
+        // 5. Accreditation Event
+        const eventId = d.EventID || d.eventId || areaObj?.EventID || officeObj?.EventID;
+        const eventObj = eventId ? eventLookup[String(eventId)] : null;
+        const eventName = d.EventName || d.eventName || eventObj?.EventName || (typeof eventObj === 'string' ? eventObj : "");
+
+        // 6. Evidence File
+        const fileName = d.DisplayName || d.displayName || d.FileName || d.fileName || d.file_name || "";
+
+        // 7. Target User
+        const targetUserId = d.userId || d.UserID || d.targetUserId || d.TargetUserID;
+        const targetUserName = d.userName || d.FullName || (targetUserId ? userLookup[String(targetUserId)] : "");
+
+        return {
+            officeName,
+            reqCode,
+            reqDesc,
+            critLabel,
+            areaName,
+            eventName,
+            fileName,
+            targetUserName,
+            reqIds: d.requirementIds || d.RequirementIDs,
+            rawDetails: d
+        };
+    };
+
+    const buildInDepthMessage = (log, actionLabel, ctx) => {
+        const rawAction = String(log.Action || "").trim();
+
+        if (actionLabel === "Login") return "User logged in to Compliance Portal";
+        if (actionLabel === "Logout") return "User logged out of Compliance Portal";
+
+        // 1. File Upload
+        if (/RequirementFileUploaded|Upload/i.test(rawAction)) {
+            let msg = `Uploaded evidence file ${ctx.fileName ? `"${ctx.fileName}"` : 'document'}`;
+            if (ctx.reqCode) msg += ` for Requirement ${ctx.reqCode}`;
+            if (ctx.officeName) msg += ` in ${ctx.officeName}`;
+            if (ctx.eventName) msg += ` under "${ctx.eventName}"`;
+            return msg;
+        }
+
+        // 2. File Delete / Unsubmit
+        if (/RequirementFileDeleted|Unsubmit/i.test(rawAction)) {
+            let msg = `Removed evidence file ${ctx.fileName ? `"${ctx.fileName}"` : 'document'}`;
+            if (ctx.reqCode) msg += ` from Requirement ${ctx.reqCode}`;
+            if (ctx.officeName) msg += ` in ${ctx.officeName}`;
+            return msg;
+        }
+
+        // 3. Requirement Added
+        if (/RequirementAdded|Requirement/i.test(rawAction) && actionLabel === "Created") {
+            let msg = `Created Requirement ${ctx.reqCode ? ctx.reqCode : ''}`;
+            if (ctx.reqDesc) msg += ` ("${ctx.reqDesc}")`;
+            if (ctx.critLabel) msg += ` under Criteria ${ctx.critLabel}`;
+            if (ctx.areaName) msg += ` in ${ctx.areaName}`;
+            if (ctx.eventName) msg += ` — "${ctx.eventName}"`;
+            return msg;
+        }
+
+        // 4. Criteria Added
+        if (/CriteriaAdded|Criteria/i.test(rawAction) && actionLabel === "Created") {
+            let msg = `Created Criteria ${ctx.critLabel ? `"${ctx.critLabel}"` : ''}`;
+            if (ctx.areaName) msg += ` under ${ctx.areaName}`;
+            if (ctx.eventName) msg += ` — "${ctx.eventName}"`;
+            return msg;
+        }
+
+        // 5. Area Added
+        if (/AreaAdded|Area/i.test(rawAction) && actionLabel === "Created") {
+            let msg = `Created Area ${ctx.areaName ? `"${ctx.areaName}"` : ''}`;
+            if (ctx.eventName) msg += ` under "${ctx.eventName}"`;
+            return msg;
+        }
+
+        // 6. Office / Program Created or Assigned
+        if (/OfficeAdded|Created Office|Office/i.test(rawAction)) {
+            let msg = `${actionLabel} Office/Program ${ctx.officeName ? `"${ctx.officeName}"` : ''}`;
+            if (ctx.eventName) msg += ` under "${ctx.eventName}"`;
+            if (Array.isArray(ctx.reqIds)) {
+                msg += ` (${ctx.reqIds.length} requirement${ctx.reqIds.length === 1 ? '' : 's'} assigned)`;
             }
-
-            const approvalMatch = detailsText.match(/approval(?:[_\s-]*status)?\s*(?:set to|updated to)?\s*:?\s*([A-Za-z]+)/i);
-            if (approvalMatch && approvalMatch[1]) {
-                return `Updated ${userLabel} - Approval to ${toTitle(approvalMatch[1])}`;
-            }
-
-            const existingMessage = String(log.Message || "").trim();
-            if (existingMessage) {
-                return existingMessage.replace(/User\s*#?\s*\d+/gi, userLabel);
-            }
-
-            return `Updated ${userLabel}`;
+            return msg;
         }
 
-        if (/^CriteriaAdded$/i.test(rawAction)) {
-            const criteriaLabel = getCriteriaLabel(details) || "Criteria";
-            const eventLabel = getEventLabel(details);
-            return `Created Criteria ${criteriaLabel}${eventLabel ? ` under ${eventLabel}` : ""}`;
+        // 7. Accreditation Event
+        if (/EventAdded|Event/i.test(rawAction)) {
+            return `${actionLabel} Accreditation Event ${ctx.eventName ? `"${ctx.eventName}"` : ''}`;
         }
 
-        if (/^RequirementAdded$/i.test(rawAction)) {
-            const requirementLabel = details?.RequirementCode || details?.RequirementID || "Requirement";
-            const eventLabel = getEventLabel(details);
-            const criteriaLabel = getCriteriaLabel(details);
-            const underLabel = [eventLabel, criteriaLabel].filter(Boolean).join(" / ");
-            return `Created Requirement ${requirementLabel}${underLabel ? ` under ${underLabel}` : ""}`;
+        // 8. User Updates
+        if (/UserRoleUpdated|UserApprovalUpdated|UserUpdated|User/i.test(rawAction)) {
+            return `Updated User ${ctx.targetUserName ? `"${ctx.targetUserName}"` : ''}`;
         }
 
-        if (httpMatch) {
-            const entity = getEntityFromPath(httpMatch[2]);
-            const detail = summarizeDetails(log.DetailsSummary || log.DetailsParsed || log.Details);
-            return `${actionLabel} ${entity}${detail ? ` - ${detail}` : ""}`;
-        }
-
+        // Fallback
         const existingMessage = String(log.Message || "").trim();
         if (existingMessage && !/^(GET|POST|PUT|PATCH|DELETE)\s+\//i.test(existingMessage) && !/\/api\//i.test(existingMessage)) {
             return existingMessage;
         }
 
-        const entityRaw = rawAction
-            .replace(/(Added|Created|Updated|Deleted|Removed|Copied|Canceled|Cancelled)$/i, "")
-            .trim();
-        const entity = toTitle(entityRaw || "Record");
-        const detail = summarizeDetails(log.DetailsSummary || log.DetailsParsed || log.Details);
-        return `${actionLabel} ${entity}${detail ? ` - ${detail}` : ""}`;
+        let fallback = `${actionLabel} Record`;
+        if (ctx.officeName) fallback += ` for ${ctx.officeName}`;
+        if (ctx.reqCode) fallback += ` (${ctx.reqCode})`;
+        if (ctx.eventName) fallback += ` under "${ctx.eventName}"`;
+        return fallback;
     };
 
     const preparedLogs = useMemo(() => {
         return logs.map((log) => {
             const normalizedAction = normalizeActionLabel(log.Action);
+            const ctx = resolveLogContext(log);
             return {
                 ...log,
                 normalizedAction,
-                readableMessage: buildReadableMessage(log, normalizedAction),
+                context: ctx,
+                readableMessage: buildInDepthMessage(log, normalizedAction, ctx),
             };
         });
-    }, [logs, criteriaLookup, eventLookup, userLookup]);
+    }, [logs, eventLookup, areaLookup, criteriaLookup, requirementLookup, officeLookup, userLookup]);
 
     const filteredLogs = useMemo(() => {
         const q = searchTerm.trim().toLowerCase();
         return preparedLogs.filter((log) => {
             const matchesAction = actionFilter === "all" || log.normalizedAction === actionFilter;
             if (!matchesAction) return false;
-
             if (!q) return true;
 
+            const c = log.context;
             const haystack = [
                 log.readableMessage,
                 log.normalizedAction,
                 log.displayName,
                 log.RoleName,
+                c.officeName,
+                c.reqCode,
+                c.reqDesc,
+                c.critLabel,
+                c.areaName,
+                c.eventName,
+                c.fileName,
                 log.Details,
             ]
                 .map((v) => String(v || "").toLowerCase())
@@ -324,14 +328,23 @@ export default function AuditLogs() {
         });
     }, [preparedLogs, searchTerm, actionFilter]);
 
-    // Pagination calculations
+    const stats = useMemo(() => {
+        let created = 0, updated = 0, deleted = 0, auth = 0;
+        preparedLogs.forEach(l => {
+            if (l.normalizedAction === 'Created') created++;
+            else if (l.normalizedAction === 'Updated') updated++;
+            else if (l.normalizedAction === 'Deleted') deleted++;
+            else if (['Login', 'Logout'].includes(l.normalizedAction)) auth++;
+        });
+        return { total: preparedLogs.length, created, updated, deletedAndAuth: deleted + auth };
+    }, [preparedLogs]);
+
     const totalPages = Math.max(1, Math.ceil(filteredLogs.length / itemsPerPage));
     useEffect(() => {
         if (currentPage > totalPages) setCurrentPage(1);
     }, [currentPage, totalPages]);
 
     useEffect(() => {
-        // reset to first page when filters/search change
         setCurrentPage(1);
     }, [searchTerm, actionFilter]);
 
@@ -343,6 +356,7 @@ export default function AuditLogs() {
         setActionFilter("all");
     };
 
+    // Fetch Logs
     useEffect(() => {
         const fetchLogs = async () => {
             try {
@@ -363,66 +377,127 @@ export default function AuditLogs() {
         fetchLogs();
     }, []);
 
+    // Fetch All Tree Lookups in Parallel
     useEffect(() => {
         const fetchLookups = async () => {
             try {
-                const [criteriaRes, eventsRes, usersRes] = await Promise.all([
-                    fetch("/api/criteria"),
-                    fetch("/api/events"),
-                    fetch("/api/user")
+                const [eventsRes, areasRes, criteriaRes, reqsRes, officesRes, usersRes] = await Promise.all([
+                    fetch("/api/events").catch(() => null),
+                    fetch("/api/areas").catch(() => null),
+                    fetch("/api/criteria").catch(() => null),
+                    fetch("/api/requirements").catch(() => null),
+                    fetch("/api/offices").catch(() => null),
+                    fetch("/api/user").catch(() => null)
                 ]);
 
-                if (criteriaRes.ok) {
-                    const criteriaPayload = await criteriaRes.json();
-                    const criteriaArr = toArrayPayload(criteriaPayload);
-                    const nextCriteriaLookup = {};
-                    for (const item of criteriaArr) {
-                        if (item?.CriteriaID !== undefined && item?.CriteriaID !== null) {
-                            nextCriteriaLookup[String(item.CriteriaID)] = {
-                                CriteriaCode: item.CriteriaCode || "",
-                                CriteriaName: item.CriteriaName || ""
+                // 1. Events
+                if (eventsRes?.ok) {
+                    const payload = await eventsRes.json();
+                    const arr = toArrayPayload(payload);
+                    const map = {};
+                    for (const item of arr) {
+                        if (item?.EventID != null) {
+                            map[String(item.EventID)] = {
+                                EventName: item.EventName || "",
+                                EventCode: item.EventCode || "",
+                                Year: item.Year || ""
                             };
                         }
                     }
-                    setCriteriaLookup(nextCriteriaLookup);
+                    setEventLookup(map);
                 }
 
-                if (eventsRes.ok) {
-                    const eventsPayload = await eventsRes.json();
-                    const eventsArr = toArrayPayload(eventsPayload);
-                    const nextEventLookup = {};
-                    for (const event of eventsArr) {
-                        if (event?.EventID !== undefined && event?.EventID !== null) {
-                            nextEventLookup[String(event.EventID)] = String(event.EventName || "").trim();
+                // 2. Areas
+                if (areasRes?.ok) {
+                    const payload = await areasRes.json();
+                    const arr = toArrayPayload(payload);
+                    const map = {};
+                    for (const item of arr) {
+                        if (item?.AreaID != null) {
+                            map[String(item.AreaID)] = {
+                                AreaName: item.AreaName || "",
+                                EventID: item.EventID || null
+                            };
                         }
                     }
-                    setEventLookup(nextEventLookup);
+                    setAreaLookup(map);
                 }
 
-                if (usersRes.ok) {
-                    const usersPayload = await usersRes.json();
-                    const usersArr = toArrayPayload(usersPayload?.users ? { data: usersPayload.users } : usersPayload);
-                    const nextUserLookup = {};
-                    for (const user of usersArr) {
-                        if (user?.UserID !== undefined && user?.UserID !== null) {
-                            const fullName = String(
-                                user.FullName ||
-                                `${user.FirstName || ""}${user.MiddleInitial ? ` ${user.MiddleInitial}.` : ""} ${user.LastName || ""}`
+                // 3. Criteria
+                if (criteriaRes?.ok) {
+                    const payload = await criteriaRes.json();
+                    const arr = toArrayPayload(payload);
+                    const map = {};
+                    for (const item of arr) {
+                        if (item?.CriteriaID != null) {
+                            map[String(item.CriteriaID)] = {
+                                CriteriaCode: item.CriteriaCode || "",
+                                CriteriaName: item.CriteriaName || "",
+                                AreaID: item.AreaID || null
+                            };
+                        }
+                    }
+                    setCriteriaLookup(map);
+                }
+
+                // 4. Requirements
+                if (reqsRes?.ok) {
+                    const payload = await reqsRes.json();
+                    const arr = toArrayPayload(payload);
+                    const map = {};
+                    for (const item of arr) {
+                        if (item?.RequirementID != null) {
+                            map[String(item.RequirementID)] = {
+                                RequirementCode: item.RequirementCode || "",
+                                Description: item.Description || "",
+                                CriteriaID: item.CriteriaID || null
+                            };
+                        }
+                    }
+                    setRequirementLookup(map);
+                }
+
+                // 5. Offices
+                if (officesRes?.ok) {
+                    const payload = await officesRes.json();
+                    const arr = toArrayPayload(payload);
+                    const map = {};
+                    for (const item of arr) {
+                        if (item?.OfficeID != null) {
+                            map[String(item.OfficeID)] = {
+                                OfficeName: item.OfficeName || "",
+                                OfficeCode: item.OfficeCode || "",
+                                EventID: item.EventID || null
+                            };
+                        }
+                    }
+                    setOfficeLookup(map);
+                }
+
+                // 6. Users
+                if (usersRes?.ok) {
+                    const payload = await usersRes.json();
+                    const arr = toArrayPayload(payload?.users ? { data: payload.users } : payload);
+                    const map = {};
+                    for (const u of arr) {
+                        if (u?.UserID != null) {
+                            const name = String(
+                                u.FullName ||
+                                `${u.FirstName || ""}${u.MiddleInitial ? ` ${u.MiddleInitial}.` : ""} ${u.LastName || ""}`
                             ).replace(/\s+/g, " ").trim();
-                            nextUserLookup[String(user.UserID)] = fullName || user.Email || "User";
+                            map[String(u.UserID)] = name || u.Email || "User";
                         }
                     }
-                    setUserLookup(nextUserLookup);
+                    setUserLookup(map);
                 }
             } catch (err) {
-                console.error("Failed to load criteria/event lookup:", err);
+                console.error("Failed to load audit lookups:", err);
             }
         };
 
         fetchLookups();
     }, []);
 
-    // Match other management pages: keep outer page fixed and scroll only content area.
     useEffect(() => {
         const prevOverflow = document.body.style.overflow;
         document.body.style.overflow = 'hidden';
@@ -437,6 +512,7 @@ export default function AuditLogs() {
         const time = d.toLocaleTimeString([], {
             hour: "2-digit",
             minute: "2-digit",
+            second: "2-digit",
         });
         const date = d.toLocaleDateString("en-US", {
             month: "short",
@@ -446,152 +522,341 @@ export default function AuditLogs() {
         return { time, date };
     };
 
+    const [cardHeight, setCardHeight] = useState("calc(100vh - 20rem)");
+
+    useEffect(() => {
+        const updateHeight = () => {
+            if (window.innerWidth < 1024) {
+                setCardHeight("calc(100vh - 25rem)");
+            } else {
+                setCardHeight("calc(100vh - 20rem)");
+            }
+        };
+        updateHeight();
+        window.addEventListener("resize", updateHeight);
+        return () => window.removeEventListener("resize", updateHeight);
+    }, []);
 
     return (
-        <div className="h-screen w-full flex flex-col overflow-hidden">
+        <div className="w-full flex flex-col bg-slate-50/80">
             <Header pageTitle="Audit Logs" />
 
-            <div className="flex-1 overflow-hidden px-4 pb-6 pt-6">
-                <div className="mb-4 flex flex-col gap-2 relative">
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-800 mb-1">Audit Logs</h1>
-                        <p className="text-xs text-gray-600">Track system activity, updates, and account actions.</p>
+
+            <div className="px-6 pt-6 pb-12 flex flex-col gap-5">
+                {/* Header Title & Quick Stat Cards */}
+                <div className="flex flex-col gap-4 shrink-0">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Audit Logs</h1>
+                            <p className="text-xs text-slate-500 mt-0.5 font-medium">Track system activity, updates, and account actions in detail.</p>
+                        </div>
                     </div>
-                    <div className="flex w-full items-center justify-between gap-1">
-                            <div className="relative w-full max-w-sm">
-                                <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
-                                >
-                                    <circle cx="11" cy="11" r="7" />
-                                    <path d="m20 20-3.5-3.5" />
-                                </svg>
-                                <input
-                                    type="text"
-                                    placeholder="Search activity, users, or actions..."
-                                    className="h-9 w-full rounded-lg border border-slate-200 bg-white pl-8 pr-3 text-[9px] text-slate-700 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-brand-500"
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                />
+
+                    {/* Summary Stat Cards */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div className="rounded-xl border border-slate-200/90 bg-white p-3.5 shadow-2xs flex items-center justify-between">
+                            <div>
+                                <p className="text-[11px] font-semibold text-slate-500">Total Activity</p>
+                                <p className="text-xl font-bold text-slate-900 mt-0.5">{stats.total}</p>
                             </div>
-                        <div className="flex items-center gap-1">
-                            <button
-                                onClick={clearControls}
-                                title="Clear controls"
-                                aria-label="Clear controls"
-                                className="flex h-9 w-9 min-w-[36px] items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5" aria-hidden="true">
-                                    <path d="m3 6 3 0 14 0" />
-                                    <path d="M8 6v-2h8v2" />
-                                    <path d="m7 6 1 14h8l1-14" />
-                                    <path d="M10 10v6M14 10v6" />
-                                </svg>
-                            </button>
-                        <div className="flex h-9 items-center justify-end gap-1">
-                            <div className="relative inline-block">
-                                <select
-                                    value={actionFilter}
-                                    onChange={(e) => setActionFilter(e.target.value)}
-                                    className="h-8 min-w-[146px] appearance-none rounded-md border border-slate-200 bg-white px-4 text-center text-[10px] font-medium leading-4 text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                                >
-                                    <option value="all">All</option>
-                                    <option value="Created">Created</option>
-                                    <option value="Updated">Updated</option>
-                                    <option value="Deleted">Deleted</option>
-                                    <option value="Viewed">Viewed</option>
-                                    <option value="Login">Login</option>
-                                    <option value="Logout">Logout</option>
-                                </select>
-                                <svg xmlns="http://www.w3.org/2000/svg" className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-2.5 w-2.5 text-slate-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                    <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
-                                </svg>
+                            <div className="h-9 w-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-sm">
+                                📋
                             </div>
                         </div>
+
+                        <div className="rounded-xl border border-slate-200/90 bg-white p-3.5 shadow-2xs flex items-center justify-between">
+                            <div>
+                                <p className="text-[11px] font-semibold text-slate-500 font-medium">Created Records</p>
+                                <p className="text-xl font-bold text-emerald-600 mt-0.5">{stats.created}</p>
+                            </div>
+                            <div className="h-9 w-9 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-sm">
+                                ➕
+                            </div>
+                        </div>
+
+                        <div className="rounded-xl border border-slate-200/90 bg-white p-3.5 shadow-2xs flex items-center justify-between">
+                            <div>
+                                <p className="text-[11px] font-semibold text-slate-500">Updated Records</p>
+                                <p className="text-xl font-bold text-indigo-600 mt-0.5">{stats.updated}</p>
+                            </div>
+                            <div className="h-9 w-9 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-sm">
+                                ✏️
+                            </div>
+                        </div>
+
+                        <div className="rounded-xl border border-slate-200/90 bg-white p-3.5 shadow-2xs flex items-center justify-between">
+                            <div>
+                                <p className="text-[11px] font-semibold text-slate-500">Security & Deletions</p>
+                                <p className="text-xl font-bold text-rose-600 mt-0.5">{stats.deletedAndAuth}</p>
+                            </div>
+                            <div className="h-9 w-9 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center font-bold text-sm">
+                                🛡️
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div className="bg-white rounded-md shadow-md border border-gray-200 h-[calc(100%-7.5rem)] flex flex-col min-h-0">
-                    <div className="px-4 py-3 border-b border-gray-200">
-                        <div className="flex items-center justify-between gap-3">
-                            <h2 className="text-xl font-semibold" style={{ color: "#121212" }}>
-                                Activity History
-                            </h2>
-                            <span className="text-sm text-gray-500">{filteredLogs.length} item(s)</span>
+                {/* Main Card Container — flex-1 so it fills all remaining vertical space */}
+                <div
+                    className="bg-white rounded-2xl shadow-sm border border-slate-200/90 flex flex-col overflow-hidden"
+                    style={{ height: "calc(100vh - 23rem)", minHeight: "540px" }}
+                >
+                    {/* Filter Toolbar */}
+                    <div className="p-4 border-b border-slate-200/90 bg-slate-50/50 flex flex-wrap items-center justify-between gap-3 shrink-0">
+                        <div className="flex items-center gap-2">
+                            <h2 className="text-base font-bold text-slate-900">Activity History</h2>
+                            <span className="rounded-full bg-slate-200/70 px-2.5 py-0.5 text-xs font-bold text-slate-700">
+                                {filteredLogs.length} item(s)
+                            </span>
+                        </div>
+
+                        <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
+                            {/* Search Input */}
+                            <div className="relative w-full max-w-sm">
+                                <svg
+                                    className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={2}
+                                >
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                                </svg>
+                                <input
+                                    type="text"
+                                    placeholder="Search accreditation, requirement, area, office, or user..."
+                                    className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-8 text-xs font-medium text-slate-800 shadow-2xs transition focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-slate-400"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
+                                {searchTerm && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setSearchTerm("")}
+                                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
+                                    >
+                                        ✕
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Action Filter Dropdown */}
+                            <select
+                                value={actionFilter}
+                                onChange={(e) => setActionFilter(e.target.value)}
+                                className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-2xs transition focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                            >
+                                <option value="all">All Actions</option>
+                                <option value="Created">Created</option>
+                                <option value="Updated">Updated</option>
+                                <option value="Deleted">Deleted</option>
+                                <option value="Viewed">Viewed</option>
+                                <option value="Login">Login</option>
+                                <option value="Logout">Logout</option>
+                            </select>
+
+                            {/* Reset Controls Button */}
+                            {(searchTerm || actionFilter !== "all") && (
+                                <button
+                                    onClick={clearControls}
+                                    title="Clear All Filters"
+                                    className="flex h-9 px-3 items-center justify-center rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-100 transition shadow-2xs"
+                                >
+                                    Clear Filters
+                                </button>
+                            )}
                         </div>
                     </div>
 
+                    {/* Logs List Container */}
                     {loading ? (
-                        <div className="px-4 py-6 text-sm text-gray-500">Loading logs...</div>
+                        <div className="flex-1 flex flex-col items-center justify-center p-8 text-slate-400">
+                            <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent mb-2" />
+                            <span className="text-xs font-medium">Loading activity history...</span>
+                        </div>
                     ) : filteredLogs.length === 0 ? (
-                        <div className="px-4 py-6 text-sm text-gray-500">
-                            {logs.length === 0 ? 'No audit logs found.' : 'No matching logs found.'}
+                        <div className="flex-1 flex flex-col items-center justify-center p-12 text-center">
+                            <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3 text-lg">
+                                🔍
+                            </div>
+                            <p className="text-sm font-bold text-slate-700">No activity logs found</p>
+                            <p className="text-xs text-slate-400 mt-1 max-w-xs">
+                                {logs.length === 0 ? 'No activity logs have been recorded in the database yet.' : 'No logs matching your search term or action filter.'}
+                            </p>
                         </div>
                     ) : (
-                        <>
-                        <div className="divide-y divide-gray-100 overflow-y-auto flex-1 min-h-0">
+                        <div className="flex-1 overflow-y-auto divide-y divide-slate-100 min-h-0 [contain:content]">
                             {visibleLogs.map((log) => {
-                                const normalizedAction = log.normalizedAction;
-                                const color = statusColorMap[normalizedAction] || statusColorMap.default;
+                                const action = log.normalizedAction;
+                                const style = actionStyles[action] || actionStyles.default;
                                 const readableMessage = log.readableMessage;
                                 const { time, date } = formatTimestamp(log.Timestamp);
+                                const isExpanded = expandedLogId === log.LogID;
+                                const userDisplayName = log.displayName || (log.UserID ? `User #${log.UserID}` : 'System');
+                                const roleLabel = log.RoleName ? roleIdToName(log.RoleName) : '';
+                                const ctx = log.context;
 
                                 return (
                                     <div
                                         key={log.LogID}
-                                        className="flex items-start justify-between px-4 py-3 text-sm hover:bg-gray-50 transition"
+                                        className="group transition-colors hover:bg-slate-50/80"
                                     >
-                                        {/* Left: status + message */}
-                                        <div className="flex items-start gap-3">
-                                            <span
-                                                className={`px-2 py-0.5 text-[11px] font-semibold rounded-full border ${color}`}
-                                            >
-                                                {normalizedAction}
-                                            </span>
-                                            <div className="leading-snug">
-                                                <p className="text-gray-800">
-                                                    {readableMessage}
-                                                </p>
-                                                <p className="text-xs text-gray-500 mt-0.5">
-                                                    By{" "}
-                                                    <span className="font-medium">
-                                                        {log.displayName || (log.UserID ? `User #${log.UserID}` : 'System')}
-                                                    </span>
-                                                    {log.RoleName ? ` — ${log.RoleName}` : ''}
-                                                </p>
+                                        <div
+                                            className="flex items-center justify-between px-5 py-3.5 text-xs cursor-pointer gap-4"
+                                            onClick={() => setExpandedLogId(prev => prev === log.LogID ? null : log.LogID)}
+                                        >
+                                            {/* Left: Icon + Action Badge + Message */}
+                                            <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                                                <div className={`h-8 w-8 shrink-0 rounded-lg flex items-center justify-center shadow-2xs ${style.iconBg}`}>
+                                                    {style.icon}
+                                                </div>
+
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${style.badge}`}>
+                                                            {action}
+                                                        </span>
+                                                        <p className="text-xs font-bold text-slate-900 truncate">
+                                                            {readableMessage}
+                                                        </p>
+                                                    </div>
+
+                                                    <div className="mt-1 flex items-center gap-2 text-[11px] text-slate-500 font-medium">
+                                                        <span>By <strong className="text-slate-700">{userDisplayName}</strong></span>
+                                                        {roleLabel && (
+                                                            <>
+                                                                <span>•</span>
+                                                                <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">{roleLabel}</span>
+                                                            </>
+                                                        )}
+                                                        {ctx.eventName && (
+                                                            <>
+                                                                <span>•</span>
+                                                                <span className="text-blue-600 font-semibold truncate max-w-[200px]" title={ctx.eventName}>
+                                                                    🎯 {ctx.eventName}
+                                                                </span>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Right: Timestamp & Details Toggle */}
+                                            <div className="flex items-center gap-3 shrink-0">
+                                                <div className="text-right text-[11px] text-slate-500 font-medium leading-tight">
+                                                    <div className="font-bold text-slate-700">{time}</div>
+                                                    <div className="text-slate-400 text-[10px] mt-0.5">{date}</div>
+                                                </div>
+                                                <div className="text-slate-400 group-hover:text-slate-600 transition-colors">
+                                                    <svg
+                                                        className={`w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-180 text-blue-600' : ''}`}
+                                                        fill="none"
+                                                        viewBox="0 0 24 24"
+                                                        stroke="currentColor"
+                                                        strokeWidth={2}
+                                                    >
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                                                    </svg>
+                                                </div>
                                             </div>
                                         </div>
 
-                                        {/* Right: time + date */}
-                                        <div className="text-right text-xs text-gray-500 whitespace-nowrap">
-                                            <div>{time}</div>
-                                            <div>{date}</div>
-                                        </div>
+                                        {/* Rich In-Depth Context Card (Tree Labeled Pills) */}
+                                        {isExpanded && (
+                                            <div className="px-5 py-4 bg-slate-50/90 border-t border-slate-100 text-xs text-slate-700 transition-all animate-in fade-in duration-150">
+                                                <div className="mb-2 flex items-center justify-between text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                                                    <span>Detailed Activity Breakdown (Log ID #{log.LogID})</span>
+                                                    <span>Action: {log.Action}</span>
+                                                </div>
+
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                                                    {ctx.eventName && (
+                                                        <div className="rounded-xl border border-blue-200/80 bg-white p-3 shadow-2xs">
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 flex items-center gap-1">
+                                                                🎯 Accreditation Event
+                                                            </span>
+                                                            <span className="text-xs font-bold text-slate-900 mt-1 block">{ctx.eventName}</span>
+                                                        </div>
+                                                    )}
+
+                                                    {ctx.areaName && (
+                                                        <div className="rounded-xl border border-indigo-200/80 bg-white p-3 shadow-2xs">
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 flex items-center gap-1">
+                                                                📁 Area
+                                                            </span>
+                                                            <span className="text-xs font-bold text-slate-900 mt-1 block">{ctx.areaName}</span>
+                                                        </div>
+                                                    )}
+
+                                                    {ctx.critLabel && (
+                                                        <div className="rounded-xl border border-purple-200/80 bg-white p-3 shadow-2xs">
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 flex items-center gap-1">
+                                                                📋 Criteria
+                                                            </span>
+                                                            <span className="text-xs font-bold text-slate-900 mt-1 block">{ctx.critLabel}</span>
+                                                        </div>
+                                                    )}
+
+                                                    {(ctx.reqCode || ctx.reqDesc) && (
+                                                        <div className="rounded-xl border border-sky-200/80 bg-white p-3 shadow-2xs">
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider text-sky-600 flex items-center gap-1">
+                                                                📄 Requirement
+                                                            </span>
+                                                            <span className="text-xs font-bold text-slate-900 mt-1 block">
+                                                                {ctx.reqCode} {ctx.reqDesc ? `— ${ctx.reqDesc}` : ''}
+                                                            </span>
+                                                        </div>
+                                                    )}
+
+                                                    {ctx.officeName && (
+                                                        <div className="rounded-xl border border-emerald-200/80 bg-white p-3 shadow-2xs">
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 flex items-center gap-1">
+                                                                🏢 Office / Program
+                                                            </span>
+                                                            <span className="text-xs font-bold text-slate-900 mt-1 block">{ctx.officeName}</span>
+                                                        </div>
+                                                    )}
+
+                                                    {ctx.fileName && (
+                                                        <div className="rounded-xl border border-amber-200/80 bg-white p-3 shadow-2xs">
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 flex items-center gap-1">
+                                                                📎 Evidence File
+                                                            </span>
+                                                            <span className="text-xs font-bold text-slate-900 mt-1 block truncate" title={ctx.fileName}>
+                                                                {ctx.fileName}
+                                                            </span>
+                                                        </div>
+                                                    )}
+
+                                                    <div className="rounded-xl border border-slate-200/80 bg-white p-3 shadow-2xs">
+                                                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
+                                                            👤 Performed By
+                                                        </span>
+                                                        <span className="text-xs font-bold text-slate-900 mt-1 block">
+                                                            {userDisplayName} ({roleLabel || 'User'})
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })}
                         </div>
-                        <div className="px-4 py-4 bg-white">
-                            <Pagination
-                                currentPage={currentPage}
-                                totalPages={totalPages}
-                                onPageChange={(p) => setCurrentPage(p)}
-                                fixed={false}
-                                showWhenSinglePage={false}
-                            />
-                        </div>
-                        </>
                     )}
                 </div>
             </div>
+
+            {/* Fixed bottom pagination — same position as all other pages */}
+            {!loading && filteredLogs.length > 0 && (
+                <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={(p) => setCurrentPage(p)}
+                    fixed={true}
+                    showWhenSinglePage={false}
+                />
+            )}
         </div>
     );
 }
-
-
-

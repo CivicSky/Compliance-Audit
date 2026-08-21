@@ -1,5 +1,6 @@
-﻿import RowActionMenu from './RowActionMenu';
+import RowActionMenu from './RowActionMenu';
 import { formatDateTime } from '../../utils/formatDateTime';
+import { ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
 
 export default function CriteriaItem({
     criteria,
@@ -29,7 +30,11 @@ export default function CriteriaItem({
                     className="h-4 w-4 accent-white"
                 />
             )}
-            <span className="text-lg">{isExpanded ? 'â–¼' : 'â–¶'}</span>
+            {isExpanded ? (
+                <ChevronDown className="h-5 w-5 shrink-0 text-white transition-transform" />
+            ) : (
+                <ChevronRight className="h-5 w-5 shrink-0 text-white transition-transform" />
+            )}
             <div className="flex-1 min-w-0">
                 <span className="font-semibold text-lg truncate block">
                     {(() => {
@@ -43,7 +48,7 @@ export default function CriteriaItem({
                     <span>Updated: {formatDateTime(criteria.UpdatedAt || criteria.CreatedAt)}</span>
                 </div>
             </div>
-            {loading && <span className="text-xs opacity-75">â³</span>}
+            {loading && <Loader2 className="h-4 w-4 animate-spin text-white opacity-75" />}
             <RowActionMenu
                 onEdit={handleEdit ? () => handleEdit(criteria) : undefined}
                 onDelete={onDeleteClick ? () => onDeleteClick(criteria) : undefined}

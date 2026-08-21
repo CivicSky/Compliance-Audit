@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 export default function RowActionMenu({
@@ -100,15 +100,15 @@ export default function RowActionMenu({
         <div
             ref={menuRef}
             role="menu"
-            className="office-card-actions-menu fixed z-[200] w-[220px] overflow-hidden rounded-lg border border-gray-100 bg-white py-1 shadow-lg"
+            className="office-card-actions-menu fixed z-[200] w-48 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl animate-in fade-in zoom-in-95 duration-100"
             style={{ left: position.left, top: position.top }}
             onClick={(e) => e.stopPropagation()}
         >
             {menuItems.map((item) => {
                 const tone = item.tone || 'slate';
-                const hoverClass = item.hoverClassName || (tone === 'red' ? 'hover:bg-red-50' : tone === 'emerald' ? 'hover:bg-emerald-50' : tone === 'indigo' ? 'hover:bg-blue-50' : 'hover:bg-gray-50');
-                const textClass = item.textClassName || (tone === 'red' ? 'text-red-600' : 'text-gray-700');
-                const iconClass = item.iconClassName || (tone === 'red' ? 'text-red-600' : tone === 'emerald' ? 'text-emerald-600' : tone === 'indigo' ? 'text-blue-600' : 'text-gray-600');
+                const hoverClass = item.hoverClassName || (tone === 'red' || tone === 'rose' ? 'hover:bg-rose-50' : tone === 'emerald' ? 'hover:bg-emerald-50' : tone === 'indigo' || tone === 'blue' ? 'hover:bg-blue-50 hover:text-blue-600' : 'hover:bg-slate-50');
+                const textClass = item.textClassName || (tone === 'red' || tone === 'rose' ? 'text-rose-600 font-semibold' : 'text-slate-700 font-semibold');
+                const iconClass = item.iconClassName || (tone === 'red' || tone === 'rose' ? 'text-rose-600 shrink-0' : tone === 'emerald' ? 'text-emerald-600 shrink-0' : tone === 'indigo' || tone === 'blue' ? 'text-blue-600 shrink-0' : 'text-slate-500 shrink-0');
 
                 return (
                     <button
@@ -120,7 +120,7 @@ export default function RowActionMenu({
                             close();
                             item.onClick?.();
                         }}
-                        className={`flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-xs transition ${textClass} ${hoverClass} disabled:cursor-not-allowed disabled:opacity-50 whitespace-nowrap`}
+                        className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs transition ${textClass} ${hoverClass} disabled:cursor-not-allowed disabled:opacity-50 whitespace-nowrap`}
                     >
                         {item.icon ? (
                             <svg className={`h-4 w-4 ${iconClass}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -133,6 +133,8 @@ export default function RowActionMenu({
             })}
         </div>
     ) : null;
+
+    if (!menuItems || menuItems.length === 0) return null;
 
     return (
         <>
