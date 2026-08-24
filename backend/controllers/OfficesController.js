@@ -1205,19 +1205,18 @@ const OfficesController = {
 
       // Detect already-assigned requirements for this office so we can report duplicate skips.
       const [existingRows] = await db.query(
-        `SELECT RequirementID FROM compliancestatusoffices WHERE OfficeID = ? AND RequirementID IN (?)`,
-        [officeId, normalizedRequirementIds]
+        `SELECT RequirementID FROM compliancestatusoffices WHERE OfficeID = ? AND RequirementID IN (${normalizedRequirementIds.join(',')})`,
+        [officeId]
       );
 
-      const existingSet = new Set(existingRows.map((row) => Number(row.RequirementID)));
+      const existingSet = new Set(existingRows.map((row) => Number(row.RequirementID ?? row.requirementid)));
       const newRequirementIds = normalizedRequirementIds.filter((id) => !existingSet.has(id));
       const duplicateCount = normalizedRequirementIds.length - newRequirementIds.length;
 
       if (newRequirementIds.length > 0) {
-        const values = newRequirementIds.map((reqId) => [officeId, reqId, 3]); // Default status: 3 = Not Complied
+        const valuesSql = newRequirementIds.map((reqId) => `(${Number(officeId)}, ${Number(reqId)}, 3)`).join(',');
         await db.query(
-          `INSERT INTO compliancestatusoffices (OfficeID, RequirementID, Status) VALUES ?`,
-          [values]
+          `INSERT INTO compliancestatusoffices (OfficeID, RequirementID, Status) VALUES ${valuesSql}`
         );
 
         // Auto-assign current office heads to the newly-added requirements
@@ -1331,8 +1330,9 @@ const OfficesController = {
   updateRequirementStatus: async (req, res) => {
     const { id: officeId, requirementId } = req.params;
     const { statusId, comments } = req.body;
+    const nextStatusId = Number(statusId);
 
-    if (!statusId || ![3, 4, 5].includes(Number(statusId))) {
+    if (!nextStatusId || ![3, 4, 5].includes(nextStatusId)) {
       return res.status(400).json({
         success: false,
         message: "Invalid status. Must be 3 (Not Complied), 4 (Partially Complied), or 5 (Complied)"
@@ -1348,15 +1348,10 @@ const OfficesController = {
       const currentStatus = existingStatusRows[0]?.Status;
 
       // If status is being set or changed, ensure evidence exists
-      if (statusId && Number(statusId) !== Number(currentStatus)) {
+      if (nextStatusId && nextStatusId !== Number(currentStatus)) {
         const [userUploads] = await db.query(
           `SELECT COUNT(*) as cnt FROM requirement_user_assignments 
-           WHERE OfficeID = ? AND RequirementID = ? AND (HasUploaded = 1 OR HasUploaded = true)`,
-          [officeId, requirementId]
-        );
-        const [userFiles] = await db.query(
-          `SELECT COUNT(*) as cnt FROM user_uploaded_files 
-           WHERE office_id = ? AND requirement_id = ?`,
+           WHERE OfficeID = ? AND RequirementID = ? AND HasUploaded = TRUE`,
           [officeId, requirementId]
         );
         const [proofDocs] = await db.query(
@@ -1365,7 +1360,7 @@ const OfficesController = {
           [officeId, requirementId]
         );
 
-        const hasEvidence = (userUploads[0]?.cnt > 0) || (userFiles[0]?.cnt > 0) || (proofDocs[0]?.cnt > 0);
+        const hasEvidence = (userUploads[0]?.cnt > 0) || (proofDocs[0]?.cnt > 0);
 
         if (!hasEvidence) {
           return res.status(400).json({
@@ -1375,13 +1370,422 @@ const OfficesController = {
         }
       }
 
-      // Use INSERT ... ON CONFLICT DO UPDATE to handle both insert and update, including comments in PostgreSQL
-      await db.query(
-        `INSERT INTO compliancestatusoffices (OfficeID, RequirementID, Status, comments)
-         VALUES (?, ?, ?, ?)
-         ON CONFLICT (OfficeID, RequirementID) DO UPDATE SET Status = EXCLUDED.Status, comments = EXCLUDED.comments`,
-        [officeId, requirementId, statusId, comments || null]
+      const hasCommentPayload = Object.prototype.hasOwnProperty.call(req.body, 'comments');
+      const updateSql = hasCommentPayload
+        ? `UPDATE compliancestatusoffices
+           SET Status = ?, comments = ?, LastUpdated = CURRENT_TIMESTAMP
+           WHERE OfficeID = ? AND RequirementID = ?`
+        : `UPDATE compliancestatusoffices
+           SET Status = ?, LastUpdated = CURRENT_TIMESTAMP
+           WHERE OfficeID = ? AND RequirementID = ?`;
+      const updateParams = hasCommentPayload
+        ? [nextStatusId, comments || null, officeId, requirementId]
+        : [nextStatusId, officeId, requirementId];
+      const [updateResult] = await db.query(updateSql, updateParams);
+
+      if (!updateResult?.affectedRows) {
+        await db.query(
+          `INSERT INTO compliancestatusoffices (OfficeID, RequirementID, Status, comments)
+           VALUES (?, ?, ?, ?)`,
+          [officeId, requirementId, nextStatusId, hasCommentPayload ? (comments || null) : null]
+        );
+      }
+
+      // Update the overall office status
+      await updateOverallOfficeStatus(officeId);
+
+      res.json({
+        success: true,
+        message: "Compliance status and comment updated successfully"
+      });
+    } catch (err) {
+      console.error("Error updating requirement status:", err);
+      res.status(500).json({
+        success: false,
+        error: "Database error",
+        details: err.message
+      });
+    }
+  },
+
+  // ================================
+  // EXPORT OFFICE REQUIREMENTS (EXCEL TABLE FORMAT)
+  // ================================
+  exportOfficeExcel: async (req, res) => {
+    const officeId = Number(req.params.id);
+
+    if (!Number.isInteger(officeId) || officeId <= 0) {
+      return res.status(400).json({ success: false, message: 'Invalid office id' });
+    }
+
+    try {
+      const [officeRows] = await db.query(
+        `SELECT o.OfficeID, o.OfficeName
+         FROM offices o
+         WHERE o.OfficeID = ?
+         LIMIT 1`,
+        [officeId]
       );
+
+      if (!officeRows.length) {
+        return res.status(404).json({ success: false, message: 'Office not found' });
+      }
+
+      const officeName = officeRows[0].OfficeName || `Office ${officeId}`;
+
+      const [requirementsRows] = await db.query(
+        `SELECT
+          r.RequirementID,
+          r.RequirementCode,
+          r.Description,
+          c.CriteriaID,
+          c.ParentCriteriaID,
+          c.CriteriaCode,
+          c.CriteriaName,
+          pc.CriteriaCode AS ParentCriteriaCode,
+          pc.CriteriaName AS ParentCriteriaName,
+          a.AreaID,
+          a.AreaCode,
+          a.AreaName,
+          cso.Status AS ComplianceStatusID,
+          cst.StatusName AS ComplianceStatusName,
+          cso.comments AS Comments
+        FROM compliancestatusoffices cso
+        INNER JOIN requirements r ON cso.RequirementID = r.RequirementID
+        LEFT JOIN criteria c ON r.CriteriaID = c.CriteriaID
+        LEFT JOIN criteria pc ON c.ParentCriteriaID = pc.CriteriaID
+        LEFT JOIN areas a ON c.AreaID = a.AreaID
+        LEFT JOIN compliancestatustypes cst ON cso.Status = cst.StatusID
+        WHERE cso.OfficeID = ?
+        ORDER BY
+          COALESCE(a.AreaCode, 'ZZZ') ASC,
+          COALESCE(a.AreaName, 'ZZZ') ASC,
+          COALESCE(COALESCE(pc.CriteriaCode, c.CriteriaCode), 'ZZZ') ASC,
+          COALESCE(c.CriteriaCode, 'ZZZ') ASC,
+          COALESCE(r.RequirementCode, 'ZZZ') ASC,
+          r.RequirementID ASC`,
+        [officeId]
+      );
+
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'Compliance Audit';
+      workbook.created = new Date();
+
+      const sheet = workbook.addWorksheet('Office Export');
+      sheet.columns = [
+        { key: 'status', width: 20 },
+        { key: 'requirement', width: 140 },
+        { key: 'comments', width: 64 },
+      ];
+
+      const thinBorder = {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' },
+      };
+
+      const areaHeaderStyle = {
+        font: { bold: true, size: 13 },
+        alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
+      };
+
+      const criteriaHeaderStyle = {
+        font: { bold: true, size: 12 },
+        alignment: { horizontal: 'left', vertical: 'middle', wrapText: true },
+      };
+
+      let rowIndex = 1;
+
+      sheet.mergeCells(`A${rowIndex}:C${rowIndex}`);
+      const officeCell = sheet.getCell(`A${rowIndex}`);
+      officeCell.value = String(officeName).toUpperCase();
+      officeCell.font = { bold: true, size: 14 };
+      officeCell.alignment = { horizontal: 'center', vertical: 'middle' };
+      officeCell.border = thinBorder;
+      sheet.getCell(`B${rowIndex}`).border = thinBorder;
+      sheet.getCell(`C${rowIndex}`).border = thinBorder;
+      rowIndex += 1;
+
+      if (!requirementsRows.length) {
+        sheet.mergeCells(`A${rowIndex}:B${rowIndex}`);
+        const emptyCell = sheet.getCell(`A${rowIndex}`);
+        emptyCell.value = 'No requirements assigned to this office.';
+        emptyCell.alignment = { horizontal: 'center', vertical: 'middle' };
+        emptyCell.border = thinBorder;
+        sheet.getCell(`B${rowIndex}`).border = thinBorder;
+      } else {
+        const areasMap = new Map();
+
+        requirementsRows.forEach((row) => {
+          const areaCode = row.AreaCode || 'N/A';
+          const areaName = row.AreaName || 'No Area';
+          const areaKey = `${areaCode}__${areaName}`;
+
+          if (!areasMap.has(areaKey)) {
+            areasMap.set(areaKey, {
+              areaCode,
+              areaName,
+              criteriaMap: new Map(),
+            });
+          }
+
+          const areaEntry = areasMap.get(areaKey);
+          const critId = row.CriteriaID != null ? Number(row.CriteriaID) : `req_${row.RequirementID}`;
+          const parentId = row.ParentCriteriaID != null ? Number(row.ParentCriteriaID) : null;
+
+          if (!areaEntry.criteriaMap.has(critId)) {
+            areaEntry.criteriaMap.set(critId, {
+              id: critId,
+              code: row.CriteriaCode || '',
+              name: row.CriteriaName || '',
+              parentId: parentId,
+              children: [],
+              requirements: [],
+            });
+          }
+
+          if (parentId && !areaEntry.criteriaMap.has(parentId)) {
+            areaEntry.criteriaMap.set(parentId, {
+              id: parentId,
+              code: row.ParentCriteriaCode || '',
+              name: row.ParentCriteriaName || '',
+              parentId: null,
+              children: [],
+              requirements: [],
+            });
+          }
+
+          areaEntry.criteriaMap.get(critId).requirements.push({
+            status: normalizeComplianceStatus(row.ComplianceStatusID, row.ComplianceStatusName),
+            requirementCode: row.RequirementCode || 'N/A',
+            description: row.Description || '',
+            comments: row.Comments || ''
+          });
+        });
+
+        for (const area of areasMap.values()) {
+          for (const node of area.criteriaMap.values()) {
+            if (node.parentId && area.criteriaMap.has(node.parentId)) {
+              area.criteriaMap.get(node.parentId).children.push(node);
+            }
+          }
+        }
+
+        for (const area of areasMap.values()) {
+          sheet.mergeCells(`A${rowIndex}:C${rowIndex}`);
+          const areaTitleCell = sheet.getCell(`A${rowIndex}`);
+          areaTitleCell.value = `${area.areaCode} - ${area.areaName}`;
+          areaTitleCell.font = areaHeaderStyle.font;
+          areaTitleCell.alignment = areaHeaderStyle.alignment;
+          areaTitleCell.border = thinBorder;
+          sheet.getCell(`B${rowIndex}`).border = thinBorder;
+          sheet.getCell(`C${rowIndex}`).border = thinBorder;
+          rowIndex += 1;
+
+          const allNodes = Array.from(area.criteriaMap.values());
+          const roots = allNodes.filter(n => !n.parentId || !area.criteriaMap.has(n.parentId));
+          roots.sort((a, b) => (String(a.code || a.name)).localeCompare(String(b.code || b.name)));
+
+          for (const root of roots) {
+            sheet.mergeCells(`A${rowIndex}:C${rowIndex}`);
+            const criteriaLabel = root.code ? `${String(root.code).trim().replace(/\.+$/, '').toUpperCase()}. ${root.name}` : root.name || 'No Criteria';
+            const criteriaCell = sheet.getCell(`A${rowIndex}`);
+            criteriaCell.value = criteriaLabel;
+            criteriaCell.font = criteriaHeaderStyle.font;
+            criteriaCell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+            criteriaCell.border = thinBorder;
+            sheet.getCell(`B${rowIndex}`).border = thinBorder;
+            sheet.getCell(`C${rowIndex}`).border = thinBorder;
+            rowIndex += 1;
+
+            for (const req of root.requirements) {
+              sheet.getCell(`A${rowIndex}`).value = req.status;
+              sheet.getCell(`B${rowIndex}`).value = `${req.requirementCode} - ${req.description}`;
+              sheet.getCell(`C${rowIndex}`).value = req.comments || '';
+              sheet.getCell(`A${rowIndex}`).alignment = { horizontal: 'left', vertical: 'middle' };
+              sheet.getCell(`B${rowIndex}`).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+              sheet.getCell(`C${rowIndex}`).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+              sheet.getCell(`A${rowIndex}`).border = thinBorder;
+              sheet.getCell(`B${rowIndex}`).border = thinBorder;
+              sheet.getCell(`C${rowIndex}`).border = thinBorder;
+              rowIndex += 1;
+            }
+
+            const children = (root.children || []).slice().sort((a,b) => (String(a.code || a.name)).localeCompare(String(b.code || b.name)));
+            for (const child of children) {
+              sheet.mergeCells(`A${rowIndex}:C${rowIndex}`);
+              const childLabel = child.code ? `${String(child.code).trim().replace(/\.+$/, '').toUpperCase()}. ${child.name}` : child.name || 'No Criteria';
+              const childCell = sheet.getCell(`A${rowIndex}`);
+              childCell.value = childLabel;
+              childCell.font = { bold: true, size: 11 };
+              childCell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+              childCell.border = thinBorder;
+              sheet.getCell(`B${rowIndex}`).border = thinBorder;
+              sheet.getCell(`C${rowIndex}`).border = thinBorder;
+              rowIndex += 1;
+
+              for (const req of child.requirements) {
+                sheet.getCell(`A${rowIndex}`).value = req.status;
+                sheet.getCell(`B${rowIndex}`).value = `${req.requirementCode} - ${req.description}`;
+                sheet.getCell(`C${rowIndex}`).value = req.comments || '';
+                sheet.getCell(`A${rowIndex}`).alignment = { horizontal: 'left', vertical: 'middle' };
+                sheet.getCell(`B${rowIndex}`).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+                sheet.getCell(`C${rowIndex}`).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+                sheet.getCell(`A${rowIndex}`).border = thinBorder;
+                sheet.getCell(`B${rowIndex}`).border = thinBorder;
+                sheet.getCell(`C${rowIndex}`).border = thinBorder;
+                rowIndex += 1;
+              }
+            }
+          }
+        }
+      }
+
+      const safeName = String(officeName)
+        .replace(/[\\/:*?"<>|]+/g, '_')
+        .replace(/\s+/g, '_')
+        .trim();
+
+      const fileName = `${safeName || `office_${officeId}`}_export.xlsx`;
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+
+      await workbook.xlsx.write(res);
+      return res.end();
+    } catch (err) {
+      console.error('Error exporting office excel:', err);
+      return res.status(500).json({ success: false, message: 'Failed to export office excel', details: err.message });
+    }
+    try {
+      const [result] = await db.query(
+        "DELETE FROM compliancestatusoffices WHERE OfficeID = ? AND RequirementID = ?",
+        [officeId, requirementId]
+      );
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ 
+          success: false, 
+          message: "Requirement not found for this office" 
+        });
+      }
+
+      // Update the overall office status after removal
+      await updateOverallOfficeStatus(officeId);
+
+      // Remove any user assignments for this requirement in this office
+      try {
+        await db.execute('DELETE FROM requirement_user_assignments WHERE RequirementID = ? AND OfficeID = ?', [requirementId, officeId]);
+      } catch (cleanupErr) {
+        console.error('Failed to cleanup requirement_user_assignments after removing office requirement:', cleanupErr);
+      }
+
+      // Also remove any uploaded proof documents (disk + DB) related to this requirement for the office
+      try {
+        const [files] = await db.query(
+          'SELECT id, file_path FROM office_proof_documents WHERE requirement_id = ? AND office_id = ?',
+          [requirementId, officeId]
+        );
+
+        if (files && files.length > 0) {
+          for (const f of files) {
+            try {
+              const absPath = path.join(__dirname, '..', (f.file_path || '').replace(/^\//, ''));
+              if (fs.existsSync(absPath)) {
+                fs.unlinkSync(absPath);
+              }
+            } catch (fsErr) {
+              console.warn('Failed to delete requirement proof file from disk during removeOfficeRequirement:', fsErr);
+            }
+          }
+
+          await db.query('DELETE FROM office_proof_documents WHERE requirement_id = ? AND office_id = ?', [requirementId, officeId]);
+        }
+      } catch (docErr) {
+        console.error('Failed to cleanup office_proof_documents after removing office requirement:', docErr);
+      }
+
+      res.json({ 
+        success: true, 
+        message: "Requirement removed successfully" 
+      });
+    } catch (err) {
+      console.error("Error removing office requirement:", err);
+      res.status(500).json({ 
+        success: false, 
+        error: "Database error", 
+        details: err.message 
+      });
+    }
+  },
+
+  // ================================
+  // UPDATE REQUIREMENT STATUS
+  // ================================
+  updateRequirementStatus: async (req, res) => {
+    const { id: officeId, requirementId } = req.params;
+    const { statusId, comments } = req.body;
+    const nextStatusId = Number(statusId);
+
+    if (!nextStatusId || ![3, 4, 5].includes(nextStatusId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid status. Must be 3 (Not Complied), 4 (Partially Complied), or 5 (Complied)"
+      });
+    }
+
+    try {
+      // Check existing status to see if statusId is changing or being set
+      const [existingStatusRows] = await db.query(
+        `SELECT Status FROM compliancestatusoffices WHERE OfficeID = ? AND RequirementID = ?`,
+        [officeId, requirementId]
+      );
+      const currentStatus = existingStatusRows[0]?.Status;
+
+      // If status is being set or changed, ensure evidence exists
+      if (nextStatusId && nextStatusId !== Number(currentStatus)) {
+        const [userUploads] = await db.query(
+          `SELECT COUNT(*) as cnt FROM requirement_user_assignments 
+           WHERE OfficeID = ? AND RequirementID = ? AND HasUploaded = TRUE`,
+          [officeId, requirementId]
+        );
+        const [proofDocs] = await db.query(
+          `SELECT COUNT(*) as cnt FROM office_proof_documents 
+           WHERE office_id = ? AND (requirement_id = ? OR requirement_id IS NULL)`,
+          [officeId, requirementId]
+        );
+
+        const hasEvidence = (userUploads[0]?.cnt > 0) || (proofDocs[0]?.cnt > 0);
+
+        if (!hasEvidence) {
+          return res.status(400).json({
+            success: false,
+            message: "Cannot change compliance status: No evidence or proof document has been uploaded for this requirement yet."
+          });
+        }
+      }
+
+      const hasCommentPayload = Object.prototype.hasOwnProperty.call(req.body, 'comments');
+      const updateSql = hasCommentPayload
+        ? `UPDATE compliancestatusoffices
+           SET Status = ?, comments = ?, LastUpdated = CURRENT_TIMESTAMP
+           WHERE OfficeID = ? AND RequirementID = ?`
+        : `UPDATE compliancestatusoffices
+           SET Status = ?, LastUpdated = CURRENT_TIMESTAMP
+           WHERE OfficeID = ? AND RequirementID = ?`;
+      const updateParams = hasCommentPayload
+        ? [nextStatusId, comments || null, officeId, requirementId]
+        : [nextStatusId, officeId, requirementId];
+      const [updateResult] = await db.query(updateSql, updateParams);
+
+      if (!updateResult?.affectedRows) {
+        await db.query(
+          `INSERT INTO compliancestatusoffices (OfficeID, RequirementID, Status, comments)
+           VALUES (?, ?, ?, ?)`,
+          [officeId, requirementId, nextStatusId, hasCommentPayload ? (comments || null) : null]
+        );
+      }
 
       // Update the overall office status
       await updateOverallOfficeStatus(officeId);

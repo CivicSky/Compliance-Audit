@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import StatusBadge from './StatusBadge';
+import StatusSlider from './StatusSlider';
 import { API_BASE_URL } from '../../utils/apiBase';
 import { useModal } from '../UI/ModalProvider';
 
@@ -42,9 +43,9 @@ export default function RequirementsTree({
 
     const [auditorAssignedAreaIds, setAuditorAssignedAreaIds] = useState(new Set());
 
-    const isAuditor = currentUser?.RoleID === 4 || 
-                      String(currentUser?.RoleName || '').toLowerCase().includes('auditor') || 
-                      currentUser?.isExternalAuditor;
+    const isAuditor = currentUser?.RoleID === 4 ||
+        String(currentUser?.RoleName || '').toLowerCase().includes('auditor') ||
+        currentUser?.isExternalAuditor;
 
     useEffect(() => {
         if (!currentUser || !isAuditor) return;
@@ -60,13 +61,13 @@ export default function RequirementsTree({
                     const ids = new Set((data.assignments || []).map(a => Number(a.area_id)));
                     setAuditorAssignedAreaIds(ids);
                 }
-            } catch (e) {}
+            } catch (e) { }
         };
         fetchAssignments();
         return () => { mounted = false; };
     }, [currentUser, isAuditor]);
 
-    const effectiveRequirements = isAuditor 
+    const effectiveRequirements = isAuditor
         ? (requirements || []).filter(req => auditorAssignedAreaIds.has(Number(req.AreaID)))
         : (requirements || []);
 
@@ -78,10 +79,10 @@ export default function RequirementsTree({
                         <div key={i} className="space-y-4">
                             {/* Skeleton Area Header */}
                             <div className="h-10 w-full rounded-xl bg-slate-200/80" />
-                            
+
                             {/* Skeleton Criteria Header */}
                             <div className="ml-4 h-9 w-[95%] rounded-xl bg-slate-200/50" />
-                            
+
                             {/* Skeleton Requirement Cards */}
                             <div className="ml-8 space-y-3">
                                 {[1, 2].map((j) => (
@@ -92,17 +93,17 @@ export default function RequirementsTree({
                                             <div className="h-3 w-20 rounded bg-slate-200/50" />
                                             <div className="h-3 w-14 rounded bg-slate-200/50" />
                                         </div>
-                                        
+
                                         {/* Details placeholder */}
                                         <div className="flex-1 space-y-2">
                                             <div className="h-3.5 w-12 rounded bg-slate-200/80" />
                                             <div className="h-3 w-full rounded bg-slate-200/50" />
                                             <div className="h-3 w-4/5 rounded bg-slate-200/50" />
-                                            
+
                                             {/* Comment input box placeholder */}
                                             <div className="h-8 w-full rounded-lg bg-slate-100/50 mt-3" />
                                         </div>
-                                        
+
                                         {/* Action buttons placeholder */}
                                         <div className="w-16 flex flex-col items-end gap-2 shrink-0">
                                             <div className="h-3 w-10 rounded bg-slate-200/80" />
@@ -193,9 +194,10 @@ export default function RequirementsTree({
                             if (!matchesSearch) return false;
 
                             if (statusFilter === 'all') return true;
-                            if (statusFilter === 'complied') return req.ComplianceStatusID === 5;
-                            if (statusFilter === 'partially') return req.ComplianceStatusID === 4;
-                            return (req.ComplianceStatusID === 3 || !req.ComplianceStatusID);
+                            const statusId = Number(req.ComplianceStatusID);
+                            if (statusFilter === 'complied') return statusId === 5;
+                            if (statusFilter === 'partially') return statusId === 4;
+                            return (statusId === 3 || !statusId);
                         };
 
                         // helper: check if node or any descendant has matching requirements
@@ -236,68 +238,30 @@ export default function RequirementsTree({
                                                             if (isAdmin || isAuditor) onViewSubmission?.(req);
                                                             else if (isOfficeHead) onViewMySubmission?.(req);
                                                         }
-                                                }}
+                                                    }}
                                                     role={canOpenSubmission ? 'button' : undefined}
                                                     tabIndex={canOpenSubmission ? 0 : undefined}
                                                 >
                                                     {/* Reuse existing requirement rendering block by inlining the minimal structure */}
-                                                    <div className="flex items-start gap-3">
-                                                        <div className="min-w-[90px]">
+                                                    <div className="flex items-stretch gap-3">
+                                                        <div className="min-w-[90px] flex flex-col">
                                                             {isAdmin ? (
                                                                 (() => {
                                                                     const reqUsers = assignedUsersMap[req.RequirementID] || [];
                                                                     const hasUploadedEvidence = reqUsers.some(u => u?.HasUploaded === 1 || u?.HasUploaded === true) ||
                                                                         Boolean(req.DocumentProof || req.ProofDocument || req.hasProof || req.has_proof || req.file_url);
+                                                                    const currentStatusId = Number(req.ComplianceStatusID) || 3;
 
                                                                     return (
-                                                                        <div 
-                                                                            className={`space-y-2 rounded-xl border border-slate-300/40 bg-slate-200/50 p-2 ${!hasUploadedEvidence ? 'opacity-50' : ''}`}
-                                                                            title={!hasUploadedEvidence ? "Upload evidence or proof document before selecting compliance status" : ""}
-                                                                        >
-                                                                            {[
-                                                                                { id: 5, label: 'Complied', color: 'emerald' },
-                                                                                { id: 4, label: 'Partially Complied', color: 'amber' },
-                                                                                { id: 3, label: 'Not Complied', color: 'rose' },
-                                                                            ].map((option) => (
-                                                                                <label
-                                                                                    key={option.id}
-                                                                                    className={`flex w-40 items-center gap-2 whitespace-nowrap rounded-lg px-1 py-0.5 text-xs transition ${hasUploadedEvidence ? 'cursor-pointer hover:bg-white/80' : 'cursor-not-allowed opacity-60'}`}
-                                                                                    title={!hasUploadedEvidence ? "Evidence / proof document required" : option.label}
-                                                                                    onClick={(e) => {
-                                                                                        e.stopPropagation();
-                                                                                        if (!hasUploadedEvidence) {
-                                                                                            showAlert('Cannot change compliance status: No evidence or proof document has been uploaded for this requirement yet.');
-                                                                                        }
-                                                                                    }}
-                                                                                >
-                                                                                    <input
-                                                                                        type="radio"
-                                                                                        name={`status-${req.RequirementID}`}
-                                                                                        checked={req.ComplianceStatusID === option.id}
-                                                                                        disabled={!hasUploadedEvidence}
-                                                                                        onChange={(e) => {
-                                                                                            e.stopPropagation();
-                                                                                            if (!hasUploadedEvidence) {
-                                                                                                showAlert('Cannot change compliance status: No evidence or proof document has been uploaded for this requirement yet.');
-                                                                                                return;
-                                                                                            }
-                                                                                            handleStatusChange(req.RequirementID, option.id);
-                                                                                        }}
-                                                                                        className={`w-3 h-3 text-${option.color}-600 border-${option.color}-300 focus:ring-${option.color}-500 focus:ring-2 disabled:cursor-not-allowed`}
-                                                                                    />
-                                                                                    <span
-                                                                                        className={`font-medium ${option.color === 'emerald'
-                                                                                            ? 'text-emerald-700'
-                                                                                            : option.color === 'amber'
-                                                                                                ? 'text-amber-700'
-                                                                                                : 'text-rose-700'
-                                                                                            }`}
-                                                                                    >
-                                                                                        {option.label}
-                                                                                    </span>
-                                                                                </label>
-                                                                            ))}
-                                                                        </div>
+                                                                        <StatusSlider
+                                                                            currentStatusId={currentStatusId}
+                                                                            disabled={!hasUploadedEvidence}
+                                                                            className="h-full"
+                                                                            onChange={(newStatusId) => handleStatusChange(req.RequirementID, newStatusId)}
+                                                                            onDisabledClick={() => {
+                                                                                showAlert('Cannot change compliance status: No evidence or proof document has been uploaded for this requirement yet.');
+                                                                            }}
+                                                                        />
                                                                     );
                                                                 })()
                                                             ) : (
@@ -338,85 +302,85 @@ export default function RequirementsTree({
                                                             })()}
 
                                                             {/* Comments display / edit */}
-                                                                {editingCommentId === req.RequirementID ? (
-                                                                    <div className="mt-2" onClick={(e) => e.stopPropagation()}>
-                                            {req.comments ? (
-                                                <div className="mb-2 rounded-lg border border-slate-300/50 bg-slate-50 p-3 shadow-sm">
-                                                    <div className="flex items-center justify-between gap-2">
-                                                        <div className="text-[12px] font-semibold text-gray-800">{commentLabel}</div>
-                                                        {isAdmin ? (
-                                                            <button
-                                                                type="button"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleCommentClear?.(req);
-                                                                }}
-                                                                disabled={savingComment}
-                                                                className="rounded-md px-2 py-1 text-[11px] font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-40"
-                                                            >
-                                                                Clear
-                                                            </button>
-                                                        ) : null}
-                                                    </div>
-                                                    <div className="mt-1 text-[13px] text-gray-800 break-words">{req.comments}</div>
-                                                </div>
-                                            ) : null}
+                                                            {editingCommentId === req.RequirementID ? (
+                                                                <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                                                                    {req.comments ? (
+                                                                        <div className="mb-2 rounded-lg border border-slate-300/50 bg-slate-50 p-3 shadow-sm">
+                                                                            <div className="flex items-center justify-between gap-2">
+                                                                                <div className="text-[12px] font-semibold text-gray-800">{commentLabel}</div>
+                                                                                {isAdmin ? (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            handleCommentClear?.(req);
+                                                                                        }}
+                                                                                        disabled={savingComment}
+                                                                                        className="rounded-md px-2 py-1 text-[11px] font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-40"
+                                                                                    >
+                                                                                        Clear
+                                                                                    </button>
+                                                                                ) : null}
+                                                                            </div>
+                                                                            <div className="mt-1 text-[13px] text-gray-800 break-words">{req.comments}</div>
+                                                                        </div>
+                                                                    ) : null}
 
-                                                                        <div className="rounded-full border border-slate-300/50 bg-slate-50 px-3 py-2 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                                                                            <input
-                                                    type="text"
-                                                    value={commentInput}
-                                                    onChange={handleCommentInputChange}
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === 'Enter') {
-                                                            e.preventDefault();
-                                                            handleCommentSave(req);
-                                                        }
-                                                        if (e.key === 'Escape') {
-                                                            e.preventDefault();
-                                                            handleCommentCancel();
-                                                        }
-                                                    }}
-                                                    className="flex-1 bg-transparent outline-none text-[12px] text-gray-800 placeholder:text-gray-400"
-                                                    placeholder="Add private comment..."
-                                                    disabled={!isAdmin || savingComment}
-                                                />
-                                                <button
-                                                    type="button"
+                                                                    <div className="rounded-full border border-slate-300/50 bg-slate-50 px-3 py-2 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={commentInput}
+                                                                            onChange={handleCommentInputChange}
+                                                                            onKeyDown={(e) => {
+                                                                                if (e.key === 'Enter') {
+                                                                                    e.preventDefault();
+                                                                                    handleCommentSave(req);
+                                                                                }
+                                                                                if (e.key === 'Escape') {
+                                                                                    e.preventDefault();
+                                                                                    handleCommentCancel();
+                                                                                }
+                                                                            }}
+                                                                            className="flex-1 bg-transparent outline-none text-[12px] text-gray-800 placeholder:text-gray-400"
+                                                                            placeholder="Add private comment..."
+                                                                            disabled={!isAdmin || savingComment}
+                                                                        />
+                                                                        <button
+                                                                            type="button"
                                                                             onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            handleCommentSave(req);
-                                                                        }}
-                                                    disabled={!isAdmin || savingComment || !String(commentInput || '').trim()}
-                                                    className="h-7 w-7 rounded-full flex items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-40"
-                                                    aria-label="Send comment"
-                                                    title="Send"
-                                                >
-                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                                        <path d="M3 12L21 3l-6 18-2.7-7.3L3 12Z" fill="currentColor" />
-                                                    </svg>
-                                                </button>
-                                                <button
-                                                    type="button"
+                                                                                e.stopPropagation();
+                                                                                handleCommentSave(req);
+                                                                            }}
+                                                                            disabled={!isAdmin || savingComment || !String(commentInput || '').trim()}
+                                                                            className="h-7 w-7 rounded-full flex items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-40"
+                                                                            aria-label="Send comment"
+                                                                            title="Send"
+                                                                        >
+                                                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                                                                <path d="M3 12L21 3l-6 18-2.7-7.3L3 12Z" fill="currentColor" />
+                                                                            </svg>
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
                                                                             onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            handleCommentCancel();
-                                                                        }}
-                                                    className="h-7 w-7 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100"
-                                                    aria-label="Cancel"
-                                                    title="Cancel"
-                                                >
-                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                                        <path d="M18 6 6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                                                    </svg>
-                                                </button>
-                                            </div>
+                                                                                e.stopPropagation();
+                                                                                handleCommentCancel();
+                                                                            }}
+                                                                            className="h-7 w-7 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100"
+                                                                            aria-label="Cancel"
+                                                                            title="Cancel"
+                                                                        >
+                                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                                                                <path d="M18 6 6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                                                            </svg>
+                                                                        </button>
+                                                                    </div>
                                                                 </div>
-                                                                    ) : (
+                                                            ) : (
                                                                 <div className="mt-2">
                                                                     {req.comments ? (
                                                                         <div
-                                                                                onClick={(e) => {
+                                                                            onClick={(e) => {
                                                                                 e.stopPropagation();
                                                                                 if (isAdmin) handleCommentClick(req);
                                                                             }}
@@ -424,29 +388,29 @@ export default function RequirementsTree({
                                                                             tabIndex={isAdmin ? 0 : undefined}
                                                                             className={`rounded-lg border border-slate-300/50 bg-slate-50 p-3 shadow-sm ${isAdmin ? 'cursor-pointer' : ''}`}
                                                                         >
-                                                <div>
-                                                    <div className="flex items-center justify-between gap-2">
-                                                        <div className="text-[12px] font-semibold text-gray-800">{commentLabel}</div>
-                                                        {isAdmin ? (
-                                                            <button
-                                                                type="button"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleCommentClear?.(req);
-                                                                }}
-                                                                disabled={savingComment}
-                                                                className="rounded-md px-2 py-1 text-[11px] font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-40"
-                                                            >
-                                                                Clear
-                                                            </button>
-                                                        ) : null}
-                                                    </div>
-                                                    <div className="mt-1 text-[13px] text-gray-800 break-words">{req.comments}</div>
-                                                </div>
+                                                                            <div>
+                                                                                <div className="flex items-center justify-between gap-2">
+                                                                                    <div className="text-[12px] font-semibold text-gray-800">{commentLabel}</div>
+                                                                                    {isAdmin ? (
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={(e) => {
+                                                                                                e.stopPropagation();
+                                                                                                handleCommentClear?.(req);
+                                                                                            }}
+                                                                                            disabled={savingComment}
+                                                                                            className="rounded-md px-2 py-1 text-[11px] font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-40"
+                                                                                        >
+                                                                                            Clear
+                                                                                        </button>
+                                                                                    ) : null}
+                                                                                </div>
+                                                                                <div className="mt-1 text-[13px] text-gray-800 break-words">{req.comments}</div>
+                                                                            </div>
                                                                         </div>
                                                                     ) : (
                                                                         <div
-                                                                                onClick={(e) => {
+                                                                            onClick={(e) => {
                                                                                 e.stopPropagation();
                                                                                 if (isAdmin) handleCommentClick(req);
                                                                             }}
@@ -454,12 +418,12 @@ export default function RequirementsTree({
                                                                             tabIndex={isAdmin ? 0 : undefined}
                                                                             className={`rounded-full border border-slate-300/50 bg-slate-50 px-3 py-2 flex items-center gap-2 ${isAdmin ? 'cursor-pointer' : ''}`}
                                                                         >
-                                                <span className="flex-1 text-[12px] text-gray-400">{isAdmin ? 'Add private comment...' : 'No comments'}</span>
-                                                <span className="h-7 w-7 rounded-full flex items-center justify-center text-gray-400">
-                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                                        <path d="M3 12L21 3l-6 18-2.7-7.3L3 12Z" fill="currentColor" />
-                                                    </svg>
-                                                </span>
+                                                                            <span className="flex-1 text-[12px] text-gray-400">{isAdmin ? 'Add private comment...' : 'No comments'}</span>
+                                                                            <span className="h-7 w-7 rounded-full flex items-center justify-center text-gray-400">
+                                                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                                                                    <path d="M3 12L21 3l-6 18-2.7-7.3L3 12Z" fill="currentColor" />
+                                                                                </svg>
+                                                                            </span>
                                                                         </div>
                                                                     )}
                                                                 </div>
@@ -499,9 +463,9 @@ export default function RequirementsTree({
                                                                                             e.target.src = '/src/assets/images/user.svg';
                                                                                         }}
                                                                                         onClick={(e) => {
-                                                                                        e.stopPropagation();
-                                                                                        handleUserAvatarClick(e, user, req.RequirementID);
-                                                                                    }}
+                                                                                            e.stopPropagation();
+                                                                                            handleUserAvatarClick(e, user, req.RequirementID);
+                                                                                        }}
                                                                                         className={`h-7 w-7 cursor-pointer rounded-full border-2 object-cover shadow-sm ring-1 ring-slate-200/50 ${hasUploaded ? 'border-emerald-500' : 'border-white'}`}
                                                                                     />
                                                                                     {hasUploaded && (
@@ -513,24 +477,24 @@ export default function RequirementsTree({
                                                                             );
                                                                         })}
 
-                                                                    {assignedUsersMap[req.RequirementID].length > 4 && (
-                                                                        <div className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-slate-100 text-[10px] font-semibold text-slate-600">
-                                                                            +{assignedUsersMap[req.RequirementID].length - 4}
-                                                                        </div>
-                                                                    )}
-                                                                </div>
+                                                                        {assignedUsersMap[req.RequirementID].length > 4 && (
+                                                                            <div className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-slate-100 text-[10px] font-semibold text-slate-600">
+                                                                                +{assignedUsersMap[req.RequirementID].length - 4}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
                                                                 </div>
                                                             )}
 
                                                             {/* Requirement rows: no upload UI here (Evidence panel only). */}
 
-                                                                            {isAdmin && (
+                                                            {isAdmin && (
                                                                 <>
                                                                     <button
-                                                                                        onClick={(e) => {
-                                                                                        e.stopPropagation();
-                                                                                        handleRemoveRequirement(req.RequirementID);
-                                                                                    }}
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            handleRemoveRequirement(req.RequirementID);
+                                                                        }}
                                                                         disabled={removingReqId === req.RequirementID}
                                                                         className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-[11px] font-medium text-rose-600 shadow-sm transition hover:bg-rose-100"
                                                                     >

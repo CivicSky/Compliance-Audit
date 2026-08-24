@@ -26,6 +26,107 @@ export function CardListSkeleton({ count = 4 }) {
 }
 
 /**
+ * A beautiful 3-column card grid skeleton matching Master List page cards.
+ */
+export function MasterListSkeleton({ count = 6 }) {
+  return (
+    <div className="w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-pulse">
+      {Array.from({ length: count }).map((_, i) => (
+        <div
+          key={i}
+          className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm min-h-[170px] flex flex-col justify-between space-y-4"
+        >
+          {/* Top Row: Icon + Title + Department + Menu button */}
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-slate-200 rounded-xl shrink-0" />
+              <div className="space-y-1.5">
+                <div className="h-4 bg-slate-200 rounded w-28" />
+                <div className="h-3 bg-slate-200 rounded w-14" />
+              </div>
+            </div>
+            <div className="w-7 h-7 bg-slate-200 rounded-lg shrink-0" />
+          </div>
+
+          {/* Middle Row: CREATED & UPDATED dates */}
+          <div className="grid grid-cols-2 gap-4 border-t border-slate-100 pt-3">
+            <div className="space-y-1">
+              <div className="h-2.5 bg-slate-200 rounded w-12" />
+              <div className="h-3 bg-slate-200 rounded w-20" />
+            </div>
+            <div className="space-y-1">
+              <div className="h-2.5 bg-slate-200 rounded w-12" />
+              <div className="h-3 bg-slate-200 rounded w-20" />
+            </div>
+          </div>
+
+          {/* Bottom Row: Type badge + Department tag */}
+          <div className="flex items-center justify-between pt-1">
+            <div className="h-6 bg-slate-200 rounded-full w-28" />
+            <div className="h-3 bg-slate-200 rounded w-12" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * A beautiful 3-column card grid skeleton matching Category Management / Office Head cards.
+ */
+export function OfficeCardSkeleton({ count = 6 }) {
+  return (
+    <div className="w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-pulse">
+      {Array.from({ length: count }).map((_, i) => (
+        <div
+          key={i}
+          className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4"
+        >
+          {/* Top Row: Icon + Title + Event/Dept + Academic Pill + 3-dots */}
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-slate-200 rounded-xl shrink-0" />
+              <div className="space-y-1.5">
+                <div className="h-4 bg-slate-200 rounded w-24" />
+                <div className="h-3 bg-slate-200 rounded w-16" />
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="h-5 bg-slate-200 rounded-full w-16" />
+              <div className="w-6 h-6 bg-slate-200 rounded-lg shrink-0" />
+            </div>
+          </div>
+
+          {/* Dates Row */}
+          <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100">
+            <div className="h-3 bg-slate-200 rounded w-24" />
+            <div className="h-3 bg-slate-200 rounded w-24" />
+          </div>
+
+          {/* Requirements & Progress Bar */}
+          <div className="space-y-2 pt-1">
+            <div className="flex items-center justify-between">
+              <div className="h-3 bg-slate-200 rounded w-24" />
+              <div className="h-4 bg-slate-200 rounded-full w-16" />
+            </div>
+            <div className="w-full h-2 bg-slate-200 rounded-full" />
+          </div>
+
+          {/* Personnel Footer */}
+          <div className="border-t border-slate-100 pt-3 space-y-2">
+            <div className="h-2.5 bg-slate-200 rounded w-14" />
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 bg-slate-200 rounded-full shrink-0" />
+              <div className="h-3 bg-slate-200 rounded w-20" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
  * A pulsing dashboard grid and chart template loader mirroring the main home page.
  */
 export function DashboardSkeleton() {

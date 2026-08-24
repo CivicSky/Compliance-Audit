@@ -19,7 +19,7 @@ export default function AuditLogs() {
     const [actionFilter, setActionFilter] = useState("all");
     const [currentPage, setCurrentPage] = useState(1);
     const [expandedLogId, setExpandedLogId] = useState(null);
-    const itemsPerPage = 30;
+    const itemsPerPage = 8;
 
     const actionStyles = {
         Created: {
@@ -329,6 +329,9 @@ export default function AuditLogs() {
         });
     }, [preparedLogs, searchTerm, actionFilter]);
 
+    const [serverTotalPages, setServerTotalPages] = useState(1);
+    const [serverTotalCount, setServerTotalCount] = useState(0);
+
     const stats = useMemo(() => {
         let created = 0, updated = 0, deleted = 0, auth = 0;
         preparedLogs.forEach(l => {
@@ -337,38 +340,29 @@ export default function AuditLogs() {
             else if (l.normalizedAction === 'Deleted') deleted++;
             else if (['Login', 'Logout'].includes(l.normalizedAction)) auth++;
         });
-        return { total: preparedLogs.length, created, updated, deletedAndAuth: deleted + auth };
-    }, [preparedLogs]);
+        return { total: serverTotalCount || preparedLogs.length, created, updated, deletedAndAuth: deleted + auth };
+    }, [preparedLogs, serverTotalCount]);
 
-    const totalPages = Math.max(1, Math.ceil(filteredLogs.length / itemsPerPage));
-    useEffect(() => {
-        if (currentPage > totalPages) setCurrentPage(1);
-    }, [currentPage, totalPages]);
-
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [searchTerm, actionFilter]);
-
-    const startIdx = (currentPage - 1) * itemsPerPage;
-    const visibleLogs = filteredLogs.slice(startIdx, startIdx + itemsPerPage);
+    const totalPages = serverTotalPages;
+    const visibleLogs = filteredLogs;
 
     const clearControls = () => {
         setSearchTerm("");
         setActionFilter("all");
     };
 
-    // Fetch Logs
+    // Fetch Logs on Demand when currentPage changes
     useEffect(() => {
         const fetchLogs = async () => {
+            setloading(true);
             try {
-                const res = await fetch("/api/logs");
+                const res = await fetch(`/api/logs?page=${currentPage}&limit=${itemsPerPage}`);
                 if (!res.ok) throw new Error("Failed to fetch logs");
                 const data = await res.json();
                 const logsArr = data.logs || [];
-                const sorted = [...logsArr].sort(
-                    (a, b) => new Date(b.Timestamp) - new Date(a.Timestamp)
-                );
-                setLogs(sorted);
+                setLogs(logsArr);
+                if (data.totalPages) setServerTotalPages(data.totalPages);
+                if (data.total !== undefined) setServerTotalCount(data.total);
             } catch (err) {
                 console.error("Failed to load audit logs:", err);
             } finally {
@@ -376,7 +370,7 @@ export default function AuditLogs() {
             }
         };
         fetchLogs();
-    }, []);
+    }, [currentPage]);
 
     // Fetch All Tree Lookups in Parallel
     useEffect(() => {
@@ -523,33 +517,17 @@ export default function AuditLogs() {
         return { time, date };
     };
 
-    const [cardHeight, setCardHeight] = useState("calc(100vh - 20rem)");
 
-    useEffect(() => {
-        const updateHeight = () => {
-            if (window.innerWidth < 1024) {
-                setCardHeight("calc(100vh - 25rem)");
-            } else {
-                setCardHeight("calc(100vh - 20rem)");
-            }
-        };
-        updateHeight();
-        window.addEventListener("resize", updateHeight);
-        return () => window.removeEventListener("resize", updateHeight);
-    }, []);
 
     return (
-        <div className="w-full flex flex-col bg-slate-50/80">
-            <Header pageTitle="Audit Logs" />
-
-
-            <div className="px-6 pt-6 pb-12 flex flex-col gap-5">
+        <div className="w-full min-h-[calc(100vh-80px)] flex flex-col bg-slate-50/80">
+            <div className="px-4 pt-6 pb-20 flex-1 flex flex-col gap-4 min-h-0">
                 {/* Header Title & Quick Stat Cards */}
-                <div className="flex flex-col gap-4 shrink-0">
-                    <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 shrink-0">
+                    <div className="flex items-start justify-between gap-2">
                         <div>
-                            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Audit Logs</h1>
-                            <p className="text-xs text-slate-500 mt-0.5 font-medium">Track system activity, updates, and account actions in detail.</p>
+                            <h1 className="text-2xl font-bold text-gray-800 mb-1">Audit Logs</h1>
+                            <p className="text-xs text-gray-600">Track system activity, updates, and account actions in detail.</p>
                         </div>
                     </div>
 
@@ -597,11 +575,8 @@ export default function AuditLogs() {
                     </div>
                 </div>
 
-                {/* Main Card Container — flex-1 so it fills all remaining vertical space */}
-                <div
-                    className="bg-white rounded-2xl shadow-sm border border-slate-200/90 flex flex-col overflow-hidden"
-                    style={{ height: "calc(100vh - 23rem)", minHeight: "540px" }}
-                >
+                {/* Main Card Container — flex-1 so it fills all remaining vertical space down to pagination */}
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200/90 flex flex-col overflow-hidden flex-1 min-h-0">
                     {/* Filter Toolbar */}
                     <div className="p-4 border-b border-slate-200/90 bg-slate-50/50 flex flex-wrap items-center justify-between gap-3 shrink-0">
                         <div className="flex items-center gap-2">

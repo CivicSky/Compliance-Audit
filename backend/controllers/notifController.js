@@ -155,15 +155,20 @@ class NotificationController {
             const [counts] = await db.query(`
                 SELECT 
                     COUNT(*) as total,
-                    SUM(CASE WHEN IsRead = FALSE THEN 1 ELSE 0 END) as unread,
-                    SUM(CASE WHEN IsRead = TRUE THEN 1 ELSE 0 END) as \`read\`
+                    COALESCE(SUM(CASE WHEN IsRead = FALSE THEN 1 ELSE 0 END), 0) as unread,
+                    COALESCE(SUM(CASE WHEN IsRead = TRUE THEN 1 ELSE 0 END), 0) as "read"
                 FROM notifications 
                 WHERE UserID = ?
             `, [userId]);
             
+            const c = counts && counts[0] ? counts[0] : { total: 0, unread: 0, read: 0 };
             res.json({
                 success: true,
-                data: counts[0] || { total: 0, unread: 0, read: 0 }
+                data: {
+                    total: Number(c.total || 0),
+                    unread: Number(c.unread || 0),
+                    read: Number(c.read || 0)
+                }
             });
         } catch (error) {
             console.error('Error fetching notification counts:', error);

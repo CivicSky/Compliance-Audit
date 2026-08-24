@@ -1,6 +1,7 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from "react";
 import { eventsAPI } from "../../utils/api";
 import { useModal } from "../UI/ModalProvider";
+import { useToast } from "../UI/Toast";
 
 const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionChange, onEventClick }, ref) => {
     const [events, setEvents] = useState([]);
@@ -10,6 +11,7 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
     const [selectedEvents, setSelectedEvents] = useState(new Set());
     const [downloadableFolders, setDownloadableFolders] = useState([]);
     const { showAlert } = useModal();
+    const { toast } = useToast();
 
     // Fetch events data from database
     useEffect(() => {
@@ -81,8 +83,20 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
             if (response.success) {
                 setEvents(prev => prev.filter(event => !eventIds.includes(event.EventID)));
                 setSelectedEvents(new Set());
+                toast?.({
+                    title: 'Events Deleted',
+                    description: `Successfully deleted ${eventIds.length} event(s)`,
+                    variant: 'success',
+                    duration: 3000,
+                });
                 return { success: true };
             } else {
+                toast?.({
+                    title: 'Delete Failed',
+                    description: response.message || 'Failed to delete events',
+                    variant: 'error',
+                    duration: 3000,
+                });
                 return { success: false, message: response.message || 'Failed to delete events' };
             }
         } catch (error) {

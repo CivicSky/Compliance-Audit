@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import { renderAsync } from 'docx-preview';
-import { usersAPI, requirementsAPI, officesAPI } from '../../utils/api';
+import api, { usersAPI, requirementsAPI, officesAPI } from '../../utils/api';
 import { API_BASE_URL } from '../../utils/apiBase';
 
 import { useModal } from "../UI/ModalProvider";
@@ -184,17 +184,34 @@ export default function ViewReqPASSCUModal({
                     body: formData
                 });
                 const data = await res.json();
-                    if (data.success && data.url) {
-                    setProofFileUrl(`${API_BASE_URL}${data.url}`);
+                if (data.success && data.url) {
+                    const fullUrl = data.url.startsWith('http') ? data.url : `${API_BASE_URL}${data.url}`;
+                    setProofFileUrl(fullUrl);
                     setProofFileName(data.filename);
-                    setPersistedProof({ fileName: data.filename, url: `${API_BASE_URL}${data.url}` });
+                    setPersistedProof({ fileName: data.filename, url: fullUrl });
                     await fetchOfficeRequirements();
+                    toast?.({
+                        title: 'Proof Uploaded',
+                        description: 'Office proof document uploaded successfully.',
+                        variant: 'success',
+                        duration: 3000
+                    });
                 } else {
-                    await showAlert(data.message || 'Failed to upload proof document');
+                    toast?.({
+                        title: 'Upload Failed',
+                        description: data.message || 'Failed to upload proof document',
+                        variant: 'error',
+                        duration: 3000
+                    });
                 }
             } catch (err) {
                 console.error('Upload error:', err);
-                await showAlert('Failed to upload proof document');
+                toast?.({
+                    title: 'Upload Failed',
+                    description: 'Failed to upload proof document',
+                    variant: 'error',
+                    duration: 3000
+                });
             } finally {
                 setUploadingProof(false);
                 setProofFile(null);
@@ -240,7 +257,24 @@ export default function ViewReqPASSCUModal({
         setLoading(true);
         try {
             const response = await axios.get(`${API_BASE_URL}/api/offices/${office.id}/requirements`);
-            const reqs = response.data.data || [];
+            const reqs = (response.data.data || []).map((req) => {
+                const statusId = Number(
+                    req.ComplianceStatusID ??
+                    req.complianceStatusId ??
+                    req.compliancestatusid ??
+                    req.Status ??
+                    req.status ??
+                    3
+                );
+
+                return {
+                    ...req,
+                    RequirementID: req.RequirementID ?? req.requirementId ?? req.requirementid,
+                    ComplianceStatusID: [3, 4, 5].includes(statusId) ? statusId : 3,
+                    ComplianceStatus: req.ComplianceStatus ?? req.complianceStatus ?? req.ComplianceStatusName ?? req.compliancestatusname,
+                    comments: req.comments ?? req.Comments ?? '',
+                };
+            });
             setRequirements(reqs);
 
             const assignedMap = {};
@@ -334,7 +368,7 @@ export default function ViewReqPASSCUModal({
         }
 
         try {
-            await axios.put(`${API_BASE_URL}/api/offices/${office.id}/requirements/${reqId}/status`, {
+            await api.put(`/api/offices/${office.id}/requirements/${reqId}/status`, {
                 statusId: newStatusId
             });
             setRequirements(prev => prev.map(req => 
@@ -347,7 +381,7 @@ export default function ViewReqPASSCUModal({
                       }
                     : req
             ));
-            const officeResponse = await axios.get(`${API_BASE_URL}/api/offices/${office.id}`);
+            const officeResponse = await api.get(`/api/offices/${office.id}`);
             if (officeResponse.data) {
                 setOfficeData(prev => ({
                     ...prev,
@@ -359,7 +393,7 @@ export default function ViewReqPASSCUModal({
             }
         } catch (error) {
             console.error('Error updating status:', error);
-            await showAlert('Failed to update compliance status');
+            await showAlert(error.response?.data?.message || error.response?.data?.details || 'Failed to update compliance status');
         }
     };
 

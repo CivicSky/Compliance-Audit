@@ -124,7 +124,7 @@ router.post('/:id/proof', auth, upload.single('file'), async (req, res) => {
     try {
       const supabaseRes = await uploadToSupabaseBucket(
         req.file.path, 
-        `events/${safeEventName}/${finalFileName}`, 
+        `events/${safeEventName}/${safeOfficeName}/${finalFileName}`, 
         req.file.mimetype
       );
       if (supabaseRes && supabaseRes.publicUrl) {
@@ -152,6 +152,53 @@ router.post('/:id/proof', auth, upload.single('file'), async (req, res) => {
     console.log('File path for DB/URL:', filePath);
     // Save to database
     await saveOfficeProofDocument(officeId, finalFileName, req.file.originalname, filePath);
+    
+    try {
+      const { createNotifications, getAdminUserIds } = require('../utils/notificationService');
+      const adminIds = await getAdminUserIds();
+      
+      // Get office heads
+      const [headRows] = await db.query(
+        `SELECT u.UserID 
+         FROM users u
+         JOIN headofoffice h ON u.UserID = h.UserID
+         JOIN office_head_assignments oha ON h.HeadID = oha.HeadID
+         WHERE oha.OfficeID = ?`,
+        [officeId]
+      );
+      const headUserIds = headRows.map(r => Number(r.UserID));
+      
+      // Get auditors assigned to this office
+      const [auditorRows] = await db.query(
+        `SELECT aaa.auditor_user_id as UserID
+         FROM auditor_area_assignments aaa
+         JOIN offices o ON o.OfficeID = ?
+         JOIN criteria c ON c.EventID = o.EventID
+         WHERE aaa.area_id = c.AreaID`,
+        [officeId]
+      );
+      const auditorUserIds = auditorRows.map(r => Number(r.UserID));
+      
+      const allRecipientIds = [...new Set([...adminIds, ...headUserIds, ...auditorUserIds])];
+      const uploaderId = Number(req.user?.userId || 0);
+
+      await createNotifications({
+        userIds: allRecipientIds.filter(id => id !== uploaderId),
+        adminId: uploaderId,
+        title: 'New Office Proof Uploaded',
+        message: `Office proof document was uploaded for office "${officeName}" under event "${eventName}".`,
+        type: 'info',
+        relatedTable: 'office_proof_upload',
+        relatedId: Number(officeId),
+        meta: {
+          officeId: Number(officeId),
+          openSubmission: true
+        }
+      });
+    } catch (notifErr) {
+      console.warn('Failed to notify about office proof upload:', notifErr.message);
+    }
+
     console.log('--- Proof Upload Debug End ---');
     res.json({ 
       success: true, 
@@ -235,17 +282,20 @@ router.delete('/:id/proof', auth, async (req, res) => {
       return res.status(404).json({ success: false, message: 'No proof document found for this office' });
     }
     const doc = rows[0];
-    // Delete file from disk
+    // Delete file from Supabase Storage bucket and disk
     try {
+      const { deleteFromSupabaseBucket } = require('../utils/supabaseStorage');
+      await deleteFromSupabaseBucket(doc.file_path, 'proof-documents');
+
       const filePath = path.join(__dirname, '..', doc.file_path.replace(/^\//, ''));
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
     } catch (fsErr) {
-      console.warn('Failed to delete proof file from disk:', fsErr);
+      console.warn('Failed to delete proof file:', fsErr);
     }
-    // Delete DB record (match by office_id and file_path/file_name)
+    // Delete DB record by primary key id
     await db.query(
-      'DELETE FROM office_proof_documents WHERE office_id = ? AND requirement_id IS NULL AND (file_path = ? OR file_name = ?) LIMIT 1',
-      [officeId, doc.file_path, doc.file_name]
+      'DELETE FROM office_proof_documents WHERE id = ?',
+      [doc.id]
     );
     res.json({ success: true, message: 'Proof document deleted' });
   } catch (err) {

@@ -1,40 +1,16 @@
 const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');
 
-const supabaseUrl = process.env.SUPABASE_URL || 'https://ylluxulqxkjircffndxg.supabase.co';
+const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '';
 
-let supabase = null;
-if (supabaseKey) {
-  supabase = createClient(supabaseUrl, supabaseKey);
-}
-
-/**
- * Uploads a local file path or Buffer directly to a Supabase Storage Bucket.
- * @param {string|Buffer} fileSource - Local file path or Buffer.
- * @param {string} fileName - Destination path inside bucket (e.g. 'events/PAASCU/file.pdf')
- * @param {string} mimeType - Content type (e.g. 'application/pdf')
- * @param {string} bucket - Bucket name (default: 'proof-documents')
- * @returns {Promise<{ success: boolean, publicUrl: string, path: string }>}
- */
 async function uploadToSupabaseBucket(fileSource, fileName, mimeType, bucket = 'proof-documents') {
-  const currentKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || supabaseKey;
+  const currentKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '';
   if (!currentKey) {
     throw new Error('Supabase Storage key missing in backend/.env! Please add SUPABASE_ANON_KEY or SUPABASE_SERVICE_ROLE_KEY.');
   }
 
-  const client = supabase || createClient(supabaseUrl, currentKey);
-
-  // 1. Ensure bucket exists & is public
-  try {
-    const { data: buckets } = await client.storage.listBuckets();
-    const exists = buckets && buckets.some(b => b.name === bucket);
-    if (!exists) {
-      await client.storage.createBucket(bucket, { public: true });
-    }
-  } catch (err) {
-    console.warn('Bucket check warning (will attempt upload anyway):', err.message);
-  }
+  const client = createClient(supabaseUrl, currentKey);
 
   // 2. Read buffer
   let fileBuffer;
@@ -73,9 +49,9 @@ async function uploadToSupabaseBucket(fileSource, fileName, mimeType, bucket = '
  * Deletes a file from Supabase Storage Bucket.
  */
 async function deleteFromSupabaseBucket(filePath, bucket = 'proof-documents') {
-  const currentKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || supabaseKey;
+  const currentKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '';
   if (!currentKey || !filePath) return;
-  const client = supabase || createClient(supabaseUrl, currentKey);
+  const client = createClient(supabaseUrl, currentKey);
   const cleanPath = filePath.replace(/^\//, '').replace(/^.*\/storage\/v1\/object\/public\/[^\/]+\//, '');
   try {
     await client.storage.from(bucket).remove([cleanPath]);
@@ -85,7 +61,6 @@ async function deleteFromSupabaseBucket(filePath, bucket = 'proof-documents') {
 }
 
 module.exports = {
-  supabase,
   uploadToSupabaseBucket,
   deleteFromSupabaseBucket
 };

@@ -57,8 +57,12 @@ export default function Header() {
       } catch {}
     };
     fetchUnread();
-    const interval = setInterval(fetchUnread, 30000); // poll every 30s
-    return () => clearInterval(interval);
+    window.addEventListener('notificationsUpdated', fetchUnread);
+    const interval = setInterval(fetchUnread, 15000); // poll every 15s
+    return () => {
+      window.removeEventListener('notificationsUpdated', fetchUnread);
+      clearInterval(interval);
+    };
   }, []);
 
   useEffect(() => {

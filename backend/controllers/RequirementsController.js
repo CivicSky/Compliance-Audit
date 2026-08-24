@@ -824,11 +824,11 @@ const assignUsersToRequirement = async (req, res) => {
     }
 
     // Check which users are already assigned (unique constraint is on RequirementID + OfficeID + UserID)
-    const checkQuery = 'SELECT UserID FROM requirement_user_assignments WHERE RequirementID = ? AND OfficeID = ? AND UserID IN (?)';
-    const checkParams = [requirementId, officeId, userIds];
+    const checkQuery = `SELECT UserID FROM requirement_user_assignments WHERE RequirementID = ? AND OfficeID = ? AND UserID IN (${userIds.map(Number).join(',')})`;
+    const checkParams = [requirementId, officeId];
 
     const [alreadyAssigned] = await db.query(checkQuery, checkParams);
-    const alreadyAssignedIds = alreadyAssigned.map(a => a.UserID);
+    const alreadyAssignedIds = alreadyAssigned.map(a => Number(a.UserID ?? a.userid));
 
     // Filter out already assigned users
     const newUserIds = userIds.filter(id => !alreadyAssignedIds.includes(id));
@@ -842,11 +842,10 @@ const assignUsersToRequirement = async (req, res) => {
     }
 
     // Insert new assignments
-    const insertValues = newUserIds.map(userId => [requirementId, officeId || null, userId, assignedBy || null]);
+    const insertValuesSql = newUserIds.map(userId => `(${Number(requirementId)}, ${officeId ? Number(officeId) : 'NULL'}, ${Number(userId)}, ${assignedBy ? Number(assignedBy) : 'NULL'})`).join(',');
 
     await db.query(
-      'INSERT INTO requirement_user_assignments (RequirementID, OfficeID, UserID, AssignedBy) VALUES ?',
-      [insertValues]
+      `INSERT INTO requirement_user_assignments (RequirementID, OfficeID, UserID, AssignedBy) VALUES ${insertValuesSql}`
     );
 
     if (actorUserId) {
@@ -1329,8 +1328,8 @@ const autoAssignHeadsToRequirementsForOffice = async (officeId, requirementIds =
     const toAssign = headUserIds.filter(id => !alreadyAssignedIds.has(id)).slice(0, remainingSlots);
     if (toAssign.length === 0) continue;
 
-    const insertValues = toAssign.map(userId => [requirementId, officeId, userId, actorUserId || null]);
-    await db.query('INSERT INTO requirement_user_assignments (RequirementID, OfficeID, UserID, AssignedBy) VALUES ?', [insertValues]);
+    const insertValuesSql = toAssign.map(userId => `(${Number(requirementId)}, ${Number(officeId)}, ${Number(userId)}, ${actorUserId ? Number(actorUserId) : 'NULL'})`).join(',');
+    await db.query(`INSERT INTO requirement_user_assignments (RequirementID, OfficeID, UserID, AssignedBy) VALUES ${insertValuesSql}`);
 
     // send notifications (best-effort)
     try {

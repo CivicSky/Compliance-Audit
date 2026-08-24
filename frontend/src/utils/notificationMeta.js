@@ -47,6 +47,7 @@ export function buildNotificationRedirect(notification) {
 
 	if (table === 'office_head') return { path: '/home/officehead' };
 	if (table === 'users_role') return { path: '/home/profile' };
+	if (table === 'auditor_assignments' || table === 'auditor_area_assignments') return { path: '/home/criteria' };
 
 	if (meta.officeId) {
 		const params = new URLSearchParams({

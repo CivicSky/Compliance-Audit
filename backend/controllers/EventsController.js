@@ -1,3 +1,16 @@
+const db = require('../db');
+const fs = require('fs');
+const path = require('path');
+const archiver = require('archiver');
+const { recordLog } = require('./logsController');
+
+const sanitizeFolderName = (s) =>
+  String(s || '')
+    .replace(/[^A-Za-z0-9.-]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .trim();
+
 // Copy event (migrated from frontend)
 const copyEvent = async (req, res) => {
   try {
@@ -16,6 +29,15 @@ const copyEvent = async (req, res) => {
     }
     const sourceEvent = rows[0];
 
+    // Check if EventCode already exists
+    const [existingCode] = await db.query('SELECT * FROM Events WHERE EventCode = ?', [newEventCode]);
+    if (existingCode && existingCode.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Event Code "${newEventCode}" is already in use. Please enter a unique Event Code.`
+      });
+    }
+
     // Insert new event
     const [result] = await db.query(
       'INSERT INTO Events (EventName, EventCode, Description, CreatedAt, UpdatedAt) VALUES (?, ?, ?, NOW(), NOW())',
@@ -32,11 +54,13 @@ const copyEvent = async (req, res) => {
     const [areas] = await db.query('SELECT * FROM areas WHERE EventID = ?', [sourceEventId]);
     const areaIdMap = {}; // oldAreaId -> newAreaId
     for (const area of areas) {
+      const oldAreaId = area.AreaID ?? area.areaid;
       const [areaResult] = await db.query(
         'INSERT INTO areas (AreaCode, AreaName, EventID, Description, IsActive, SortOrder, CreatedAt, UpdatedAt) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())',
-        [area.AreaCode, area.AreaName, newEventId, area.Description, area.IsActive, area.SortOrder]
+        [area.AreaCode ?? area.areacode, area.AreaName ?? area.areaname, newEventId, area.Description ?? area.description, area.IsActive ?? area.isactive ?? 1, area.SortOrder ?? area.sortorder ?? 0]
       );
-      areaIdMap[area.AreaID] = areaResult.insertId;
+      const newAreaId = areaResult[0]?.AreaID ?? areaResult[0]?.areaid ?? areaResult.insertId;
+      if (oldAreaId) areaIdMap[oldAreaId] = newAreaId;
     }
 
     // 2. Copy CRITERIA (including no-area criteria) with ParentCriteriaID remapping
@@ -44,13 +68,16 @@ const copyEvent = async (req, res) => {
     const criteriaIdMap = {}; // oldCriteriaId -> newCriteriaId
     // First pass: insert all criteria without ParentCriteriaID
     for (const crit of criteria) {
-      const newAreaId = crit.AreaID ? areaIdMap[crit.AreaID] : null;
+      const oldCritId = crit.CriteriaID ?? crit.criteriaid;
+      const origAreaId = crit.AreaID ?? crit.areaid;
+      const newAreaId = origAreaId && areaIdMap[origAreaId] ? areaIdMap[origAreaId] : null;
       try {
         const [critResult] = await db.query(
           'INSERT INTO criteria (CriteriaCode, EventID, AreaID, ParentCriteriaID, CriteriaName, Description, CreatedAt, UpdatedAt, IsActive) VALUES (?, ?, ?, NULL, ?, ?, NOW(), NOW(), ?)',
-          [crit.CriteriaCode, newEventId, newAreaId, crit.CriteriaName, crit.Description, crit.IsActive]
+          [crit.CriteriaCode ?? crit.criteriacode, newEventId, newAreaId, crit.CriteriaName ?? crit.criterianame, crit.Description ?? crit.description, crit.IsActive ?? crit.isactive ?? 1]
         );
-        criteriaIdMap[crit.CriteriaID] = critResult.insertId;
+        const newCritId = critResult[0]?.CriteriaID ?? critResult[0]?.criteriaid ?? critResult.insertId;
+        if (oldCritId) criteriaIdMap[oldCritId] = newCritId;
       } catch (err) {
         console.error('Error inserting criteria:', err, crit);
         throw err;
@@ -58,28 +85,33 @@ const copyEvent = async (req, res) => {
     }
     // Second pass: update ParentCriteriaID for those that had it
     for (const crit of criteria) {
-      if (crit.ParentCriteriaID) {
-        const newCritId = criteriaIdMap[crit.CriteriaID];
-        const newParentId = criteriaIdMap[crit.ParentCriteriaID] || null;
-        try {
-          await db.query('UPDATE criteria SET ParentCriteriaID = ? WHERE CriteriaID = ?', [newParentId, newCritId]);
-        } catch (err) {
-          console.error('Error updating ParentCriteriaID:', err, crit);
-          throw err;
+      const oldCritId = crit.CriteriaID ?? crit.criteriaid;
+      const oldParentId = crit.ParentCriteriaID ?? crit.parentcriteriaid;
+      if (oldParentId) {
+        const newCritId = criteriaIdMap[oldCritId];
+        const newParentId = criteriaIdMap[oldParentId] || null;
+        if (newCritId && newParentId) {
+          try {
+            await db.query('UPDATE criteria SET ParentCriteriaID = ? WHERE CriteriaID = ?', [newParentId, newCritId]);
+          } catch (err) {
+            console.error('Error updating ParentCriteriaID:', err, crit);
+            throw err;
+          }
         }
       }
     }
 
     // 3. Copy REQUIREMENTS with ParentRequirementCode remapping
-    const criteriaIds = Object.keys(criteriaIdMap);
+    const criteriaIds = Object.keys(criteriaIdMap).map(Number).filter(Boolean);
     if (criteriaIds.length > 0) {
-      const [requirements] = await db.query('SELECT * FROM requirements WHERE CriteriaID IN (?)', [criteriaIds]);
+      const [requirements] = await db.query(`SELECT * FROM requirements WHERE CriteriaID IN (${criteriaIds.join(',')})`);
       for (const req of requirements) {
-        const newCriteriaId = req.CriteriaID ? criteriaIdMap[req.CriteriaID] : null;
+        const origCritId = req.CriteriaID ?? req.criteriaid;
+        const newCriteriaId = origCritId && criteriaIdMap[origCritId] ? criteriaIdMap[origCritId] : null;
         try {
           await db.query(
             'INSERT INTO requirements (RequirementCode, Description, CriteriaID, ParentRequirementCode, CreatedAt, UpdatedAt) VALUES (?, ?, ?, ?, NOW(), NOW())',
-            [req.RequirementCode, req.Description, newCriteriaId, req.ParentRequirementCode]
+            [req.RequirementCode ?? req.requirementcode, req.Description ?? req.description, newCriteriaId, req.ParentRequirementCode ?? req.parentrequirementcode ?? null]
           );
         } catch (err) {
           console.error('Error inserting requirement:', err, req);
@@ -116,11 +148,6 @@ const copyEvent = async (req, res) => {
     res.status(500).json({ success: false, message: 'Error copying event' });
   }
 };
-const db = require('../db');
-const fs = require('fs');
-const path = require('path');
-const archiver = require('archiver');
-const { recordLog } = require('./logsController');
 
 // Get all events
 const getAllEvents = async (req, res) => {
@@ -137,17 +164,6 @@ const getAllEvents = async (req, res) => {
       message: 'Error fetching events'
     });
   }
-};
-
-// Helper function to sanitize folder name (remove invalid characters)
-const sanitizeFolderName = (name) => {
-  if (!name) return '';
-  // Replace any non-alphanumeric character with underscore, collapse multiple underscores, trim edges
-  return name
-    .replace(/[^A-Za-z0-9.-]+/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .trim();
 };
 
 // Add new event

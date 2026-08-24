@@ -7,6 +7,7 @@ import UnifiedSetupWizard from "../UnifiedSetupWizard/UnifiedSetupWizard";
 import { Wand2 } from "lucide-react";
 import { usersAPI } from "../../utils/api";
 import { useModal } from "../UI/ModalProvider";
+import { useToast } from "../UI/Toast";
 import Header from "../Header/header";
 
 export default function Events() {
@@ -137,16 +138,29 @@ export default function Events() {
                 setSelectedIds([]);
                 setDeleteMode(false);
                 // Show success message
-                console.log('Successfully deleted selected events');
-                await showAlert(`Successfully deleted ${selectedIds.length} event(s)`);
+                toast?.({
+                    title: 'Events Deleted',
+                    description: `Successfully deleted ${selectedIds.length} event(s)`,
+                    variant: 'success',
+                    duration: 3000,
+                });
             } else {
                 // Show error message
-                console.error('Failed to delete events:', result.message);
-                await showAlert(result.message || 'Failed to delete events');
+                toast?.({
+                    title: 'Delete Failed',
+                    description: result.message || 'Failed to delete events',
+                    variant: 'error',
+                    duration: 3000,
+                });
             }
         } catch (error) {
             console.error('Error deleting events:', error);
-            await showAlert('An error occurred while deleting events');
+            toast?.({
+                title: 'Delete Error',
+                description: 'An error occurred while deleting events',
+                variant: 'error',
+                duration: 3000,
+            });
         }
     };
 

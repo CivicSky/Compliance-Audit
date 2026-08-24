@@ -5,6 +5,7 @@ import Pagination from '../Pagination/Pagination';
 import NotificationToast from '../Notification/NotificationToast';
 import { departmentsAPI, masterlistAPI, usersAPI } from '../../utils/api';
 import { formatDateTime } from '../../utils/formatDateTime';
+import { MasterListSkeleton } from '../UI/Skeleton';
 
 const DEFAULT_DEPARTMENTS = [];
 
@@ -353,7 +354,9 @@ export default function MasterList() {
       </div>
 
       <div className="w-full px-4 pt-6 pb-6" style={{ marginTop: 0 }}>
-        {viewMode === 'list' ? (
+        {loadingItems ? (
+          <MasterListSkeleton count={9} />
+        ) : viewMode === 'list' ? (
           <div className="flex h-full flex-col">
             <div className="px-0">
               <div className="hidden md:grid grid-cols-[minmax(140px,1fr)_180px_180px_120px] gap-6 px-6 py-3 mb-1 bg-white border border-slate-200 rounded-xl shadow-sm text-xs font-semibold text-gray-700 w-full">

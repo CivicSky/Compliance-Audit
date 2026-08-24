@@ -42,10 +42,14 @@ const createNotifications = async ({
   meta = null,
 }) => {
   const recipients = normalizeUserIds(userIds);
-  const senderId = Number(adminId);
-
+  let senderId = Number(adminId);
   if (!Number.isInteger(senderId) || senderId <= 0) {
-    return { inserted: 0, skipped: recipients.length };
+    try {
+      const [adminRows] = await db.query(`SELECT UserID FROM users WHERE RoleID = 1 ORDER BY UserID ASC LIMIT 1`);
+      senderId = adminRows[0]?.UserID || null;
+    } catch (e) {
+      senderId = null;
+    }
   }
 
   if (recipients.length === 0 || !title || !message) {
@@ -55,22 +59,18 @@ const createNotifications = async ({
   const normalizedType = ALLOWED_TYPES.has(type) ? type : 'info';
   const finalMessage = appendMeta(message, meta);
 
-  const notificationValues = recipients.map((userId) => [
-    userId,
-    senderId,
-    String(title).trim(),
-    finalMessage,
-    normalizedType,
-    relatedTable || null,
-    relatedId || null,
-  ]);
-
-  await db.query(
-    `INSERT INTO notifications
-      (UserID, AdminID, Title, Message, Type, RelatedTable, RelatedID, CreatedAt)
-     VALUES ?`,
-    [notificationValues.map((entry) => [...entry, new Date()])]
-  );
+  for (const userId of recipients) {
+    try {
+      await db.query(
+        `INSERT INTO notifications
+          (UserID, AdminID, Title, Message, Type, RelatedTable, RelatedID, IsRead, CreatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, FALSE, NOW())`,
+        [userId, senderId, String(title).trim(), finalMessage, normalizedType, relatedTable || null, relatedId || null]
+      );
+    } catch (err) {
+      console.error(`Error inserting notification for user #${userId}:`, err.message);
+    }
+  }
 
   return { inserted: recipients.length, skipped: 0 };
 };

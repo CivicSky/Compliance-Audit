@@ -7,7 +7,7 @@ import EditOfficeHeadModal from '../EditHead/EditOfficeHeadModal.jsx';
 import Pagination from "../Pagination/Pagination";
 import OfficeHeaddetails from "../OfficeHead/OfficeHeaddetails.jsx";
 import { API_BASE_URL } from '../../utils/apiBase';
-import { CardListSkeleton } from "../UI/Skeleton";
+import { OfficeCardSkeleton } from "../UI/Skeleton";
 
 const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode = false, onSelectionChange, viewMode = 'grid' }, ref) => {
     const [officeHeads, setOfficeHeads] = useState([]);
@@ -411,7 +411,7 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
     if (loading) {
         return (
             <div className="mt-6 w-full">
-                <CardListSkeleton count={4} />
+                <OfficeCardSkeleton count={6} />
             </div>
         );
     }

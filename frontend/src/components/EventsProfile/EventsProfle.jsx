@@ -1,5 +1,6 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from "react";
 import { useModal } from "../UI/ModalProvider";
+import { useToast } from "../UI/Toast";
 import { eventsAPI } from "../../utils/api";
 import Pagination from "../Pagination/Pagination";
 import { CardListSkeleton } from "../UI/Skeleton";
@@ -13,6 +14,7 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
     const [downloadableFolders, setDownloadableFolders] = useState([]);
     const [currentPage, setCurrentPage] = useState(1);
     const { showAlert } = useModal();
+    const { toast } = useToast();
 
     const itemsPerPage = 30; // limit to 30 per page
 
@@ -107,8 +109,20 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
             if (response.success) {
                 setEvents(prev => prev.filter(event => !eventIds.includes(event.EventID)));
                 setSelectedEvents(new Set());
+                toast?.({
+                    title: 'Events Deleted',
+                    description: `Successfully deleted ${eventIds.length} event(s)`,
+                    variant: 'success',
+                    duration: 3000,
+                });
                 return { success: true };
             } else {
+                toast?.({
+                    title: 'Delete Failed',
+                    description: response.message || 'Failed to delete events',
+                    variant: 'error',
+                    duration: 3000,
+                });
                 return { success: false, message: response.message || 'Failed to delete events' };
             }
         } catch (error) {

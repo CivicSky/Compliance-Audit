@@ -6,6 +6,7 @@ const fs = require('fs');
 const requirementsController = require('../controllers/RequirementsController');
 const { auth, restrictAuditor } = require('../middleware/auth');
 const { recordLog } = require('../controllers/logsController');
+const { notifyUsers } = require('../utils/notify');
 
 const ensureSortOrderColumn = async (db) => {
     try {
@@ -205,10 +206,79 @@ router.patch('/:requirementId/file/:fileId/comment', auth, async (req, res) => {
         const db = require('../db');
         const { fileId } = req.params;
         const { comment } = req.body;
+        
+        // Fetch file uploader and metadata
+        const [fileRows] = await db.query(
+            `SELECT opd.uploaded_by, opd.display_name, opd.office_id, opd.requirement_id, r.RequirementCode, o.OfficeName
+             FROM office_proof_documents opd
+             LEFT JOIN requirements r ON opd.requirement_id = r.RequirementID
+             LEFT JOIN offices o ON opd.office_id = o.OfficeID
+             WHERE opd.id = ? LIMIT 1`,
+            [fileId]
+        );
+
         await db.query(
             'UPDATE office_proof_documents SET comment = ? WHERE id = ?',
             [comment ? comment.trim() : '', fileId]
         );
+
+        if (fileRows && fileRows.length > 0) {
+            const fileDoc = fileRows[0];
+            const uploaderId = Number(fileDoc.uploaded_by);
+            const actorId = Number(req.user?.userId || 0);
+            
+            const recipients = [];
+            
+            // 1. Notify the file uploader if they are not the one commenting
+            if (uploaderId && uploaderId !== actorId) {
+                recipients.push(uploaderId);
+            }
+            
+            try {
+                const { createNotifications, getAdminUserIds } = require('../utils/notificationService');
+                const adminIds = await getAdminUserIds();
+                
+                // 2. Get auditors assigned to this office
+                const [auditorRows] = await db.query(
+                    `SELECT aaa.auditor_user_id as UserID
+                     FROM auditor_area_assignments aaa
+                     JOIN offices o ON o.OfficeID = ?
+                     JOIN criteria c ON c.EventID = o.EventID
+                     WHERE aaa.area_id = c.AreaID`,
+                    [fileDoc.office_id]
+                );
+                const auditorUserIds = auditorRows.map(r => Number(r.UserID));
+                
+                // Merge admins and auditors, excluding the commenter
+                const others = [...adminIds, ...auditorUserIds].filter(id => id !== actorId);
+                recipients.push(...others);
+                
+                const uniqueRecipients = [...new Set(recipients)];
+                
+                if (uniqueRecipients.length > 0) {
+                    const reqCode = fileDoc.RequirementCode || 'a requirement';
+                    const officeName = fileDoc.OfficeName || 'your office';
+                    
+                    await createNotifications({
+                        userIds: uniqueRecipients,
+                        adminId: actorId,
+                        title: 'New Comment on Uploaded File',
+                        message: `A new comment was added to the uploaded file "${fileDoc.display_name}" for requirement ${reqCode} in ${officeName}.`,
+                        type: 'info',
+                        relatedTable: 'requirement_file_comment',
+                        relatedId: Number(fileDoc.office_id),
+                        meta: {
+                            officeId: Number(fileDoc.office_id),
+                            requirementId: Number(fileDoc.requirement_id),
+                            openSubmission: true
+                        }
+                    });
+                }
+            } catch (notifErr) {
+                console.error('Failed to notify about comment:', notifErr);
+            }
+        }
+
         res.json({ success: true, message: 'Document comment updated successfully' });
     } catch (error) {
         console.error('Error updating evidence document comment:', error);
@@ -256,6 +326,14 @@ router.delete('/:requirementId/file/:userId', auth, async (req, res) => {
             'DELETE FROM office_proof_documents WHERE id = ?',
             [file.id]
         );
+
+        // Delete from Supabase Storage bucket (if hosted on cloud)
+        try {
+            const { deleteFromSupabaseBucket } = require('../utils/supabaseStorage');
+            await deleteFromSupabaseBucket(filePath, 'proof-documents');
+        } catch (sErr) {
+            console.warn('Supabase Storage file deletion warning:', sErr);
+        }
 
         // Check if other DB records use the same physical file on disk
         const [sharedRows] = await db.query(
@@ -433,6 +511,7 @@ router.post('/user-upload', auth, userReqUpload.single('file'), async (req, res)
             finalFileName = `${baseFileName}_${collisionCounter}${ext}`;
         }
 
+        const safeOfficeName = officeName.replace(/[^a-zA-Z0-9-_]/g, '_').substring(0, 40);
         const { uploadToSupabaseBucket } = require('../utils/supabaseStorage');
 
         const destPath = require('path').join(eventDir, finalFileName);
@@ -441,7 +520,7 @@ router.post('/user-upload', auth, userReqUpload.single('file'), async (req, res)
         try {
             const supabaseRes = await uploadToSupabaseBucket(
                 req.file.path, 
-                `events/${safeEventName}/${finalFileName}`, 
+                `events/${safeEventName}/${safeOfficeName}/${finalFileName}`, 
                 req.file.mimetype
             );
             if (supabaseRes && supabaseRes.publicUrl) {
@@ -474,10 +553,35 @@ router.post('/user-upload', auth, userReqUpload.single('file'), async (req, res)
             const { createNotifications, getAdminUserIds } = require('../utils/notificationService');
             const actorUserId = Number(req.user?.userId || userId);
             const adminIds = await getAdminUserIds();
+            
+            // Get office heads
+            const [headRows] = await db.query(
+                `SELECT u.UserID 
+                 FROM users u
+                 JOIN headofoffice h ON u.UserID = h.UserID
+                 JOIN office_head_assignments oha ON h.HeadID = oha.HeadID
+                 WHERE oha.OfficeID = ?`,
+                [resolvedOfficeId]
+            );
+            const headUserIds = headRows.map(r => Number(r.UserID));
+            
+            // Get auditors assigned to this office
+            const [auditorRows] = await db.query(
+                `SELECT aaa.auditor_user_id as UserID
+                 FROM auditor_area_assignments aaa
+                 JOIN offices o ON o.OfficeID = ?
+                 JOIN criteria c ON c.EventID = o.EventID
+                 WHERE aaa.area_id = c.AreaID`,
+                [resolvedOfficeId]
+            );
+            const auditorUserIds = auditorRows.map(r => Number(r.UserID));
+            
+            const allRecipientIds = [...new Set([...adminIds, ...headUserIds, ...auditorUserIds])];
             const uploaderDisplay = userName.replace(/_/g, ' ');
-            if (adminIds.length > 0 && resolvedOfficeId) {
+
+            if (allRecipientIds.length > 0 && resolvedOfficeId) {
                 await createNotifications({
-                    userIds: adminIds.filter((id) => id !== actorUserId),
+                    userIds: allRecipientIds.filter((id) => id !== actorUserId),
                     adminId: actorUserId,
                     title: 'New evidence uploaded',
                     message: `${uploaderDisplay} uploaded evidence for ${RequirementCode || 'a requirement'} in ${officeName}.`,
@@ -493,7 +597,7 @@ router.post('/user-upload', auth, userReqUpload.single('file'), async (req, res)
                 });
             }
         } catch (notifErr) {
-            console.error('Failed to notify admins about file upload:', notifErr);
+            console.error('Failed to notify about file upload:', notifErr);
         }
 
         try {

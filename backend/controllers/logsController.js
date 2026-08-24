@@ -17,8 +17,18 @@ exports.recordLog = recordLog;
 
 exports.getLogs = async (req, res) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit, 10) || 300, 1000);
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(Math.max(1, parseInt(req.query.limit, 10) || 8), 100);
+    const offset = (page - 1) * limit;
     const includeHttp = String(req.query.includeHttp || '').trim() === '1';
+
+    let countSql = `SELECT COUNT(*) as total FROM logs l`;
+    if (!includeHttp) {
+      countSql += ` WHERE l.Action !~ '^(GET|POST|PUT|PATCH|DELETE)\\s+'`;
+    }
+    const [countRows] = await db.query(countSql);
+    const totalCount = parseInt(countRows[0]?.total || 0, 10);
+    const totalPages = Math.ceil(totalCount / limit) || 1;
 
     let sql = `SELECT
         l.LogID,
@@ -41,9 +51,9 @@ exports.getLogs = async (req, res) => {
       sql += ` WHERE l.Action !~ '^(GET|POST|PUT|PATCH|DELETE)\\s+'`;
     }
 
-    sql += ` ORDER BY l.Timestamp DESC, l.LogID DESC LIMIT ?`;
+    sql += ` ORDER BY l.Timestamp DESC, l.LogID DESC LIMIT ? OFFSET ?`;
 
-    const [rows] = await db.query(sql, [limit]);
+    const [rows] = await db.query(sql, [limit, offset]);
 
     const logs = rows.map((row) => {
       const mid = row.MiddleInitial ? ` ${row.MiddleInitial}.` : '';
@@ -348,7 +358,7 @@ exports.getLogs = async (req, res) => {
       };
     });
 
-    res.json({ success: true, logs });
+    res.json({ success: true, logs, total: totalCount, totalPages, page, limit });
   } catch (err) {
     console.error('getLogs:', err);
     res.status(500).json({ success: false, message: 'Failed to load activity logs' });

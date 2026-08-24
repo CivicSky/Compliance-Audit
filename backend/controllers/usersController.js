@@ -693,18 +693,15 @@ exports.updateUser = async (req, res) => {
       return res.status(403).json({ success: false, message: "Not authorized" });
     }
 
-    // Store only the filename if uploaded, like office head
+    const { FirstName, MiddleInitial, LastName, Email } = req.body;
     let ProfilePic = req.file ? req.file.filename : req.body.ProfilePic || null;
 
     if (req.file) {
       try {
         const { uploadToSupabaseBucket } = require('../utils/supabaseStorage');
-        const supabaseRes = await uploadToSupabaseBucket(req.file.path, req.file.filename, req.file.mimetype, 'profile-pics');
-        if (supabaseRes && supabaseRes.publicUrl) {
-          ProfilePic = supabaseRes.publicUrl;
-        }
+        await uploadToSupabaseBucket(req.file.path, req.file.filename, req.file.mimetype, 'profile-pics');
       } catch (sErr) {
-        console.warn('Profile pic cloud upload notice (falling back to local disk):', sErr.message);
+        console.warn('Profile pic cloud upload notice:', sErr.message);
       }
     }
 

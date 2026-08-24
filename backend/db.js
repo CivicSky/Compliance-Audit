@@ -1,7 +1,12 @@
 const postgres = require('postgres');
 require('dotenv').config();
 
-const sql = postgres(process.env.DATABASE_URL, {
+const rawUrl = (process.env.DATABASE_URL || '').trim();
+const dbUrl = (rawUrl && rawUrl.startsWith('postgres'))
+  ? rawUrl
+  : 'postgresql://postgres.ylluxulqxkjircffndxg:gwapoakogwa@aws-0-ap-northeast-1.pooler.supabase.com:5432/postgres';
+
+const sql = postgres(dbUrl, {
   ssl: {
     rejectUnauthorized: false
   }
@@ -82,13 +87,27 @@ const db = {
       pgText += ' RETURNING *';
     }
 
+    // Sanitize parameters so undefined becomes null (preventing Postgres 'undefined' string casting)
+    const cleanParams = (params || []).map(p => (p === undefined ? null : p));
+
     // Run the query using the postgres library's unsafe method for raw SQL string execution
-    const result = await sql.unsafe(pgText, params || []);
+    const result = await sql.unsafe(pgText, cleanParams);
     
     // Add compatibility properties
     result.affectedRows = result.count;
     if (result.length > 0) {
-      result.insertId = result[0].id || result[0].UserID || result[0].RequirementID || Object.values(result[0])[0];
+      const row = result[0];
+      if (/insert\s+into\s+["`]?areas["`]?/i.test(pgText)) {
+        result.insertId = row.AreaID ?? row.areaid ?? row.id ?? row.ID;
+      } else if (/insert\s+into\s+["`]?criteria["`]?/i.test(pgText)) {
+        result.insertId = row.CriteriaID ?? row.criteriaid ?? row.id ?? row.ID;
+      } else if (/insert\s+into\s+["`]?requirements["`]?/i.test(pgText)) {
+        result.insertId = row.RequirementID ?? row.requirementid ?? row.id ?? row.ID;
+      } else if (/insert\s+into\s+["`]?events["`]?/i.test(pgText)) {
+        result.insertId = row.EventID ?? row.eventid ?? row.id ?? row.ID;
+      } else {
+        result.insertId = row.id ?? row.ID ?? row.AreaID ?? row.areaid ?? row.CriteriaID ?? row.criteriaid ?? row.RequirementID ?? row.requirementid ?? row.EventID ?? row.eventid ?? row.UserID ?? row.userid ?? Object.values(row)[0];
+      }
     }
 
     return [result, result];

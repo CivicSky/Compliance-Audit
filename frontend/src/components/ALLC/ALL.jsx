@@ -11,6 +11,7 @@ import EventPopup from './EventPopup';
 import EditEventPopup from './EditEventPopup';
 import { eventsAPI, usersAPI } from '../../utils/api';
 import { useModal } from "../UI/ModalProvider";
+import { useToast } from '../UI/Toast';
 import AddEventModal from '../AddEvent/AddEventModal';
 
 
@@ -25,6 +26,7 @@ function ALL() {
     const [isAddEventOpen, setIsAddEventOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const { showAlert, showConfirm } = useModal();
+    const { toast } = useToast();
         // Search helpers
         const matchesSearch = (text, searchLower) => {
             return (text?.toLowerCase() || '').includes(searchLower);
@@ -277,6 +279,21 @@ function ALL() {
         setExpandedNoArea(new Set());
         // Set the selected event - useEffect will auto-fetch areas
         setSelectedEvent(event);
+    };
+
+    const openCopyModal = (originalEvent) => {
+        if (!originalEvent) return;
+        const baseCode = originalEvent.EventCode || 'EVENT';
+        const baseName = originalEvent.EventName || 'Event';
+        let defaultCode = `${baseCode}-COPY`;
+        let defaultName = `${baseName} (Copy)`;
+        let counter = 1;
+        while (events.some(e => String(e.EventCode || '').trim().toUpperCase() === defaultCode.toUpperCase())) {
+            defaultCode = `${baseCode}-COPY-${counter}`;
+            defaultName = `${baseName} (Copy ${counter})`;
+            counter++;
+        }
+        setCopyPopup({ open: true, event: originalEvent, defaultCode, defaultName });
     };
 
     const fetchCriteriaForArea = async (areaId, force = false) => {
@@ -623,10 +640,20 @@ function ALL() {
                                         const { eventsAPI } = await import('../../utils/api');
                                         const resp = await eventsAPI.deleteEvents(ids);
                                         if (resp && resp.success) {
-                                            await showAlert(resp.message || 'Selected standards deleted.');
+                                            toast?.({
+                                                title: 'Events Deleted',
+                                                description: resp.message || `${ids.length} event(s) deleted successfully`,
+                                                variant: 'success',
+                                                duration: 3000,
+                                            });
                                             await fetchEvents();
                                         } else {
-                                            await showAlert(resp?.message || 'Failed to delete selected standards.');
+                                            toast?.({
+                                                title: 'Delete Failed',
+                                                description: resp?.message || 'Failed to delete selected events.',
+                                                variant: 'error',
+                                                duration: 3000,
+                                            });
                                         }
                                     } catch (err) {
                                         console.error('Delete events error', err);
@@ -732,7 +759,7 @@ function ALL() {
                             openEventModal(event);
                         }}
                         onCopy={(originalEvent) => {
-                            setCopyPopup({ open: true, event: originalEvent });
+                            openCopyModal(originalEvent);
                         }}
                         onEdit={(originalEvent) => {
                             setEditPopup({ open: true, event: originalEvent });
@@ -741,22 +768,41 @@ function ALL() {
                             const eventId = Number(targetEvent?.EventID);
                             if (!eventId) return;
 
+                            // Ensure modal structure is closed when deleting
+                            setSelectedEvent(null);
+
                             const confirmed = await showConfirm(`Delete event "${targetEvent?.EventName || eventId}"? This cannot be undone.`);
                             if (!confirmed) return;
 
                             try {
                                 const resp = await eventsAPI.deleteEvents([eventId]);
                                 if (resp?.success) {
+                                    toast?.({
+                                        title: 'Event Deleted',
+                                        description: `Event "${targetEvent?.EventName || targetEvent?.EventCode || eventId}" deleted successfully`,
+                                        variant: 'success',
+                                        duration: 3000,
+                                    });
                                     await fetchEvents();
                                     if (selectedEvent?.EventID === eventId) {
                                         setSelectedEvent(null);
                                     }
                                 } else {
-                                    await showAlert(resp?.message || 'Failed to delete event.');
+                                    toast?.({
+                                        title: 'Delete Failed',
+                                        description: resp?.message || 'Failed to delete event.',
+                                        variant: 'error',
+                                        duration: 3000,
+                                    });
                                 }
                             } catch (err) {
                                 console.error('Delete event error', err);
-                                await showAlert(err?.message || 'Error deleting event.');
+                                toast?.({
+                                    title: 'Delete Error',
+                                    description: err?.message || 'Error deleting event.',
+                                    variant: 'error',
+                                    duration: 3000,
+                                });
                             }
                         }}
                         showCheckbox={deleteMode}
@@ -869,7 +915,7 @@ function ALL() {
                     onEditCriteria={editCriteria}
                     onBulkDelete={bulkDeleteHierarchy}
                     onEditEvent={(evt) => setEditPopup({ open: true, event: evt })}
-                    onCopyEvent={(evt) => setCopyPopup({ open: true, event: evt })}
+                    onCopyEvent={(evt) => openCopyModal(evt)}
                     isAdmin={isAdmin}
                 />
             )}
@@ -877,8 +923,8 @@ function ALL() {
             {copyPopup.open && (
                 <CopyEventPopup
                     open={copyPopup.open}
-                    defaultName={copyPopup.event?.EventName ? copyPopup.event.EventName + ' (Copy)' : ''}
-                    defaultCode={copyPopup.event?.EventCode ? copyPopup.event.EventCode + '-COPY' : ''}
+                    defaultName={copyPopup.defaultName || (copyPopup.event?.EventName ? copyPopup.event.EventName + ' (Copy)' : '')}
+                    defaultCode={copyPopup.defaultCode || (copyPopup.event?.EventCode ? copyPopup.event.EventCode + '-COPY' : '')}
                     defaultDescription={copyPopup.event?.Description || ''}
                     onCancel={() => setCopyPopup({ open: false, event: null })}
                     onConfirm={async ({ eventName, eventCode, description }) => {
@@ -894,9 +940,19 @@ function ALL() {
                             });
                             setCopyPopup({ open: false, event: null });
                             await fetchEvents();
-                            alert('Event copied successfully!');
+                            toast?.({
+                                title: 'Event Copied',
+                                description: `Successfully copied "${eventName}"`,
+                                variant: 'success',
+                                duration: 3000,
+                            });
                         } catch (err) {
-                            alert('Failed to copy event: ' + (err?.response?.data?.message || err.message));
+                            toast?.({
+                                title: 'Copy Failed',
+                                description: err?.response?.data?.message || err.message || 'Failed to copy event',
+                                variant: 'error',
+                                duration: 3000,
+                            });
                         }
                     }}
                 />

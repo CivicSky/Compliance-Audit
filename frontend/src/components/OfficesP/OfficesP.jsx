@@ -6,7 +6,7 @@ import userIcon from "../../assets/images/user.svg";
 import Pagination from "../Pagination/Pagination";
 import { API_BASE_URL } from '../../utils/apiBase';
 import { formatDateTime } from '../../utils/formatDateTime';
-import { CardListSkeleton } from "../UI/Skeleton";
+import { OfficeCardSkeleton } from "../UI/Skeleton";
 
 const renderOfficeIcon = (office, deleteMode = false) => {
     const isAcademic = office.entity_type_id === 1 || String(office.category_name || office.TypeName || office.office_type_name || office.office_type || "").toLowerCase().includes("academic program") || String(office.category_name || office.TypeName || office.office_type_name || office.office_type || "").toLowerCase().includes("program");
@@ -328,7 +328,7 @@ const OfficesP = forwardRef(
         if (loading) {
             return (
                 <div className="w-full py-4">
-                    <CardListSkeleton count={6} />
+                    <OfficeCardSkeleton count={6} />
                 </div>
             );
         }

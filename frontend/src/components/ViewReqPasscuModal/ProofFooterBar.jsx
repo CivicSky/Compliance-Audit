@@ -1,6 +1,7 @@
 import React from 'react';
 import axios from 'axios';
 import { API_BASE_URL } from '../../utils/apiBase';
+import { useToast } from '../UI/Toast';
 
 const btnBase = 'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed';
 
@@ -26,6 +27,8 @@ export default function ProofFooterBar({
     setShowDocViewer,
     onClose,
 }) {
+    const { toast } = useToast();
+
     return (
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200/70 bg-white px-5 py-3 shadow-[0_-1px_4px_0_rgba(0,0,0,0.04)]">
             {isAdmin ? (
@@ -146,7 +149,12 @@ export default function ProofFooterBar({
                                                     setProofFileUrl('');
                                                 }
                                             } catch (e) { /* ignore */ }
-                                            await showAlert('Proof deleted');
+                                            toast?.({
+                                                title: 'Proof Deleted',
+                                                description: 'Proof document removed successfully.',
+                                                variant: 'success',
+                                                duration: 3000
+                                            });
                                         } else {
                                             await showAlert(data.message || 'Failed to delete proof');
                                         }

@@ -106,6 +106,26 @@ router.post('/assign', auth, restrictAuditor, async (req, res) => {
             } catch (e) {}
         }
 
+        try {
+            const { createNotifications } = require('../utils/notificationService');
+            const areaNames = assignedAreas.map(a => a.AreaCode || a.AreaName || '').filter(Boolean).join(', ');
+            await createNotifications({
+                userIds: [userId],
+                adminId: req.user?.userId || null,
+                title: 'New Area Assignments',
+                message: `You have been assigned as the auditor for: ${areaNames || 'no areas'}.`,
+                type: 'info',
+                relatedTable: 'auditor_assignments',
+                relatedId: Number(userId),
+                meta: {
+                    userId: Number(userId),
+                    openSubmission: false
+                }
+            });
+        } catch (notifErr) {
+            console.error('Failed to notify auditor about area assignments:', notifErr);
+        }
+
         res.json({
             success: true,
             message: 'Auditor areas assigned successfully',

@@ -116,9 +116,10 @@ export default function RowActionMenu({
                         type="button"
                         role="menuitem"
                         disabled={item.disabled}
-                        onClick={() => {
+                        onClick={(e) => {
+                            e.stopPropagation();
                             close();
-                            item.onClick?.();
+                            item.onClick?.(e);
                         }}
                         className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs transition ${textClass} ${hoverClass} disabled:cursor-not-allowed disabled:opacity-50 whitespace-nowrap`}
                     >
