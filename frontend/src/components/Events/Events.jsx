@@ -165,8 +165,8 @@ export default function Events() {
     };
 
     return (
-        <div className="px-6 pb-6 pt-6 w-full">
-            <div className="flex items-center justify-between mb-4">
+        <div className="px-4 sm:px-6 pb-6 pt-2 w-full">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                 <Header 
                     pageTitle="Events" 
                     onAddClick={() => setIsModalOpen(true)}
@@ -182,7 +182,7 @@ export default function Events() {
                 {isAdmin && (
                     <button 
                         onClick={() => setShowWizard(true)}
-                        className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition text-sm"
+                        className="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition text-sm shrink-0 self-start sm:self-auto"
                         title="Quick setup with wizard"
                     >
                         <Wand2 size={18} /> Wizard

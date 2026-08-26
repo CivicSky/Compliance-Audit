@@ -27,23 +27,23 @@ function ALL() {
     const [searchTerm, setSearchTerm] = useState("");
     const { showAlert, showConfirm } = useModal();
     const { toast } = useToast();
-        // Search helpers
-        const matchesSearch = (text, searchLower) => {
-            return (text?.toLowerCase() || '').includes(searchLower);
-        };
+    // Search helpers
+    const matchesSearch = (text, searchLower) => {
+        return (text?.toLowerCase() || '').includes(searchLower);
+    };
 
-        const eventMatchesSearch = (event, searchLower) => {
-            return matchesSearch(event.EventName, searchLower) ||
-                   matchesSearch(event.EventCode, searchLower) ||
-                   matchesSearch(event.Description, searchLower);
-        };
+    const eventMatchesSearch = (event, searchLower) => {
+        return matchesSearch(event.EventName, searchLower) ||
+            matchesSearch(event.EventCode, searchLower) ||
+            matchesSearch(event.Description, searchLower);
+    };
 
 
     const [auditorAssignments, setAuditorAssignments] = useState({ areaIds: new Set(), eventIds: new Set(), rawList: [] });
 
-    const isAuditor = currentUser?.RoleID === 4 || 
-                      String(currentUser?.RoleName || '').toLowerCase().includes('auditor') || 
-                      currentUser?.isExternalAuditor;
+    const isAuditor = currentUser?.RoleID === 4 ||
+        String(currentUser?.RoleName || '').toLowerCase().includes('auditor') ||
+        currentUser?.isExternalAuditor;
 
     useEffect(() => {
         if (!currentUser || !isAuditor) return;
@@ -73,7 +73,7 @@ function ALL() {
         const eventStatus = String(event.status || event.Status || '').toLowerCase().trim();
         if (sortStatus === 'active' && eventStatus === 'inactive') return false;
         if (sortStatus === 'inactive' && eventStatus !== 'inactive') return false;
-        
+
         // Auditor Scoping filter: only show events containing areas assigned to this auditor!
         if (isAuditor) {
             const isEventAssigned = auditorAssignments.eventIds.has(Number(event.EventID));
@@ -107,10 +107,10 @@ function ALL() {
     const [loadingNoAreaCriteria, setLoadingNoAreaCriteria] = useState(new Set());
 
     const isAdmin = currentUser?.RoleName === 'admin' || currentUser?.RoleID === 1;
-    
+
     // Track abort controllers to cancel stale requests
     const abortControllersRef = useRef({});
-    
+
     const itemsPerPage = 4; // limit to 4 per page
 
     useEffect(() => {
@@ -213,7 +213,7 @@ function ALL() {
     const fetchAreasForEvent = async (eventId, force = false) => {
         // Skip if already cached and not forcing refresh
         if (!force && areasData[eventId]) return;
-        
+
         try {
             setLoadingAreas(prev => new Set([...prev, eventId]));
             const token = localStorage.getItem('token');
@@ -299,7 +299,7 @@ function ALL() {
     const fetchCriteriaForArea = async (areaId, force = false) => {
         // Skip if already cached and not forcing refresh
         if (criteriaData[areaId] && !force) return;
-        
+
         try {
             setLoadingCriteria(prev => new Set([...prev, areaId]));
             const token = localStorage.getItem('token');
@@ -321,7 +321,7 @@ function ALL() {
     const fetchRequirementsForCriteria = async (criteriaId, force = false) => {
         // Skip if already cached and not forcing refresh
         if (requirementsData[criteriaId] && !force) return;
-        
+
         try {
             setLoadingRequirements(prev => new Set([...prev, criteriaId]));
             const token = localStorage.getItem('token');
@@ -619,8 +619,8 @@ function ALL() {
     const visibleEvents = filteredEvents.slice(startIdx, startIdx + itemsPerPage);
 
     return (
-        <div className="px-4 pb-6 pt-6 w-full overflow-hidden">
-<div className="mb-4 flex flex-col gap-2 relative">
+        <div className="px-4 pb-6 pt-2 w-full overflow-hidden">
+            <div className="mb-4 flex flex-col gap-2 relative">
                 <div className="flex items-start justify-between gap-2">
                     <div>
                         <h1 className="text-2xl font-bold text-gray-800 mb-1">Compliance Standards</h1>
@@ -628,111 +628,110 @@ function ALL() {
                     </div>
 
                     {isAdmin && (
-                    <div className="flex items-center gap-1 pt-0.5">
-                        {deleteMode && (
-                            <button
-                                onClick={async () => {
-                                    const ids = Array.from(selectedEventIdsForDelete).map(Number).filter(Boolean);
-                                    if (ids.length === 0) return await showAlert('Select at least one standard to delete.');
-                                    const confirmed = await showConfirm(`Delete ${ids.length} selected standard(s)? This cannot be undone.`);
-                                    if (!confirmed) return;
-                                    try {
-                                        const { eventsAPI } = await import('../../utils/api');
-                                        const resp = await eventsAPI.deleteEvents(ids);
-                                        if (resp && resp.success) {
-                                            toast?.({
-                                                title: 'Events Deleted',
-                                                description: resp.message || `${ids.length} event(s) deleted successfully`,
-                                                variant: 'success',
-                                                duration: 3000,
-                                            });
-                                            await fetchEvents();
-                                        } else {
-                                            toast?.({
-                                                title: 'Delete Failed',
-                                                description: resp?.message || 'Failed to delete selected events.',
-                                                variant: 'error',
-                                                duration: 3000,
-                                            });
+                        <div className="flex items-center gap-1 pt-0.5">
+                            {deleteMode && (
+                                <button
+                                    onClick={async () => {
+                                        const ids = Array.from(selectedEventIdsForDelete).map(Number).filter(Boolean);
+                                        if (ids.length === 0) return await showAlert('Select at least one standard to delete.');
+                                        const confirmed = await showConfirm(`Delete ${ids.length} selected standard(s)? This cannot be undone.`);
+                                        if (!confirmed) return;
+                                        try {
+                                            const { eventsAPI } = await import('../../utils/api');
+                                            const resp = await eventsAPI.deleteEvents(ids);
+                                            if (resp && resp.success) {
+                                                toast?.({
+                                                    title: 'Events Deleted',
+                                                    description: resp.message || `${ids.length} event(s) deleted successfully`,
+                                                    variant: 'success',
+                                                    duration: 3000,
+                                                });
+                                                await fetchEvents();
+                                            } else {
+                                                toast?.({
+                                                    title: 'Delete Failed',
+                                                    description: resp?.message || 'Failed to delete selected events.',
+                                                    variant: 'error',
+                                                    duration: 3000,
+                                                });
+                                            }
+                                        } catch (err) {
+                                            console.error('Delete events error', err);
+                                            await showAlert(err?.message || 'Error deleting selected standards.');
+                                        } finally {
+                                            setDeleteMode(false);
+                                            setSelectedEventIdsForDelete(new Set());
                                         }
-                                    } catch (err) {
-                                        console.error('Delete events error', err);
-                                        await showAlert(err?.message || 'Error deleting selected standards.');
-                                    } finally {
+                                    }}
+                                    className={`ml-2 inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-red-400 bg-red-600 text-white hover:bg-red-700 ${selectedEventIdsForDelete.size === 0 ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                    disabled={selectedEventIdsForDelete.size === 0}
+                                >
+                                    Delete Selected ({selectedEventIdsForDelete.size})
+                                </button>
+                            )}
+
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (deleteMode) {
                                         setDeleteMode(false);
                                         setSelectedEventIdsForDelete(new Set());
+                                        return;
                                     }
-                                }}
-                                className={`ml-2 inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-red-400 bg-red-600 text-white hover:bg-red-700 ${selectedEventIdsForDelete.size === 0 ? 'opacity-60 cursor-not-allowed' : ''}`}
-                                disabled={selectedEventIdsForDelete.size === 0}
-                            >
-                                Delete Selected ({selectedEventIdsForDelete.size})
-                            </button>
-                        )}
-
-                        <button
-                            type="button"
-                            onClick={() => {
-                                if (deleteMode) {
-                                    setDeleteMode(false);
+                                    setDeleteMode(true);
                                     setSelectedEventIdsForDelete(new Set());
-                                    return;
-                                }
-                                setDeleteMode(true);
-                                setSelectedEventIdsForDelete(new Set());
-                            }}
-                            className={`inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-red-400 ${
-                                deleteMode
-                                    ? 'border-red-300 bg-red-100 text-red-700 hover:bg-red-200'
-                                    : 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100'
-                            }`}
-                        >
-                            {deleteMode ? 'Cancel Delete' : 'Delete'}
-                        </button>
+                                }}
+                                className={`inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-red-400 ${deleteMode
+                                        ? 'border-red-300 bg-red-100 text-red-700 hover:bg-red-200'
+                                        : 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100'
+                                    }`}
+                            >
+                                {deleteMode ? 'Cancel Delete' : 'Delete'}
+                            </button>
 
-                        <button
-                            type="button"
-                            onClick={() => setIsAddEventOpen(true)}
-                            className="inline-flex h-8 items-center gap-1 rounded-lg bg-emerald-600 px-3 text-[11px] font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                        >
-                            <span className="text-sm leading-none">+</span>
-                            Add
-                        </button>
-                    </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsAddEventOpen(true)}
+                                className="inline-flex h-8 items-center gap-1 rounded-lg bg-emerald-600 px-3 text-[11px] font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                            >
+                                <span className="text-sm leading-none">+</span>
+                                Add
+                            </button>
+                        </div>
                     )}
                 </div>
 
                 <div className="flex w-full items-center justify-between gap-1">
                     <div className="relative w-full max-w-sm">
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
-                            >
-                                <circle cx="11" cy="11" r="7" />
-                                <path d="m20 20-3.5-3.5" />
-                            </svg>
-                            <input
-                                type="text"
-                                placeholder="Search events, codes, or descriptions..."
-                                className="h-9 w-full rounded-lg border border-slate-200 bg-white pl-8 pr-3 text-[9px] text-slate-700 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-brand-500"
-                                value={searchTerm}
-                                onChange={handleSearchChange}
-                            />
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
+                        >
+                            <circle cx="11" cy="11" r="7" />
+                            <path d="m20 20-3.5-3.5" />
+                        </svg>
+                        <input
+                            type="text"
+                            placeholder="Search events, codes, or descriptions..."
+                            className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs text-slate-800 placeholder-slate-400 shadow-2xs transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                            value={searchTerm}
+                            onChange={handleSearchChange}
+                        />
                     </div>
 
                     <div className="flex items-center gap-1">
                         <div className="flex h-9 items-center justify-end gap-1">
-                        <div className="relative inline-block">
-                            <SortEvents value={sortStatus} onChange={setSortStatus} />
-                        </div>
+                            <div className="relative inline-block">
+                                <SortEvents value={sortStatus} onChange={setSortStatus} />
+                            </div>
                         </div>
                     </div>
                 </div>
-                
+
             </div>
 
             {/* Events Grid 2x2 */}
@@ -745,79 +744,80 @@ function ALL() {
                             event={event}
                             assignedAreas={eventAssignments}
                             onClick={() => {
-                            if (deleteMode) {
-                                // toggle selection when clicking card in delete mode
-                                setSelectedEventIdsForDelete(prev => {
-                                    const next = new Set(prev);
-                                    const id = Number(event.EventID);
-                                    if (next.has(id)) next.delete(id);
-                                    else next.add(id);
-                                    return next;
-                                });
-                                return;
-                            }
-                            openEventModal(event);
-                        }}
-                        onCopy={(originalEvent) => {
-                            openCopyModal(originalEvent);
-                        }}
-                        onEdit={(originalEvent) => {
-                            setEditPopup({ open: true, event: originalEvent });
-                        }}
-                        onDelete={async (targetEvent) => {
-                            const eventId = Number(targetEvent?.EventID);
-                            if (!eventId) return;
-
-                            // Ensure modal structure is closed when deleting
-                            setSelectedEvent(null);
-
-                            const confirmed = await showConfirm(`Delete event "${targetEvent?.EventName || eventId}"? This cannot be undone.`);
-                            if (!confirmed) return;
-
-                            try {
-                                const resp = await eventsAPI.deleteEvents([eventId]);
-                                if (resp?.success) {
-                                    toast?.({
-                                        title: 'Event Deleted',
-                                        description: `Event "${targetEvent?.EventName || targetEvent?.EventCode || eventId}" deleted successfully`,
-                                        variant: 'success',
-                                        duration: 3000,
+                                if (deleteMode) {
+                                    // toggle selection when clicking card in delete mode
+                                    setSelectedEventIdsForDelete(prev => {
+                                        const next = new Set(prev);
+                                        const id = Number(event.EventID);
+                                        if (next.has(id)) next.delete(id);
+                                        else next.add(id);
+                                        return next;
                                     });
-                                    await fetchEvents();
-                                    if (selectedEvent?.EventID === eventId) {
-                                        setSelectedEvent(null);
+                                    return;
+                                }
+                                openEventModal(event);
+                            }}
+                            onCopy={(originalEvent) => {
+                                openCopyModal(originalEvent);
+                            }}
+                            onEdit={(originalEvent) => {
+                                setEditPopup({ open: true, event: originalEvent });
+                            }}
+                            onDelete={async (targetEvent) => {
+                                const eventId = Number(targetEvent?.EventID);
+                                if (!eventId) return;
+
+                                // Ensure modal structure is closed when deleting
+                                setSelectedEvent(null);
+
+                                const confirmed = await showConfirm(`Delete event "${targetEvent?.EventName || eventId}"? This cannot be undone.`);
+                                if (!confirmed) return;
+
+                                try {
+                                    const resp = await eventsAPI.deleteEvents([eventId]);
+                                    if (resp?.success) {
+                                        toast?.({
+                                            title: 'Event Deleted',
+                                            description: `Event "${targetEvent?.EventName || targetEvent?.EventCode || eventId}" deleted successfully`,
+                                            variant: 'success',
+                                            duration: 3000,
+                                        });
+                                        await fetchEvents();
+                                        if (selectedEvent?.EventID === eventId) {
+                                            setSelectedEvent(null);
+                                        }
+                                    } else {
+                                        toast?.({
+                                            title: 'Delete Failed',
+                                            description: resp?.message || 'Failed to delete event.',
+                                            variant: 'error',
+                                            duration: 3000,
+                                        });
                                     }
-                                } else {
+                                } catch (err) {
+                                    console.error('Delete event error', err);
                                     toast?.({
-                                        title: 'Delete Failed',
-                                        description: resp?.message || 'Failed to delete event.',
+                                        title: 'Delete Error',
+                                        description: err?.message || 'Error deleting event.',
                                         variant: 'error',
                                         duration: 3000,
                                     });
                                 }
-                            } catch (err) {
-                                console.error('Delete event error', err);
-                                toast?.({
-                                    title: 'Delete Error',
-                                    description: err?.message || 'Error deleting event.',
-                                    variant: 'error',
-                                    duration: 3000,
+                            }}
+                            showCheckbox={deleteMode}
+                            isAdmin={isAdmin}
+                            isChecked={selectedEventIdsForDelete.has(Number(event.EventID))}
+                            onToggleSelect={(evt, checked) => {
+                                setSelectedEventIdsForDelete(prev => {
+                                    const next = new Set(prev);
+                                    const id = Number(evt.EventID);
+                                    if (checked) next.add(id); else next.delete(id);
+                                    return next;
                                 });
-                            }
-                        }}
-                        showCheckbox={deleteMode}
-                        isAdmin={isAdmin}
-                        isChecked={selectedEventIdsForDelete.has(Number(event.EventID))}
-                        onToggleSelect={(evt, checked) => {
-                            setSelectedEventIdsForDelete(prev => {
-                                const next = new Set(prev);
-                                const id = Number(evt.EventID);
-                                if (checked) next.add(id); else next.delete(id);
-                                return next;
-                            });
-                        }}
-                    />
-                )})}
+                            }}
+                        />
+                    )
+                })}
                 {/* Edit Event Popup */}
                 <EditEventPopup
                     open={editPopup.open}
@@ -846,9 +846,9 @@ function ALL() {
                                 status,
                                 accreditation_level
                             } : prev);
-                            alert('Event updated successfully!');
+                            await showAlert('Event updated successfully!', 'success');
                         } catch (err) {
-                            alert('Failed to update event: ' + (err?.response?.data?.message || err.message));
+                            await showAlert('Failed to update event: ' + (err?.response?.data?.message || err.message), 'error');
                         }
                     }}
                 />

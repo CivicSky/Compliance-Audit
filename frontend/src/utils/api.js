@@ -22,9 +22,21 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor for 401/403 Unauthorized & Expired Tokens
+// Response interceptor for 401/403 Unauthorized & Expired Tokens and Live Sync
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const method = response?.config?.method?.toLowerCase();
+    if (['post', 'put', 'patch', 'delete'].includes(method)) {
+      const url = response?.config?.url || '';
+      // Exclude login/logout/verify tokens from triggering full data sync
+      if (!url.includes('/login') && !url.includes('/logout') && !url.includes('/otp') && !url.includes('/verify')) {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('app:data-sync', { detail: { url, method, timestamp: Date.now() } }));
+        }
+      }
+    }
+    return response;
+  },
   (error) => {
     const originalRequest = error.config;
     // Only redirect if not a login or register request
@@ -191,6 +203,7 @@ export const usersAPI = {
 // ========================
 export const eventsAPI = {
   getAllEvents: async () => (await api.get('/api/events')).data,
+  getAll: async () => (await api.get('/api/events')).data,
   getAccreditationLevels: async () => (await api.get('/api/events/accreditation-levels')).data,
   addEvent: async (eventData) => (await api.post('/api/events/add', eventData)).data,
   updateEvent: async (eventId, eventData) => (await api.put(`/api/events/update/${eventId}`, eventData)).data,

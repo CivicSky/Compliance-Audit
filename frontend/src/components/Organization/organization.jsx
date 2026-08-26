@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import Sortoffice from "./sortoffice";
+import CustomDropdown from "../UI/CustomDropdown";
 import EventsAddDelete from "../ALLC/eventsadddelete";
 import EventTabs from "./EventTabs";
 import OfficeAddDelete from "./officeadddelete";
@@ -13,6 +14,7 @@ import ViewReqPasscuModal from "../../components/ViewReqPasscuModal/ViewReqPassc
 import ViewReqPASSCUModal from "../../components/ViewReqPASSCUModal/ViewReqPASSCUModal";
 import AddReqOffModal from "../../components/AddReqOffModal/AddReqOffModal";
 import { useModal } from "../UI/ModalProvider";
+import { useLiveRefresh } from "../../utils/liveSync";
 
 const normalizeOfficeRecord = (office) => {
     if (!office) return null;
@@ -27,7 +29,7 @@ const normalizeOfficeRecord = (office) => {
     };
 };
 
-export default function Organization() {
+export default function Organization({ selectedEventIdProp, onEventSelect }) {
     const [searchParams, setSearchParams] = useSearchParams();
     const [modalDeepLink, setModalDeepLink] = useState(null);
     const notifDeepLinkHandled = useRef(false);
@@ -51,7 +53,20 @@ export default function Organization() {
     const [deleteMode, setDeleteMode] = useState(false);
     const [selectedCount, setSelectedCount] = useState(0);
     const [selectedIds, setSelectedIds] = useState([]);
-    const [selectedEventType, setSelectedEventType] = useState(''); // will hold EventID
+    const [selectedEventType, setSelectedEventType] = useState(selectedEventIdProp || ''); // will hold EventID
+
+    useEffect(() => {
+        if (selectedEventIdProp) {
+            setSelectedEventType(selectedEventIdProp);
+        }
+    }, [selectedEventIdProp]);
+
+    const handleEventTabChange = (eventId) => {
+        setSelectedEventType(eventId);
+        if (typeof onEventSelect === 'function') {
+            onEventSelect(eventId);
+        }
+    };
     const [events, setEvents] = useState([]);
     const [currentUser, setCurrentUser] = useState(() => {
         try {
@@ -97,13 +112,9 @@ export default function Organization() {
         };
     }, [updateContentHeight]);
 
-    // Prevent page/body scrolling while this component is mounted
+    // Allow normal scrolling
     useEffect(() => {
-        const previous = document.body.style.overflow;
-        document.body.style.overflow = 'hidden';
-        return () => {
-            document.body.style.overflow = previous;
-        };
+        return () => {};
     }, []);
 
     // Fetch office types and events safely
@@ -199,6 +210,18 @@ export default function Organization() {
         }
         fetchAvailableMasterList(selectedEventType);
     };
+
+    // Real-time live syncing on mutations or window focus
+    const refreshOrgData = useCallback(() => {
+        if (officesPRef.current?.refresh) {
+            officesPRef.current.refresh();
+        }
+        if (selectedEventType) {
+            fetchAvailableMasterList(selectedEventType);
+        }
+    }, [selectedEventType]);
+
+    useLiveRefresh(refreshOrgData, { deps: [selectedEventType] });
 
     const handleOfficeClick = (office) => {
         if (!deleteMode) {
@@ -332,14 +355,16 @@ export default function Organization() {
                 }
 
                 setIsEditModalOpen(false);
-                setIsViewReqModalOpen(true);
-                await showAlert('Office updated successfully!');
+                await showAlert('Office personnel updated successfully!', 'success');
+                return { success: true };
             } else {
-                await showAlert(response?.message || 'Failed to update office');
+                await showAlert(response?.message || 'Failed to update office personnel', 'error');
+                return { success: false, message: response?.message };
             }
         } catch (err) {
             console.error(err);
-            await showAlert('Error updating office');
+            await showAlert('Error updating office', 'error');
+            return { success: false, message: err.message };
         }
     };
 
@@ -487,37 +512,29 @@ export default function Organization() {
 
 
     return (
-        <div className="w-full h-screen flex flex-col bg-app">
+        <div className="w-full h-full flex flex-col bg-app overflow-hidden">
             {/* Fixed header */}
             <div ref={headerRef} style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50, background: 'transparent' }}>
 </div>
 
             {/* Fixed controls and filters */}
-            <div
-                className="flex flex-col gap-0 px-4 pt-6 pb-0"
-                style={{ marginTop: headerRef.current ? headerRef.current.offsetHeight : 0 }}
-            >
-                <div className="flex items-start justify-between gap-2">
-                        <div ref={controlsRef}>
-                        <h1 className="text-2xl font-bold text-gray-800 mb-1">Category Management</h1>
-                        <p className="text-xs text-gray-600 ">{deleteMode ? '\u00A0' : 'Manage your Categories.'}</p>
+            <div className="flex flex-col gap-0 px-4 pt-1.5 pb-0" style={{ marginTop: headerRef.current ? headerRef.current.offsetHeight : 0 }}>
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+                    <div ref={controlsRef}>
+                        <h1 className="text-xl font-bold text-gray-800 mb-0.5">Organization</h1>
+                        <p className="text-[11px] text-gray-500">
+                            {deleteMode
+                                ? ' '
+                                : 'Manage and monitor all offices, departments, and compliance requirements.'}
+                        </p>
                     </div>
                     {isAdmin && (
-                        <div className="flex items-center gap-1 pt-0.5">
+                        <div className="flex items-center gap-1.5 pt-0.5 self-start sm:self-auto flex-wrap">
                             {deleteMode && (
                                 <button
-                                    onClick={async () => {
-                                        if (selectedCount === 0) return;
-                                        const confirmed = await showConfirm(`Delete ${selectedCount} selected item(s)? This cannot be undone.`);
-                                        if (!confirmed) return;
-                                        try {
-                                            await handleDeleteSelected();
-                                        } catch (err) {
-                                            console.error(err);
-                                        }
-                                    }}
-                                    className={`ml-2 inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-red-400 bg-red-600 text-white hover:bg-red-700 ${selectedCount === 0 ? 'opacity-60 cursor-not-allowed' : ''}`}
-                                    disabled={selectedCount === 0}
+                                    type="button"
+                                    onClick={() => officesPRef.current?.deleteSelected?.()}
+                                    className="inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-red-400 bg-red-600 text-white hover:bg-red-700"
                                 >
                                     Delete Selected ({selectedCount})
                                 </button>
@@ -564,15 +581,15 @@ export default function Organization() {
                         </div>
                     )}
                 </div>
-                <div className="flex w-full items-center justify-between gap-1 mt-2">
-                    <div className="relative w-full max-w-sm">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5 mt-2 flex-wrap">
+                    <div className="relative w-full md:w-64 lg:w-72">
                         <svg
                             xmlns="http://www.w3.org/2000/svg"
                             viewBox="0 0 24 24"
                             fill="none"
                             stroke="currentColor"
                             strokeWidth="2"
-                            className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
+                            className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
                         >
                             <circle cx="11" cy="11" r="7" />
                             <path d="m20 20-3.5-3.5" />
@@ -580,54 +597,42 @@ export default function Organization() {
                         <input
                             type="text"
                             placeholder="Search offices..."
-                            className="h-9 w-full rounded-lg border border-slate-200 bg-white pl-8 pr-3 text-[9px] text-slate-700 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-brand-500"
+                            className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs text-slate-800 placeholder-slate-400 shadow-2xs transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                             value={searchTerm}
                             onChange={e => setSearchTerm(e.target.value)}
                         />
                     </div>
-                    <div className="flex items-center gap-1">
-                        <div className="flex items-center gap-2 mr-2">
-                            <div className="relative inline-flex">
-                                <select
-                                    value={selectedOfficeTypeFilter}
-                                    onChange={(e) => setSelectedOfficeTypeFilter(e.target.value)}
-                                    className="h-8 min-w-[146px] appearance-none rounded-md border border-slate-200 bg-white px-4 text-center text-[10px] font-medium leading-4 text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                                    style={{ textAlignLast: 'center' }}
-                                >
-                                    <option value="">All Office Types</option>
-                                    <option value="academic">Academic</option>
-                                    <option value="non_academic">Non Academic</option>
-                                </select>
-                                <svg xmlns="http://www.w3.org/2000/svg" className="pointer-events-none absolute right-2.5 top-1/2 h-2.5 w-2.5 -translate-y-1/2 text-slate-500" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
-                                </svg>
-                            </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <CustomDropdown
+                            value={selectedOfficeTypeFilter}
+                            onChange={setSelectedOfficeTypeFilter}
+                            options={[
+                                { value: '', label: 'All Office Types' },
+                                { value: 'academic', label: 'Academic' },
+                                { value: 'non_academic', label: 'Non Academic' },
+                            ]}
+                            minWidth="min-w-[140px]"
+                            size="sm"
+                        />
 
-                            <div className="relative inline-flex">
-                                <select
-                                    value={selectedDepartmentFilter}
-                                    onChange={(e) => setSelectedDepartmentFilter(e.target.value)}
-                                    className="h-8 min-w-[146px] appearance-none rounded-md border border-slate-200 bg-white px-4 text-center text-[10px] font-medium leading-4 text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                                    style={{ textAlignLast: 'center' }}
-                                >
-                                    <option value="">All Departments</option>
-                                    {departments.map((d) => (
-                                        <option key={d.id ?? d.ID ?? d.DepartmentID} value={d.id ?? d.ID ?? d.DepartmentID}>
-                                            {d.name ?? d.DepartmentName ?? d.Name}
-                                        </option>
-                                    ))}
-                                </select>
-                                <svg xmlns="http://www.w3.org/2000/svg" className="pointer-events-none absolute right-2.5 top-1/2 h-2.5 w-2.5 -translate-y-1/2 text-slate-500" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
-                                </svg>
-                            </div>
-                        </div>
-
+                        <CustomDropdown
+                            value={selectedDepartmentFilter}
+                            onChange={setSelectedDepartmentFilter}
+                            options={[
+                                { value: '', label: 'All Departments' },
+                                ...departments.map((d) => ({
+                                    value: String(d.id ?? d.ID ?? d.DepartmentID),
+                                    label: d.name ?? d.DepartmentName ?? d.Name,
+                                })),
+                            ]}
+                            minWidth="min-w-[140px]"
+                            size="sm"
+                        />
 
                         <div className="relative inline-block">
                             <Sortoffice value={sortStatus} onChange={setSortStatus} />
                         </div>
-                        <div className="flex h-9 items-center justify-end gap-1">
+                        <div className="flex items-center">
                             <div className="flex h-7 items-center gap-0.5 rounded-md border border-slate-200 bg-slate-100 p-0.5">
                                 <button
                                     onClick={() => setViewMode('grid')}
@@ -662,14 +667,14 @@ export default function Organization() {
             </div>
 
             {/* Event Tabs (replaces dropdown) */}
-            <div className="px-4 mb-4 mt-1">
-                <EventTabs selectedEventId={selectedEventType} onChange={setSelectedEventType} />
+            <div className="px-4 mb-2 mt-0.5 overflow-x-auto">
+                <EventTabs selectedEventId={selectedEventType} onChange={handleEventTabChange} />
             </div>
 
             {/* List header (rendered outside scrollable area so it doesn't move) */}
             {viewMode === 'list' && (
-                <div className="px-4">
-                    <div className="hidden md:grid grid-cols-[minmax(120px,1fr)_160px_160px_100px_140px_80px] gap-6 px-6 py-3 mb-1 bg-white border border-slate-200 rounded-xl shadow-sm text-xs font-semibold text-gray-700 w-full">
+                <div className="px-4 overflow-x-auto">
+                    <div className="hidden md:grid grid-cols-[minmax(120px,1fr)_160px_160px_100px_140px_80px] gap-6 px-6 py-3 mb-1 bg-white border border-slate-200 rounded-xl shadow-sm text-xs font-semibold text-gray-700 w-full min-w-[720px]">
                         <div className="flex items-center">Office Name</div>
                         <div className="flex items-center justify-center">Office Type</div>
                         <div className="flex items-center justify-center">Compliance Status</div>
@@ -680,10 +685,10 @@ export default function Organization() {
                 </div>
             )}
 
-            {/* Split layout: Left Available Categories (Drag Sources) + Right Scrollable Grid/List */}
+            {/* Split layout: Left Available Categories (Drag Sources) + Right Grid/List */}
             <div 
-                className="flex-1 min-h-0 px-4 pb-6 flex gap-6"
-                style={{ marginTop: 0, height: contentHeight ? `${contentHeight}px` : undefined }}
+                className="flex-1 min-h-0 px-4 pb-2 flex gap-4 overflow-hidden"
+                style={{ marginTop: 0 }}
             >
                 {/* Left Panel: Available Master List Categories (collapsible/persistent sidebar) */}
                 {isAdmin && selectedEventType && showAddSidebar && (
@@ -789,7 +794,7 @@ export default function Organization() {
                     </div>
                 )}
 
-                {/* Right Panel: Scrollable Grid / List of assigned categories */}
+                {/* Right Panel: Grid / List of assigned categories */}
                 <div
                     onDragOver={(e) => {
                         if (isAdmin && selectedEventType) {
@@ -808,7 +813,7 @@ export default function Organization() {
                             await handleInstantAddCategory(item);
                         }
                     }}
-                    className={`flex-1 ${viewMode === 'grid' ? 'overflow-hidden' : 'overflow-y-auto'} transition-all duration-300 rounded-xl relative border-2 ${
+                    className={`flex-1 overflow-hidden transition-all duration-300 rounded-xl relative border-2 ${
                         isDraggingOver 
                             ? 'border-dashed border-blue-500 bg-blue-50/10 shadow-inner' 
                             : 'border-transparent'
@@ -826,7 +831,7 @@ export default function Organization() {
                         </div>
                     )}
 
-                    <div className="relative z-10 w-full">
+                    <div className="relative z-10 w-full h-full">
                         <OfficesP
                             ref={officesPRef}
                             searchTerm={searchTerm}
@@ -847,8 +852,6 @@ export default function Organization() {
                             onDeleteOffice={handleDeleteOffice}
                             hideHeader={viewMode === 'list'}
                         />
-                        {/* spacer so last card can be scrolled into view */}
-                        <div className="h-6 md:h-12" aria-hidden="true" />
                     </div>
                 </div>
             </div>

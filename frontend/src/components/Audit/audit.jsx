@@ -1,7 +1,7 @@
 import React from "react";
 export default function Requirements() {
     return (
-        <div className="px-6 pb-6 pt-6 w-full">
+        <div className="px-6 pb-6 pt-2 w-full">
             <Header pageTitle="Audits" />
 
             <div className="relative z-10">

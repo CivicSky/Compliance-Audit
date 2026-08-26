@@ -378,7 +378,7 @@ export default function AuditLogs() {
 
 
     return (
-        <div className="px-6 pb-6 pt-6 w-full">
+        <div className="px-6 pb-6 pt-2 w-full">
             <Header pageTitle="Audit Logs" />
 
             <div className="mt-4 bg-white rounded-md shadow-md border border-gray-200">

@@ -12,6 +12,9 @@ import api from "../../utils/api";
 import { Link } from "react-router-dom";
 import UnifiedSetupWizard from "../UnifiedSetupWizard/UnifiedSetupWizard";
 import { DashboardSkeleton } from "../UI/Skeleton";
+import DeficiencyTracker from "./DeficiencyTracker";
+import ViewReqPasscuModal from "../ViewReqPasscuModal/ViewReqPasscuModal";
+import { useLiveRefresh } from "../../utils/liveSync";
 import {
     Activity,
     Building2,
@@ -68,6 +71,8 @@ export default function Home() {
     const [error, setError] = useState(null);
     const [showWizard, setShowWizard] = useState(false);
     const [currentUser, setCurrentUser] = useState(null);
+    const [inspectOffice, setInspectOffice] = useState(null);
+    const [isViewReqModalOpen, setIsViewReqModalOpen] = useState(false);
 
     // Default to admin (show features) until we confirm otherwise
     const isAdmin = !!(currentUser && (currentUser.RoleName === 'admin' || currentUser.RoleID === 1));
@@ -138,6 +143,9 @@ export default function Home() {
     useEffect(() => {
         fetchDashboardData();
     }, [fetchDashboardData]);
+
+    // Live real-time syncing for dashboard metrics and logs
+    useLiveRefresh(fetchDashboardData);
 
 
     const {
@@ -479,7 +487,7 @@ export default function Home() {
 
     return (
         <div className="h-screen w-full flex flex-col overflow-hidden">
-            <div className="flex-1 overflow-y-auto px-4 pb-6 pt-6">
+            <div className="flex-1 overflow-y-auto px-4 pb-6 pt-2">
                 <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div>
                         <h1 className="text-4xl font-bold text-gray-800 mb-2">Dashboard Overview</h1>
@@ -492,26 +500,26 @@ export default function Home() {
                             <p className="text-lg font-semibold text-slate-800">{completionRate}%</p>
                         </div>
 
-                {isAdmin && (
+                        {isAdmin && (
                             <button
-                            onClick={() => setShowWizard(true)}
-                            className="flex items-center gap-2 rounded-xl px-5 py-3 font-semibold text-white shadow-md transition hover:shadow-lg"
-                            style={{ background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' }}
-                        >
-                            <Plus size={18} /> Quick Setup
-                        </button>
-                )}
+                                onClick={() => setShowWizard(true)}
+                                className="flex items-center gap-2 rounded-xl px-5 py-3 font-semibold text-white shadow-md transition hover:shadow-lg"
+                                style={{ background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' }}
+                            >
+                                <Plus size={18} /> Quick Setup
+                            </button>
+                        )}
                     </div>
-            </div>
+                </div>
 
-            <UnifiedSetupWizard 
-                isOpen={showWizard} 
-                onClose={() => setShowWizard(false)}
-                        onSuccess={fetchDashboardData}
-            />
+                <UnifiedSetupWizard
+                    isOpen={showWizard}
+                    onClose={() => setShowWizard(false)}
+                    onSuccess={fetchDashboardData}
+                />
 
-            <div className="relative z-10">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                <div className="relative z-10">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         {dashboardCards.map(({ title, value, subtitle, Icon, tone }) => (
                             <div key={title} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                                 <div className="flex items-start justify-between">
@@ -602,8 +610,9 @@ export default function Home() {
                                     <div key={eventItem.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-3.5">
                                         <div className="mb-3 flex items-start justify-between gap-3">
                                             <div>
-                                                <h3 className="text-[30px] font-bold leading-none text-slate-900">{eventItem.name}</h3>
-                                                <p className="mt-1 text-sm text-slate-600">Code: {eventItem.code}</p>
+                                                <h3 className="text-2xl font-bold leading-tight text-slate-900">
+                                                    {eventItem.code && eventItem.code !== '-' ? eventItem.code : eventItem.name}
+                                                </h3>
                                             </div>
                                             <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xl font-semibold text-slate-700">
                                                 {eventItem.completionPercent}%
@@ -676,30 +685,31 @@ export default function Home() {
                         )}
                     </div>
 
-                    <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <h2 className="mb-4 text-lg font-semibold text-slate-800">Offices Needing Attention</h2>
-                        <div className="space-y-3">
-                            {officeProgress.length === 0 ? (
-                                <p className="text-sm text-slate-500">No office compliance data yet.</p>
-                            ) : (
-                                officeProgress.map((officeItem) => (
-                                    <div key={officeItem.id} className="rounded-xl border border-slate-200 p-3">
-                                        <div className="mb-1 flex items-center justify-between text-sm">
-                                            <p className="font-medium text-slate-700 truncate pr-3">{officeItem.name}</p>
-                                            <span className="text-slate-600">{officeItem.percent}%</span>
-                                        </div>
-                                        <div className="h-2.5 rounded-full bg-slate-100">
-                                            <div
-                                                className={`h-2.5 rounded-full ${officeItem.percent >= 80 ? "bg-emerald-600" : officeItem.percent >= 50 ? "bg-amber-500" : "bg-rose-600"}`}
-                                                style={{ width: `${officeItem.percent}%` }}
-                                            />
-                                        </div>
-                                        <p className="mt-1 text-xs text-slate-500">{officeItem.compiledCount} of {officeItem.total} requirement(s) compiled</p>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                    </div>
+                    {/* Comprehensive Compliance Deficiencies & Action Tracker */}
+                    <DeficiencyTracker
+                        offices={offices}
+                        events={events}
+                        complianceData={complianceData}
+                        onInspectOffice={(office) => {
+                            setInspectOffice(office);
+                            setIsViewReqModalOpen(true);
+                        }}
+                        onRefresh={fetchDashboardData}
+                        isAdmin={isAdmin}
+                    />
+
+                    {/* In-place View/Edit Requirements Modal from Dashboard */}
+                    {isViewReqModalOpen && inspectOffice && (
+                        <ViewReqPasscuModal
+                            isOpen={isViewReqModalOpen}
+                            onClose={() => {
+                                setIsViewReqModalOpen(false);
+                                setInspectOffice(null);
+                                fetchDashboardData();
+                            }}
+                            office={inspectOffice}
+                        />
+                    )}
 
                     <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                         <div className="mb-3 flex items-center justify-between gap-3">

@@ -8,6 +8,7 @@ import Pagination from "../Pagination/Pagination";
 import OfficeHeaddetails from "../OfficeHead/OfficeHeaddetails.jsx";
 import { API_BASE_URL } from '../../utils/apiBase';
 import { OfficeCardSkeleton } from "../UI/Skeleton";
+import { useLiveRefresh } from "../../utils/liveSync";
 
 const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode = false, onSelectionChange, viewMode = 'grid' }, ref) => {
     const [officeHeads, setOfficeHeads] = useState([]);
@@ -40,6 +41,12 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
         fetchCurrentUser();
     }, []);
 
+    // Live syncing on mutations / window focus
+    useLiveRefresh(() => {
+        fetchOfficeHeads();
+        fetchOffices();
+    });
+
     const fetchOffices = async () => {
         try {
             const res = await officesAPI.getAll();
@@ -59,7 +66,7 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
     // Filter and sort office heads based on search term and sort type
     useEffect(() => {
         let filtered = officeHeads;
-        
+
         // Apply search filter first
         if (searchTerm.trim()) {
             filtered = officeHeads.filter(person => {
@@ -67,10 +74,10 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                 const position = person.Position?.toLowerCase() || '';
                 const contact = person.ContactInfo?.toLowerCase() || '';
                 const searchLower = searchTerm.toLowerCase();
-                
-                return fullName.includes(searchLower) || 
-                       position.includes(searchLower) || 
-                       contact.includes(searchLower);
+
+                return fullName.includes(searchLower) ||
+                    position.includes(searchLower) ||
+                    contact.includes(searchLower);
             });
         }
 
@@ -80,12 +87,12 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                 // Show only assigned office heads (those with OfficeID)
                 filtered = filtered.filter(person => person.OfficeID);
                 break;
-                
+
             case 'unassigned':
                 // Show only unassigned office heads (those without OfficeID)
                 filtered = filtered.filter(person => !person.OfficeID);
                 break;
-                
+
             case 'name':
             default:
                 // Show all, no additional filtering
@@ -168,11 +175,11 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
         try {
             console.log('Attempting to delete heads:', headIds);
             console.log('API Base URL:', `${API_BASE_URL}/api/officeheads/delete`);
-            
+
             // Make API call to delete heads
             const response = await officeHeadsAPI.deleteHeads(headIds);
             console.log('Delete response:', response);
-            
+
             if (response.success) {
                 // Remove deleted heads from local state
                 setOfficeHeads(prev => prev.filter(head => !headIds.includes(head.HeadID)));
@@ -185,17 +192,17 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
         } catch (error) {
             console.error('Error deleting office heads:', error);
             console.error('Error details:', error.response?.data || error.message);
-            
+
             // Check if it's a network error
             if (error.code === 'ERR_NETWORK' || error.message.includes('Network Error')) {
                 return { success: false, message: 'Network error. Please check if the backend server is running on port 5000.' };
             }
-            
+
             // Check for specific error responses
             if (error.response) {
                 return { success: false, message: `Server error: ${error.response.data?.message || error.response.statusText}` };
             }
-            
+
             return { success: false, message: 'Error deleting office heads. Please try again.' };
         }
     };
@@ -425,7 +432,7 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                         <span className="text-red-700">{error}</span>
-                        <button 
+                        <button
                             onClick={fetchOfficeHeads}
                             className="ml-4 px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
                         >
@@ -476,29 +483,35 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                 </div>
             )}
 
-            <div className={viewMode === 'list' ? 'flex flex-col gap-2' : 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 auto-rows-fr'}>
+            <div className={viewMode === 'list' ? 'flex flex-col gap-2' : 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 auto-rows-fr'}>
                 {visibleOfficeHeads.map((person) => {
-                    const fullName = `${person.FirstName}${person.MiddleInitial ? ' ' + person.MiddleInitial + '.' : ''} ${person.LastName}`;
+                    const fullName = `${person.FirstName || ''}${person.MiddleInitial ? ' ' + person.MiddleInitial + '.' : ''} ${person.LastName || ''}`.trim() || 'Personnel';
+                    const initials = `${(person.FirstName || '').trim().charAt(0)}${(person.LastName || '').trim().charAt(0)}`.toUpperCase() || 'OP';
                     const profilePicUrl = person.TempPreview
                         ? person.TempPreview
                         : person.ProfilePic
                             ? `${API_BASE_URL}/uploads/profile-pics/${person.ProfilePic}`
-                            : user;
+                            : null;
                     const assignedOffices = offices.filter((office) => officeHasHead(office, person.HeadID));
                     const isAssigned = assignedOffices.length > 0;
                     const statusClass = isAssigned
-                        ? 'bg-green-100 text-green-700 border-green-200'
-                        : 'bg-gray-100 text-gray-600 border-gray-200';
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80'
+                        : 'bg-slate-100 text-slate-600 border-slate-200';
                     const isExpanded = expandedCards.has(person.HeadID);
-                    // Removed employeeCode display per user request
-                    const { email, phone } = parseContactInfo(person);
-                    const joinDate = formatJoinDate(person);
-                    const assignedOfficeNames = assignedOffices
-                        .map((office) => office.OfficeName || office.office_name || `Office #${office.id || office.OfficeID}`)
-                        .join(', ');
-                    const assignedOfficeSummary = assignedOffices.length > 0
-                        ? `${assignedOffices[0].OfficeName || assignedOffices[0].office_name || `Office #${assignedOffices[0].id || assignedOffices[0].OfficeID}`}${assignedOffices.length > 1 ? ` (+${assignedOffices.length - 1})` : ''}`
-                        : 'Not assigned';
+                    const isSelected = selectedHeads.has(person.HeadID);
+                    const { email } = parseContactInfo(person);
+
+                    const avatarPalettes = [
+                        { bg: 'bg-gradient-to-br from-indigo-500 to-blue-600', ring: 'ring-indigo-100' },
+                        { bg: 'bg-gradient-to-br from-violet-500 to-purple-600', ring: 'ring-purple-100' },
+                        { bg: 'bg-gradient-to-br from-sky-500 to-cyan-600', ring: 'ring-sky-100' },
+                        { bg: 'bg-gradient-to-br from-emerald-500 to-teal-600', ring: 'ring-emerald-100' },
+                        { bg: 'bg-gradient-to-br from-amber-500 to-orange-600', ring: 'ring-amber-100' },
+                        { bg: 'bg-gradient-to-br from-rose-500 to-pink-600', ring: 'ring-rose-100' },
+                    ];
+                    let hash = 0;
+                    for (let i = 0; i < fullName.length; i++) hash = fullName.charCodeAt(i) + ((hash << 5) - hash);
+                    const avatarStyle = avatarPalettes[Math.abs(hash) % avatarPalettes.length];
 
                     if (viewMode === 'list') {
                         return (
@@ -508,9 +521,8 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                                     if (deleteMode) toggleHeadSelection(person.HeadID);
                                     else openDetails(person, assignedOffices);
                                 }}
-                                className={`relative overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all duration-150 ${
-                                    selectedHeads.has(person.HeadID) ? 'ring-2 ring-blue-500' : ''
-                                } ${deleteMode ? 'cursor-pointer hover:border-gray-300' : 'hover:border-indigo-200 hover:shadow-md'}`}
+                                className={`relative overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xs transition-all duration-150 ${selectedHeads.has(person.HeadID) ? 'ring-2 ring-indigo-500 border-indigo-500' : ''
+                                    } ${deleteMode ? 'cursor-pointer hover:border-gray-300' : 'hover:border-indigo-200 hover:shadow-md'}`}
                             >
                                 <div className="grid grid-cols-8 items-center gap-2 px-4 py-3">
                                     {/* Name column (col-span-4) */}
@@ -522,18 +534,26 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                                                     checked={selectedHeads.has(person.HeadID)}
                                                     onChange={(e) => handleCheckboxChange(person.HeadID, e.target.checked)}
                                                     onClick={(e) => e.stopPropagation()}
-                                                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                    className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                                                 />
                                             </div>
                                         )}
 
-                                        <div className="h-14 w-14 flex-shrink-0 rounded-full p-0.5 overflow-hidden">
-                                            <img
-                                                src={profilePicUrl}
-                                                alt={fullName}
-                                                className="h-14 w-14 rounded-full object-cover border border-white"
-                                                onError={(e) => { e.target.src = user; }}
-                                            />
+                                        <div className="h-10 w-10 flex-shrink-0 rounded-xl overflow-hidden relative">
+                                            {profilePicUrl ? (
+                                                <img
+                                                    src={profilePicUrl}
+                                                    alt={fullName}
+                                                    className="h-full w-full rounded-xl object-cover ring-2 ring-slate-100"
+                                                    onError={(e) => {
+                                                        e.target.style.display = 'none';
+                                                        if (e.target.nextElementSibling) e.target.nextElementSibling.style.display = 'flex';
+                                                    }}
+                                                />
+                                            ) : null}
+                                            <div className={`h-full w-full rounded-xl flex items-center justify-center font-bold text-white text-xs ${avatarStyle.bg} ${profilePicUrl ? 'hidden' : 'flex'}`}>
+                                                {initials}
+                                            </div>
                                         </div>
 
                                         <div className="min-w-0">
@@ -546,8 +566,8 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
 
                                     {/* Role column (col-span-2) */}
                                     <div className="col-span-2 flex items-center justify-center">
-                                        <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold bg-indigo-50 text-indigo-700 border-indigo-200">
-                                            {person.RoleName || person.role || 'Personnel'}
+                                        <span className="inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold bg-indigo-50 text-indigo-700 border-indigo-200">
+                                            {person.Position || person.RoleName || person.role || 'Personnel'}
                                         </span>
                                     </div>
 
@@ -560,7 +580,7 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
 
                                     {/* Actions column (col-span-1) */}
                                     <div className="col-span-1 flex items-center justify-end">
-                                            <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2">
                                             {isAdmin && (
                                                 <div className="relative">
                                                     <button
@@ -576,12 +596,12 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                                                                 setActionMenuAnchorRect(rect);
                                                             }
                                                         }}
-                                                            className="office-head-actions-button inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-100"
+                                                        className="office-head-actions-button inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-100"
                                                         aria-label="Open office personnel actions"
                                                         title="Actions"
                                                     >
-                                                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6h.01M12 12h.01M12 18h.01" />
+                                                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6h.01M12 12h.01M12 18h.01" />
                                                         </svg>
                                                     </button>
                                                 </div>
@@ -596,143 +616,146 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                     return (
                         <div
                             key={person.HeadID}
-                            className={`relative overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-b from-white via-white to-slate-50 shadow-[0_6px_14px_rgba(15,23,42,0.08)] transition-all duration-200 ${
-                                selectedHeads.has(person.HeadID) ? 'ring-2 ring-indigo-500 border-indigo-500 bg-indigo-50/30' : ''
-                            } ${deleteMode ? 'cursor-pointer hover:-translate-y-0.5 hover:shadow-[0_10px_18px_rgba(15,23,42,0.12)]' : 'hover:border-cyan-200 hover:shadow-[0_14px_28px_rgba(15,23,42,0.12)]'} min-h-[240px]`}
-                            onClick={() => {
-                                if (deleteMode) toggleHeadSelection(person.HeadID);
-                                else openDetails(person, assignedOffices);
-                            }}
+                            className={`group relative flex flex-col justify-between rounded-2xl border bg-white shadow-xs hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 overflow-hidden ${isSelected
+                                    ? 'border-indigo-500 ring-2 ring-indigo-400/50 bg-indigo-50/15'
+                                    : 'border-slate-200/90 hover:border-indigo-300/80'
+                                }`}
                         >
-                            <input
-                                type="checkbox"
-                                checked={selectedHeads.has(person.HeadID)}
-                                onChange={(e) => handleCheckboxChange(person.HeadID, e.target.checked)}
-                                onClick={(e) => e.stopPropagation()}
-                                aria-label="Select office personnel for deletion"
-                                style={{
-                                    position: 'absolute',
-                                    top: 12,
-                                    left: 12,
-                                    width: 18,
-                                    height: 18,
-                                    accentColor: '#2563eb',
-                                    transition: 'opacity 180ms ease, transform 180ms ease',
-                                    transitionDelay: deleteMode ? '180ms' : '0ms',
-                                    opacity: deleteMode ? 1 : 0,
-                                    transform: deleteMode ? 'scale(1) translateX(0px)' : 'scale(0.8) translateX(-6px)',
-                                    pointerEvents: deleteMode ? 'auto' : 'none',
-                                    zIndex: 10
-                                }}
-                            />
+                            <div className="p-3.5 flex flex-col flex-1 justify-between gap-2.5">
+                                {/* Card Top: Status Badge & Option Menu */}
+                                <div className="flex items-center justify-between gap-2">
+                                    {deleteMode ? (
+                                        <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                                            <input
+                                                type="checkbox"
+                                                checked={isSelected}
+                                                onChange={(e) => handleCheckboxChange(person.HeadID, e.target.checked)}
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                            />
+                                            <span className="text-[10px] font-semibold text-slate-600">Select</span>
+                                        </label>
+                                    ) : (
+                                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold tracking-wide border ${statusClass}`}>
+                                            <span className={`h-1.5 w-1.5 rounded-full ${isAssigned ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'
+                                                }`} />
+                                            {isAssigned ? 'Assigned' : 'Unassigned'}
+                                        </span>
+                                    )}
 
-                            <div
-                                className="p-3 h-full flex flex-col"
-                            >
-                                {!isExpanded ? (
-                                    <>
-                                        <div className="flex items-center justify-between">
-                                            <span
-                                                className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${statusClass}`}
-                                                style={{
-                                                    transition: 'transform 180ms ease',
-                                                    transform: deleteMode ? 'translateX(20px)' : 'translateX(0)'
+                                    {!deleteMode && isAdmin && (
+                                        <div className="relative">
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    const rect = e.currentTarget.getBoundingClientRect();
+                                                    const isOpen = actionMenuHeadId === person.HeadID;
+                                                    if (isOpen) {
+                                                        setActionMenuHeadId(null);
+                                                        setActionMenuAnchorRect(null);
+                                                    } else {
+                                                        setActionMenuHeadId(person.HeadID);
+                                                        setActionMenuAnchorRect(rect);
+                                                    }
                                                 }}
+                                                className="office-head-actions-button flex h-6 w-6 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition hover:bg-slate-50 hover:text-slate-700"
+                                                aria-label="Open office personnel actions"
+                                                title="Actions"
                                             >
-                                                {isAssigned ? 'Assigned' : 'Unassigned'}
-                                            </span>
-                                            {isAdmin && (
-                                                <div className="relative">
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        const rect = e.currentTarget.getBoundingClientRect();
-                                                        const isOpen = actionMenuHeadId === person.HeadID;
-                                                        if (isOpen) {
-                                                            setActionMenuHeadId(null);
-                                                            setActionMenuAnchorRect(null);
-                                                        } else {
-                                                            setActionMenuHeadId(person.HeadID);
-                                                            setActionMenuAnchorRect(rect);
-                                                        }
-                                                    }}
-                                                    className="office-head-actions-button inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-100"
-                                                    aria-label="Open office personnel actions"
-                                                    title="Actions"
-                                                >
-                                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6h.01M12 12h.01M12 18h.01" />
-                                                    </svg>
-                                                </button>
-                                                </div>
-                                            )}
+                                                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6h.01M12 12h.01M12 18h.01" />
+                                                </svg>
+                                            </button>
                                         </div>
+                                    )}
+                                </div>
 
-                                        <div className="mt-1 flex justify-center">
-                                            <div className="h-[72px] w-[72px] rounded-full p-0 overflow-hidden">
+                                {/* Profile Section */}
+                                <div
+                                    onClick={() => {
+                                        if (deleteMode) toggleHeadSelection(person.HeadID);
+                                        else openDetails(person, assignedOffices);
+                                    }}
+                                    className="cursor-pointer group/content"
+                                    title="Click to view details and assigned offices"
+                                >
+                                    <div className="flex items-center gap-2.5">
+                                        {/* Smart Avatar */}
+                                        <div className="relative shrink-0">
+                                            {profilePicUrl ? (
                                                 <img
                                                     src={profilePicUrl}
                                                     alt={fullName}
-                                                    className="h-[72px] w-[72px] rounded-full object-cover border border-white"
-                                                    onError={(e) => { e.target.src = user; }}
+                                                    onError={(e) => {
+                                                        e.target.style.display = 'none';
+                                                        if (e.target.nextElementSibling) e.target.nextElementSibling.style.display = 'flex';
+                                                    }}
+                                                    className="h-10 w-10 rounded-xl object-cover ring-2 ring-slate-100 shadow-xs"
                                                 />
-                                            </div>
-                                        </div>
-
-                                        <div className="mt-0.5 text-center">
-                                            <h3 className="text-[18px] font-semibold text-slate-900 truncate">{fullName}</h3>
-                                            <p className="text-[12px] font-medium uppercase tracking-wide text-slate-500 truncate">{person.Position || 'Office Personnel'}</p>
-                                        </div>
-
-                                        <div className="mt-1 space-y-1 p-0 text-[12px] text-slate-700 flex flex-col items-center text-center">
-                                            {/* Contact (centered) - minimal, no outline */}
-                                            <div className="flex items-center gap-2">
-                                                <svg className="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.5 5L18 8" />
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 8v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8" />
-                                                </svg>
-                                                <span className="truncate max-w-[160px]">{email}</span>
-                                            </div>
-                                        </div>
-
-                                        <div className="mt-1 flex items-center justify-between pt-1">
-                                            {/* Join date removed as requested */}
-                                            {/* View details button removed — clicking the card opens details now */}
-                                        </div>
-                                    </>
-                                ) : (
-                                    <>
-                                        <div className="min-w-0">
-                                            <h3 className="text-[14px] font-semibold text-slate-900 truncate">{fullName}</h3>
-                                            <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500 truncate">{person.Position || 'Office Personnel'}</p>
-                                        </div>
-
-                                        <div className="mt-2 flex-1 border-t border-slate-200 pt-2">
-                                            <p className="text-[12px] font-semibold text-slate-500">Assigned office(s)</p>
-                                            {assignedOffices.length > 0 ? (
-                                                <ul className="mt-1 max-h-[110px] list-disc overflow-y-auto pl-4 text-[12px] text-slate-700">
-                                                    {assignedOffices.map((office) => (
-                                                        <li key={office.id || office.OfficeID}>
-                                                            {office.OfficeName || office.office_name || `Office #${office.id || office.OfficeID}`}
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            ) : (
-                                                <p className="mt-1 text-[12px] text-slate-600">Not assigned to any office</p>
-                                            )}
-                                        </div>
-
-                                        <div className="mt-1 flex items-center justify-between border-t border-slate-200 pt-1">
-                                            <p className="text-[11px] text-slate-500 truncate">Assigned offices</p>
-                                            <button
-                                                onClick={() => toggleExpand(person.HeadID)}
-                                                className="text-[12px] font-semibold text-slate-700 transition hover:text-blue-600"
+                                            ) : null}
+                                            <div
+                                                className={`h-10 w-10 rounded-xl flex items-center justify-center font-bold text-white text-xs shadow-xs ring-2 ${avatarStyle.ring} ${avatarStyle.bg} ${profilePicUrl ? 'hidden' : 'flex'}`}
                                             >
-                                                Back
-                                            </button>
+                                                {initials}
+                                            </div>
                                         </div>
-                                    </>
-                                )}
+
+                                        {/* Name & Role */}
+                                        <div className="min-w-0 flex-1">
+                                            <h3 className="text-[13px] font-bold text-slate-900 truncate group-hover/content:text-indigo-600 transition-colors leading-tight">
+                                                {fullName}
+                                            </h3>
+                                            <div className="mt-0.5">
+                                                <span className="inline-flex items-center rounded bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-emerald-800 border border-emerald-200/60 uppercase">
+                                                    {person.Position || 'Office Personnel'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Email Strip */}
+                                    <div className="mt-2.5 flex items-center gap-1.5 rounded-lg bg-slate-50/80 px-2 py-1 border border-slate-100 text-[10px] text-slate-600 group-hover/content:bg-slate-100/70 transition-colors">
+                                        <svg className="w-3 h-3 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                        </svg>
+                                        <span className="truncate font-medium">{email || 'No email registered'}</span>
+                                    </div>
+                                </div>
+
+                                {/* Assigned Office(s) Footer */}
+                                <div className="mt-1 pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2">
+                                    <div className="min-w-0 flex-1">
+                                        <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">
+                                            Assigned Office(s)
+                                        </div>
+                                        {assignedOffices.length > 0 ? (
+                                            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-800 truncate" title={assignedOffices.map(o => o.OfficeName || o.office_name).join(', ')}>
+                                                <svg className="w-3.5 h-3.5 text-teal-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                                </svg>
+                                                <span className="truncate">
+                                                    {assignedOffices[0].OfficeName || assignedOffices[0].office_name || `Office #${assignedOffices[0].id || assignedOffices[0].OfficeID}`}
+                                                    {assignedOffices.length > 1 && ` (+${assignedOffices.length - 1})`}
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <span className="text-[11px] text-slate-400 italic">Not assigned to any office</span>
+                                        )}
+                                    </div>
+
+                                    {!deleteMode && (
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                openDetails(person, assignedOffices);
+                                            }}
+                                            className="shrink-0 rounded-lg px-2 py-1 text-[10px] font-bold transition flex items-center gap-1 bg-slate-100 text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 border border-slate-200/60"
+                                        >
+                                            Details
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     );
@@ -825,13 +848,13 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                 offices={detailsOffices}
             />
 
-                {/* Edit modal */}
-                <EditOfficeHeadModal
-                    visible={isEditModalOpen}
-                    onClose={closeEdit}
-                    head={selectedHead}
-                    onSave={handleSave}
-                />
+            {/* Edit modal */}
+            <EditOfficeHeadModal
+                visible={isEditModalOpen}
+                onClose={closeEdit}
+                head={selectedHead}
+                onSave={handleSave}
+            />
         </div>
     );
 });

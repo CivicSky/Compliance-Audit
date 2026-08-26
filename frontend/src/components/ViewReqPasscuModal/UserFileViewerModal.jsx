@@ -42,7 +42,7 @@ export default function UserFileViewerModal({
             await downloadFileFromUrl(url, downloadName);
         } catch (err) {
             console.error('Download error:', err);
-            window.alert(err?.message || 'Failed to download file');
+            showAlert(err?.message || 'Failed to download file', 'error');
         } finally {
             setDownloading(false);
         }

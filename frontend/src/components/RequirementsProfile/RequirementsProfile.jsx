@@ -1,6 +1,7 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from "react";
 import { requirementsAPI } from "../../utils/api";
 import { CardListSkeleton } from "../UI/Skeleton";
+import { useLiveRefresh } from "../../utils/liveSync";
 
 const RequirementsP = forwardRef(
   (
@@ -24,6 +25,9 @@ const RequirementsP = forwardRef(
     useEffect(() => {
       fetchRequirements();
     }, [eventId]);
+
+    // Live syncing on mutations / window focus
+    useLiveRefresh(fetchRequirements, { deps: [eventId] });
 
     // Filter and sort requirements based on search term and filters
     useEffect(() => {

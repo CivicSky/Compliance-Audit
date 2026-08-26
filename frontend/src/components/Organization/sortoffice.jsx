@@ -1,5 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 
+const SORT_OPTIONS = [
+    { value: 'all', label: 'All Offices', dot: 'bg-slate-400' },
+    { value: 'compiled', label: 'Complied', dot: 'bg-emerald-500' },
+    { value: 'partially_compiled', label: 'Partially Complied', dot: 'bg-amber-500' },
+    { value: 'not_compiled', label: 'Not Complied', dot: 'bg-rose-500' },
+];
+
 export default function Sortoffice({ value = 'all', onChange }) {
     const [open, setOpen] = useState(false);
     const ref = useRef(null);
@@ -12,47 +19,51 @@ export default function Sortoffice({ value = 'all', onChange }) {
         return () => document.removeEventListener('mousedown', onDocClick);
     }, []);
 
+    const activeOption = SORT_OPTIONS.find((o) => o.value === value) || SORT_OPTIONS[0];
+
     return (
         <div className="relative inline-block" ref={ref}>
             <button
-                onClick={() => setOpen(v => !v)}
-                className="relative flex h-8 min-w-[146px] items-center justify-center rounded-md border border-slate-200 bg-white px-4 text-center text-[10px] font-medium leading-4 text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                title="Filter offices"
-                aria-label={`Filter offices: ${value === 'all' ? 'All Offices' : value === 'not_compiled' ? 'Not Complied' : value === 'partially_compiled' ? 'Partially Complied' : 'Complied'}`}
-                style={{ textAlignLast: 'center' }}
+                type="button"
+                onClick={() => setOpen((v) => !v)}
+                className="flex h-8 min-w-[146px] items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-2xs transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                title="Filter offices by status"
+                aria-label={`Filter offices: ${activeOption.label}`}
             >
-                <span className="block w-full truncate text-center">{value === 'all' ? 'All Offices' : value === 'not_compiled' ? 'Not Complied' : value === 'partially_compiled' ? 'Partially Complied' : 'Complied'}</span>
-                <svg xmlns="http://www.w3.org/2000/svg" className="pointer-events-none absolute right-2.5 top-1/2 h-2.5 w-2.5 -translate-y-1/2 text-slate-500" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
+                <div className="flex items-center gap-2 truncate">
+                    <span className={`h-2 w-2 shrink-0 rounded-full ${activeOption.dot}`} />
+                    <span className="truncate">{activeOption.label}</span>
+                </div>
+                <svg
+                    className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform duration-150 ${open ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
             </button>
 
             {open && (
-                <div className="absolute right-0 z-50 mt-2 w-40 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
-                    <button
-                        onClick={() => { onChange('all'); setOpen(false); }}
-                        className={`w-full px-2.5 py-1.5 text-center text-[8px] transition ${value === 'all' ? 'bg-slate-100 text-slate-900' : 'text-slate-700 hover:bg-slate-50'}`}
-                    >
-                        All Offices
-                    </button>
-                    <button
-                        onClick={() => { onChange('compiled'); setOpen(false); }}
-                        className={`w-full px-2.5 py-1.5 text-center text-[8px] transition ${value === 'compiled' ? 'bg-slate-100 text-slate-900' : 'text-slate-700 hover:bg-slate-50'}`}
-                    >
-                        Complied
-                    </button>
-                    <button
-                        onClick={() => { onChange('partially_compiled'); setOpen(false); }}
-                        className={`w-full px-2.5 py-1.5 text-center text-[8px] transition ${value === 'partially_compiled' ? 'bg-slate-100 text-slate-900' : 'text-slate-700 hover:bg-slate-50'}`}
-                    >
-                        Partially Complied
-                    </button>
-                    <button
-                        onClick={() => { onChange('not_compiled'); setOpen(false); }}
-                        className={`w-full px-2.5 py-1.5 text-center text-[8px] transition ${value === 'not_compiled' ? 'bg-slate-100 text-slate-900' : 'text-slate-700 hover:bg-slate-50'}`}
-                    >
-                        Not Complied
-                    </button>
+                <div className="absolute right-0 top-full z-50 mt-1.5 w-48 rounded-xl border border-slate-200/80 bg-white p-1.5 shadow-xl shadow-slate-200/60 animate-in fade-in zoom-in-95 duration-100">
+                    {SORT_OPTIONS.map((option) => (
+                        <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => {
+                                onChange(option.value);
+                                setOpen(false);
+                            }}
+                            className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-medium transition ${
+                                value === option.value
+                                    ? 'bg-indigo-50/80 font-semibold text-indigo-700'
+                                    : 'text-slate-700 hover:bg-slate-50'
+                            }`}
+                        >
+                            <span className={`h-2 w-2 shrink-0 rounded-full ${option.dot}`} />
+                            <span className="truncate">{option.label}</span>
+                        </button>
+                    ))}
                 </div>
             )}
         </div>

@@ -40,7 +40,7 @@ export default function RequirementsToolbar({
                     </button>
 
                     {showStatusDropdown && (
-                        <div className="absolute right-0 top-full z-20 mt-1.5 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl shadow-slate-200/60">
+                        <div className="absolute right-0 top-full z-20 mt-1.5 w-44 rounded-xl border border-slate-200/80 bg-white p-1.5 shadow-xl shadow-slate-200/60 animate-in fade-in zoom-in-95 duration-100">
                             {FILTER_OPTIONS.map((option) => (
                                 <button
                                     key={option.value}
@@ -49,13 +49,13 @@ export default function RequirementsToolbar({
                                         setStatusFilter(option.value);
                                         setShowStatusDropdown(false);
                                     }}
-                                    className={`flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-xs transition hover:bg-slate-50 ${
+                                    className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs transition ${
                                         statusFilter === option.value
                                             ? 'bg-indigo-50/80 font-semibold text-indigo-700'
-                                            : 'text-slate-700'
+                                            : 'text-slate-700 hover:bg-slate-50'
                                     }`}
                                 >
-                                    <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${option.dot}`} />
+                                    <span className={`h-2 w-2 shrink-0 rounded-full ${option.dot}`} />
                                     {option.label}
                                 </button>
                             ))}

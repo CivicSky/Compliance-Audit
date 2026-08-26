@@ -67,20 +67,20 @@ function ToastItem({ toast, onDismiss }) {
 
   const variantStyles = {
     error: {
-      container: 'border-rose-200 bg-rose-50 text-rose-900 shadow-rose-100/80',
-      title: 'text-rose-950',
-      text: 'text-rose-800',
-      button: 'text-rose-600 hover:text-rose-900 hover:bg-rose-100',
+      container: 'border-rose-600 bg-rose-600 text-white shadow-lg shadow-rose-600/30',
+      title: 'text-white font-extrabold',
+      text: 'text-rose-50 font-medium',
+      button: 'text-white hover:text-rose-100 hover:bg-rose-700/80',
       Icon: XCircle,
-      iconColor: 'text-rose-600'
+      iconColor: 'text-white'
     },
     success: {
-      container: 'border-emerald-200 bg-emerald-50 text-emerald-900 shadow-emerald-100/80',
-      title: 'text-emerald-950',
-      text: 'text-emerald-800',
-      button: 'text-emerald-600 hover:text-emerald-900 hover:bg-emerald-100',
+      container: 'border-emerald-600 bg-emerald-600 text-white shadow-lg shadow-emerald-600/30',
+      title: 'text-white font-extrabold',
+      text: 'text-emerald-50 font-medium',
+      button: 'text-white hover:text-emerald-100 hover:bg-emerald-700/80',
       Icon: CheckCircle,
-      iconColor: 'text-emerald-600'
+      iconColor: 'text-white'
     },
     warning: {
       container: 'border-amber-200 bg-amber-50 text-amber-900 shadow-amber-100/80',

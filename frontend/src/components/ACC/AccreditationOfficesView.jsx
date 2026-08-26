@@ -1,0 +1,413 @@
+import React, { useState, useMemo, useEffect } from 'react';
+import { Search, GraduationCap, Building2, User, MoreVertical, LayoutGrid, List, Plus, Trash2, GripVertical } from 'lucide-react';
+import Pagination from '../Pagination/Pagination';
+import CustomDropdown from '../UI/CustomDropdown';
+import { formatDateTime } from '../../utils/formatDateTime';
+
+export default function AccreditationOfficesView({
+  offices = [],
+  events = [],
+  selectedEventId = '',
+  onSelectEvent,
+  onSelectOffice,
+  onAddOffice,
+  onEditOffice,
+  onDeleteOffice,
+  onReorderOffices,
+  isAdmin = false
+}) {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [activeEventTab, setActiveEventTab] = useState(selectedEventId || 'all');
+  const [officeTypeFilter, setOfficeTypeFilter] = useState('all');
+  const [departmentFilter, setDepartmentFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [viewMode, setViewMode] = useState('grid');
+  const [localOffices, setLocalOffices] = useState([]);
+  const [draggedIdx, setDraggedIdx] = useState(null);
+  const [dragOverIdx, setDragOverIdx] = useState(null);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 6;
+
+  useEffect(() => {
+    setLocalOffices(offices || []);
+  }, [offices]);
+
+  const formatDateString = (dateStr) => {
+    if (!dateStr) return 'Aug 24, 2026';
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return 'Aug 24, 2026';
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    } catch {
+      return 'Aug 24, 2026';
+    }
+  };
+
+  // Derive unique departments & office types
+  const departmentOptions = useMemo(() => {
+    const depts = new Set();
+    localOffices.forEach(o => {
+      if (o.department_name || o.DepartmentCode) {
+        depts.add(o.department_name || o.DepartmentCode);
+      }
+    });
+    return Array.from(depts);
+  }, [localOffices]);
+
+  // Filter offices by active event tab, search query, and filters
+  const filteredOffices = useMemo(() => {
+    let list = localOffices;
+
+    // Filter by Event Tab
+    if (activeEventTab && activeEventTab !== 'all') {
+      list = list.filter(o => String(o.EventID || o.event_id) === String(activeEventTab));
+    }
+
+    // Filter by Office Type
+    if (officeTypeFilter !== 'all') {
+      if (officeTypeFilter === 'academic') {
+        list = list.filter(o => o.entity_type_id === 1 || String(o.category_name || o.TypeName || o.office_type || '').toLowerCase().includes('academic'));
+      } else if (officeTypeFilter === 'non-academic') {
+        list = list.filter(o => o.entity_type_id === 2 || String(o.category_name || o.TypeName || o.office_type || '').toLowerCase().includes('non-academic'));
+      }
+    }
+
+    // Filter by Department
+    if (departmentFilter !== 'all') {
+      list = list.filter(o => (o.department_name || o.DepartmentCode) === departmentFilter);
+    }
+
+    // Filter by Status
+    if (statusFilter !== 'all') {
+      list = list.filter(o => {
+        const pct = Math.round(o.compliance_percentage || o.compliancePercentage || 0);
+        if (statusFilter === 'complied') return pct >= 100;
+        if (statusFilter === 'partial') return pct > 0 && pct < 100;
+        if (statusFilter === 'not') return pct === 0;
+        return true;
+      });
+    }
+
+    // Filter by Search Query
+    const q = searchTerm.trim().toLowerCase();
+    if (q) {
+      list = list.filter(o =>
+        String(o.OfficeName || o.office_name || '').toLowerCase().includes(q) ||
+        String(o.DepartmentCode || o.department_name || '').toLowerCase().includes(q) ||
+        String(o.EventCode || o.event_name || '').toLowerCase().includes(q)
+      );
+    }
+
+    return list;
+  }, [localOffices, activeEventTab, officeTypeFilter, departmentFilter, statusFilter, searchTerm]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeEventTab, officeTypeFilter, departmentFilter, statusFilter, searchTerm]);
+
+  const totalPages = Math.ceil(filteredOffices.length / itemsPerPage) || 1;
+  const paginatedOffices = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredOffices.slice(start, start + itemsPerPage);
+  }, [filteredOffices, currentPage, itemsPerPage]);
+
+  // Drag and Drop Handlers
+  const handleDragStart = (e, index) => {
+    setDraggedIdx(index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e, index) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (draggedIdx === null || draggedIdx === index) return;
+    setDragOverIdx(index);
+  };
+
+  const handleDrop = (e, targetIdx) => {
+    e.preventDefault();
+    if (draggedIdx === null || draggedIdx === targetIdx) {
+      setDraggedIdx(null);
+      setDragOverIdx(null);
+      return;
+    }
+
+    const updated = [...localOffices];
+    const [movedItem] = updated.splice(draggedIdx, 1);
+    updated.splice(targetIdx, 0, movedItem);
+
+    setLocalOffices(updated);
+    setDraggedIdx(null);
+    setDragOverIdx(null);
+
+    if (onReorderOffices) {
+      onReorderOffices(updated);
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIdx(null);
+    setDragOverIdx(null);
+  };
+
+  return (
+    <div className="flex flex-col h-full bg-slate-50 font-sans p-6 overflow-y-auto">
+      {/* Top Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
+        <div>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Category Management</h1>
+          <p className="text-xs font-semibold text-slate-500 mt-0.5">Manage your Categories.</p>
+        </div>
+
+        <div className="flex items-center gap-2.5">
+          {onDeleteOffice && (
+            <button
+              type="button"
+              onClick={onDeleteOffice}
+              className="px-3.5 py-1.5 rounded-lg border border-rose-200 bg-rose-50 text-rose-600 font-extrabold text-xs hover:bg-rose-100 transition-all cursor-pointer"
+            >
+              Delete
+            </button>
+          )}
+
+          {onAddOffice && (
+            <button
+              type="button"
+              onClick={onAddOffice}
+              className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs flex items-center gap-1 shadow-xs transition-all cursor-pointer"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Add</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Filter Row */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+        {/* Search Input */}
+        <div className="relative w-full md:w-72">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search offices..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="h-9 w-full pl-9 pr-4 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all outline-none shadow-2xs"
+          />
+        </div>
+
+        {/* Dropdown Filters & Grid View Toggles */}
+        <div className="flex items-center gap-3 shrink-0">
+          <CustomDropdown
+            value={officeTypeFilter}
+            onChange={setOfficeTypeFilter}
+            options={[
+              { value: 'all', label: 'All Office Types' },
+              { value: 'academic', label: 'Academic Programs' },
+              { value: 'non-academic', label: 'Non-Academic Offices' },
+            ]}
+            minWidth="min-w-[146px]"
+            size="sm"
+          />
+
+          <CustomDropdown
+            value={departmentFilter}
+            onChange={setDepartmentFilter}
+            options={[
+              { value: 'all', label: 'All Departments' },
+              ...departmentOptions.map((dept) => ({ value: dept, label: dept })),
+            ]}
+            minWidth="min-w-[146px]"
+            size="sm"
+          />
+
+          <div className="flex items-center bg-slate-200/70 p-0.5 rounded-lg border border-slate-200">
+            <button
+              type="button"
+              onClick={() => setViewMode('grid')}
+              className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+              title="Grid View"
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('list')}
+              className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+              title="List View"
+            >
+              <List className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Grid of Office / Program Cards with Drag-and-Drop */}
+      {filteredOffices.length === 0 ? (
+        <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center my-auto shadow-2xs">
+          <Building2 className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+          <h3 className="text-base font-bold text-slate-800">No Programs or Offices Found</h3>
+          <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">There are no programs or offices matching the selected accreditation tab or filter criteria.</p>
+        </div>
+      ) : (
+        <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5' : 'space-y-3'}>
+        <>
+          <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5' : 'space-y-3'}>
+            {paginatedOffices.map((office, idx) => {
+              const officeId = office.OfficeID || office.id;
+              const isAcademic = office.entity_type_id === 1 || 
+                String(office.category_name || office.TypeName || office.office_type || '').toLowerCase().includes('academic') ||
+                String(office.category_name || office.TypeName || office.office_type || '').toLowerCase().includes('program');
+
+              const reqCount = office.total_requirements || office.requirementCount || 66;
+              const compliancePct = Math.round(office.compliance_percentage || office.compliancePercentage || 0);
+              const statusLabel = compliancePct >= 100 ? 'Compiled' : compliancePct > 0 ? 'Partially Complied' : 'Not Complied';
+              const statusBadgeClass = compliancePct >= 100 
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                : compliancePct > 0
+                ? 'bg-amber-50 text-amber-700 border-amber-200'
+                : 'bg-rose-50 text-rose-700 border-rose-200';
+
+              const isDraggingThis = draggedIdx === idx;
+              const isDragOverThis = dragOverIdx === idx;
+
+              return (
+                <div
+                  key={officeId}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, idx)}
+                  onDragOver={(e) => handleDragOver(e, idx)}
+                  onDrop={(e) => handleDrop(e, idx)}
+                  onDragEnd={handleDragEnd}
+                  onClick={() => onSelectOffice && onSelectOffice(office)}
+                  className={`bg-white border rounded-2xl p-5 shadow-xs hover:shadow-md transition-all cursor-pointer group relative ${
+                    isDraggingThis ? 'opacity-40 border-dashed border-blue-400 bg-blue-50/20 scale-[0.98]' :
+                    isDragOverThis ? 'border-blue-500 ring-2 ring-blue-400/50 shadow-lg scale-[1.01]' :
+                    'border-slate-200 hover:border-blue-400'
+                  }`}
+                >
+                  {/* Drag Grip Handle */}
+                  <div 
+                    className="absolute top-3 right-3 text-slate-300 group-hover:text-slate-500 cursor-grab active:cursor-grabbing p-1 rounded-md hover:bg-slate-100 transition-colors"
+                    title="Drag to reorder"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <GripVertical className="h-4 w-4" />
+                  </div>
+
+                  {/* Header Row */}
+                  <div className="flex items-start gap-3.5 pr-6">
+                    <div className={`h-11 w-11 rounded-2xl flex items-center justify-center shrink-0 border shadow-2xs ${
+                      isAcademic ? 'bg-cyan-50 text-cyan-600 border-cyan-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                    }`}>
+                      {isAcademic ? <GraduationCap className="h-6 w-6" /> : <Building2 className="h-6 w-6" />}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-base font-extrabold text-slate-900 group-hover:text-blue-600 transition-colors truncate">
+                        {office.OfficeName || office.office_name}
+                      </h3>
+                      <div className="flex items-center gap-1.5 mt-0.5 min-w-0 overflow-hidden">
+                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide truncate max-w-[130px]">
+                          {office.EventCode || office.event_code || (office.EventName ? String(office.EventName).split(' ')[0] : 'PAASCU-COPY')}
+                        </span>
+                        <span className="text-slate-300 shrink-0">•</span>
+                        <span className="text-[11px] font-bold text-slate-500 uppercase shrink-0">
+                          {office.department_name || office.DepartmentCode || 'SSLATE'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Type Badge */}
+                  <div className="mt-3">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                      {isAcademic ? 'Academic' : 'Non-Academic'}
+                    </span>
+                  </div>
+
+                  {/* Dates */}
+                  <div className="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-slate-100 text-xs text-slate-500">
+                    <div>
+                      <span className="block text-[9px] font-extrabold uppercase tracking-wider text-slate-400">CREATED</span>
+                      <span className="font-semibold text-slate-700">{formatDateString(office.created_at || office.CreatedAt)}</span>
+                    </div>
+                    <div>
+                      <span className="block text-[9px] font-extrabold uppercase tracking-wider text-slate-400">UPDATED</span>
+                      <span className="font-semibold text-slate-700">{formatDateString(office.updated_at || office.UpdatedAt)}</span>
+                    </div>
+                  </div>
+
+                  {/* Requirements & Compliance Bar */}
+                  <div className="mt-4 pt-3 border-t border-slate-100">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs font-semibold text-slate-600">
+                        {reqCount} requirements
+                      </span>
+                      <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-bold border ${statusBadgeClass}`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${
+                          compliancePct >= 100 ? 'bg-emerald-500' : compliancePct > 0 ? 'bg-amber-500' : 'bg-rose-500'
+                        }`} />
+                        {statusLabel}
+                      </span>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 h-2 rounded-full bg-slate-100 border border-slate-200 overflow-hidden">
+                        <div
+                          className={`h-full transition-all duration-300 ${
+                            compliancePct >= 100 ? 'bg-emerald-500' : compliancePct > 0 ? 'bg-amber-400' : 'bg-rose-500'
+                          }`}
+                          style={{ width: `${compliancePct}%` }}
+                        />
+                      </div>
+                      <span className="text-xs font-extrabold text-slate-700 font-mono w-9 text-right">
+                        {compliancePct}%
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Personnel Section Footer */}
+                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                    <div>
+                      <span className="block text-[9px] font-extrabold uppercase tracking-wider text-slate-400 mb-1">Personnel</span>
+                      <div className="flex items-center gap-1.5">
+                        <div className="h-6 w-6 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500">
+                          <User className="h-3.5 w-3.5" />
+                        </div>
+                        <span className="font-semibold text-slate-600">
+                          {office.head_name || office.HeadName || 'Unassigned'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Bottom Pagination Control */}
+          <div className="mt-8 flex justify-center pb-4">
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              fixed={false}
+              showWhenSinglePage={true}
+            />
+          </div>
+        </>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -13,6 +13,17 @@ const deleteCriteria = async (req, res) => {
       });
     }
 
+    // Clean up requirements under these criteria
+    try {
+      const placeholders = criteriaIds.map(() => '?').join(',');
+      await db.query(`DELETE FROM office_proof_documents WHERE requirement_id IN (SELECT RequirementID FROM requirements WHERE CriteriaID IN (${placeholders}))`, criteriaIds);
+      await db.query(`DELETE FROM requirement_user_assignments WHERE RequirementID IN (SELECT RequirementID FROM requirements WHERE CriteriaID IN (${placeholders}))`, criteriaIds);
+      await db.query(`DELETE FROM compliancestatusoffices WHERE RequirementID IN (SELECT RequirementID FROM requirements WHERE CriteriaID IN (${placeholders}))`, criteriaIds);
+      await db.query(`DELETE FROM requirements WHERE CriteriaID IN (${placeholders})`, criteriaIds);
+    } catch (cascadeErr) {
+      console.error('Error during cascading requirement cleanup in deleteCriteria:', cascadeErr);
+    }
+
     // Delete criteria
     const placeholders = criteriaIds.map(() => '?').join(',');
     const [result] = await db.query(

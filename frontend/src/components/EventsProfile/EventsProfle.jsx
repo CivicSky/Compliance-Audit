@@ -4,6 +4,7 @@ import { useToast } from "../UI/Toast";
 import { eventsAPI } from "../../utils/api";
 import Pagination from "../Pagination/Pagination";
 import { CardListSkeleton } from "../UI/Skeleton";
+import { useLiveRefresh } from "../../utils/liveSync";
 
 const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionChange, onEventClick }, ref) => {
     const [events, setEvents] = useState([]);
@@ -37,10 +38,13 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
         });
     }, []);
 
+    // Live syncing on mutations / window focus
+    useLiveRefresh(fetchEvents);
+
     // Filter and sort events based on search term
     useEffect(() => {
         let filtered = events;
-        
+
         // Apply search filter
         if (searchTerm.trim()) {
             filtered = events.filter(event => {
@@ -48,10 +52,10 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
                 const description = event.Description?.toLowerCase() || '';
                 const eventCode = event.EventCode?.toLowerCase() || '';
                 const searchLower = searchTerm.toLowerCase();
-                
-                return eventName.includes(searchLower) || 
-                       description.includes(searchLower) || 
-                       eventCode.includes(searchLower);
+
+                return eventName.includes(searchLower) ||
+                    description.includes(searchLower) ||
+                    eventCode.includes(searchLower);
             });
         }
 
@@ -103,9 +107,9 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
     const deleteSelectedEvents = async (eventIds) => {
         try {
             console.log('Attempting to delete events:', eventIds);
-            
+
             const response = await eventsAPI.deleteEvents(eventIds);
-            
+
             if (response.success) {
                 setEvents(prev => prev.filter(event => !eventIds.includes(event.EventID)));
                 setSelectedEvents(new Set());
@@ -127,15 +131,15 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
             }
         } catch (error) {
             console.error('Error deleting events:', error);
-            
+
             if (error.code === 'ERR_NETWORK' || error.message.includes('Network Error')) {
                 return { success: false, message: 'Network error. Please check if the backend server is running on port 5000.' };
             }
-            
+
             if (error.response) {
                 return { success: false, message: `Server error: ${error.response.data?.message || error.response.statusText}` };
             }
-            
+
             return { success: false, message: `Error deleting events: ${error.message}` };
         }
     };
@@ -145,7 +149,7 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
             setLoading(true);
             setError(null);
             const response = await eventsAPI.getAllEvents();
-            
+
             if (response.success) {
                 setEvents(response.data);
             } else {
@@ -194,7 +198,7 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
                         </svg>
                     </div>
                     <p className="text-rose-600 text-sm mb-3">{error}</p>
-                    <button 
+                    <button
                         onClick={fetchEvents}
                         className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 transition-colors"
                     >
@@ -222,7 +226,7 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
                         {searchTerm ? 'No Results Found' : 'No Events Found'}
                     </h3>
                     <p className="text-xs text-gray-500">
-                        {searchTerm 
+                        {searchTerm
                             ? `No events match "${searchTerm}"`
                             : 'No compliance events available yet.'}
                     </p>
@@ -243,20 +247,20 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
                     Showing {filteredEvents.length} of {events.length} events
                 </div>
             )}
-            
+
             <div className="space-y-2">
                 {paginatedEvents.map((event) => (
-                    <div 
+                    <div
                         key={event.EventID}
                         onClick={() => !deleteMode && onEventClick && onEventClick(event)}
                         className={`
                             relative bg-white rounded-lg border transition-all duration-200
-                            ${deleteMode 
-                                ? 'border-gray-200 hover:border-gray-300' 
+                            ${deleteMode
+                                ? 'border-gray-200 hover:border-gray-300'
                                 : 'border-gray-100 hover:border-indigo-200 hover:shadow-sm cursor-pointer'
                             }
-                            ${selectedEvents.has(event.EventID) 
-                                ? 'ring-2 ring-indigo-500 border-indigo-500 bg-indigo-50/30' 
+                            ${selectedEvents.has(event.EventID)
+                                ? 'ring-2 ring-indigo-500 border-indigo-500 bg-indigo-50/30'
                                 : ''
                             }
                         `}
@@ -275,14 +279,14 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
                                         />
                                     </div>
                                 )}
-                                
+
                                 {/* Icon */}
                                 <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-lg flex items-center justify-center">
                                     <svg className="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                     </svg>
                                 </div>
-                                
+
                                 {/* Event Info - Compact */}
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2">
@@ -293,13 +297,13 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
                                             {event.status === 'active' ? 'Active' : 'Inactive'}
                                         </span>
                                     </div>
-                                    
+
                                     {event.EventCode && (
                                         <p className="text-xs text-gray-500 mt-0.5">
                                             {event.EventCode}
                                         </p>
                                     )}
-                                    
+
                                     {event.Description && (
                                         <p className="text-xs text-gray-400 mt-1 line-clamp-1">
                                             {event.Description}
@@ -318,14 +322,14 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
                                                 const keyName = event.EventCode || event.EventName;
                                                 const sanitizedName = String(keyName).replace(/[<>:"/\\|?*]/g, '_').trim();
                                                 const url = await eventsAPI.downloadEventZip(keyName);
-                                                
+
                                                 const link = document.createElement('a');
                                                 link.href = url;
                                                 link.download = `${sanitizedName}.zip`;
                                                 document.body.appendChild(link);
                                                 link.click();
                                                 document.body.removeChild(link);
-                                                
+
                                                 setTimeout(() => {
                                                     window.URL.revokeObjectURL(url);
                                                 }, 100);

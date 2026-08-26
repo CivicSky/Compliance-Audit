@@ -21,6 +21,7 @@ import Area from './components/Area/Area.jsx'
 import ALLC from './components/ALLC/ALL.jsx'
 import MasterList from './components/MasterList/MasterList.jsx'
 import ExternalAuditors from './components/ExternalAuditors/ExternalAuditors.jsx'
+import ACCPage from './components/ACC/ACCPage.jsx'
 
 import ProtectedRoute from "./components/ProtectedRoute/ProtectedRoute.jsx";
 import RoleProtectedRoute from "./components/ProtectedRoute/RoleProtectedRoute.jsx";
@@ -82,6 +83,7 @@ export default function App() {
         { path: "area", element: <Area /> },
         { path: "setup", element: <ALLC /> },
         { path: "allc", element: <ALLC /> },
+        { path: "acc-management", element: <ACCPage /> },
         { path: "master-list", element: <MasterList /> },
         { path: "external-auditors", element: <RoleProtectedRoute allowedRoles={[1, 'admin']}><ExternalAuditors /></RoleProtectedRoute> },
       ],

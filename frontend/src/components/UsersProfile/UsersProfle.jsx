@@ -6,6 +6,7 @@ import { useModal } from "../UI/ModalProvider";
 import Pagination from "../Pagination/Pagination";
 import { API_BASE_URL } from '../../utils/apiBase';
 import { CardListSkeleton } from "../UI/Skeleton";
+import { useLiveRefresh } from "../../utils/liveSync";
 
 const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = false, onSelectionChange, onUserClick, viewMode = 'list' }, ref) => {
     const [users, setUsers] = useState([]);
@@ -44,20 +45,30 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
     const itemsPerPage = 30; // limit to 30 per page for users pagination
 
     // Fetch current user ID from token
-    useEffect(() => {{
-        const fetchCurrentUser = async () => {{
-            try {{
-                const response = await usersAPI.getLoggedInUser();
-                if (response && response.success && response.user) {{
-                    setCurrentUserID(response.user.UserID);
-                    setCurrentUser(response.user);
-                }}
-            }} catch (error) {{
-                console.error('Error fetching current user:', error);
-            }}
-        }};
-        fetchCurrentUser();
-    }}, []);
+    useEffect(() => {
+        {
+            const fetchCurrentUser = async () => {
+                {
+                    try {
+                        {
+                            const response = await usersAPI.getLoggedInUser();
+                            if (response && response.success && response.user) {
+                                {
+                                    setCurrentUserID(response.user.UserID);
+                                    setCurrentUser(response.user);
+                                }
+                            }
+                        }
+                    } catch (error) {
+                        {
+                            console.error('Error fetching current user:', error);
+                        }
+                    }
+                }
+            };
+            fetchCurrentUser();
+        }
+    }, []);
 
     // Close action menu when clicking outside
     useEffect(() => {
@@ -92,14 +103,17 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
     }, [actionMenuUserId]);
 
     // Fetch users data from database
-    useEffect(() => {{
+    useEffect(() => {
         fetchUsers();
-    }}, []);
+    }, []);
+
+    // Live syncing on mutations / window focus
+    useLiveRefresh(fetchUsers);
 
     // Filter and sort users based on search term and approval status
     useEffect(() => {
         let filtered = users;
-        
+
         // Apply search filter
         if (searchTerm.trim()) {
             filtered = users.filter(person => {
@@ -107,16 +121,16 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
                 const email = person.Email?.toLowerCase() || '';
                 const role = person.RoleName?.toLowerCase() || '';
                 const searchLower = searchTerm.toLowerCase();
-                
-                return fullName.includes(searchLower) || 
-                       email.includes(searchLower) || 
-                       role.includes(searchLower);
+
+                return fullName.includes(searchLower) ||
+                    email.includes(searchLower) ||
+                    role.includes(searchLower);
             });
         }
 
         // Apply approval status filter
         if (filterOptions.approvalStatus && filterOptions.approvalStatus.length > 0) {
-            filtered = filtered.filter(person => 
+            filtered = filtered.filter(person =>
                 filterOptions.approvalStatus.includes(person.approval_status || 'pending')
             );
         }
@@ -207,7 +221,7 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
             setLoading(true);
             setError(null);
             const response = await usersAPI.getAllUsers();
-            
+
             if (response.success) {
                 setUsers(response.users);
             } else {
@@ -249,7 +263,7 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                         <span className="text-red-700">{error}</span>
-                        <button 
+                        <button
                             onClick={fetchUsers}
                             className="ml-4 px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
                         >
@@ -300,78 +314,97 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
                 </div>
             )}
 
-            <div className={viewMode === 'grid' ? 'grid grid-cols-1 gap-2 xl:grid-cols-2' : 'space-y-2'}>
-            {visibleUsers.map((person) => {
-                // Construct full name
-                const fullName = `${person.FirstName}${person.MiddleInitial ? ' ' + person.MiddleInitial + '.' : ''} ${person.LastName}`;
-                const roleLabel = getRoleLabel(person);
-                const approvalLabel = getApprovalLabel(person);
-                const roleBadgeClass = getRoleBadgeClass(person);
-                const approvalBadgeClass = getApprovalBadgeClass(person);
+            <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-20' : 'space-y-2'}>
+                {visibleUsers.map((person) => {
+                    // Construct full name
+                    const fullName = `${person.FirstName || ''}${person.MiddleInitial ? ' ' + person.MiddleInitial + '.' : ''} ${person.LastName || ''}`.trim() || 'User';
+                    const initials = `${(person.FirstName || '').trim().charAt(0)}${(person.LastName || '').trim().charAt(0)}`.toUpperCase() || 'U';
+                    const roleLabel = getRoleLabel(person);
+                    const approvalLabel = getApprovalLabel(person);
+                    const roleBadgeClass = getRoleBadgeClass(person);
+                    const approvalBadgeClass = getApprovalBadgeClass(person);
 
-                // Profile photo logic: use preview if available, else use uploaded filename, else default
-                let profilePicUrl = user;
-                if (person.TempPreview) {
-                    profilePicUrl = person.TempPreview;
-                } else if (person.ProfilePic) {
-                    profilePicUrl = `${API_BASE_URL}/uploads/profile-pics/${person.ProfilePic}`;
-                }
+                    const avatarPalettes = [
+                        { bg: 'bg-gradient-to-br from-indigo-500 to-blue-600', ring: 'ring-indigo-100' },
+                        { bg: 'bg-gradient-to-br from-violet-500 to-purple-600', ring: 'ring-purple-100' },
+                        { bg: 'bg-gradient-to-br from-sky-500 to-cyan-600', ring: 'ring-sky-100' },
+                        { bg: 'bg-gradient-to-br from-emerald-500 to-teal-600', ring: 'ring-emerald-100' },
+                        { bg: 'bg-gradient-to-br from-amber-500 to-orange-600', ring: 'ring-amber-100' },
+                        { bg: 'bg-gradient-to-br from-rose-500 to-pink-600', ring: 'ring-rose-100' },
+                    ];
+                    let hash = 0;
+                    for (let i = 0; i < fullName.length; i++) hash = fullName.charCodeAt(i) + ((hash << 5) - hash);
+                    const avatarStyle = avatarPalettes[Math.abs(hash) % avatarPalettes.length];
 
-                if (viewMode === 'list') {
-                    return (
-                        <div
-                            key={person.UserID}
-                            onClick={() => !deleteMode && onUserClick && onUserClick(person)}
-                            className={`relative overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all duration-200 ${
-                                selectedUsers.has(person.UserID) ? 'ring-2 ring-blue-500' : ''
-                            } ${
-                                currentUserID === person.UserID ? 'border-blue-300 bg-blue-50/40' : ''
-                            } ${deleteMode ? 'cursor-pointer hover:border-gray-300' : 'cursor-pointer hover:border-indigo-200 hover:shadow-md'}`}
-                        >
-                            <div className="grid grid-cols-8 items-center gap-2 px-3 py-2">
-                                {/* Name & Email */}
-                                <div className="flex items-center gap-3 col-span-4 min-w-0">
-                                    {deleteMode && (
-                                        <div className="flex-shrink-0">
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedUsers.has(person.UserID)}
-                                                onChange={(e) => handleCheckboxChange(person.UserID, e.target.checked)}
-                                                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                                onClick={(e) => e.stopPropagation()}
-                                            />
+                    // Profile photo logic: use preview if available, else use uploaded filename, else null
+                    let profilePicUrl = null;
+                    if (person.TempPreview) {
+                        profilePicUrl = person.TempPreview;
+                    } else if (person.ProfilePic) {
+                        profilePicUrl = `${API_BASE_URL}/uploads/profile-pics/${person.ProfilePic}`;
+                    }
+
+                    if (viewMode === 'list') {
+                        return (
+                            <div
+                                key={person.UserID}
+                                onClick={() => !deleteMode && onUserClick && onUserClick(person)}
+                                className={`relative overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xs transition-all duration-200 ${selectedUsers.has(person.UserID) ? 'ring-2 ring-indigo-500 border-indigo-500' : ''
+                                    } ${currentUserID === person.UserID ? 'border-indigo-300 bg-indigo-50/30' : ''
+                                    } ${deleteMode ? 'cursor-pointer hover:border-gray-300' : 'cursor-pointer hover:border-indigo-200 hover:shadow-md'}`}
+                            >
+                                <div className="grid grid-cols-8 items-center gap-2 px-3 py-2">
+                                    {/* Name & Email */}
+                                    <div className="flex items-center gap-3 col-span-4 min-w-0">
+                                        {deleteMode && (
+                                            <div className="flex-shrink-0">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedUsers.has(person.UserID)}
+                                                    onChange={(e) => handleCheckboxChange(person.UserID, e.target.checked)}
+                                                    className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                />
+                                            </div>
+                                        )}
+                                        <div className="h-9 w-9 flex-shrink-0 rounded-xl overflow-hidden relative">
+                                            {profilePicUrl ? (
+                                                <img
+                                                    src={profilePicUrl}
+                                                    alt={fullName}
+                                                    className="h-full w-full rounded-xl object-cover ring-2 ring-slate-100"
+                                                    onError={e => {
+                                                        e.target.style.display = 'none';
+                                                        if (e.target.nextElementSibling) e.target.nextElementSibling.style.display = 'flex';
+                                                    }}
+                                                />
+                                            ) : null}
+                                            <div className={`h-full w-full rounded-xl flex items-center justify-center font-bold text-white text-xs ${avatarStyle.bg} ${profilePicUrl ? 'hidden' : 'flex'}`}>
+                                                {initials}
+                                            </div>
                                         </div>
-                                    )}
-                                    <div className="h-9 w-9 flex-shrink-0 rounded-full bg-blue-100 p-0.5">
-                                        <img
-                                            src={profilePicUrl}
-                                            alt={fullName}
-                                            className="h-full w-full rounded-full border border-white object-cover"
-                                            onError={e => { e.target.onerror = null; e.target.src = user; }}
-                                        />
-                                    </div>
-                                    <div className="min-w-0">
-                                        <h3 className="truncate text-[13px] font-semibold text-gray-900">{fullName}</h3>
-                                        <div className="mt-0.5 flex items-center gap-2 text-[11px] text-gray-600">
-                                            <span className="truncate">{person.Email}</span>
+                                        <div className="min-w-0">
+                                            <h3 className="truncate text-[13px] font-semibold text-gray-900">{fullName}</h3>
+                                            <div className="mt-0.5 flex items-center gap-2 text-[11px] text-gray-600">
+                                                <span className="truncate">{person.Email}</span>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                                {/* Role */}
-                                <div className="flex items-center col-span-2 justify-center">
-                                    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${roleBadgeClass}`}>
-                                        {roleLabel}
-                                    </span>
-                                </div>
-                                {/* Approval Status */}
-                                <div className="flex items-center col-span-1 justify-center">
-                                    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${approvalBadgeClass}`}>
-                                        {approvalLabel}
-                                    </span>
-                                </div>
-                                {/* Actions */}
-                                <div className="flex items-center col-span-1 justify-end">
-                                    {isAdmin && (
+                                    {/* Role */}
+                                    <div className="flex items-center col-span-2 justify-center">
+                                        <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-semibold ${roleBadgeClass}`}>
+                                            {roleLabel}
+                                        </span>
+                                    </div>
+                                    {/* Approval Status */}
+                                    <div className="flex items-center col-span-1 justify-center">
+                                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${approvalBadgeClass}`}>
+                                            {approvalLabel}
+                                        </span>
+                                    </div>
+                                    {/* Actions */}
+                                    <div className="flex items-center col-span-1 justify-end">
+                                        {isAdmin && (
                                             <div className="relative">
                                                 <button
                                                     onClick={(e) => {
@@ -396,69 +429,110 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
                                                 </button>
                                             </div>
                                         )}
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    }
+
+                    return (
+                        <div
+                            key={person.UserID}
+                            onClick={() => !deleteMode && onUserClick && onUserClick(person)}
+                            className={`group relative flex flex-col justify-between rounded-2xl border bg-white shadow-xs hover:shadow-xl transition-all duration-200 hover:-translate-y-1 overflow-hidden min-h-[200px] ${selectedUsers.has(person.UserID)
+                                    ? 'border-indigo-500 ring-2 ring-indigo-400/50 bg-indigo-50/15'
+                                    : currentUserID === person.UserID
+                                        ? 'border-indigo-300 bg-indigo-50/20'
+                                        : 'border-slate-200/90 hover:border-indigo-300/80'
+                                } ${deleteMode ? 'cursor-pointer hover:border-slate-300' : 'cursor-pointer'}`}
+                        >
+                            <div className="p-4 flex flex-col flex-1 justify-between gap-3">
+                                {/* Card Top: Approval Badge & Actions / Checkbox */}
+                                <div className="flex items-center justify-between gap-2">
+                                    {deleteMode ? (
+                                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedUsers.has(person.UserID)}
+                                                onChange={(e) => handleCheckboxChange(person.UserID, e.target.checked)}
+                                                className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                                onClick={(e) => e.stopPropagation()}
+                                            />
+                                            <span className="text-[11px] font-semibold text-slate-600">Select</span>
+                                        </label>
+                                    ) : (
+                                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold tracking-wide border ${approvalBadgeClass}`}>
+                                            {approvalLabel}
+                                        </span>
+                                    )}
+
+                                    <div className="flex items-center gap-1.5">
+                                        <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-semibold ${roleBadgeClass}`}>
+                                            {roleLabel}
+                                        </span>
+
+                                        {!deleteMode && isAdmin && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    const rect = e.currentTarget.getBoundingClientRect();
+                                                    setActionMenuUserId((prev) => (prev === person.UserID ? null : person.UserID));
+                                                    setActionMenuAnchorRect((prev) => (actionMenuUserId === person.UserID ? null : rect));
+                                                }}
+                                                className="user-actions-button flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition hover:bg-slate-50 hover:text-slate-700"
+                                                aria-label="User actions"
+                                                title="User actions"
+                                            >
+                                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6h.01M12 12h.01M12 18h.01" />
+                                                </svg>
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Profile Info */}
+                                <div className="flex items-center gap-3">
+                                    <div className="relative shrink-0">
+                                        {profilePicUrl ? (
+                                            <img
+                                                src={profilePicUrl}
+                                                alt={fullName}
+                                                className="h-12 w-12 rounded-xl object-cover ring-2 ring-slate-100 shadow-xs"
+                                                onError={e => {
+                                                    e.target.style.display = 'none';
+                                                    if (e.target.nextElementSibling) e.target.nextElementSibling.style.display = 'flex';
+                                                }}
+                                            />
+                                        ) : null}
+                                        <div className={`h-12 w-12 rounded-xl flex items-center justify-center font-bold text-white text-sm shadow-xs ring-2 ${avatarStyle.ring} ${avatarStyle.bg} ${profilePicUrl ? 'hidden' : 'flex'}`}>
+                                            {initials}
+                                        </div>
+                                    </div>
+
+                                    <div className="min-w-0 flex-1">
+                                        <h3 className="text-[14px] font-bold text-slate-900 truncate group-hover:text-indigo-600 transition-colors">
+                                            {fullName}
+                                        </h3>
+                                        {currentUserID === person.UserID && (
+                                            <span className="inline-block mt-0.5 text-[9px] font-bold text-indigo-600 uppercase tracking-wider">
+                                                (You)
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Email Container */}
+                                <div className="flex items-center gap-2 rounded-xl bg-slate-50/80 px-2.5 py-1.5 border border-slate-100 text-[11px] text-slate-600 group-hover:bg-slate-100/70 transition-colors">
+                                    <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                    </svg>
+                                    <span className="truncate font-medium">{person.Email}</span>
                                 </div>
                             </div>
                         </div>
                     );
-                }
-
-                return (
-                    <div 
-                        key={person.UserID} 
-                        onClick={() => !deleteMode && onUserClick && onUserClick(person)}
-                        className={`bg-white rounded-md p-4 shadow-lg border-2 stroke-2 transition-all duration-300 relative min-h-[160px] ${
-                            currentUserID === person.UserID ? 'border-blue-400 bg-blue-50' : 'border-gray-200'
-                        } ${
-                            deleteMode ? 'hover:shadow-md' : 'hover:shadow-none hover:bg-gray-100 cursor-pointer'
-                        } ${selectedUsers.has(person.UserID) ? 'ring-2 ring-blue-500 bg-blue-100' : ''}`}
-                    >
-                        <div className="flex items-center justify-between min-h-[4rem]">
-                            {/* Checkbox for delete mode */}
-                            {deleteMode && (
-                                <div className="flex items-center mr-4">
-                                    <input
-                                        type="checkbox"
-                                        checked={selectedUsers.has(person.UserID)}
-                                        onChange={(e) => handleCheckboxChange(person.UserID, e.target.checked)}
-                                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                        onClick={(e) => e.stopPropagation()}
-                                    />
-                                </div>
-                            )}
-                            
-                            {/* Left section - Profile pic, name and email */}
-                            <div className="flex items-center gap-4 flex-1">
-                                <img
-                                    src={profilePicUrl}
-                                    alt={fullName}
-                                    className="w-12 h-12 rounded-full object-cover border-2 border-gray-200"
-                                    onError={e => { e.target.onerror = null; e.target.src = user; }}
-                                />
-                                <div className="flex-1">
-                                    <h3 className="font-bold text-lg" style={{color: '#121212'}}>
-                                        {fullName}
-                                    </h3>
-                                    <p className="text-gray-600 text-sm">{person.Email}</p>
-                                    
-                                </div>
-                            </div>
-
-                            {/* Fixed vertical separator line */}
-                            <div className="absolute top-4 bottom-4 w-px bg-gray-300" style={{left: 'calc(88% - 12px)'}}></div>
-
-                            {/* Right section - Role and Approval Status Badges */}
-                            <div className="text-right flex-shrink-0 flex flex-col gap-2 ml-6">
-                                <span className={`px-3 py-1 rounded-full text-sm font-medium border ${roleBadgeClass}`}>
-                                    {roleLabel}
-                                </span>
-                                <span className={`px-3 py-1 rounded-full text-sm font-medium border ${approvalBadgeClass}`}>
-                                    {approvalLabel}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                );
-            })}
+                })}
             </div>
 
             {/* Portal action menu (prevents clipping inside card/list containers) */}

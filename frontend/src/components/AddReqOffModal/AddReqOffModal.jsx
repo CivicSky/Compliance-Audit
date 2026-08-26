@@ -69,6 +69,8 @@ export default function AddReqOffModal({ isOpen, onClose, office, onSave }) {
             await axios.post(`${API_BASE_URL}/api/offices/${office.id}/requirements`, {
                 requirementIds: selectedRequirements
             });
+
+            await showAlert(`Successfully added ${selectedRequirements.length} requirement(s) to ${office.office_name || office.OfficeName || 'office'}.`, 'success');
             
             onSave();
             setSelectedRequirements([]);

@@ -76,6 +76,14 @@ const db = {
       pgText = text.replace(/\?/g, () => `$${index++}`);
     }
 
+    // Convert INSERT IGNORE INTO (MySQL) to PostgreSQL ON CONFLICT DO NOTHING
+    if (/\bINSERT\s+IGNORE\s+INTO\b/i.test(pgText)) {
+      pgText = pgText.replace(/\bINSERT\s+IGNORE\s+INTO\b/gi, 'INSERT INTO');
+      if (!/\bon\s+conflict\b/i.test(pgText)) {
+        pgText += ' ON CONFLICT DO NOTHING';
+      }
+    }
+
     // Convert backticks ` to double quotes " for PostgreSQL
     pgText = pgText.replace(/`/g, '"');
 

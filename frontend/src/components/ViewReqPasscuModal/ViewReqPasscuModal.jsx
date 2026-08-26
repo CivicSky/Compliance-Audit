@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import { renderAsync } from 'docx-preview';
@@ -951,10 +952,10 @@ export default function ViewReqPASSCUModal({
     const assignedRequirementCount = requirements.filter((req) => isUserAssignedToRequirement(req.RequirementID)).length;
     const isAssignedInCurrentOffice = assignedRequirementCount > 0;
 
-    return (
+    const modalContent = (
         <div
-            className="fixed inset-y-0 right-0 left-0 z-[50] flex bg-slate-900/55 backdrop-blur-[2px] lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out"
-            style={{ left: 'var(--sidebar-width, 0px)', transition: 'left 200ms ease-in-out' }}
+            className="fixed inset-y-0 right-0 left-0 z-[9999] flex bg-slate-900/55 backdrop-blur-[2px] lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out"
+            style={{ zIndex: 9999, left: 'var(--sidebar-width, 0px)', transition: 'left 200ms ease-in-out' }}
             onClick={onClose}
         >
             <div className="flex h-full w-full flex-col bg-app-muted shadow-2xl" onClick={(e) => e.stopPropagation()}>
@@ -1251,4 +1252,6 @@ export default function ViewReqPASSCUModal({
             />
         </div>
     );
+
+    return createPortal(modalContent, document.body);
 }

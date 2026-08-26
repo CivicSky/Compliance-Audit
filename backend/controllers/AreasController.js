@@ -54,8 +54,26 @@ exports.deleteAreas = async (req, res) => {
             return res.status(400).json({ success: false, message: 'No area IDs provided' });
         }
 
-        // Perform a hard delete so frontend deletions remove rows from the DB
         const placeholders = areaIds.map(() => '?').join(',');
+
+        // Clean up requirements & criteria under these areas
+        try {
+          const [critRows] = await db.query(`SELECT CriteriaID FROM criteria WHERE AreaID IN (${placeholders})`, areaIds);
+          if (critRows && critRows.length > 0) {
+            const critIds = critRows.map(c => c.CriteriaID ?? c.criteriaid).filter(Boolean);
+            if (critIds.length > 0) {
+              const critPlaceholders = critIds.map(() => '?').join(',');
+              await db.query(`DELETE FROM office_proof_documents WHERE requirement_id IN (SELECT RequirementID FROM requirements WHERE CriteriaID IN (${critPlaceholders}))`, critIds);
+              await db.query(`DELETE FROM requirement_user_assignments WHERE RequirementID IN (SELECT RequirementID FROM requirements WHERE CriteriaID IN (${critPlaceholders}))`, critIds);
+              await db.query(`DELETE FROM compliancestatusoffices WHERE RequirementID IN (SELECT RequirementID FROM requirements WHERE CriteriaID IN (${critPlaceholders}))`, critIds);
+              await db.query(`DELETE FROM requirements WHERE CriteriaID IN (${critPlaceholders})`, critIds);
+              await db.query(`DELETE FROM criteria WHERE CriteriaID IN (${critPlaceholders})`, critIds);
+            }
+          }
+        } catch (cascadeErr) {
+          console.error('Error during cascading cleanup in deleteAreas:', cascadeErr);
+        }
+
         const [result] = await db.query(
             `DELETE FROM areas WHERE AreaID IN (${placeholders})`,
             areaIds

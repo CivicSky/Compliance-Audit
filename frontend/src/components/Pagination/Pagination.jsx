@@ -67,11 +67,10 @@ export default function Pagination({ currentPage, totalPages, onPageChange, fixe
                         <button
                             key={page}
                             onClick={() => onPageChange(page)}
-                            className={`rounded-md text-xs font-medium transition ${
-                                currentPage === page
+                            className={`rounded-md text-xs font-medium transition ${currentPage === page
                                     ? 'bg-blue-600 text-white shadow-sm'
                                     : 'bg-gray-200/80 text-gray-800 hover:bg-gray-300/80'
-                            }`}
+                                }`}
                             style={{ width: '28px', height: '28px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontVariantNumeric: 'tabular-nums' }}
                         >
                             {page}

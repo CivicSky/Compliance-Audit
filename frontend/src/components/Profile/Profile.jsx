@@ -15,7 +15,7 @@ function DetailRow({ label, value }) {
 function ProfileShell({ children }) {
 	return (
 		<div className="min-h-screen w-full bg-app">
-			<div className="mx-auto max-w-5xl px-4 pb-12 pt-[88px] sm:px-6 lg:px-8">{children}</div>
+			<div className="mx-auto max-w-5xl px-4 pb-12 pt-3 sm:px-6 lg:px-8">{children}</div>
 		</div>
 	);
 }

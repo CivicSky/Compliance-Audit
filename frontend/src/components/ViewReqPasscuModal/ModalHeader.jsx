@@ -129,7 +129,7 @@ export default function ModalHeader({
                                                 setTimeout(() => window.URL.revokeObjectURL(url), 200);
                                             } catch (err) {
                                                 console.error('Export failed', err);
-                                                alert(err?.message || 'Failed to export office');
+                                                 showAlert(err?.message || 'Failed to export office', 'error');
                                             }
                                         }}
                                         className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-xs text-slate-700 transition hover:bg-slate-50 whitespace-nowrap"

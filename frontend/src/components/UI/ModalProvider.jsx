@@ -12,15 +12,32 @@ export function ModalProvider({ children }) {
     let title = 'Notice';
     let variant = 'info';
 
-    if (['error', 'success', 'warning', 'info'].includes(titleOrVariant)) {
+    const msgLower = String(message || '').toLowerCase();
+    const titleLower = String(titleOrVariant || '').toLowerCase();
+
+    const isErr = ['error', 'failed', 'cannot', 'invalid', 'denied', 'limit', 'reached', 'violates'].some(word => 
+      msgLower.includes(word) || titleLower.includes(word)
+    );
+
+    const isSuccess = ['success', 'successfully', 'created', 'updated', 'deleted', 'assigned', 'saved', 'added', 'copied'].some(word =>
+      msgLower.includes(word) || titleLower.includes(word)
+    );
+
+    if (isErr || titleOrVariant === 'error' || variantParam === 'error') {
+      variant = 'error';
+      title = 'Error';
+    } else if (isSuccess || titleOrVariant === 'success' || variantParam === 'success') {
+      variant = 'success';
+      title = 'Success';
+    } else if (['error', 'success', 'warning', 'info'].includes(titleOrVariant)) {
       variant = titleOrVariant;
-      title = titleOrVariant === 'error' ? 'Error' : titleOrVariant === 'success' ? 'Success' : 'Notice';
+      title = titleOrVariant === 'success' ? 'Success' : titleOrVariant === 'warning' ? 'Warning' : 'Notice';
     } else {
       title = titleOrVariant;
       variant = variantParam;
     }
 
-    toast({ title, description: message, variant, duration: 3000 });
+    toast({ title, description: message, variant, duration: 3500 });
     return Promise.resolve(true);
   }, [toast]);
 

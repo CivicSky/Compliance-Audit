@@ -458,7 +458,7 @@ const OfficesController = {
       if (headIdArray.length > 0) {
         for (const hid of headIdArray) {
           await db.query(
-            `INSERT IGNORE INTO office_head_assignments (HeadID, OfficeID) VALUES (?, ?)`,
+            `INSERT INTO office_head_assignments (HeadID, OfficeID) VALUES (?, ?) ON CONFLICT DO NOTHING`,
             [hid, newOfficeId]
           );
         }
@@ -558,11 +558,15 @@ const OfficesController = {
       }
 
       let nameToSave = OfficeName;
-      if (master_list_id) {
+      if (!nameToSave && master_list_id) {
         const [mlRows] = await db.query('SELECT entity_name FROM master_list WHERE id = ?', [master_list_id]);
         if (mlRows.length > 0) {
           nameToSave = mlRows[0].entity_name;
         }
+      }
+
+      if (nameToSave && master_list_id) {
+        await db.query('UPDATE master_list SET entity_name = ? WHERE id = ?', [nameToSave, master_list_id]);
       }
 
       const [result] = await db.query(
@@ -589,7 +593,7 @@ const OfficesController = {
       if (headIdArray.length > 0) {
         for (const hid of headIdArray) {
           await db.query(
-            `INSERT IGNORE INTO office_head_assignments (HeadID, OfficeID) VALUES (?, ?)`,
+            `INSERT INTO office_head_assignments (HeadID, OfficeID) VALUES (?, ?) ON CONFLICT DO NOTHING`,
             [hid, id]
           );
         }

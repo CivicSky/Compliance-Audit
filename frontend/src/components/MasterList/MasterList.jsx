@@ -6,6 +6,7 @@ import NotificationToast from '../Notification/NotificationToast';
 import { departmentsAPI, masterlistAPI, usersAPI } from '../../utils/api';
 import { formatDateTime } from '../../utils/formatDateTime';
 import { MasterListSkeleton } from '../UI/Skeleton';
+import { useLiveRefresh } from '../../utils/liveSync';
 
 const DEFAULT_DEPARTMENTS = [];
 
@@ -74,36 +75,39 @@ export default function MasterList() {
     };
   }, []);
 
+  const loadMasterList = useCallback(async () => {
+    try {
+      setLoadingItems(true);
+      const response = await masterlistAPI.getAll();
+      setItems(response.data || response);
+    } catch (error) {
+      console.error('Failed to load master list items:', error);
+      if (error.response?.status === 429) {
+        setNotice('Rate limit exceeded (Max 30 requests/min). Please try again later.');
+      } else {
+        setNotice('Failed to load master list items.');
+      }
+    } finally {
+      setLoadingItems(false);
+    }
+  }, []);
+
+  const loadDepartments = useCallback(async () => {
+    try {
+      const response = await departmentsAPI.getAll();
+      setDepartments(response.data || response);
+    } catch (error) {
+      console.error('Failed to load departments:', error);
+    }
+  }, []);
+
   useEffect(() => {
-    const loadMasterList = async () => {
-      try {
-        setLoadingItems(true);
-        const response = await masterlistAPI.getAll();
-        setItems(response.data || response);
-      } catch (error) {
-        console.error('Failed to load master list items:', error);
-        if (error.response?.status === 429) {
-          setNotice('Rate limit exceeded (Max 30 requests/min). Please try again later.');
-        } else {
-          setNotice('Failed to load master list items.');
-        }
-      } finally {
-        setLoadingItems(false);
-      }
-    };
-
-    const loadDepartments = async () => {
-      try {
-        const response = await departmentsAPI.getAll();
-        setDepartments(response.data || response);
-      } catch (error) {
-        console.error('Failed to load departments:', error);
-      }
-    };
-
     loadMasterList();
     loadDepartments();
-  }, []);
+  }, [loadMasterList, loadDepartments]);
+
+  // Live syncing on mutations / window focus
+  useLiveRefresh(loadMasterList);
 
   useEffect(() => {
     const previous = document.body.style.overflow;
@@ -217,22 +221,22 @@ export default function MasterList() {
   return (
     <div className="w-full min-h-screen flex flex-col bg-app pb-12">
       <div ref={headerRef} style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50, background: 'transparent' }}>
-</div>
+      </div>
 
       <NotificationToast title="Notice" message={notice} visible={isNoticeVisible} onDismiss={() => setNotice('')} />
 
-      <div className="flex flex-col gap-0 px-4 pt-6 pb-0" style={{ marginTop: headerRef.current ? headerRef.current.offsetHeight : 0 }}>
-        <div className="flex items-start justify-between gap-2">
+      <div className="flex flex-col gap-0 px-4 pt-2 pb-0" style={{ marginTop: headerRef.current ? headerRef.current.offsetHeight : 0 }}>
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
           <div ref={controlsRef}>
             <h1 className="text-2xl font-bold text-gray-800 mb-1">Master List</h1>
             <p className="text-xs text-gray-600">{deleteMode ? ' ' : 'Manage your reusable academic programs and non-academic offices.'}</p>
           </div>
           {isAdmin && (
-            <div className="flex items-center gap-1 pt-0.5">
+            <div className="flex items-center gap-1.5 pt-0.5 self-start sm:self-auto flex-wrap">
               {deleteMode && (
                 <button
                   type="button"
-                  className="ml-2 inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-red-400 bg-red-600 text-white hover:bg-red-700"
+                  className="inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-red-400 bg-red-600 text-white hover:bg-red-700"
                 >
                   Delete Selected (0)
                 </button>
@@ -246,11 +250,10 @@ export default function MasterList() {
                   }
                   setDeleteMode(true);
                 }}
-                className={`inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-red-400 ${
-                  deleteMode
+                className={`inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-red-400 ${deleteMode
                     ? 'border-red-300 bg-red-100 text-red-700 hover:bg-red-200'
                     : 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100'
-                }`}
+                  }`}
               >
                 {deleteMode ? 'Cancel Delete' : 'Delete'}
               </button>
@@ -266,15 +269,15 @@ export default function MasterList() {
           )}
         </div>
 
-        <div className="flex w-full items-center justify-between gap-1 mt-2">
-          <div className="relative w-full max-w-sm">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5 mt-2 flex-wrap">
+          <div className="relative w-full md:w-64 lg:w-72">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
               strokeWidth="2"
-              className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
+              className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
             >
               <circle cx="11" cy="11" r="7" />
               <path d="m20 20-3.5-3.5" />
@@ -282,84 +285,79 @@ export default function MasterList() {
             <input
               type="text"
               placeholder="Search master list..."
-              className="h-9 w-full rounded-lg border border-slate-200 bg-white pl-8 pr-3 text-[9px] text-slate-700 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-brand-500"
+              className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs text-slate-800 placeholder-slate-400 shadow-2xs transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
 
-          <div className="flex items-center gap-1">
-            <div className="flex items-center gap-2 mr-2">
-              <div className="relative inline-flex">
-                <select
-                  value={typeFilter}
-                  onChange={(e) => setTypeFilter(e.target.value)}
-                  className="h-8 min-w-[146px] appearance-none rounded-md border border-slate-200 bg-white px-4 text-center text-[10px] font-medium leading-4 text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                  style={{ textAlignLast: 'center' }}
-                >
-                  <option value="all">All Types</option>
-                  <option value="Academic Program">Academic Program</option>
-                  <option value="Non-Academic Office">Non-Academic Office</option>
-                </select>
-                <svg xmlns="http://www.w3.org/2000/svg" className="pointer-events-none absolute right-2.5 top-1/2 h-2.5 w-2.5 -translate-y-1/2 text-slate-500" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
-                </svg>
-              </div>
-
-              <div className="relative inline-flex">
-                <select
-                  value={departmentFilter}
-                  onChange={(e) => setDepartmentFilter(e.target.value)}
-                  className="h-8 min-w-[146px] appearance-none rounded-md border border-slate-200 bg-white px-4 text-center text-[10px] font-medium leading-4 text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                  style={{ textAlignLast: 'center' }}
-                >
-                  <option value="all">All Departments</option>
-                  {departments.map((department) => (
-                    <option key={department.id} value={String(department.id)}>
-                      {department.name}
-                    </option>
-                  ))}
-                </select>
-                <svg xmlns="http://www.w3.org/2000/svg" className="pointer-events-none absolute right-2.5 top-1/2 h-2.5 w-2.5 -translate-y-1/2 text-slate-500" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
-                </svg>
-              </div>
-
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="relative inline-flex">
+              <select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                className="h-8 min-w-[140px] appearance-none rounded-md border border-slate-200 bg-white px-4 text-center text-xs font-medium leading-4 text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                style={{ textAlignLast: 'center' }}
+              >
+                <option value="all">All Types</option>
+                <option value="Academic Program">Academic Program</option>
+                <option value="Non-Academic Office">Non-Academic Office</option>
+              </select>
+              <svg xmlns="http://www.w3.org/2000/svg" className="pointer-events-none absolute right-2.5 top-1/2 h-2.5 w-2.5 -translate-y-1/2 text-slate-500" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
+              </svg>
             </div>
 
-            <div className="flex h-9 items-center justify-end gap-1">
-              <div className="flex h-7 items-center gap-0.5 rounded-md border border-slate-200 bg-slate-100 p-0.5">
-                <button
-                  onClick={() => setViewMode('grid')}
-                  className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${viewMode === 'grid' ? 'bg-white text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
-                  title="Grid View"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                  </svg>
-                </button>
-                <button
-                  onClick={() => setViewMode('list')}
-                  className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${viewMode === 'list' ? 'bg-white text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
-                  title="List View"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                  </svg>
-                </button>
-              </div>
+            <div className="relative inline-flex">
+              <select
+                value={departmentFilter}
+                onChange={(e) => setDepartmentFilter(e.target.value)}
+                className="h-8 min-w-[140px] appearance-none rounded-md border border-slate-200 bg-white px-4 text-center text-xs font-medium leading-4 text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                style={{ textAlignLast: 'center' }}
+              >
+                <option value="all">All Departments</option>
+                {departments.map((department) => (
+                  <option key={department.id} value={String(department.id)}>
+                    {department.name}
+                  </option>
+                ))}
+              </select>
+              <svg xmlns="http://www.w3.org/2000/svg" className="pointer-events-none absolute right-2.5 top-1/2 h-2.5 w-2.5 -translate-y-1/2 text-slate-500" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
+              </svg>
+            </div>
+
+            <div className="flex h-7 items-center gap-0.5 rounded-md border border-slate-200 bg-slate-100 p-0.5">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${viewMode === 'grid' ? 'bg-white text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
+                title="Grid View"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                </svg>
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${viewMode === 'list' ? 'bg-white text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
+                title="List View"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="w-full px-4 pt-6 pb-6" style={{ marginTop: 0 }}>
+      <div className="w-full px-4 pt-2 pb-6" style={{ marginTop: 0 }}>
         {loadingItems ? (
           <MasterListSkeleton count={9} />
         ) : viewMode === 'list' ? (
           <div className="flex h-full flex-col">
-            <div className="px-0">
-              <div className="hidden md:grid grid-cols-[minmax(140px,1fr)_180px_180px_120px] gap-6 px-6 py-3 mb-1 bg-white border border-slate-200 rounded-xl shadow-sm text-xs font-semibold text-gray-700 w-full">
+            <div className="px-0 overflow-x-auto">
+              <div className="hidden md:grid grid-cols-[minmax(140px,1fr)_180px_180px_120px] gap-6 px-6 py-3 mb-1 bg-white border border-slate-200 rounded-xl shadow-sm text-xs font-semibold text-gray-700 w-full min-w-[640px]">
                 <div className="flex items-center">Name</div>
                 <div className="flex items-center justify-center">Type</div>
                 <div className="flex items-center justify-center">Department</div>
@@ -376,9 +374,9 @@ export default function MasterList() {
                     paginatedItems.map((item) => (
                       <div
                         key={item.id}
-                        className="rounded-xl border border-slate-200 bg-white shadow-sm transition-all duration-200 hover:border-indigo-200 hover:shadow-md"
+                        className="rounded-xl border border-slate-200 bg-white shadow-sm transition-all duration-200 hover:border-indigo-200 hover:shadow-md overflow-x-auto"
                       >
-                        <div className="grid grid-cols-[minmax(140px,1fr)_180px_180px_120px] items-center gap-6 px-5 py-2">
+                        <div className="grid grid-cols-[minmax(140px,1fr)_180px_180px_120px] items-center gap-6 px-5 py-2 min-w-[640px]">
                           <div className="min-w-0">
                             <div className="flex items-center gap-3">
                               {renderItemIcon(item.type)}
@@ -388,11 +386,10 @@ export default function MasterList() {
                             </div>
                           </div>
                           <div className="flex items-center justify-center">
-                            <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium ${
-                              item.type === 'Academic Program'
+                            <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium ${item.type === 'Academic Program'
                                 ? 'bg-blue-50 text-blue-700 border-blue-200'
                                 : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                            }`}>
+                              }`}>
                               {item.type}
                             </span>
                           </div>
@@ -468,7 +465,7 @@ export default function MasterList() {
                     )}
 
                     <div className="flex items-start gap-3 pr-8">
-                        {renderItemIcon(item.type)}
+                      {renderItemIcon(item.type)}
                       <div className="min-w-0">
                         <h3 className="text-sm font-semibold text-slate-800 truncate">{item.name}</h3>
                         <p className="mt-1 text-[11px] text-slate-500 truncate">{item.department ?? 'Institution-wide'}</p>
@@ -485,11 +482,10 @@ export default function MasterList() {
                       </div>
                     </div>
                     <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-2 text-[11px] text-slate-600">
-                      <span className={`rounded-full border px-2.5 py-1 font-medium ${
-                        item.type === 'Academic Program'
+                      <span className={`rounded-full border px-2.5 py-1 font-medium ${item.type === 'Academic Program'
                           ? 'bg-blue-50 text-blue-700 border-blue-200'
                           : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                      }`}>
+                        }`}>
                         {item.type}
                       </span>
                       <span>{item.department ?? 'Institution-wide'}</span>

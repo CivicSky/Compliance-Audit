@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Header from "../Header/header";
 import Pagination from "../Pagination/Pagination";
+import CustomDropdown from "../UI/CustomDropdown";
 import { CardListSkeleton } from "../UI/Skeleton";
 import AssignAreaModal from "./AssignAreaModal";
 import AuditorDetailsModal from "./AuditorDetailsModal";
@@ -218,26 +219,24 @@ export default function ExternalAuditors() {
 
     return (
         <div className="h-screen w-full flex flex-col overflow-hidden bg-slate-50/80">
-            <Header pageTitle="External Auditors" />
-
-            <div className="flex-1 overflow-hidden p-6 flex flex-col gap-4 min-h-0 pb-16">
+            <div className="flex-1 overflow-hidden px-4 pt-2 pb-16 flex flex-col gap-4 min-h-0">
                 {/* Title & Top Toolbar */}
                 <div className="flex flex-col gap-3 shrink-0">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
                         <div>
                             <h1 className="text-2xl font-bold text-slate-900 tracking-tight">External Auditors</h1>
                             <p className="text-xs text-slate-500 mt-0.5 font-medium">Manage external auditors and area assignments.</p>
                         </div>
 
                         {/* Top Right Actions */}
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 pt-0.5 self-start sm:self-auto flex-wrap">
                             {deleteMode ? (
                                 <div className="flex items-center gap-2">
                                     <button
                                         type="button"
                                         onClick={handleDeleteSelected}
                                         disabled={selectedIds.length === 0}
-                                        className="h-9 px-4 rounded-xl bg-rose-600 text-white text-xs font-bold shadow-2xs hover:bg-rose-700 transition disabled:opacity-50"
+                                        className="h-8 px-3 rounded-lg bg-rose-600 text-white text-[11px] font-semibold transition hover:bg-rose-700 disabled:opacity-50"
                                     >
                                         Delete Selected ({selectedIds.length})
                                     </button>
@@ -247,7 +246,7 @@ export default function ExternalAuditors() {
                                             setDeleteMode(false);
                                             setSelectedIds([]);
                                         }}
-                                        className="h-9 px-3 rounded-xl border border-slate-200 bg-white text-slate-600 text-xs font-semibold hover:bg-slate-100 transition"
+                                        className="h-8 px-3 rounded-lg border border-slate-200 bg-white text-slate-600 text-[11px] font-semibold hover:bg-slate-100 transition"
                                     >
                                         Cancel
                                     </button>
@@ -257,7 +256,7 @@ export default function ExternalAuditors() {
                                     <button
                                         type="button"
                                         onClick={() => setDeleteMode(true)}
-                                        className="h-9 px-4 rounded-xl border border-rose-200 bg-white text-rose-600 text-xs font-bold shadow-2xs hover:bg-rose-50 hover:border-rose-300 transition"
+                                        className="h-8 px-3 rounded-lg border border-rose-200 bg-rose-50 text-rose-600 text-[11px] font-semibold transition hover:bg-rose-100"
                                     >
                                         Delete
                                     </button>
@@ -265,7 +264,7 @@ export default function ExternalAuditors() {
                                         type="button"
                                         onClick={handleCreateInvite}
                                         disabled={inviteLoading}
-                                        className="h-9 px-4 rounded-xl border border-blue-200 bg-blue-50 text-blue-700 text-xs font-bold shadow-2xs hover:bg-blue-100 hover:border-blue-300 transition disabled:opacity-50"
+                                        className="h-8 px-3 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 text-[11px] font-semibold transition hover:bg-blue-100 disabled:opacity-50"
                                     >
                                         {inviteLoading ? "Generating..." : "Invite"}
                                     </button>
@@ -275,10 +274,10 @@ export default function ExternalAuditors() {
                     </div>
 
                     {/* Search & Filter Toolbar */}
-                    <div className="flex items-center justify-between gap-3">
-                        <div className="relative w-full max-w-sm">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5 flex-wrap">
+                        <div className="relative w-full md:w-64 lg:w-72">
                             <svg
-                                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                                className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
                                 fill="none"
                                 viewBox="0 0 24 24"
                                 stroke="currentColor"
@@ -289,7 +288,7 @@ export default function ExternalAuditors() {
                             <input
                                 type="text"
                                 placeholder="Search personnel, office, or email..."
-                                className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-8 text-xs font-medium text-slate-800 shadow-2xs transition focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-slate-400"
+                                className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-8 text-xs text-slate-800 placeholder-slate-400 shadow-2xs transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />
@@ -306,40 +305,46 @@ export default function ExternalAuditors() {
 
                         <div className="flex items-center gap-2">
                             {/* Filter Dropdown */}
-                            <select
+                            <CustomDropdown
                                 value={filterStatus}
-                                onChange={(e) => setFilterStatus(e.target.value)}
-                                className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-2xs transition focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-                            >
-                                <option value="all">All Personnel</option>
-                                <option value="assigned">Assigned</option>
-                                <option value="unassigned">Unassigned</option>
-                            </select>
+                                onChange={setFilterStatus}
+                                options={[
+                                    { value: 'all', label: 'All Personnel' },
+                                    { value: 'assigned', label: 'Assigned' },
+                                    { value: 'unassigned', label: 'Unassigned' },
+                                ]}
+                                minWidth="min-w-[146px]"
+                                size="sm"
+                            />
 
                             {/* View Mode Toggle Button */}
-                            <div className="flex items-center rounded-xl border border-slate-200 bg-white p-0.5 shadow-2xs">
+                            <div className="flex h-7 items-center gap-0.5 rounded-md border border-slate-200 bg-slate-100 p-0.5">
                                 <button
                                     type="button"
                                     onClick={() => setViewMode('grid')}
-                                    className={`flex h-8 w-8 items-center justify-center rounded-lg transition ${
-                                        viewMode === 'grid' ? 'bg-blue-600 text-white shadow-2xs' : 'text-slate-400 hover:text-slate-600'
+                                    className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
+                                        viewMode === 'grid'
+                                            ? 'bg-white text-indigo-600 shadow-2xs'
+                                            : 'text-gray-500 hover:text-gray-700'
                                     }`}
                                     title="Grid View"
                                 >
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
                                     </svg>
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setViewMode('list')}
-                                    className={`flex h-8 w-8 items-center justify-center rounded-lg transition ${
-                                        viewMode === 'list' ? 'bg-blue-600 text-white shadow-2xs' : 'text-slate-400 hover:text-slate-600'
+                                    className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
+                                        viewMode === 'list'
+                                            ? 'bg-white text-indigo-600 shadow-2xs'
+                                            : 'text-gray-500 hover:text-gray-700'
                                     }`}
                                     title="Table List View"
                                 >
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                                     </svg>
                                 </button>
                             </div>
@@ -359,132 +364,217 @@ export default function ExternalAuditors() {
                             <p className="text-xs text-slate-400 mt-1">No auditors matching your search criteria.</p>
                         </div>
                     ) : viewMode === 'grid' ? (
-                        /* GRID VIEW CARDS (Matching Screenshot 100%) */
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        /* MODERN GRID VIEW CARDS */
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5 pb-28">
                             {visibleAuditors.map((auditor) => {
                                 const isAssigned = !!auditor.assignedArea;
                                 const isSelected = selectedIds.includes(auditor.UserID);
-                                const avatarSrc = auditor.ProfilePic 
-                                    ? `${API_BASE_URL}/uploads/profile-pics/${auditor.ProfilePic}`
-                                    : '/src/assets/images/user.svg';
+                                const fullName = `${auditor.FirstName || ''} ${auditor.LastName || ''}`.trim() || 'Auditor';
+                                const initials = `${(auditor.FirstName || '').trim().charAt(0)}${(auditor.LastName || '').trim().charAt(0)}`.toUpperCase() || 'EA';
+                                
+                                const avatarPalettes = [
+                                    { bg: 'bg-gradient-to-br from-indigo-500 to-blue-600', ring: 'ring-indigo-100' },
+                                    { bg: 'bg-gradient-to-br from-violet-500 to-purple-600', ring: 'ring-purple-100' },
+                                    { bg: 'bg-gradient-to-br from-sky-500 to-cyan-600', ring: 'ring-sky-100' },
+                                    { bg: 'bg-gradient-to-br from-emerald-500 to-teal-600', ring: 'ring-emerald-100' },
+                                    { bg: 'bg-gradient-to-br from-amber-500 to-orange-600', ring: 'ring-amber-100' },
+                                    { bg: 'bg-gradient-to-br from-rose-500 to-pink-600', ring: 'ring-rose-100' },
+                                ];
+                                let hash = 0;
+                                for (let i = 0; i < fullName.length; i++) hash = fullName.charCodeAt(i) + ((hash << 5) - hash);
+                                const avatarStyle = avatarPalettes[Math.abs(hash) % avatarPalettes.length];
 
                                 return (
                                     <div
                                         key={auditor.UserID}
-                                        className={`group relative flex flex-col justify-between rounded-2xl border bg-white p-5 shadow-2xs transition-all ${
-                                            isSelected ? 'border-blue-500 ring-2 ring-blue-400/50 bg-blue-50/20' : 'border-slate-200/90 hover:border-blue-300 hover:shadow-md'
+                                        className={`group relative flex flex-col justify-between rounded-2xl border bg-white shadow-xs hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 overflow-hidden ${
+                                            isSelected 
+                                                ? 'border-indigo-500 ring-2 ring-indigo-400/50 bg-indigo-50/15' 
+                                                : 'border-slate-200/90 hover:border-indigo-300/80'
                                         }`}
                                     >
-                                        {/* Card Top Header: Status Badge & Option Menu */}
-                                        <div className="flex items-center justify-between gap-2">
-                                            {deleteMode ? (
-                                                <input
-                                                    type="checkbox"
-                                                    checked={isSelected}
-                                                    onChange={() => handleToggleSelect(auditor.UserID)}
-                                                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                                                />
-                                            ) : (
-                                                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
-                                                    isAssigned 
-                                                        ? 'bg-emerald-100/90 text-emerald-700 border border-emerald-300/60' 
-                                                        : 'bg-slate-100 text-slate-600 border border-slate-200'
-                                                }`}>
-                                                    {isAssigned ? 'Assigned' : 'Unassigned'}
-                                                </span>
-                                            )}
+                                        <div className="p-3.5 flex flex-col flex-1 justify-between gap-2.5">
+                                            {/* Card Top Header: Status Badge & Option Menu */}
+                                            <div className="flex items-center justify-between gap-2">
+                                                {deleteMode ? (
+                                                    <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isSelected}
+                                                            onChange={() => handleToggleSelect(auditor.UserID)}
+                                                            className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                                        />
+                                                        <span className="text-[10px] font-semibold text-slate-600">Select</span>
+                                                    </label>
+                                                ) : (
+                                                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold tracking-wide border ${
+                                                        isAssigned 
+                                                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80' 
+                                                            : 'bg-slate-100 text-slate-600 border-slate-200'
+                                                    }`}>
+                                                        <span className={`h-1.5 w-1.5 rounded-full ${
+                                                            isAssigned ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'
+                                                        }`} />
+                                                        {isAssigned ? 'Assigned' : 'Unassigned'}
+                                                    </span>
+                                                )}
 
-                                            {!deleteMode && (
-                                                <div className="relative">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setOpenMenuId(openMenuId === auditor.UserID ? null : auditor.UserID)}
-                                                        className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition hover:bg-slate-50 hover:text-slate-600"
-                                                    >
-                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                                                        </svg>
-                                                    </button>
-
-                                                    {openMenuId === auditor.UserID && (
-                                                        <div 
-                                                            ref={menuRef}
-                                                            className="absolute right-0 top-8 z-30 w-48 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl animate-in fade-in zoom-in-95 duration-100"
+                                                {!deleteMode && (
+                                                    <div className="relative">
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setOpenMenuId(openMenuId === auditor.UserID ? null : auditor.UserID);
+                                                            }}
+                                                            className="flex h-6 w-6 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition hover:bg-slate-50 hover:text-slate-700"
+                                                            title="Options"
                                                         >
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    setOpenMenuId(null);
-                                                                    setSelectedAuditorForAssign(auditor);
-                                                                    setAssignModalOpen(true);
-                                                                }}
-                                                                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition"
+                                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                                                            </svg>
+                                                        </button>
+
+                                                        {openMenuId === auditor.UserID && (
+                                                            <div 
+                                                                ref={menuRef}
+                                                                className="absolute right-0 top-7 z-30 w-44 rounded-xl border border-slate-200 bg-white p-1 shadow-xl animate-in fade-in zoom-in-95 duration-100"
                                                             >
-                                                                <svg className="h-4 w-4 text-blue-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                                                                </svg>
-                                                                <span>Assign Area(s)</span>
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={async () => {
-                                                                    setOpenMenuId(null);
-                                                                    const confirmed = await showConfirm(`Remove ${auditor.FirstName} ${auditor.LastName}?`);
-                                                                    if (confirmed) {
-                                                                        setAuditors(prev => prev.filter(a => a.UserID !== auditor.UserID));
-                                                                    }
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setOpenMenuId(null);
+                                                                        setSelectedAuditorForAssign(auditor);
+                                                                        setAssignModalOpen(true);
+                                                                    }}
+                                                                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 transition"
+                                                                >
+                                                                    <svg className="h-3.5 w-3.5 text-indigo-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                                                    </svg>
+                                                                    <span>Assign Area(s)</span>
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setOpenMenuId(null);
+                                                                        handleOpenDetails(auditor);
+                                                                    }}
+                                                                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition"
+                                                                >
+                                                                    <svg className="h-3.5 w-3.5 text-slate-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                                    </svg>
+                                                                    <span>View Details</span>
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={async () => {
+                                                                        setOpenMenuId(null);
+                                                                        const confirmed = await showConfirm(`Remove ${auditor.FirstName} ${auditor.LastName}?`);
+                                                                        if (confirmed) {
+                                                                            setAuditors(prev => prev.filter(a => a.UserID !== auditor.UserID));
+                                                                        }
+                                                                    }}
+                                                                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50 transition"
+                                                                >
+                                                                    <svg className="h-3.5 w-3.5 text-rose-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
+                                                                    </svg>
+                                                                    <span>Remove Auditor</span>
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Profile Information (Clickable to view modal) */}
+                                            <div 
+                                                onClick={() => handleOpenDetails(auditor)}
+                                                className="cursor-pointer group/content"
+                                                title="Click to view details and assigned areas"
+                                            >
+                                                <div className="flex items-center gap-2.5">
+                                                    {/* Smart Avatar */}
+                                                    <div className="relative shrink-0">
+                                                        {auditor.ProfilePic ? (
+                                                            <img
+                                                                src={`${API_BASE_URL}/uploads/profile-pics/${auditor.ProfilePic}`}
+                                                                alt={fullName}
+                                                                onError={(e) => { 
+                                                                    e.target.style.display = 'none'; 
+                                                                    if (e.target.nextElementSibling) e.target.nextElementSibling.style.display = 'flex'; 
                                                                 }}
-                                                                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50 transition"
-                                                            >
-                                                                <svg className="h-4 w-4 text-rose-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
-                                                                </svg>
-                                                                <span>Remove Auditor</span>
-                                                            </button>
+                                                                className="h-10 w-10 rounded-xl object-cover ring-2 ring-slate-100 shadow-xs"
+                                                            />
+                                                        ) : null}
+                                                        <div
+                                                            className={`h-10 w-10 rounded-xl flex items-center justify-center font-bold text-white text-xs shadow-xs ring-2 ${avatarStyle.ring} ${avatarStyle.bg} ${auditor.ProfilePic ? 'hidden' : 'flex'}`}
+                                                        >
+                                                            {initials}
                                                         </div>
+                                                    </div>
+
+                                                    {/* Name & Role */}
+                                                    <div className="min-w-0 flex-1">
+                                                        <h3 className="text-[13px] font-bold text-slate-900 truncate group-hover/content:text-indigo-600 transition-colors leading-tight">
+                                                            {fullName}
+                                                        </h3>
+                                                        <div className="mt-0.5">
+                                                            <span className="inline-flex items-center rounded bg-sky-50 px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-sky-700 border border-sky-200/60 uppercase">
+                                                                External Auditor
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Email Strip */}
+                                                <div className="mt-2.5 flex items-center gap-1.5 rounded-lg bg-slate-50/80 px-2 py-1 border border-slate-100 text-[10px] text-slate-600 group-hover/content:bg-slate-100/70 transition-colors">
+                                                    <svg className="w-3 h-3 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                                    </svg>
+                                                    <span className="truncate font-medium">{auditor.Email || 'No email provided'}</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Assigned Scope / Quick Action Footer */}
+                                            <div className="mt-1 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">
+                                                        Assigned Scope
+                                                    </div>
+                                                    {auditor.assignedArea ? (
+                                                        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-800 truncate" title={auditor.assignedArea}>
+                                                            <svg className="w-3.5 h-3.5 text-indigo-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                                            </svg>
+                                                            <span className="truncate">{auditor.assignedArea}</span>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-[11px] text-slate-400 italic">No areas assigned</span>
                                                     )}
                                                 </div>
-                                            )}
-                                        </div>
 
-                                        {/* Avatar & Profile Information (Clickable to view modal) */}
-                                        <div 
-                                            onClick={() => handleOpenDetails(auditor)}
-                                            className="my-4 flex flex-col items-center text-center cursor-pointer group-hover:opacity-95 transition"
-                                            title="Click to view assigned areas and accreditations"
-                                        >
-                                            <div className="relative mb-3">
-                                                <img
-                                                    src={avatarSrc}
-                                                    alt={auditor.FirstName}
-                                                    onError={(e) => { e.target.src = '/src/assets/images/user.svg'; }}
-                                                    className="h-16 w-16 rounded-full object-cover border-2 border-slate-100 shadow-2xs group-hover:scale-105 transition-transform"
-                                                />
+                                                {!deleteMode && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setSelectedAuditorForAssign(auditor);
+                                                            setAssignModalOpen(true);
+                                                        }}
+                                                        className={`shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-bold transition flex items-center gap-1 ${
+                                                            auditor.assignedArea
+                                                                ? 'bg-slate-100 text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 border border-slate-200/60'
+                                                                : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white border border-indigo-200/80 shadow-2xs'
+                                                        }`}
+                                                    >
+                                                        {auditor.assignedArea ? 'Change' : '+ Assign'}
+                                                    </button>
+                                                )}
                                             </div>
-
-                                            <h3 className="text-sm font-bold text-slate-900 truncate max-w-full group-hover:text-blue-600 transition-colors">
-                                                {auditor.FirstName} {auditor.LastName}
-                                            </h3>
-                                            <span className="mt-0.5 text-[10px] font-extrabold uppercase tracking-wider text-sky-600">
-                                                EXTERNAL AUDITOR
-                                            </span>
-
-                                            <div className="mt-2 flex items-center justify-center gap-1.5 text-xs text-slate-500 font-medium">
-                                                <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                                                </svg>
-                                                <span className="truncate max-w-[180px]">{auditor.Email}</span>
-                                            </div>
-
-                                            {auditor.assignedArea ? (
-                                                <div className="mt-3 rounded-lg bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700 border border-blue-100/80 truncate max-w-full">
-                                                     {auditor.assignedArea}
-                                                </div>
-                                            ) : (
-                                                <div className="mt-3 rounded-lg bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-400 border border-slate-200/60 truncate max-w-full italic">
-                                                    No areas assigned
-                                                </div>
-                                            )}
                                         </div>
                                     </div>
                                 );

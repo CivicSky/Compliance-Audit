@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import Pagination from "../Pagination/Pagination";
+import CustomDropdown from "../UI/CustomDropdown";
 import Header from "../Header/header";
 import { CardListSkeleton } from "../UI/Skeleton";
+import { useLiveRefresh } from "../../utils/liveSync";
 
 export default function AuditLogs() {
     const [logs, setLogs] = useState([]);
@@ -351,26 +353,30 @@ export default function AuditLogs() {
         setActionFilter("all");
     };
 
+    const fetchLogs = useCallback(async () => {
+        setloading(true);
+        try {
+            const res = await fetch(`/api/logs?page=${currentPage}&limit=${itemsPerPage}`);
+            if (!res.ok) throw new Error("Failed to fetch logs");
+            const data = await res.json();
+            const logsArr = data.logs || [];
+            setLogs(logsArr);
+            if (data.totalPages) setServerTotalPages(data.totalPages);
+            if (data.total !== undefined) setServerTotalCount(data.total);
+        } catch (err) {
+            console.error("Failed to load audit logs:", err);
+        } finally {
+            setloading(false);
+        }
+    }, [currentPage]);
+
     // Fetch Logs on Demand when currentPage changes
     useEffect(() => {
-        const fetchLogs = async () => {
-            setloading(true);
-            try {
-                const res = await fetch(`/api/logs?page=${currentPage}&limit=${itemsPerPage}`);
-                if (!res.ok) throw new Error("Failed to fetch logs");
-                const data = await res.json();
-                const logsArr = data.logs || [];
-                setLogs(logsArr);
-                if (data.totalPages) setServerTotalPages(data.totalPages);
-                if (data.total !== undefined) setServerTotalCount(data.total);
-            } catch (err) {
-                console.error("Failed to load audit logs:", err);
-            } finally {
-                setloading(false);
-            }
-        };
         fetchLogs();
-    }, [currentPage]);
+    }, [fetchLogs]);
+
+    // Live syncing on mutations / window focus
+    useLiveRefresh(fetchLogs, { deps: [currentPage] });
 
     // Fetch All Tree Lookups in Parallel
     useEffect(() => {
@@ -520,55 +526,53 @@ export default function AuditLogs() {
 
 
     return (
-        <div className="w-full min-h-[calc(100vh-80px)] flex flex-col bg-slate-50/80">
-            <div className="px-4 pt-6 pb-20 flex-1 flex flex-col gap-4 min-h-0">
+        <div className="w-full h-[calc(100vh-70px)] flex flex-col bg-slate-50/80 overflow-hidden">
+            <div className="px-4 pt-2 pb-24 flex-1 flex flex-col gap-3 min-h-0">
                 {/* Header Title & Quick Stat Cards */}
-                <div className="flex flex-col gap-3 shrink-0">
+                <div className="flex flex-col gap-2 shrink-0">
                     <div className="flex items-start justify-between gap-2">
                         <div>
-                            <h1 className="text-2xl font-bold text-gray-800 mb-1">Audit Logs</h1>
+                            <h1 className="text-xl font-bold text-gray-800 mb-0.5">Audit Logs</h1>
                             <p className="text-xs text-gray-600">Track system activity, updates, and account actions in detail.</p>
                         </div>
-                    </div>
-
-                    {/* Summary Stat Cards */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        <div className="rounded-xl border border-slate-200/90 bg-white p-3.5 shadow-2xs flex items-center justify-between">
+                    </div>                    {/* 4 Stat Boxes in a Single Balanced Grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                        <div className="rounded-xl border border-slate-200/90 bg-white p-2.5 shadow-2xs flex items-center justify-between">
                             <div>
-                                <p className="text-[11px] font-semibold text-slate-500">Total Activity</p>
-                                <p className="text-xl font-bold text-slate-900 mt-0.5">{stats.total}</p>
+                                <p className="text-[10px] font-semibold text-slate-500">Total Activities</p>
+                                <p className="text-lg font-bold text-slate-900 mt-0.5">{stats.total}</p>
                             </div>
-                            <div className="h-9 w-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-sm">
-                                📋
+                            <div className="h-8 w-8 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-xs">
+                                📊
                             </div>
                         </div>
 
-                        <div className="rounded-xl border border-slate-200/90 bg-white p-3.5 shadow-2xs flex items-center justify-between">
+                        <div className="rounded-xl border border-slate-200/90 bg-white p-2.5 shadow-2xs flex items-center justify-between">
                             <div>
-                                <p className="text-[11px] font-semibold text-slate-500 font-medium">Created Records</p>
-                                <p className="text-xl font-bold text-emerald-600 mt-0.5">{stats.created}</p>
+                                <p className="text-[10px] font-semibold text-slate-500">Created Records</p>
+                                <p className="text-lg font-bold text-emerald-600 mt-0.5">{stats.created}</p>
                             </div>
-                            <div className="h-9 w-9 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-sm">
+                            <div className="h-8 w-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-xs">
                                 ➕
                             </div>
                         </div>
 
-                        <div className="rounded-xl border border-slate-200/90 bg-white p-3.5 shadow-2xs flex items-center justify-between">
+                        <div className="rounded-xl border border-slate-200/90 bg-white p-2.5 shadow-2xs flex items-center justify-between">
                             <div>
-                                <p className="text-[11px] font-semibold text-slate-500">Updated Records</p>
-                                <p className="text-xl font-bold text-indigo-600 mt-0.5">{stats.updated}</p>
+                                <p className="text-[10px] font-semibold text-slate-500">Updated Records</p>
+                                <p className="text-lg font-bold text-indigo-600 mt-0.5">{stats.updated}</p>
                             </div>
-                            <div className="h-9 w-9 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-sm">
+                            <div className="h-8 w-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-xs">
                                 ✏️
                             </div>
                         </div>
 
-                        <div className="rounded-xl border border-slate-200/90 bg-white p-3.5 shadow-2xs flex items-center justify-between">
+                        <div className="rounded-xl border border-slate-200/90 bg-white p-2.5 shadow-2xs flex items-center justify-between">
                             <div>
-                                <p className="text-[11px] font-semibold text-slate-500">Security & Deletions</p>
-                                <p className="text-xl font-bold text-rose-600 mt-0.5">{stats.deletedAndAuth}</p>
+                                <p className="text-[10px] font-semibold text-slate-500">Security & Deletions</p>
+                                <p className="text-lg font-bold text-rose-600 mt-0.5">{stats.deletedAndAuth}</p>
                             </div>
-                            <div className="h-9 w-9 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center font-bold text-sm">
+                            <div className="h-8 w-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center font-bold text-xs">
                                 🛡️
                             </div>
                         </div>
@@ -578,19 +582,19 @@ export default function AuditLogs() {
                 {/* Main Card Container — flex-1 so it fills all remaining vertical space down to pagination */}
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200/90 flex flex-col overflow-hidden flex-1 min-h-0">
                     {/* Filter Toolbar */}
-                    <div className="p-4 border-b border-slate-200/90 bg-slate-50/50 flex flex-wrap items-center justify-between gap-3 shrink-0">
+                    <div className="px-4 py-2.5 border-b border-slate-200/90 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
                         <div className="flex items-center gap-2">
-                            <h2 className="text-base font-bold text-slate-900">Activity History</h2>
-                            <span className="rounded-full bg-slate-200/70 px-2.5 py-0.5 text-xs font-bold text-slate-700">
+                            <h2 className="text-sm font-bold text-slate-900">Activity History</h2>
+                            <span className="rounded-full bg-slate-200/70 px-2 py-0.5 text-[11px] font-bold text-slate-700">
                                 {filteredLogs.length} item(s)
                             </span>
                         </div>
 
-                        <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
+                        <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap justify-start sm:justify-end">
                             {/* Search Input */}
-                            <div className="relative w-full max-w-sm">
+                            <div className="relative w-full sm:w-64">
                                 <svg
-                                    className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                                    className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
                                     fill="none"
                                     viewBox="0 0 24 24"
                                     stroke="currentColor"
@@ -600,8 +604,8 @@ export default function AuditLogs() {
                                 </svg>
                                 <input
                                     type="text"
-                                    placeholder="Search accreditation, requirement, area, office, or user..."
-                                    className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-8 text-xs font-medium text-slate-800 shadow-2xs transition focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-slate-400"
+                                    placeholder="Search activity, area, office..."
+                                    className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-8 text-xs text-slate-800 placeholder-slate-400 shadow-2xs transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
                                 />
@@ -617,28 +621,30 @@ export default function AuditLogs() {
                             </div>
 
                             {/* Action Filter Dropdown */}
-                            <select
+                            <CustomDropdown
                                 value={actionFilter}
-                                onChange={(e) => setActionFilter(e.target.value)}
-                                className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-2xs transition focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-                            >
-                                <option value="all">All Actions</option>
-                                <option value="Created">Created</option>
-                                <option value="Updated">Updated</option>
-                                <option value="Deleted">Deleted</option>
-                                <option value="Viewed">Viewed</option>
-                                <option value="Login">Login</option>
-                                <option value="Logout">Logout</option>
-                            </select>
+                                onChange={setActionFilter}
+                                options={[
+                                    { value: 'all', label: 'All Actions' },
+                                    { value: 'Created', label: 'Created' },
+                                    { value: 'Updated', label: 'Updated' },
+                                    { value: 'Deleted', label: 'Deleted' },
+                                    { value: 'Viewed', label: 'Viewed' },
+                                    { value: 'Login', label: 'Login' },
+                                    { value: 'Logout', label: 'Logout' },
+                                ]}
+                                minWidth="min-w-[130px]"
+                                size="sm"
+                            />
 
                             {/* Reset Controls Button */}
                             {(searchTerm || actionFilter !== "all") && (
                                 <button
                                     onClick={clearControls}
                                     title="Clear All Filters"
-                                    className="flex h-9 px-3 items-center justify-center rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-100 transition shadow-2xs"
+                                    className="flex h-8 px-2.5 items-center justify-center rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-100 transition shadow-2xs"
                                 >
-                                    Clear Filters
+                                    Clear
                                 </button>
                             )}
                         </div>
@@ -649,8 +655,8 @@ export default function AuditLogs() {
                             <CardListSkeleton count={8} />
                         </div>
                     ) : filteredLogs.length === 0 ? (
-                        <div className="flex-1 flex flex-col items-center justify-center p-12 text-center">
-                            <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3 text-lg">
+                        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+                            <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-2 text-base">
                                 🔍
                             </div>
                             <p className="text-sm font-bold text-slate-700">No activity logs found</p>
@@ -676,18 +682,18 @@ export default function AuditLogs() {
                                         className="group transition-colors hover:bg-slate-50/80"
                                     >
                                         <div
-                                            className="flex items-center justify-between px-5 py-3.5 text-xs cursor-pointer gap-4"
+                                            className="flex items-center justify-between px-4 py-2 text-xs cursor-pointer gap-3"
                                             onClick={() => setExpandedLogId(prev => prev === log.LogID ? null : log.LogID)}
                                         >
                                             {/* Left: Icon + Action Badge + Message */}
-                                            <div className="flex items-center gap-3.5 min-w-0 flex-1">
-                                                <div className={`h-8 w-8 shrink-0 rounded-lg flex items-center justify-center shadow-2xs ${style.iconBg}`}>
+                                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                                <div className={`h-7 w-7 shrink-0 rounded-lg flex items-center justify-center shadow-2xs ${style.iconBg}`}>
                                                     {style.icon}
                                                 </div>
 
                                                 <div className="min-w-0 flex-1">
-                                                    <div className="flex items-center gap-2 flex-wrap">
-                                                        <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${style.badge}`}>
+                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[9px] font-bold ${style.badge}`}>
                                                             {action}
                                                         </span>
                                                         <p className="text-xs font-bold text-slate-900 truncate">
@@ -695,18 +701,18 @@ export default function AuditLogs() {
                                                         </p>
                                                     </div>
 
-                                                    <div className="mt-1 flex items-center gap-2 text-[11px] text-slate-500 font-medium">
+                                                    <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-slate-500 font-medium">
                                                         <span>By <strong className="text-slate-700">{userDisplayName}</strong></span>
                                                         {roleLabel && (
                                                             <>
                                                                 <span>•</span>
-                                                                <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">{roleLabel}</span>
+                                                                <span className="rounded bg-slate-100 px-1 py-0.2 text-[9px] font-semibold text-slate-600">{roleLabel}</span>
                                                             </>
                                                         )}
                                                         {ctx.eventName && (
                                                             <>
                                                                 <span>•</span>
-                                                                <span className="text-blue-600 font-semibold truncate max-w-[200px]" title={ctx.eventName}>
+                                                                <span className="text-blue-600 font-semibold truncate max-w-[180px]" title={ctx.eventName}>
                                                                     🎯 {ctx.eventName}
                                                                 </span>
                                                             </>
@@ -716,14 +722,14 @@ export default function AuditLogs() {
                                             </div>
 
                                             {/* Right: Timestamp & Details Toggle */}
-                                            <div className="flex items-center gap-3 shrink-0">
-                                                <div className="text-right text-[11px] text-slate-500 font-medium leading-tight">
+                                            <div className="flex items-center gap-2.5 shrink-0">
+                                                <div className="text-right text-[10px] text-slate-500 font-medium leading-tight">
                                                     <div className="font-bold text-slate-700">{time}</div>
-                                                    <div className="text-slate-400 text-[10px] mt-0.5">{date}</div>
+                                                    <div className="text-slate-400 text-[9px] mt-0.5">{date}</div>
                                                 </div>
                                                 <div className="text-slate-400 group-hover:text-slate-600 transition-colors">
                                                     <svg
-                                                        className={`w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-180 text-blue-600' : ''}`}
+                                                        className={`w-3.5 h-3.5 transition-transform duration-200 ${isExpanded ? 'rotate-180 text-blue-600' : ''}`}
                                                         fill="none"
                                                         viewBox="0 0 24 24"
                                                         stroke="currentColor"

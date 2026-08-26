@@ -238,7 +238,7 @@ export default function RequirementBars() {
     };
 
     return (
-        <div className="px-6 pb-6 pt-6 w-full">
+        <div className="px-6 pb-6 pt-2 w-full">
             {/* Event Type Dropdown at the very top */}
             <div className="mb-4">
                 <div className="relative w-full">

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useImperativeHandle, forwardRef } from "react";
 import { criteriaAPI } from "../../utils/api";
+import { useLiveRefresh } from "../../utils/liveSync";
 
 const CriteriaP = forwardRef(function CriteriaP({ searchTerm = "", eventId = null, deleteMode = false, onSelectionChange, selectedIds = [], onDeleteSelected, onCriteriaClick }, ref) {
   const [criteria, setCriteria] = useState([]);
@@ -12,6 +13,9 @@ const CriteriaP = forwardRef(function CriteriaP({ searchTerm = "", eventId = nul
     fetchCriteria();
     // eslint-disable-next-line
   }, [eventId]);
+
+  // Live real-time syncing
+  useLiveRefresh(fetchCriteria, { deps: [eventId] });
 
   useImperativeHandle(ref, () => ({
     refresh: fetchCriteria

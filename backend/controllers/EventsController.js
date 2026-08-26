@@ -241,6 +241,32 @@ const deleteEvents = async (req, res) => {
 
     // Delete events
       const placeholders = eventIds.map(() => '?').join(',');
+
+      // 1. Clean up requirements under criteria linked to these events (or under areas of these events)
+      try {
+        const [targetCriteria] = await db.query(
+          `SELECT CriteriaID FROM criteria WHERE EventID IN (${placeholders}) OR AreaID IN (SELECT AreaID FROM areas WHERE EventID IN (${placeholders}))`,
+          [...eventIds, ...eventIds]
+        );
+        if (targetCriteria && targetCriteria.length > 0) {
+          const critIds = targetCriteria.map(c => c.CriteriaID ?? c.criteriaid).filter(Boolean);
+          if (critIds.length > 0) {
+            const critPlaceholders = critIds.map(() => '?').join(',');
+            await db.query(`DELETE FROM office_proof_documents WHERE requirement_id IN (SELECT RequirementID FROM requirements WHERE CriteriaID IN (${critPlaceholders}))`, critIds);
+            await db.query(`DELETE FROM requirement_user_assignments WHERE RequirementID IN (SELECT RequirementID FROM requirements WHERE CriteriaID IN (${critPlaceholders}))`, critIds);
+            await db.query(`DELETE FROM compliancestatusoffices WHERE RequirementID IN (SELECT RequirementID FROM requirements WHERE CriteriaID IN (${critPlaceholders}))`, critIds);
+            await db.query(`DELETE FROM requirements WHERE CriteriaID IN (${critPlaceholders})`, critIds);
+          }
+        }
+        // Cleanup any remaining orphaned requirements
+        await db.query(`DELETE FROM office_proof_documents WHERE requirement_id IN (SELECT RequirementID FROM requirements WHERE CriteriaID IS NULL OR CriteriaID NOT IN (SELECT CriteriaID FROM criteria))`);
+        await db.query(`DELETE FROM requirement_user_assignments WHERE RequirementID IN (SELECT RequirementID FROM requirements WHERE CriteriaID IS NULL OR CriteriaID NOT IN (SELECT CriteriaID FROM criteria))`);
+        await db.query(`DELETE FROM compliancestatusoffices WHERE RequirementID IN (SELECT RequirementID FROM requirements WHERE CriteriaID IS NULL OR CriteriaID NOT IN (SELECT CriteriaID FROM criteria))`);
+        await db.query(`DELETE FROM requirements WHERE CriteriaID IS NULL OR CriteriaID NOT IN (SELECT CriteriaID FROM criteria)`);
+      } catch (cascadeErr) {
+        console.error('Error during cascading requirement cleanup in deleteEvents:', cascadeErr);
+      }
+
       // Fetch names and codes for logging before deletion
       const [toDeleteRows] = await db.query(`SELECT EventID, EventName, EventCode FROM Events WHERE EventID IN (${placeholders})`, eventIds);
       const deletedNames = toDeleteRows.map(r => r.EventName);
