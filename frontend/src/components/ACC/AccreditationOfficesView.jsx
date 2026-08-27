@@ -60,9 +60,64 @@ export default function AccreditationOfficesView({
     return Array.from(depts);
   }, [localOffices]);
 
-  // Filter offices by active event tab, search query, and filters
+  // Filter offices by active event tab, search query, role, and filters
   const filteredOffices = useMemo(() => {
+    let currentUser = null;
+    try {
+      const stored = localStorage.getItem('user');
+      currentUser = stored ? JSON.parse(stored) : null;
+    } catch {
+      currentUser = null;
+    }
+
+    const rId = Number(currentUser?.RoleID);
+    const rName = String(currentUser?.RoleName || currentUser?.role_name || '').toLowerCase();
+    const isPersonnelUser = (rId === 2 || rId === 3 || rName.includes('personnel') || rName.includes('office') || rName === 'user' || rName === 'head') && !rName.includes('auditor') && rId !== 4 && rId !== 1 && rName !== 'admin';
+
     let list = localOffices;
+
+    // Filter by Personnel assignment
+    if (isPersonnelUser && currentUser) {
+      const uid = String(currentUser.UserID ?? currentUser.id ?? '');
+      const hid = String(currentUser.HeadID ?? currentUser.head_id ?? '');
+
+      list = list.filter(o => {
+        if (Array.isArray(o.heads) && o.heads.length > 0) {
+          const matchedHead = o.heads.some(h => {
+            if (uid && (String(h.UserID ?? '') === uid || String(h.user_id ?? '') === uid)) return true;
+            if (hid && (String(h.HeadID ?? '') === hid || String(h.head_id ?? '') === hid)) return true;
+            const headName = String(h.full_name || `${h.FirstName || ''} ${h.LastName || ''}`).toLowerCase().trim();
+            const userFirst = String(currentUser.FirstName || currentUser.first_name || '').toLowerCase().trim();
+            const userLast = String(currentUser.LastName || currentUser.last_name || '').toLowerCase().trim();
+            if (userFirst && userLast && headName) {
+              if (headName.includes(userFirst) && headName.includes(userLast)) return true;
+            } else if (userFirst && headName && headName.includes(userFirst)) {
+              return true;
+            }
+            return false;
+          });
+          if (matchedHead) return true;
+        }
+
+        if (hid) {
+          if (String(o.head_id ?? '') === hid) return true;
+          if (Array.isArray(o.head_ids) && o.head_ids.some(id => String(id) === hid)) return true;
+        }
+
+        if (o.head_name && o.head_name !== 'Unassigned' && o.head_name !== 'unassigned') {
+          const headName = String(o.head_name).toLowerCase().trim();
+          const userFirst = String(currentUser.FirstName || currentUser.first_name || '').toLowerCase().trim();
+          const userLast = String(currentUser.LastName || currentUser.last_name || '').toLowerCase().trim();
+          if (userFirst && userLast) {
+            if (headName.includes(userFirst) && headName.includes(userLast)) return true;
+          } else if (userFirst && headName && headName.includes(userFirst)) {
+            return true;
+          }
+        }
+
+        return false;
+      });
+    }
 
     // Filter by Event Tab
     if (activeEventTab && activeEventTab !== 'all') {

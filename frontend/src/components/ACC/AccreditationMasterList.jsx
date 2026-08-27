@@ -302,39 +302,116 @@ export default function AccreditationMasterList({
                                   </span>
                                 </div>
                                 <span className="text-[10px] font-semibold px-2 py-0.5 bg-white text-slate-600 rounded border border-slate-200">
-                                  {reqs.length} reqs
+                                  {reqs.length + (crit.children || []).reduce((acc, ch) => acc + (ch.requirements || []).length, 0)} reqs
                                 </span>
                               </div>
 
-                              {/* Requirements List */}
+                              {/* Requirements & Subcriteria List */}
                               {isCritExpanded && (
-                                <div className="p-2.5 space-y-1.5 bg-white border-t border-slate-100">
-                                  {reqs.length === 0 ? (
-                                    <p className="text-[11px] text-slate-400 italic px-2 py-1">No requirements added yet.</p>
-                                  ) : (
-                                    reqs.map((req) => {
-                                      const reqId = req.id || req.RequirementID;
-                                      const reqCode = req.RequirementCode || req.code || req.req_code || `Req #${reqId}`;
-                                      const reqTitle = req.RequirementTitle || req.Title || req.title || req.RequirementName || req.description || req.Description || '';
+                                <div className="p-2.5 space-y-2 bg-white border-t border-slate-100">
+                                  {/* Direct Requirements */}
+                                  {reqs.length > 0 && (
+                                    <div className="space-y-1.5">
+                                      {reqs.map((req) => {
+                                        const reqId = req.id || req.RequirementID;
+                                        const reqCode = req.RequirementCode || req.code || req.req_code || `Req #${reqId}`;
+                                        const reqTitle = req.RequirementTitle || req.Title || req.title || req.RequirementName || req.description || req.Description || '';
 
-                                      return (
-                                        <div
-                                          key={reqId}
-                                          className="flex items-start justify-between p-2.5 rounded-lg border border-slate-100 hover:border-slate-300 bg-slate-50/50 transition-all text-xs"
-                                        >
-                                          <div className="min-w-0 pr-2">
-                                            <span className="font-bold text-slate-900 block mb-0.5">
-                                              {reqCode}
-                                            </span>
-                                            {reqTitle && (
-                                              <p className="text-slate-600 line-clamp-2 leading-relaxed">
-                                                {reqTitle}
-                                              </p>
+                                        return (
+                                          <div
+                                            key={reqId}
+                                            className="flex items-start justify-between p-2.5 rounded-lg border border-slate-100 hover:border-slate-300 bg-slate-50/50 transition-all text-xs"
+                                          >
+                                            <div className="min-w-0 pr-2">
+                                              <span className="font-bold text-slate-900 block mb-0.5">
+                                                {reqCode}
+                                              </span>
+                                              {reqTitle && (
+                                                <p className="text-slate-600 line-clamp-2 leading-relaxed">
+                                                  {reqTitle}
+                                                </p>
+                                              )}
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+
+                                  {/* Child Subcriteria */}
+                                  {(crit.children || []).length > 0 && (
+                                    <div className="space-y-2 pt-1">
+                                      {(crit.children || []).map((subCrit) => {
+                                        const subCritId = subCrit.id || subCrit.CriteriaID;
+                                        const isSubCritExpanded = expandedCriteria.has(subCritId);
+                                        const subReqs = subCrit.requirements || [];
+                                        const subCritCode = subCrit.CriteriaCode || subCrit.code || '';
+                                        const subCritName = subCrit.CriteriaName || subCrit.name || subCrit.title || 'Sub-Criteria';
+
+                                        return (
+                                          <div key={subCritId} className="rounded-lg border border-blue-200 bg-white overflow-hidden shadow-2xs ml-2">
+                                            <div
+                                              onClick={() => toggleCriteria(subCritId)}
+                                              className="flex items-center justify-between px-3 py-2 bg-blue-50/70 hover:bg-blue-100/60 cursor-pointer transition-colors select-none"
+                                            >
+                                              <div className="flex items-center gap-2 min-w-0">
+                                                {isSubCritExpanded ? (
+                                                  <ChevronDown className="h-3.5 w-3.5 text-blue-600 shrink-0" />
+                                                ) : (
+                                                  <ChevronRight className="h-3.5 w-3.5 text-blue-600 shrink-0" />
+                                                )}
+                                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wide uppercase bg-blue-600 text-white shrink-0 shadow-2xs">
+                                                  SUBCRITERIA
+                                                </span>
+                                                <span className="text-xs font-bold text-slate-800 truncate">
+                                                  {subCritCode ? `${subCritCode}. ${subCritName}` : subCritName}
+                                                </span>
+                                              </div>
+                                              <span className="text-[9px] font-semibold px-1.5 py-0.5 bg-white text-blue-700 rounded border border-blue-200">
+                                                {subReqs.length} reqs
+                                              </span>
+                                            </div>
+
+                                            {/* Subcriteria Requirements */}
+                                            {isSubCritExpanded && (
+                                              <div className="p-2 space-y-1.5 bg-slate-50/40 border-t border-blue-100">
+                                                {subReqs.length === 0 ? (
+                                                  <p className="text-[11px] text-slate-400 italic px-2 py-1">No requirements in this subcriterion.</p>
+                                                ) : (
+                                                  subReqs.map((req) => {
+                                                    const reqId = req.id || req.RequirementID;
+                                                    const reqCode = req.RequirementCode || req.code || req.req_code || `Req #${reqId}`;
+                                                    const reqTitle = req.RequirementTitle || req.Title || req.title || req.RequirementName || req.description || req.Description || '';
+
+                                                    return (
+                                                      <div
+                                                        key={reqId}
+                                                        className="flex items-start justify-between p-2.5 rounded-lg border border-slate-200 hover:border-blue-200 bg-white transition-all text-xs"
+                                                      >
+                                                        <div className="min-w-0 pr-2">
+                                                          <span className="font-bold text-slate-900 block mb-0.5">
+                                                            {reqCode}
+                                                          </span>
+                                                          {reqTitle && (
+                                                            <p className="text-slate-600 line-clamp-2 leading-relaxed">
+                                                              {reqTitle}
+                                                            </p>
+                                                          )}
+                                                        </div>
+                                                      </div>
+                                                    );
+                                                  })
+                                                )}
+                                              </div>
                                             )}
                                           </div>
-                                        </div>
-                                      );
-                                    })
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+
+                                  {reqs.length === 0 && (crit.children || []).length === 0 && (
+                                    <p className="text-[11px] text-slate-400 italic px-2 py-1">No requirements added yet.</p>
                                   )}
                                 </div>
                               )}

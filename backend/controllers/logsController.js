@@ -34,7 +34,7 @@ exports.getLogs = async (req, res) => {
         l.LogID,
         l.UserID,
         l.Action,
-        l.Timestamp,
+        (l.Timestamp AT TIME ZONE 'UTC') AS Timestamp,
         l.Details,
         u.FirstName,
         u.MiddleInitial,

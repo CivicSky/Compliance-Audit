@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx';
 import { renderAsync } from 'docx-preview';
 import api, { usersAPI, requirementsAPI, officesAPI } from '../../utils/api';
 import { API_BASE_URL } from '../../utils/apiBase';
+import { dataCache, CacheKeys } from '../../utils/dataCache';
 
 import { useModal } from "../UI/ModalProvider";
 import { useToast } from '../UI/Toast';
@@ -72,6 +73,7 @@ export default function ViewReqPASSCUModal({
     const [notifMessage, setNotifMessage] = useState('');
     const [showSubmissionViewer, setShowSubmissionViewer] = useState(false);
     const [selectedSubmissionRequirement, setSelectedSubmissionRequirement] = useState(null);
+    const [uploadProgressMap, setUploadProgressMap] = useState({});
     const [unsubmittingReqId, setUnsubmittingReqId] = useState(null);
     const [unsubmittingProof, setUnsubmittingProof] = useState(false);
     const [removingReqId, setRemovingReqId] = useState(null);
@@ -80,22 +82,32 @@ export default function ViewReqPASSCUModal({
 
     const handleOpenUserFilesGridModal = async (user, requirementId, initialFiles) => {
         const req = requirements.find((r) => Number(r.RequirementID) === Number(requirementId)) || selectedSubmissionRequirement;
-        if (Array.isArray(initialFiles) && initialFiles.length > 0) {
-            setGridModalData({ user, requirement: req, files: initialFiles });
-            return;
+        const cacheKey = CacheKeys.userFiles(requirementId, user.UserID);
+        const cachedFiles = (Array.isArray(initialFiles) && initialFiles.length > 0) 
+            ? initialFiles 
+            : dataCache.get(cacheKey);
+
+        if (Array.isArray(cachedFiles) && cachedFiles.length > 0) {
+            setGridModalData({ user, requirement: req, files: cachedFiles });
         }
+
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/requirements/${requirementId}/user-file/${user.UserID}`);
-            if (res.data && res.data.success && res.data.files) {
-                setGridModalData({ user, requirement: req, files: res.data.files });
-            } else if (res.data && res.data.success && res.data.file) {
-                setGridModalData({ user, requirement: req, files: [res.data.file] });
-            } else {
+            const token = localStorage.getItem('token');
+            const res = await axios.get(`${API_BASE_URL}/api/requirements/${requirementId}/user-file/${user.UserID}`, {
+                headers: { Authorization: token ? `Bearer ${token}` : '' }
+            });
+            if (res.data && res.data.success) {
+                const freshFiles = res.data.files || (res.data.file ? [res.data.file] : []);
+                dataCache.set(cacheKey, freshFiles);
+                setGridModalData({ user, requirement: req, files: freshFiles });
+            } else if (!cachedFiles || cachedFiles.length === 0) {
                 await showAlert('No files found for this user.');
             }
         } catch (err) {
             console.error('Error fetching user files:', err);
-            await showAlert('Error fetching user files.');
+            if (!cachedFiles || cachedFiles.length === 0) {
+                await showAlert('Error fetching user files.');
+            }
         }
     };
 
@@ -249,13 +261,32 @@ export default function ViewReqPASSCUModal({
         };
         if (isOpen && office) {
             setOfficeData(office);
-            fetchOfficeRequirements();
+            const cacheKey = CacheKeys.officeReqs(office.id);
+            const cached = dataCache.get(cacheKey);
+            
+            if (cached && Array.isArray(cached.reqs) && cached.reqs.length > 0) {
+                // Instant 0ms display from cache
+                setRequirements(cached.reqs);
+                if (cached.assignedMap) setAssignedUsersMap(cached.assignedMap);
+                if (cached.officeData) setOfficeData(cached.officeData);
+                if (cached.persistedProof) {
+                    setPersistedProof(cached.persistedProof);
+                    setProofFileName(cached.persistedProof.fileName || "");
+                    setProofFileUrl(cached.persistedProof.url || "");
+                }
+                setLoading(false);
+                // Background revalidation silently
+                fetchOfficeRequirements(true);
+            } else {
+                fetchOfficeRequirements(false);
+            }
             fetchProof();
         }
     }, [isOpen, office]);
 
-    const fetchOfficeRequirements = async () => {
-        setLoading(true);
+    const fetchOfficeRequirements = async (isBackground = false) => {
+        if (!office?.id) return;
+        if (!isBackground) setLoading(true);
         try {
             const response = await axios.get(`${API_BASE_URL}/api/offices/${office.id}/requirements`);
             const reqs = (response.data.data || []).map((req) => {
@@ -290,23 +321,36 @@ export default function ViewReqPASSCUModal({
             }));
             setAssignedUsersMap(assignedMap);
             
-            const officeResponse = await axios.get(`${API_BASE_URL}/api/offices/${office.id}`);
-            if (officeResponse.data) {
-                setOfficeData(prev => ({
-                    ...prev,
-                    overall_status: officeResponse.data.OverallStatus,
-                    compliance_percent: officeResponse.data.CompliancePercent,
-                    total_requirements: officeResponse.data.TotalRequirements,
-                    event_name: officeResponse.data.EventName || officeResponse.data.Event || prev.event_name || null,
-                    DepartmentName: officeResponse.data.DepartmentName || officeResponse.data.department_name || prev.DepartmentName || prev.department_name || null,
-                    ProgramTypeName: officeResponse.data.ProgramTypeName || officeResponse.data.program_type_name || prev.ProgramTypeName || prev.program_type_name || null
-                }));
+            let updatedOfficeData = null;
+            try {
+                const officeResponse = await axios.get(`${API_BASE_URL}/api/offices/${office.id}`);
+                if (officeResponse.data) {
+                    updatedOfficeData = {
+                        overall_status: officeResponse.data.OverallStatus,
+                        compliance_percent: officeResponse.data.CompliancePercent,
+                        total_requirements: officeResponse.data.TotalRequirements,
+                        event_name: officeResponse.data.EventName || officeResponse.data.Event || office.event_name || null,
+                        DepartmentName: officeResponse.data.DepartmentName || officeResponse.data.department_name || office.DepartmentName || office.department_name || null,
+                        ProgramTypeName: officeResponse.data.ProgramTypeName || officeResponse.data.program_type_name || office.ProgramTypeName || office.program_type_name || null
+                    };
+                    setOfficeData(prev => ({ ...prev, ...updatedOfficeData }));
+                }
+            } catch (officeErr) {
+                console.warn('Error fetching office details:', officeErr);
             }
+
+            // Save to in-memory data cache
+            dataCache.set(CacheKeys.officeReqs(office.id), {
+                reqs,
+                assignedMap,
+                officeData: updatedOfficeData ? { ...office, ...updatedOfficeData } : office,
+                persistedProof: persistedProof
+            });
         } catch (error) {
             console.error('Error fetching requirements:', error);
-            setRequirements([]);
+            if (!isBackground) setRequirements([]);
         } finally {
-            setLoading(false);
+            if (!isBackground) setLoading(false);
         }
     };
 
@@ -467,10 +511,42 @@ export default function ViewReqPASSCUModal({
     const handleUserReqFileUpload = async (e, requirementId) => {
         const fileList = Array.from(e.target.files || []);
         if (fileList.length === 0 || !currentUser) return;
+
+        // Fetch current files count to enforce 40 files max
+        let existingFiles = [];
+        try {
+            const currentFilesRes = await axios.get(`${API_BASE_URL}/api/requirements/${requirementId}/user-file/${currentUser.UserID}`);
+            if (currentFilesRes.data?.files) {
+                existingFiles = currentFilesRes.data.files;
+            } else if (currentFilesRes.data?.file) {
+                existingFiles = [currentFilesRes.data.file];
+            }
+        } catch (err) {
+            // ignore
+        }
+
+        if (existingFiles.length + fileList.length > 40) {
+            const allowed = Math.max(0, 40 - existingFiles.length);
+            await showAlert(`Maximum limit is 40 files per requirement. You already have ${existingFiles.length} file(s). You can upload at most ${allowed} more file(s).`);
+            if (e?.target) e.target.value = '';
+            return;
+        }
         
         setUserUploadingReqId(requirementId);
         const token = localStorage.getItem('token');
         let successCount = 0;
+
+        // Initialize progress for all files in this batch
+        const initialMap = {};
+        fileList.forEach(file => {
+            initialMap[file.name] = {
+                name: file.name,
+                size: file.size,
+                percent: 0,
+                status: 'uploading'
+            };
+        });
+        setUploadProgressMap(initialMap);
         
         for (const file of fileList) {
             const formData = new FormData();
@@ -483,19 +559,42 @@ export default function ViewReqPASSCUModal({
             }
             
             try {
-                const res = await fetch(`${API_BASE_URL}/api/requirements/user-upload`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: formData
+                const res = await axios.post(`${API_BASE_URL}/api/requirements/user-upload`, formData, {
+                    headers: token ? { Authorization: `Bearer ${token}` } : {},
+                    onUploadProgress: (progressEvent) => {
+                        if (progressEvent.total) {
+                            const percent = Math.min(99, Math.round((progressEvent.loaded * 100) / progressEvent.total));
+                            setUploadProgressMap(prev => ({
+                                ...prev,
+                                [file.name]: {
+                                    ...prev[file.name],
+                                    percent,
+                                    status: 'uploading'
+                                }
+                            }));
+                        }
+                    }
                 });
-                const data = await res.json();
-                if (data.success) {
+                if (res.data && res.data.success) {
+                    setUploadProgressMap(prev => ({
+                        ...prev,
+                        [file.name]: {
+                            ...prev[file.name],
+                            percent: 100,
+                            status: 'done'
+                        }
+                    }));
                     successCount++;
                 }
             } catch (err) {
                 console.error('Upload error for file:', file.name, err);
+                setUploadProgressMap(prev => ({
+                    ...prev,
+                    [file.name]: {
+                        ...prev[file.name],
+                        status: 'error'
+                    }
+                }));
             }
         }
         
@@ -517,7 +616,11 @@ export default function ViewReqPASSCUModal({
             await showAlert('Failed to upload file(s)');
         }
         
-        setUserUploadingReqId(null);
+        setTimeout(() => {
+            setUserUploadingReqId(null);
+            setUploadProgressMap({});
+        }, 1200);
+
         if (e?.target) e.target.value = '';
         if (userReqFileInputRef.current) {
             userReqFileInputRef.current.value = '';
@@ -626,7 +729,7 @@ export default function ViewReqPASSCUModal({
             let html = `
                 <div class="excel-preview-root">
                     <style>
-                        .excel-preview-root { font-family: 'Segoe UI', Tahoma, sans-serif; color: #0f172a; padding: 12px; background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%); height:100%; box-sizing: border-box; display:flex; flex-direction:column; }
+                        .excel-preview-root { font-family: 'Poppins', 'Inter', sans-serif; color: #0f172a; padding: 12px; background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%); height:100%; box-sizing: border-box; display:flex; flex-direction:column; }
                         .excel-sheet { border:1px solid #e2e8f0; border-radius:10px; background:#fff; margin-bottom:12px; overflow:hidden; display:flex; flex-direction:column; }
                         .excel-sheet-title { position:sticky; top:0; z-index:2; padding:10px 12px; border-bottom:1px solid #e2e8f0; background:linear-gradient(90deg,#0f3a8a 0%,#1d4ed8 100%); color:#fff; font-size:12px; font-weight:700; text-transform:uppercase; }
                         .excel-sheet-table { overflow:auto; flex:1 1 auto; min-height:0; padding:12px; }
@@ -954,8 +1057,8 @@ export default function ViewReqPASSCUModal({
 
     const modalContent = (
         <div
-            className="fixed inset-y-0 right-0 left-0 z-[9999] flex bg-slate-900/55 backdrop-blur-[2px] lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out"
-            style={{ zIndex: 9999, left: 'var(--sidebar-width, 0px)', transition: 'left 200ms ease-in-out' }}
+            className="fixed inset-y-0 right-0 left-0 z-[45] flex bg-slate-900/55 backdrop-blur-[2px] lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out"
+            style={{ left: 'var(--sidebar-width, 0px)', transition: 'left 200ms ease-in-out' }}
             onClick={onClose}
         >
             <div className="flex h-full w-full flex-col bg-app-muted shadow-2xl" onClick={(e) => e.stopPropagation()}>
@@ -1177,6 +1280,7 @@ export default function ViewReqPASSCUModal({
                 onFileRename={handleRenameUserFile}
                 onFileUpdateComment={handleUpdateUserFileComment}
                 uploadingFile={userUploadingReqId === selectedSubmissionRequirement?.RequirementID}
+                uploadProgressMap={uploadProgressMap}
                 unsubmittingFile={unsubmittingReqId === selectedSubmissionRequirement?.RequirementID}
                 onViewUserFile={handleViewUserFile}
                 onViewUserFilesModal={handleOpenUserFilesGridModal}
@@ -1212,6 +1316,42 @@ export default function ViewReqPASSCUModal({
                         ...prev,
                         files: prev.files.map(f => f.id === fileId ? { ...f, comment: newComment } : f)
                     } : null);
+                }}
+                onReviewFile={async (reqId, fileId, status, reason) => {
+                    try {
+                        const token = localStorage.getItem('token');
+                        const res = await axios.patch(
+                            `${API_BASE_URL}/api/requirements/${reqId}/file/${fileId}/review`,
+                            { status, reason },
+                            { headers: { Authorization: token ? `Bearer ${token}` : '' } }
+                        );
+                        if (res.data && res.data.success) {
+                            // Update local submission files cache if present
+                            setSubmissionViewerUsers(prev => {
+                                if (!Array.isArray(prev)) return prev;
+                                return prev.map(u => {
+                                    if (u.userFiles && Array.isArray(u.userFiles)) {
+                                        return {
+                                            ...u,
+                                            userFiles: u.userFiles.map(f => f.id === fileId ? {
+                                                ...f,
+                                                reviewStatus: res.data.reviewStatus,
+                                                rejectionReason: res.data.rejectionReason,
+                                                reviewedBy: res.data.reviewedBy,
+                                                reviewedAt: res.data.reviewedAt,
+                                                reviewerName: res.data.reviewerName
+                                            } : f)
+                                        };
+                                    }
+                                    return u;
+                                });
+                            });
+                            return res.data;
+                        }
+                    } catch (err) {
+                        console.error('Error reviewing evidence:', err);
+                        throw err;
+                    }
                 }}
                 onRename={handleRenameUserFile}
                 onReorderFiles={(reqId, newFiles) => {

@@ -89,6 +89,7 @@ export const masterlistAPI = {
   addItem: async (item) => (await api.post('/api/masterlist/add', item)).data,
   updateItem: async (id, item) => (await api.put(`/api/masterlist/${id}`, item)).data,
   deleteItem: async (id) => (await api.delete(`/api/masterlist/${id}`)).data,
+  deleteMultiple: async (ids) => (await api.post('/api/masterlist/delete-multiple', { ids })).data,
 };
 
 
@@ -276,6 +277,7 @@ export const officesAPI = {
   createOffice: async (data) => (await api.post('/api/offices', data)).data,
   updateOffice: async (id, data) => (await api.put(`/api/offices/${id}`, data)).data,
   deleteOffice: async (id) => (await api.delete(`/api/offices/${id}`)).data,
+  deleteMultipleOffices: async (ids) => (await api.post('/api/offices/delete-multiple', { ids })).data,
   getById: async (id) => (await api.get(`/api/offices/${id}`)).data,
   getOfficeRequirements: async (officeId) => (await api.get(`/api/offices/${officeId}/requirements`)).data,
   addOfficeRequirements: async (officeId, requirementIds) =>

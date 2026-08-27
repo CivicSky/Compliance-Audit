@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useModal } from "../UI/ModalProvider";
 import { API_BASE_URL } from '../../utils/apiBase';
+import { dataCache } from '../../utils/dataCache';
 
 export default function AddReqOffModal({ isOpen, onClose, office, onSave }) {
     const [requirements, setRequirements] = useState([]);
@@ -69,6 +70,8 @@ export default function AddReqOffModal({ isOpen, onClose, office, onSave }) {
             await axios.post(`${API_BASE_URL}/api/offices/${office.id}/requirements`, {
                 requirementIds: selectedRequirements
             });
+
+            dataCache.invalidate('office_reqs_');
 
             await showAlert(`Successfully added ${selectedRequirements.length} requirement(s) to ${office.office_name || office.OfficeName || 'office'}.`, 'success');
             

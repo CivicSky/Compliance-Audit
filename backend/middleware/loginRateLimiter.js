@@ -3,7 +3,7 @@
 const store = new Map();
 
 const MAX_ATTEMPTS = 5; // attempts allowed before a penalty
-const PENALTY_INCREMENT_MIN = 5; // minutes to add on each block
+const PENALTY_INCREMENT_MIN = 1; // 1 minute penalty per block
 
 function makeKey(email, ip) {
   const e = String(email || '').toLowerCase();

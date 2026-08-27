@@ -1,4 +1,4 @@
-import React, { useState, useEffect, forwardRef, useImperativeHandle } from "react";
+import React, { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { requirementsAPI } from "../../utils/api";
 import { CardListSkeleton } from "../UI/Skeleton";
 import { useLiveRefresh } from "../../utils/liveSync";
@@ -21,10 +21,29 @@ const RequirementsP = forwardRef(
     const [error, setError] = useState(null);
     const [selectedRequirements, setSelectedRequirements] = useState(new Set());
 
+    const fetchRequirements = useCallback(async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await requirementsAPI.getAllRequirements();
+
+        if (response.success) {
+          setRequirements(response.data);
+        } else {
+          setError('Failed to fetch requirements');
+        }
+      } catch (error) {
+        console.error('Error fetching requirements:', error);
+        setError('Error loading requirements. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    }, []);
+
     // Fetch requirements data from database
     useEffect(() => {
       fetchRequirements();
-    }, [eventId]);
+    }, [fetchRequirements, eventId]);
 
     // Live syncing on mutations / window focus
     useLiveRefresh(fetchRequirements, { deps: [eventId] });
@@ -141,25 +160,6 @@ const RequirementsP = forwardRef(
         }
 
         return { success: false, message: `Error deleting requirements: ${error.message}` };
-      }
-    };
-
-    const fetchRequirements = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const response = await requirementsAPI.getAllRequirements();
-
-        if (response.success) {
-          setRequirements(response.data);
-        } else {
-          setError('Failed to fetch requirements');
-        }
-      } catch (error) {
-        console.error('Error fetching requirements:', error);
-        setError('Error loading requirements. Please try again.');
-      } finally {
-        setLoading(false);
       }
     };
 

@@ -32,6 +32,7 @@ const verifyInviteTokenPayload = (token) => {
       invite: {
         email: decoded.email ? normalizeEmail(decoded.email) : null,
         roleId,
+        allowAnyEmail: Boolean(decoded.allowAnyEmail),
         expiresAt: decoded.exp ? decoded.exp * 1000 : Date.now() + INVITE_TTL_MS,
       },
     };
@@ -60,6 +61,7 @@ const createPendingRegistration = async (registrationData) => {
   const email = normalizeEmail(registrationData.email);
   const inviteToken = String(registrationData.inviteToken || '').trim();
   let roleId = Number.parseInt(registrationData.roleId, 10) || 2;
+  let allowAnyEmail = false;
 
   if (inviteToken) {
     const inviteResult = verifyInviteTokenPayload(inviteToken);
@@ -71,6 +73,7 @@ const createPendingRegistration = async (registrationData) => {
     }
 
     roleId = invite.roleId;
+    if (invite.allowAnyEmail) allowAnyEmail = true;
   }
 
   if (!firstName || !lastName || !email || !password) {
@@ -78,7 +81,7 @@ const createPendingRegistration = async (registrationData) => {
   }
 
   const isAuditor = Number(roleId) === 4;
-  if (!isCompanyEmail(email) && !isAuditor) {
+  if (!isCompanyEmail(email) && !isAuditor && !allowAnyEmail) {
     return { success: false, status: 400, message: `Only ${COMPANY_EMAIL_DOMAIN} email addresses can register` };
   }
 
@@ -104,6 +107,105 @@ const createPendingRegistration = async (registrationData) => {
   });
 
   return { success: true, email, otp, roleId };
+};
+
+const generateOtpEmailHtml = (otp) => {
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your Auditrack Verification Code</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #334155;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f1f5f9; padding: 40px 15px;">
+    <tr>
+      <td align="center">
+        <!-- Main Container Card -->
+        <table role="presentation" width="100%" style="max-width: 500px; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.07); border: 1px solid #e2e8f0; overflow: hidden;" cellspacing="0" cellpadding="0">
+          
+          <!-- Header Banner -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%); padding: 32px 30px; text-align: center;">
+              <table role="presentation" align="center" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td align="center" style="padding-bottom: 10px;">
+                    <div style="display: inline-block; width: 44px; height: 44px; background-color: rgba(255, 255, 255, 0.2); border-radius: 12px; line-height: 44px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.35);">
+                      <span style="font-size: 22px; color: #ffffff; font-weight: bold;">&#10003;</span>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center">
+                    <h1 style="margin: 0; font-size: 24px; font-weight: 800; color: #ffffff; letter-spacing: -0.3px;">Auditrack</h1>
+                    <p style="margin: 4px 0 0 0; font-size: 11px; color: #bfdbfe; font-weight: 600; text-transform: uppercase; letter-spacing: 1.2px;">Compliance & Accreditation Portal</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Main Body -->
+          <tr>
+            <td style="padding: 36px 32px 28px 32px;">
+              <h2 style="margin: 0 0 10px 0; font-size: 18px; font-weight: 700; color: #0f172a; text-align: center;">
+                Account Verification Code
+              </h2>
+              <p style="margin: 0 0 24px 0; font-size: 13px; line-height: 1.6; color: #64748b; text-align: center;">
+                Thank you for registering on <strong>Auditrack</strong>. Use the 6-digit verification code below to verify your email and complete your setup.
+              </p>
+
+              <!-- Emphasized OTP Display Box -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin: 0 0 24px 0;">
+                <tr>
+                  <td align="center">
+                    <div style="display: inline-block; width: 100%; max-width: 360px; background: linear-gradient(180deg, #f8fafc 0%, #eff6ff 100%); border: 2px dashed #93c5fd; border-radius: 14px; padding: 18px 12px; text-align: center;">
+                      <div style="font-family: 'Courier New', Consolas, Menlo, Monaco, monospace; font-size: 38px; font-weight: 900; letter-spacing: 10px; color: #1e40af; padding: 4px 0; margin-left: 10px;">
+                        ${otp}
+                      </div>
+                      <div style="margin-top: 10px; display: inline-block; background-color: #dbeafe; color: #1e40af; font-size: 11px; font-weight: 700; padding: 3px 12px; border-radius: 20px;">
+                        &#9201; Valid for 10 minutes
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Security Notice -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; border-radius: 10px; border-left: 3px solid #3b82f6; padding: 12px 14px; margin-bottom: 22px;">
+                <tr>
+                  <td style="font-size: 12px; color: #475569; line-height: 1.5;">
+                    <strong style="color: #1e293b;">Security Reminder:</strong> Never share your verification PIN with anyone. Auditrack will never ask for your PIN or password.
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin: 0; font-size: 11px; color: #94a3b8; text-align: center; line-height: 1.5;">
+                If you did not make this request, you can safely ignore this email.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f8fafc; padding: 20px 30px; border-top: 1px solid #e2e8f0; text-align: center;">
+              <p style="margin: 0 0 3px 0; font-size: 11px; color: #64748b; font-weight: 600;">
+                Auditrack Compliance Management System
+              </p>
+              <p style="margin: 0; font-size: 10px; color: #94a3b8;">
+                La Consolacion College Bacolod • Automated System Message
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
 };
 
 const sendOtpEmail = async (email, otp) => {
@@ -136,9 +238,9 @@ const sendOtpEmail = async (email, otp) => {
     await transporter.sendMail({
       from: process.env.SMTP_FROM || `"Auditrack Compliance" <${user}>`,
       to: email,
-      subject: 'Your Auditrack registration OTP',
+      subject: `${otp} is your Auditrack verification code`,
       text: `Your Auditrack registration one-time PIN is ${otp}. It expires in 10 minutes.`,
-      html: `<p>Your Auditrack registration one-time PIN is <strong>${otp}</strong>.</p><p>It expires in 10 minutes.</p>`,
+      html: generateOtpEmailHtml(otp),
     });
     return { sent: true };
   } catch (error) {
@@ -171,8 +273,17 @@ exports.sendRegistrationOtp = async (req, res) => {
       });
     }
 
+    const inviteToken = String(body.inviteToken || '').trim();
+    let allowAnyEmail = false;
+    if (inviteToken) {
+      const inviteResult = verifyInviteTokenPayload(inviteToken);
+      if (inviteResult.success && inviteResult.invite?.allowAnyEmail) {
+        allowAnyEmail = true;
+      }
+    }
+
     const isAuditor = Number(body.roleId) === 4;
-    if (!isCompanyEmail(email) && !isAuditor) {
+    if (!isCompanyEmail(email) && !isAuditor && !allowAnyEmail && !pendingRegistrationStore.has(email)) {
       return res.status(400).json({
         success: false,
         message: `Only ${COMPANY_EMAIL_DOMAIN} email addresses can register`,
@@ -295,6 +406,10 @@ exports.verifyRegistrationOtp = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Email already registered' });
     }
 
+    const isInvited = Boolean(registrationData.inviteToken);
+    const initialApprovalStatus = isInvited ? 'approved' : 'pending';
+
+    const roleId = Number(registrationData.roleId) || 2;
     const [result] = await db.query(
       'INSERT INTO users (FirstName, MiddleInitial, LastName, Email, PasswordHash, RoleID, approval_status) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [
@@ -303,18 +418,35 @@ exports.verifyRegistrationOtp = async (req, res) => {
         registrationData.lastName,
         registrationData.email,
         registrationData.passwordHash,
-        registrationData.roleId || 2,
-        'pending',
+        roleId,
+        initialApprovalStatus,
       ]
     );
 
+    const insertedUserId = result.insertId;
+
+    // If registered as Personnel (RoleID 3) and approved, auto-create headofoffice entry
+    if (roleId === 3 && initialApprovalStatus === 'approved') {
+      try {
+        const [existingHead] = await db.query('SELECT HeadID FROM headofoffice WHERE UserID = ? LIMIT 1', [insertedUserId]);
+        if (existingHead.length === 0) {
+          await db.query('INSERT INTO headofoffice (UserID, Position) VALUES (?, ?)', [insertedUserId, 'Personnel']);
+        }
+      } catch (headErr) {
+        console.error('Failed to create headofoffice entry for new personnel:', headErr);
+      }
+    }
+
     pendingRegistrationStore.delete(email);
 
-    try { recordLog(result.insertId, 'UserRegistered', `User registered after OTP: ${email}`); } catch (e) {}
+    try { recordLog(insertedUserId, 'UserRegistered', `User registered after OTP: ${email} (status: ${initialApprovalStatus})`); } catch (e) {}
 
     return res.json({
       success: true,
-      message: 'Email verified. Your account is pending approval.',
+      isApproved: isInvited,
+      message: isInvited
+        ? 'Account registered and verified successfully. You can now log in.'
+        : 'Email verified. Your account is pending approval.',
       userId: result.insertId,
       email,
     });
@@ -332,8 +464,9 @@ exports.createRegistrationInvite = async (req, res) => {
   try {
     const email = normalizeEmail(req.body?.email);
     const roleId = Number.parseInt(req.body?.roleId, 10) || 3;
+    const allowAnyEmail = Boolean(req.body?.allowAnyEmail);
 
-    if (email && !isCompanyEmail(email) && roleId !== 4) {
+    if (email && !isCompanyEmail(email) && roleId !== 4 && !allowAnyEmail) {
       return res.status(400).json({
         success: false,
         message: `Only ${COMPANY_EMAIL_DOMAIN} email addresses can register`,
@@ -343,6 +476,7 @@ exports.createRegistrationInvite = async (req, res) => {
     const payload = {
       type: 'registration_invite',
       roleId,
+      allowAnyEmail,
       createdBy: req.user?.userId || null,
     };
 
@@ -360,6 +494,7 @@ exports.createRegistrationInvite = async (req, res) => {
       success: true,
       inviteUrl,
       token,
+      allowAnyEmail,
       expiresAt: decoded.exp ? decoded.exp * 1000 : Date.now() + INVITE_TTL_MS,
       roleId,
       email: email || null,

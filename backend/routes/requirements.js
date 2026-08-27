@@ -8,11 +8,15 @@ const { auth, restrictAuditor } = require('../middleware/auth');
 const { recordLog } = require('../controllers/logsController');
 const { notifyUsers } = require('../utils/notify');
 
-const ensureSortOrderColumn = async (db) => {
+const ensureReviewColumns = async (db) => {
     try {
-        await db.query('ALTER TABLE office_proof_documents ADD COLUMN sort_order INT DEFAULT 0');
+        await db.query('ALTER TABLE office_proof_documents ADD COLUMN IF NOT EXISTS review_status VARCHAR(20) DEFAULT \'pending\'');
+        await db.query('ALTER TABLE office_proof_documents ADD COLUMN IF NOT EXISTS rejection_reason TEXT DEFAULT NULL');
+        await db.query('ALTER TABLE office_proof_documents ADD COLUMN IF NOT EXISTS reviewed_by INT DEFAULT NULL');
+        await db.query('ALTER TABLE office_proof_documents ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP DEFAULT NULL');
+        await db.query('ALTER TABLE office_proof_documents ADD COLUMN IF NOT EXISTS sort_order INT DEFAULT 0');
     } catch (e) {
-        // Column already exists
+        // Ignored if already exist
     }
 };
 
@@ -25,14 +29,26 @@ router.get('/:requirementId/user-file/:userId', async (req, res) => {
         let rows = [];
         try {
             const [r] = await db.query(
-                'SELECT id, file_name, display_name, comment, file_path, uploaded_at, sort_order FROM office_proof_documents WHERE requirement_id = ? AND uploaded_by = ? ORDER BY sort_order ASC, id ASC',
+                `SELECT opd.id, opd.file_name, opd.display_name, opd.comment, opd.file_path, opd.uploaded_at, opd.sort_order,
+                        opd.review_status, opd.rejection_reason, opd.reviewed_by, opd.reviewed_at,
+                        u.FirstName as reviewer_first_name, u.LastName as reviewer_last_name
+                 FROM office_proof_documents opd
+                 LEFT JOIN users u ON opd.reviewed_by = u.UserID
+                 WHERE opd.requirement_id = ? AND opd.uploaded_by = ? 
+                 ORDER BY opd.sort_order ASC, opd.id ASC`,
                 [requirementId, userId]
             );
             rows = r;
         } catch (e) {
-            await ensureSortOrderColumn(db);
+            await ensureReviewColumns(db);
             const [r] = await db.query(
-                'SELECT id, file_name, display_name, comment, file_path, uploaded_at FROM office_proof_documents WHERE requirement_id = ? AND uploaded_by = ? ORDER BY id ASC',
+                `SELECT opd.id, opd.file_name, opd.display_name, opd.comment, opd.file_path, opd.uploaded_at, opd.sort_order,
+                        opd.review_status, opd.rejection_reason, opd.reviewed_by, opd.reviewed_at,
+                        u.FirstName as reviewer_first_name, u.LastName as reviewer_last_name
+                 FROM office_proof_documents opd
+                 LEFT JOIN users u ON opd.reviewed_by = u.UserID
+                 WHERE opd.requirement_id = ? AND opd.uploaded_by = ? 
+                 ORDER BY opd.id ASC`,
                 [requirementId, userId]
             );
             rows = r;
@@ -47,13 +63,23 @@ router.get('/:requirementId/user-file/:userId', async (req, res) => {
             if (fileUrl.startsWith('/uploads/documents/')) {
                 fileUrl = fileUrl.replace('/uploads/documents/', '/uploads/events/');
             }
+            const revFirstName = file.reviewer_first_name || '';
+            const revLastName = file.reviewer_last_name || '';
+            const reviewerName = (revFirstName || revLastName) ? `${revFirstName} ${revLastName}`.trim() : null;
+
             return {
                 id: file.id,
                 fileName: file.file_name,
                 displayName: file.display_name || file.file_name,
                 comment: file.comment || '',
                 url: fileUrl.startsWith('http') ? fileUrl : `http://localhost:5000${fileUrl}`,
-                uploadedAt: file.uploaded_at
+                uploadedAt: file.uploaded_at,
+                sortOrder: file.sort_order ?? 0,
+                reviewStatus: file.review_status || 'pending',
+                rejectionReason: file.rejection_reason || '',
+                reviewedBy: file.reviewed_by || null,
+                reviewedAt: file.reviewed_at || null,
+                reviewerName: reviewerName
             };
         });
 
@@ -79,7 +105,7 @@ router.patch('/:requirementId/user-file/:userId/reorder', async (req, res) => {
             return res.status(400).json({ success: false, message: 'orderedIds array is required' });
         }
 
-        await ensureSortOrderColumn(db);
+        await ensureReviewColumns(db);
 
         for (let i = 0; i < orderedIds.length; i++) {
             await db.query(
@@ -150,18 +176,20 @@ router.patch('/:requirementId/file/:fileId/rename', auth, async (req, res) => {
                 }
 
                 newFileName = candidateFileName;
-                newFilePath = (dir === '/' || dir === '\\' ? '' : dir) + '/' + newFileName;
+                newFilePath = `${dir}/${candidateFileName}`.replace(/\\/g, '/');
 
                 const oldAbsPath = path.join(__dirname, '..', oldFilePath.replace(/^\//, ''));
-                const newAbsPath = path.join(__dirname, '..', newFilePath.replace(/^\//, ''));
+                const newAbsPath = path.join(absDir, candidateFileName);
 
                 try {
-                    if (fs.existsSync(oldAbsPath) && oldAbsPath !== newAbsPath) {
+                    if (fs.existsSync(oldAbsPath)) {
                         fs.renameSync(oldAbsPath, newAbsPath);
                     }
                 } catch (fsErr) {
-                    console.warn('Physical file rename warning:', fsErr);
+                    console.warn('Failed to rename physical file on disk:', fsErr.message);
                 }
+            } else {
+                newFileName = candidateFileName;
             }
         }
 
@@ -178,25 +206,24 @@ router.patch('/:requirementId/file/:fileId/rename', auth, async (req, res) => {
             [trimmedTitle, newFileName, newFilePath, fileId]
         );
 
-        let fileUrl = newFilePath;
-        if (fileUrl.startsWith('/uploads/documents/')) {
-            fileUrl = fileUrl.replace('/uploads/documents/', '/uploads/events/');
+        let returnUrl = newFilePath;
+        if (returnUrl.startsWith('/uploads/documents/')) {
+            returnUrl = returnUrl.replace('/uploads/documents/', '/uploads/events/');
         }
-        const fullUrl = fileUrl.startsWith('http') ? fileUrl : `http://localhost:5000${fileUrl}`;
+        if (returnUrl && !returnUrl.startsWith('http')) {
+            returnUrl = `http://localhost:5000${returnUrl}`;
+        }
 
         res.json({
             success: true,
-            message: 'Document title and clean file name updated successfully',
-            file: {
-                id: Number(fileId),
-                fileName: newFileName,
-                displayName: trimmedTitle,
-                url: fullUrl
-            }
+            message: 'Document renamed successfully',
+            displayName: trimmedTitle,
+            fileName: newFileName,
+            url: returnUrl
         });
     } catch (error) {
         console.error('Error renaming evidence document:', error);
-        res.status(500).json({ success: false, message: 'Error updating document title', error: error.message });
+        res.status(500).json({ success: false, message: 'Error renaming document', error: error.message });
     }
 });
 
@@ -206,10 +233,13 @@ router.patch('/:requirementId/file/:fileId/comment', auth, async (req, res) => {
         const db = require('../db');
         const { fileId } = req.params;
         const { comment } = req.body;
+        const trimmedComment = comment ? comment.trim() : '';
         
+        await ensureReviewColumns(db);
+
         // Fetch file uploader and metadata
         const [fileRows] = await db.query(
-            `SELECT opd.uploaded_by, opd.display_name, opd.office_id, opd.requirement_id, r.RequirementCode, o.OfficeName
+            `SELECT opd.uploaded_by, opd.display_name, opd.office_id, opd.requirement_id, opd.review_status, r.RequirementCode, o.OfficeName
              FROM office_proof_documents opd
              LEFT JOIN requirements r ON opd.requirement_id = r.RequirementID
              LEFT JOIN offices o ON opd.office_id = o.OfficeID
@@ -218,8 +248,8 @@ router.patch('/:requirementId/file/:fileId/comment', auth, async (req, res) => {
         );
 
         await db.query(
-            'UPDATE office_proof_documents SET comment = ? WHERE id = ?',
-            [comment ? comment.trim() : '', fileId]
+            'UPDATE office_proof_documents SET comment = ?, rejection_reason = CASE WHEN review_status = \'rejected\' THEN ? ELSE rejection_reason END WHERE id = ?',
+            [trimmedComment, trimmedComment, fileId]
         );
 
         if (fileRows && fileRows.length > 0) {
@@ -279,10 +309,132 @@ router.patch('/:requirementId/file/:fileId/comment', auth, async (req, res) => {
             }
         }
 
-        res.json({ success: true, message: 'Document comment updated successfully' });
+        res.json({ success: true, message: 'Document comment updated successfully', comment: trimmedComment });
     } catch (error) {
         console.error('Error updating evidence document comment:', error);
         res.status(500).json({ success: false, message: 'Error updating document comment', error: error.message });
+    }
+});
+
+// Update review status (Approved, Rejected, Pending) for an evidence file
+router.patch('/:requirementId/file/:fileId/review', auth, async (req, res) => {
+    try {
+        const db = require('../db');
+        const { fileId } = req.params;
+        const { status, reason } = req.body;
+        const actorRole = Number(req.user?.roleId || 0);
+        const actorId = Number(req.user?.userId || 0);
+
+        // Role check: Only Admin (1) and Auditor (4)
+        if (actorRole !== 1 && actorRole !== 4) {
+            return res.status(403).json({ success: false, message: 'Unauthorized: Only Auditors and Admins can review evidence files' });
+        }
+
+        if (!['approved', 'rejected', 'pending'].includes(status)) {
+            return res.status(400).json({ success: false, message: 'Invalid review status. Must be approved, rejected, or pending' });
+        }
+
+        await ensureReviewColumns(db);
+
+        // Fetch file and requirement metadata
+        const [fileRows] = await db.query(
+            `SELECT opd.id, opd.uploaded_by, opd.display_name, opd.file_name, opd.office_id, opd.requirement_id, opd.comment,
+                    r.RequirementCode, o.OfficeName
+             FROM office_proof_documents opd
+             LEFT JOIN requirements r ON opd.requirement_id = r.RequirementID
+             LEFT JOIN offices o ON opd.office_id = o.OfficeID
+             WHERE opd.id = ? LIMIT 1`,
+            [fileId]
+        );
+
+        if (!fileRows || fileRows.length === 0) {
+            return res.status(404).json({ success: false, message: 'Evidence document not found' });
+        }
+
+        const fileDoc = fileRows[0];
+        const existingComment = fileDoc.comment || '';
+        const trimmedReason = reason !== undefined ? (reason ? reason.trim() : '') : existingComment;
+        const reviewedBy = status === 'pending' ? null : actorId;
+        const reviewedAt = status === 'pending' ? null : new Date();
+
+        if (status === 'pending') {
+            await db.query(
+                `UPDATE office_proof_documents 
+                 SET review_status = 'pending', rejection_reason = NULL, reviewed_by = NULL, reviewed_at = NULL 
+                 WHERE id = ?`,
+                [fileId]
+            );
+        } else {
+            await db.query(
+                `UPDATE office_proof_documents 
+                 SET review_status = ?, 
+                     rejection_reason = ?, 
+                     comment = CASE WHEN ? != '' THEN ? ELSE comment END,
+                     reviewed_by = ?, 
+                     reviewed_at = CURRENT_TIMESTAMP 
+                 WHERE id = ?`,
+                [status, status === 'rejected' ? trimmedReason : null, trimmedReason, trimmedReason, actorId, fileId]
+            );
+        }
+
+        // Fetch reviewer name
+        const [reviewerRows] = await db.query('SELECT FirstName, LastName FROM users WHERE UserID = ? LIMIT 1', [actorId]);
+        const reviewerName = reviewerRows && reviewerRows.length > 0
+            ? `${reviewerRows[0].FirstName || ''} ${reviewerRows[0].LastName || ''}`.trim()
+            : 'Auditor';
+
+        // Notify uploader if reviewer is not the uploader
+        const uploaderId = Number(fileDoc.uploaded_by);
+        if (uploaderId && uploaderId !== actorId) {
+            try {
+                const { createNotifications } = require('../utils/notificationService');
+                const reqCode = fileDoc.RequirementCode || 'a requirement';
+                const fileTitle = fileDoc.display_name || fileDoc.file_name || 'evidence document';
+                
+                const statusTitle = status === 'approved' 
+                    ? 'Evidence Approved' 
+                    : status === 'rejected' 
+                    ? 'Evidence Rejected - Action Required' 
+                    : 'Evidence Review Reset';
+
+                const statusMessage = status === 'approved'
+                    ? `Your evidence "${fileTitle}" for ${reqCode} has been approved.`
+                    : status === 'rejected'
+                    ? `Your evidence "${fileTitle}" for ${reqCode} was rejected. Note: ${trimmedReason || 'Needs revision'}`
+                    : `Your evidence "${fileTitle}" for ${reqCode} review status was reset to pending.`;
+
+                await createNotifications({
+                    userIds: [uploaderId],
+                    adminId: actorId,
+                    title: statusTitle,
+                    message: statusMessage,
+                    type: status === 'approved' ? 'success' : status === 'rejected' ? 'warning' : 'info',
+                    relatedTable: 'requirement_file_review',
+                    relatedId: Number(fileDoc.office_id),
+                    meta: {
+                        officeId: Number(fileDoc.office_id),
+                        requirementId: Number(fileDoc.requirement_id),
+                        openSubmission: true
+                    }
+                });
+            } catch (notifErr) {
+                console.error('Failed to notify uploader of review status:', notifErr);
+            }
+        }
+
+        res.json({
+            success: true,
+            message: `Evidence marked as ${status}`,
+            reviewStatus: status,
+            comment: trimmedReason || existingComment,
+            rejectionReason: status === 'rejected' ? trimmedReason : '',
+            reviewedBy: reviewedBy,
+            reviewedAt: reviewedAt,
+            reviewerName: reviewerName
+        });
+    } catch (error) {
+        console.error('Error updating evidence review status:', error);
+        res.status(500).json({ success: false, message: 'Error updating review status', error: error.message });
     }
 });
 
@@ -452,8 +604,19 @@ router.post('/user-upload', auth, userReqUpload.single('file'), async (req, res)
         if (!requirementId || !userId) {
             return res.status(400).json({ success: false, message: 'RequirementID and UserID are required' });
         }
-        // Get requirement info for event and office
+
         const db = require('../db');
+
+        // Check max 40 files per user per requirement
+        const [countRows] = await db.query(
+            'SELECT COUNT(*) as count FROM requirement_user_files WHERE RequirementID = ? AND UserID = ?',
+            [requirementId, userId]
+        );
+        if (countRows && countRows[0]?.count >= 40) {
+            return res.status(400).json({ success: false, message: 'Maximum limit of 40 uploaded files reached for this requirement.' });
+        }
+
+        // Get requirement info for event and office
         const [rows] = await db.query(`
             SELECT r.RequirementID, r.RequirementCode, r.Description, c.EventID, e.EventName, e.EventCode, rua.OfficeID, c.CriteriaName, c.CriteriaCode, a.AreaID, a.AreaCode, a.AreaName
             FROM requirements r

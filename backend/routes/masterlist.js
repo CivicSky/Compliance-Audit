@@ -8,6 +8,9 @@ router.get('/', masterlistController.getAll);
 router.get('/available/:eventId', masterlistController.getAvailableForEvent);
 router.post('/add', auth, masterlistController.addItem);
 router.put('/:id', auth, masterlistController.updateItem);
+router.post('/delete-multiple', auth, masterlistController.deleteMultiple);
+router.delete('/delete-multiple', auth, masterlistController.deleteMultiple);
+router.delete('/', auth, masterlistController.deleteMultiple);
 router.delete('/:id', auth, masterlistController.deleteItem);
 
 module.exports = router;

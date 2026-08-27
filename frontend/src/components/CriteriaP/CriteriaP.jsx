@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useImperativeHandle, forwardRef } from "react";
+import React, { useState, useEffect, useCallback, useImperativeHandle, forwardRef } from "react";
 import { criteriaAPI } from "../../utils/api";
 import { useLiveRefresh } from "../../utils/liveSync";
 
@@ -8,21 +8,7 @@ const CriteriaP = forwardRef(function CriteriaP({ searchTerm = "", eventId = nul
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-
-  useEffect(() => {
-    fetchCriteria();
-    // eslint-disable-next-line
-  }, [eventId]);
-
-  // Live real-time syncing
-  useLiveRefresh(fetchCriteria, { deps: [eventId] });
-
-  useImperativeHandle(ref, () => ({
-    refresh: fetchCriteria
-  }));
-
-
-  const fetchCriteria = async () => {
+  const fetchCriteria = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -42,7 +28,18 @@ const CriteriaP = forwardRef(function CriteriaP({ searchTerm = "", eventId = nul
     } finally {
       setLoading(false);
     }
-  };
+  }, [eventId]);
+
+  useEffect(() => {
+    fetchCriteria();
+  }, [fetchCriteria]);
+
+  // Live real-time syncing
+  useLiveRefresh(fetchCriteria, { deps: [eventId] });
+
+  useImperativeHandle(ref, () => ({
+    refresh: fetchCriteria
+  }));
 
 
   let filtered = criteria;

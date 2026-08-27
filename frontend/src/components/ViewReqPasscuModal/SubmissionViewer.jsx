@@ -7,6 +7,7 @@ import YourWorkFileUpload from './YourWorkFileUpload';
 import { useToast } from '../UI/Toast';
 import { useModal } from '../UI/ModalProvider';
 import { API_BASE_URL } from '../../utils/apiBase';
+import { dataCache, CacheKeys } from '../../utils/dataCache';
 
 GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
 
@@ -33,7 +34,7 @@ const renderDocxThumbSvg = (fileName, rawText) => {
 	const textEls = lines
 		.map((l, idx) => {
 			const y = 44 + idx * 12;
-			return `<text x="12" y="${y}" font-size="10" fill="#374151" font-family="ui-sans-serif, system-ui, -apple-system">${
+			return `<text x="12" y="${y}" font-size="10" fill="#374151" font-family="Poppins, Inter, sans-serif">${
 				l.replace(/[&<>]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m]))
 			}</text>`;
 		})
@@ -43,7 +44,7 @@ const renderDocxThumbSvg = (fileName, rawText) => {
 <svg xmlns="http://www.w3.org/2000/svg" width="${THUMB_W}" height="${THUMB_H}" viewBox="0 0 ${THUMB_W} ${THUMB_H}">
   <rect x="0" y="0" width="${THUMB_W}" height="${THUMB_H}" fill="#ffffff"/>
   <rect x="0.5" y="0.5" width="${THUMB_W - 1}" height="${THUMB_H - 1}" rx="8" fill="#ffffff" stroke="#e5e7eb"/>
-  <text x="12" y="22" font-size="11" font-weight="600" fill="#111827" font-family="ui-sans-serif, system-ui, -apple-system">${
+  <text x="12" y="22" font-size="11" font-weight="600" fill="#111827" font-family="Poppins, Inter, sans-serif">${
 		title.replace(/[&<>]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m]))
 	}</text>
   <line x1="12" y1="30" x2="${THUMB_W - 12}" y2="30" stroke="#e5e7eb"/>
@@ -88,7 +89,7 @@ const renderXlsxThumbSvg = (fileName, workbook) => {
 			cells += `<rect x="${x}" y="${y}" width="${cellW}" height="${cellH}" fill="#ffffff" stroke="#e5e7eb"/>`;
 			const v = grid[r][c];
 			if (v) {
-				cells += `<text x="${x + 4}" y="${y + 12}" font-size="9" fill="#374151" font-family="ui-sans-serif, system-ui, -apple-system">${esc(
+				cells += `<text x="${x + 4}" y="${y + 12}" font-size="9" fill="#374151" font-family="Poppins, Inter, sans-serif">${esc(
 					v
 				)}</text>`;
 			}
@@ -99,7 +100,7 @@ const renderXlsxThumbSvg = (fileName, workbook) => {
 <svg xmlns="http://www.w3.org/2000/svg" width="${THUMB_W}" height="${THUMB_H}" viewBox="0 0 ${THUMB_W} ${THUMB_H}">
   <rect x="0" y="0" width="${THUMB_W}" height="${THUMB_H}" fill="#ffffff"/>
   <rect x="0.5" y="0.5" width="${THUMB_W - 1}" height="${THUMB_H - 1}" rx="8" fill="#ffffff" stroke="#e5e7eb"/>
-  <text x="12" y="22" font-size="11" font-weight="600" fill="#111827" font-family="ui-sans-serif, system-ui, -apple-system">${esc(
+  <text x="12" y="22" font-size="11" font-weight="600" fill="#111827" font-family="Poppins, Inter, sans-serif">${esc(
 		title
 	)}</text>
   <line x1="12" y1="30" x2="${THUMB_W - 12}" y2="30" stroke="#e5e7eb"/>
@@ -146,6 +147,7 @@ export default function SubmissionViewer({
 	onFileRename,
 	onFileUpdateComment,
 	uploadingFile = false,
+	uploadProgressMap = {},
 	unsubmittingFile = false,
 }) {
 	const { showConfirm } = useModal();
@@ -239,14 +241,26 @@ export default function SubmissionViewer({
 		let cancelled = false;
 		const controller = new AbortController();
 
-		setFileByUserId({});
-		setFilesByUserId({});
-		setLoadingByUserId(
-			uploadedUserIds.reduce((acc, id) => {
-				acc[id] = true;
-				return acc;
-			}, {})
-		);
+		// Immediately check and populate from cache for instant 0ms rendering
+		const initialFilesMap = {};
+		const initialFileMap = {};
+		const initialLoadingMap = {};
+
+		uploadedUserIds.forEach((id) => {
+			const cacheKey = CacheKeys.userFiles(requirementId, id);
+			const cached = dataCache.get(cacheKey);
+			if (cached && Array.isArray(cached) && cached.length > 0) {
+				initialFilesMap[id] = cached;
+				initialFileMap[id] = cached[cached.length - 1];
+				initialLoadingMap[id] = false;
+			} else {
+				initialLoadingMap[id] = true;
+			}
+		});
+
+		setFileByUserId(initialFileMap);
+		setFilesByUserId(initialFilesMap);
+		setLoadingByUserId(initialLoadingMap);
 		setThumbByUserId({});
 		setThumbLoadingByUserId({});
 		lastThumbKeyRef.current = '';
@@ -269,6 +283,10 @@ export default function SubmissionViewer({
 					const list = Array.isArray(data.files) && data.files.length > 0 
 						? data.files 
 						: (data.file ? [data.file] : []);
+					
+					// Save in dataCache
+					dataCache.set(CacheKeys.userFiles(requirementId, userId), list);
+
 					setFilesByUserId((prev) => ({ ...prev, [userId]: list }));
 					if (data.file || list.length > 0) {
 						setFileByUserId((prev) => ({ ...prev, [userId]: data.file || list[list.length - 1] }));
@@ -574,7 +592,7 @@ export default function SubmissionViewer({
 
 	return (
 		<div
-			className={`fixed inset-0 z-[130] bg-slate-900/10 backdrop-blur-[0.5px] transition-opacity duration-300 ease-out ${
+			className={`fixed inset-0 z-[130] bg-transparent transition-opacity duration-300 ease-out ${
 				active ? 'opacity-100' : 'opacity-0 pointer-events-none'
 			}`}
 			style={leftStyle}
@@ -626,6 +644,7 @@ export default function SubmissionViewer({
 								isLoadingFile={workLoadingFile}
 								isLoadingThumb={workLoadingThumb}
 								uploading={uploadingFile}
+								uploadProgressMap={uploadProgressMap}
 								unsubmitting={unsubmittingFile}
 								onUpload={onFileUpload}
 								onUnsubmit={onFileUnsubmit}
@@ -725,9 +744,47 @@ export default function SubmissionViewer({
 													</div>
 
 													<div className="flex items-center gap-2">
-														<span className={`shrink-0 rounded-full px-3 py-1 text-[11px] font-bold ${hasUploaded ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-															{hasUploaded ? 'Submitted' : 'Assigned'}
-														</span>
+														{(() => {
+															if (!hasUploaded) {
+																return (
+																	<span className="shrink-0 rounded-full px-3 py-1 text-[11px] font-bold bg-slate-100 text-slate-500">
+																		Assigned
+																	</span>
+																);
+															}
+															const approvedCount = userFiles.filter(f => f.reviewStatus === 'approved').length;
+															const rejectedCount = userFiles.filter(f => f.reviewStatus === 'rejected').length;
+
+															if (rejectedCount > 0) {
+																return (
+																	<span className="shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200 shadow-2xs flex items-center gap-1">
+																		<span className="h-1.5 w-1.5 rounded-full bg-rose-500"></span>
+																		Needs Revision ({rejectedCount})
+																	</span>
+																);
+															}
+															if (approvedCount === userFiles.length && userFiles.length > 0) {
+																return (
+																	<span className="shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-2xs flex items-center gap-1">
+																		<span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+																		All Approved
+																	</span>
+																);
+															}
+															if (approvedCount > 0) {
+																return (
+																	<span className="shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200 shadow-2xs flex items-center gap-1">
+																		<span className="h-1.5 w-1.5 rounded-full bg-blue-500"></span>
+																		{approvedCount}/{userFiles.length} Approved
+																	</span>
+																);
+															}
+															return (
+																<span className="shrink-0 rounded-full px-3 py-1 text-[11px] font-bold bg-emerald-100 text-emerald-700 shadow-2xs">
+																	Submitted
+																</span>
+															);
+														})()}
 													</div>
 												</div>
 											</div>

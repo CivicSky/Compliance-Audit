@@ -79,13 +79,33 @@ export default function AssignToOfficesModal({
             } catch {
               reqs = [];
             }
-            return { ...crit, requirements: reqs };
+            return { ...crit, requirements: reqs, children: [] };
           })
         );
 
+        // Build criteria hierarchy (parent -> children)
+        const criteriaMap = {};
+        criteriaWithReqs.forEach(c => {
+          const cId = String(c.CriteriaID || c.id);
+          criteriaMap[cId] = c;
+        });
+
+        const topLevelCriteria = [];
+        criteriaWithReqs.forEach(c => {
+          const parentId = c.ParentCriteriaID ? String(c.ParentCriteriaID) : null;
+          if (parentId && criteriaMap[parentId]) {
+            if (!c.AreaID && criteriaMap[parentId].AreaID) {
+              c.AreaID = criteriaMap[parentId].AreaID;
+            }
+            criteriaMap[parentId].children.push(c);
+          } else {
+            topLevelCriteria.push(c);
+          }
+        });
+
         const groupedAreas = (Array.isArray(areas) ? areas : []).map(a => {
           const aId = String(a.AreaID || a.id);
-          const crits = criteriaWithReqs.filter(c => String(c.AreaID || c.area_id) === aId);
+          const crits = topLevelCriteria.filter(c => String(c.AreaID || c.area_id) === aId);
           return { ...a, criteria: crits };
         });
 
@@ -188,12 +208,21 @@ export default function AssignToOfficesModal({
     });
   };
 
+  const getAllReqIdsForCriteria = (criteria) => {
+    const ids = (criteria.requirements || []).map(r => Number(r.id || r.RequirementID));
+    (criteria.children || []).forEach(child => {
+      ids.push(...getAllReqIdsForCriteria(child));
+    });
+    return ids;
+  };
+
   const toggleAreaAll = (area) => {
     const reqIds = [];
     (area.criteria || []).forEach(c => {
-      (c.requirements || []).forEach(r => reqIds.push(Number(r.id || r.RequirementID)));
+      reqIds.push(...getAllReqIdsForCriteria(c));
     });
 
+    if (reqIds.length === 0) return;
     const allSelected = reqIds.every(id => selectedRequirementIds.has(id));
     setSelectedRequirementIds(prev => {
       const next = new Set(prev);
@@ -207,7 +236,8 @@ export default function AssignToOfficesModal({
   };
 
   const toggleCriteriaAll = (criteria) => {
-    const reqIds = (criteria.requirements || []).map(r => Number(r.id || r.RequirementID));
+    const reqIds = getAllReqIdsForCriteria(criteria);
+    if (reqIds.length === 0) return;
     const allSelected = reqIds.every(id => selectedRequirementIds.has(id));
     
     setSelectedRequirementIds(prev => {
@@ -494,8 +524,9 @@ export default function AssignToOfficesModal({
                         const critCode = crit.CriteriaCode || crit.code || '';
                         const critName = crit.CriteriaName || crit.name || crit.title || 'Criteria';
 
-                        const critReqIds = reqs.map(r => Number(r.id || r.RequirementID));
-                        const isCritAllSelected = critReqIds.length > 0 && critReqIds.every(id => selectedRequirementIds.has(id));
+                        const critChildren = crit.children || [];
+                        const allCritReqIds = getAllReqIdsForCriteria(crit);
+                        const isCritAllSelected = allCritReqIds.length > 0 && allCritReqIds.every(id => selectedRequirementIds.has(id));
 
                         return (
                           <div key={critId} className="rounded-xl border border-amber-200 bg-white overflow-hidden shadow-2xs transition-all">
@@ -528,45 +559,148 @@ export default function AssignToOfficesModal({
                               </button>
                             </div>
 
-                            {/* Requirements */}
+                            {/* Criteria Contents: Direct Requirements & Subcriteria */}
                             {isCritExpanded && (
-                              <div className="p-2.5 space-y-1.5 bg-white border-t border-slate-100">
-                                {reqs.map((req) => {
-                                  const reqId = Number(req.id || req.RequirementID);
-                                  const isReqSelected = selectedRequirementIds.has(reqId);
-                                  const reqCode = req.RequirementCode || req.code || req.req_code || `Req #${reqId}`;
-                                  const reqTitle = req.RequirementTitle || req.Title || req.title || req.RequirementName || req.description || req.Description || '';
+                              <div className="p-2.5 space-y-2.5 bg-white border-t border-slate-100">
+                                {/* Direct Requirements */}
+                                {reqs.length > 0 && (
+                                  <div className="space-y-1.5">
+                                    {reqs.map((req) => {
+                                      const reqId = Number(req.id || req.RequirementID);
+                                      const isReqSelected = selectedRequirementIds.has(reqId);
+                                      const reqCode = req.RequirementCode || req.code || req.req_code || `Req #${reqId}`;
+                                      const reqTitle = req.RequirementTitle || req.Title || req.title || req.RequirementName || req.description || req.Description || '';
 
-                                  return (
-                                    <div
-                                      key={reqId}
-                                      onClick={() => toggleRequirement(reqId)}
-                                      className={`flex items-start gap-2.5 p-2.5 rounded-lg border transition-all cursor-pointer ${
-                                        isReqSelected
-                                          ? 'border-blue-400 bg-blue-50/40 text-blue-950'
-                                          : 'border-slate-100 hover:border-slate-300 bg-slate-50/40'
-                                      }`}
-                                    >
-                                      <input
-                                        type="checkbox"
-                                        checked={isReqSelected}
-                                        onChange={() => toggleRequirement(reqId)}
-                                        onClick={(e) => e.stopPropagation()}
-                                        className="mt-0.5 h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500/30 cursor-pointer"
-                                      />
-                                      <div className="text-xs min-w-0">
-                                        <span className="font-bold block mb-0.5">
-                                          {reqCode}
-                                        </span>
-                                        {reqTitle && (
-                                          <p className="text-slate-600 text-[11px] leading-relaxed">
-                                            {reqTitle}
-                                          </p>
-                                        )}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
+                                      return (
+                                        <div
+                                          key={reqId}
+                                          onClick={() => toggleRequirement(reqId)}
+                                          className={`flex items-start gap-2.5 p-2.5 rounded-lg border transition-all cursor-pointer ${
+                                            isReqSelected
+                                              ? 'border-blue-400 bg-blue-50/40 text-blue-950'
+                                              : 'border-slate-100 hover:border-slate-300 bg-slate-50/40'
+                                          }`}
+                                        >
+                                          <input
+                                            type="checkbox"
+                                            checked={isReqSelected}
+                                            onChange={() => toggleRequirement(reqId)}
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="mt-0.5 h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500/30 cursor-pointer"
+                                          />
+                                          <div className="text-xs min-w-0">
+                                            <span className="font-bold block mb-0.5">
+                                              {reqCode}
+                                            </span>
+                                            {reqTitle && (
+                                              <p className="text-slate-600 text-[11px] leading-relaxed">
+                                                {reqTitle}
+                                              </p>
+                                            )}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+
+                                {/* Sub-criteria (Children) */}
+                                {critChildren.length > 0 && (
+                                  <div className="space-y-2 pt-1">
+                                    {critChildren.map((subCrit) => {
+                                      const subCritId = subCrit.id || subCrit.CriteriaID;
+                                      const isSubCritExpanded = expandedCriteria.has(subCritId);
+                                      const subReqs = subCrit.requirements || [];
+                                      const subCritCode = subCrit.CriteriaCode || subCrit.code || '';
+                                      const subCritName = subCrit.CriteriaName || subCrit.name || subCrit.title || 'Sub-Criteria';
+                                      const subReqIds = subReqs.map(r => Number(r.id || r.RequirementID));
+                                      const isSubAllSelected = subReqIds.length > 0 && subReqIds.every(id => selectedRequirementIds.has(id));
+
+                                      return (
+                                        <div key={subCritId} className="rounded-lg border border-blue-200 bg-white overflow-hidden shadow-2xs ml-2">
+                                          <div className="flex items-center justify-between px-3 py-2 bg-blue-50/70 border-b border-blue-200/70 select-none hover:bg-blue-100/60 transition-colors">
+                                            <div className="flex items-center gap-2 min-w-0">
+                                              <input
+                                                type="checkbox"
+                                                checked={isSubAllSelected}
+                                                onChange={() => toggleCriteriaAll(subCrit)}
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="h-3.5 w-3.5 rounded border-blue-400 text-blue-600 focus:ring-blue-500/30 cursor-pointer"
+                                              />
+                                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wide uppercase bg-blue-600 text-white shrink-0 shadow-2xs">
+                                                SUBCRITERIA
+                                              </span>
+                                              <span 
+                                                onClick={() => toggleExpandCriteria(subCritId)}
+                                                className="text-xs font-bold text-slate-800 truncate cursor-pointer hover:text-blue-700"
+                                              >
+                                                {subCritCode ? `${subCritCode}. ${subCritName}` : subCritName}
+                                              </span>
+                                            </div>
+
+                                            <button
+                                              type="button"
+                                              onClick={() => toggleExpandCriteria(subCritId)}
+                                              className="text-blue-600 hover:text-blue-800 p-0.5 rounded hover:bg-blue-200/50 transition-colors"
+                                            >
+                                              {isSubCritExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                                            </button>
+                                          </div>
+
+                                          {/* Sub-criteria Requirements */}
+                                          {isSubCritExpanded && (
+                                            <div className="p-2 space-y-1.5 bg-slate-50/40">
+                                              {subReqs.length === 0 ? (
+                                                <p className="text-[11px] text-slate-400 italic px-2 py-1">No requirements in this subcriterion.</p>
+                                              ) : (
+                                                subReqs.map((req) => {
+                                                  const reqId = Number(req.id || req.RequirementID);
+                                                  const isReqSelected = selectedRequirementIds.has(reqId);
+                                                  const reqCode = req.RequirementCode || req.code || req.req_code || `Req #${reqId}`;
+                                                  const reqTitle = req.RequirementTitle || req.Title || req.title || req.RequirementName || req.description || req.Description || '';
+
+                                                  return (
+                                                    <div
+                                                      key={reqId}
+                                                      onClick={() => toggleRequirement(reqId)}
+                                                      className={`flex items-start gap-2.5 p-2.5 rounded-lg border transition-all cursor-pointer ${
+                                                        isReqSelected
+                                                          ? 'border-blue-500 bg-blue-50/70 text-blue-950 shadow-2xs'
+                                                          : 'border-slate-200 hover:border-blue-200 bg-white'
+                                                      }`}
+                                                    >
+                                                      <input
+                                                        type="checkbox"
+                                                        checked={isReqSelected}
+                                                        onChange={() => toggleRequirement(reqId)}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className="mt-0.5 h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500/30 cursor-pointer"
+                                                      />
+                                                      <div className="text-xs min-w-0">
+                                                        <span className="font-bold block mb-0.5">
+                                                          {reqCode}
+                                                        </span>
+                                                        {reqTitle && (
+                                                          <p className="text-slate-600 text-[11px] leading-relaxed">
+                                                            {reqTitle}
+                                                          </p>
+                                                        )}
+                                                      </div>
+                                                    </div>
+                                                  );
+                                                })
+                                              )}
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+
+                                {reqs.length === 0 && critChildren.length === 0 && (
+                                  <p className="text-[11px] text-slate-400 italic px-2 py-1">No requirements or sub-criteria added yet.</p>
+                                )}
                               </div>
                             )}
                           </div>

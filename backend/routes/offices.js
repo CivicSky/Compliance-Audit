@@ -11,6 +11,9 @@ router.get("/:id/export", optionalAuth, OfficesController.exportOfficeExcel);
 router.get("/:id", OfficesController.getById);
 router.post("/", optionalAuth, OfficesController.create);
 router.put("/:id", optionalAuth, OfficesController.update);
+router.post("/delete-multiple", optionalAuth, OfficesController.deleteMultiple);
+router.delete("/delete-multiple", optionalAuth, OfficesController.deleteMultiple);
+router.delete("/", optionalAuth, OfficesController.deleteMultiple);
 router.delete("/:id", optionalAuth, OfficesController.delete);
 
 // Office Requirements Routes

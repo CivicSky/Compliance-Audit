@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import user from "../../assets/images/user.svg";
 import { officeHeadsAPI, officesAPI, usersAPI } from "../../utils/api";
 import { useModal } from "../UI/ModalProvider";
-import EditOfficeHeadModal from '../EditHead/EditOfficeHeadModal.jsx';
+import EditOfficeHeadModal from '../OfficeHead/EditOfficeHeadModal.jsx';
 import Pagination from "../Pagination/Pagination";
 import OfficeHeaddetails from "../OfficeHead/OfficeHeaddetails.jsx";
 import { API_BASE_URL } from '../../utils/apiBase';
@@ -539,19 +539,19 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                                             </div>
                                         )}
 
-                                        <div className="h-10 w-10 flex-shrink-0 rounded-xl overflow-hidden relative">
+                                        <div className="h-10 w-10 flex-shrink-0 rounded-full overflow-hidden relative">
                                             {profilePicUrl ? (
                                                 <img
                                                     src={profilePicUrl}
                                                     alt={fullName}
-                                                    className="h-full w-full rounded-xl object-cover ring-2 ring-slate-100"
+                                                    className="h-full w-full rounded-full object-cover ring-2 ring-slate-100"
                                                     onError={(e) => {
                                                         e.target.style.display = 'none';
                                                         if (e.target.nextElementSibling) e.target.nextElementSibling.style.display = 'flex';
                                                     }}
                                                 />
                                             ) : null}
-                                            <div className={`h-full w-full rounded-xl flex items-center justify-center font-bold text-white text-xs ${avatarStyle.bg} ${profilePicUrl ? 'hidden' : 'flex'}`}>
+                                            <div className={`h-full w-full rounded-full flex items-center justify-center font-bold text-white text-xs ${avatarStyle.bg} ${profilePicUrl ? 'hidden' : 'flex'}`}>
                                                 {initials}
                                             </div>
                                         </div>
@@ -690,11 +690,11 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                                                         e.target.style.display = 'none';
                                                         if (e.target.nextElementSibling) e.target.nextElementSibling.style.display = 'flex';
                                                     }}
-                                                    className="h-10 w-10 rounded-xl object-cover ring-2 ring-slate-100 shadow-xs"
+                                                    className="h-10 w-10 rounded-full object-cover ring-2 ring-slate-100 shadow-xs"
                                                 />
                                             ) : null}
                                             <div
-                                                className={`h-10 w-10 rounded-xl flex items-center justify-center font-bold text-white text-xs shadow-xs ring-2 ${avatarStyle.ring} ${avatarStyle.bg} ${profilePicUrl ? 'hidden' : 'flex'}`}
+                                                className={`h-10 w-10 rounded-full flex items-center justify-center font-bold text-white text-xs shadow-xs ring-2 ${avatarStyle.ring} ${avatarStyle.bg} ${profilePicUrl ? 'hidden' : 'flex'}`}
                                             >
                                                 {initials}
                                             </div>

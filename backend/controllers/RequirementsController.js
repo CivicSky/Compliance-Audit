@@ -66,25 +66,30 @@ const getAllRequirements = async (req, res) => {
         r.*, 
         c.CriteriaName, 
         c.CriteriaCode,
-        c.AreaID,
+        c.ParentCriteriaID,
+        pc.CriteriaName AS ParentCriteriaName,
+        pc.CriteriaCode AS ParentCriteriaCode,
+        COALESCE(c.AreaID, pc.AreaID) AS AreaID,
         a.AreaCode,
         a.AreaName,
         a.SortOrder AS AreaSortOrder,
-        e.EventID,
-        e.EventName,
-        e.EventCode
+        COALESCE(c.EventID, pc.EventID, e.EventID) AS EventID,
+        COALESCE(e.EventName, pe.EventName) AS EventName,
+        COALESCE(e.EventCode, pe.EventCode) AS EventCode
       FROM requirements r
       LEFT JOIN criteria c ON r.CriteriaID = c.CriteriaID
-      LEFT JOIN areas a ON c.AreaID = a.AreaID
+      LEFT JOIN criteria pc ON c.ParentCriteriaID = pc.CriteriaID
+      LEFT JOIN areas a ON COALESCE(c.AreaID, pc.AreaID) = a.AreaID
       LEFT JOIN Events e ON c.EventID = e.EventID
+      LEFT JOIN Events pe ON pc.EventID = pe.EventID
     `;
     
     const params = [];
     
     // Filter by event if eventId is provided
     if (eventId) {
-      query += ` WHERE e.EventID = ?`;
-      params.push(eventId);
+      query += ` WHERE (c.EventID = ? OR pc.EventID = ?)`;
+      params.push(eventId, eventId);
     }
     
     query += ` ORDER BY a.SortOrder ASC, c.CriteriaCode ASC, r.RequirementCode ASC`;
@@ -1295,7 +1300,7 @@ const markUserAsUploaded = async (req, res) => {
 const autoAssignHeadsToRequirementsForOffice = async (officeId, requirementIds = [], actorUserId = null) => {
   if (!officeId || !Array.isArray(requirementIds) || requirementIds.length === 0) return { success: true, assigned: 0 };
 
-  // Get head user IDs for the office
+  // 1. Get head user IDs for the office
   const [headRows] = await db.query(
     `SELECT h.UserID FROM office_head_assignments oha
      JOIN headofoffice h ON oha.HeadID = h.HeadID
@@ -1306,71 +1311,70 @@ const autoAssignHeadsToRequirementsForOffice = async (officeId, requirementIds =
   const headUserIds = headRows.map(r => Number(r.UserID)).filter(id => Number.isInteger(id) && id > 0);
   if (headUserIds.length === 0) return { success: true, assigned: 0 };
 
-  let totalAssigned = 0;
+  // 2. Fetch ALL existing assignments for this office in a single query
+  const [allAssignedRows] = await db.query(
+    `SELECT RequirementID, UserID FROM requirement_user_assignments WHERE OfficeID = ?`,
+    [officeId]
+  );
 
+  const assignmentsByReq = new Map();
+  for (const row of allAssignedRows) {
+    const reqId = Number(row.RequirementID);
+    const uId = Number(row.UserID);
+    if (!assignmentsByReq.has(reqId)) {
+      assignmentsByReq.set(reqId, new Set());
+    }
+    assignmentsByReq.get(reqId).add(uId);
+  }
+
+  // 3. Compute bulk insert tuples in-memory
+  const insertTuples = [];
   for (const reqId of requirementIds) {
     const requirementId = Number(reqId);
     if (!Number.isInteger(requirementId) || requirementId <= 0) continue;
 
-    // how many already assigned to this requirement in this office
-    const [countRows] = await db.query('SELECT COUNT(*) as count FROM requirement_user_assignments WHERE RequirementID = ? AND OfficeID = ?', [requirementId, officeId]);
-    const currentCount = Number(countRows[0]?.count || 0);
-    const remainingSlots = Math.max(0, 4 - currentCount);
+    const assignedSet = assignmentsByReq.get(requirementId) || new Set();
+    const remainingSlots = Math.max(0, 4 - assignedSet.size);
     if (remainingSlots <= 0) continue;
 
-    // which head users are not yet assigned to this requirement
-    const placeholders = headUserIds.map(() => '?').join(',');
-    const alreadyQuery = `SELECT UserID FROM requirement_user_assignments WHERE RequirementID = ? AND OfficeID = ? AND UserID IN (${placeholders})`;
-    const alreadyParams = [requirementId, officeId, ...headUserIds];
-    const [alreadyRows] = await db.query(alreadyQuery, alreadyParams);
-    const alreadyAssignedIds = new Set(alreadyRows.map(r => Number(r.UserID)));
-
-    const toAssign = headUserIds.filter(id => !alreadyAssignedIds.has(id)).slice(0, remainingSlots);
-    if (toAssign.length === 0) continue;
-
-    const insertValuesSql = toAssign.map(userId => `(${Number(requirementId)}, ${Number(officeId)}, ${Number(userId)}, ${actorUserId ? Number(actorUserId) : 'NULL'})`).join(',');
-    await db.query(`INSERT INTO requirement_user_assignments (RequirementID, OfficeID, UserID, AssignedBy) VALUES ${insertValuesSql}`);
-
-    // send notifications (best-effort)
-    try {
-      const [[requirementRow]] = await db.query(
-        `SELECT r.RequirementCode, o.OfficeName, e.EventName
-         FROM requirements r
-         LEFT JOIN criteria c ON c.CriteriaID = r.CriteriaID
-         LEFT JOIN events e ON e.EventID = c.EventID
-         LEFT JOIN offices o ON o.OfficeID = ?
-         WHERE r.RequirementID = ?
-         LIMIT 1`,
-        [officeId, requirementId]
-      );
-
-      const requirementCode = requirementRow?.RequirementCode || `Requirement #${requirementId}`;
-      const officeName = requirementRow?.OfficeName || 'your office';
-      const eventName = requirementRow?.EventName || 'an event';
-      const message = `You were assigned to ${requirementCode} for office ${officeName} in ${eventName}.`;
-
-      await createNotifications({
-        userIds: toAssign,
-        adminId: actorUserId,
-        title: 'New Requirement Assignment',
-        message,
-        type: 'info',
-        relatedTable: 'requirements_assignment',
-        relatedId: Number(officeId),
-        meta: {
-          officeId: Number(officeId),
-          requirementId: Number(requirementId),
-          openSubmission: true,
-        },
-      });
-    } catch (notifErr) {
-      console.error('autoAssign: failed to notify assigned users', notifErr);
+    const toAssign = headUserIds.filter(id => !assignedSet.has(id)).slice(0, remainingSlots);
+    for (const userId of toAssign) {
+      insertTuples.push([requirementId, Number(officeId), Number(userId), actorUserId ? Number(actorUserId) : null]);
+      assignedSet.add(userId);
     }
-
-    totalAssigned += toAssign.length;
   }
 
-  return { success: true, assigned: totalAssigned };
+  if (insertTuples.length === 0) {
+    return { success: true, assigned: 0 };
+  }
+
+  // 4. Perform a single batch insert
+  const insertValuesSql = insertTuples.map(([rId, oId, uId, aBy]) => `(${rId}, ${oId}, ${uId}, ${aBy ? Number(aBy) : 'NULL'})`).join(',');
+  await db.query(`INSERT INTO requirement_user_assignments (RequirementID, OfficeID, UserID, AssignedBy) VALUES ${insertValuesSql} ON CONFLICT DO NOTHING`);
+
+  // 5. Send aggregated notification per office in the background
+  try {
+    const [[officeRow]] = await db.query('SELECT OfficeName FROM offices WHERE OfficeID = ?', [officeId]);
+    const officeName = officeRow?.OfficeName || 'your office';
+
+    createNotifications({
+      userIds: headUserIds,
+      adminId: actorUserId,
+      title: 'New Requirement Assignments',
+      message: `You were assigned to requirements for office ${officeName}.`,
+      type: 'info',
+      relatedTable: 'requirements_assignment',
+      relatedId: Number(officeId),
+      meta: {
+        officeId: Number(officeId),
+        openSubmission: true,
+      },
+    }).catch(e => console.warn('Background notification error:', e.message));
+  } catch (notifErr) {
+    console.warn('autoAssign: failed to notify assigned users', notifErr.message);
+  }
+
+  return { success: true, assigned: insertTuples.length };
 };
 
 module.exports = {

@@ -34,9 +34,23 @@ export default function Navbar({ isMobileMenuOpen: propIsMobileMenuOpen, setIsMo
     const setIsMobileMenuOpen = propSetIsMobileMenuOpen || setInternalIsMobileMenuOpen;
     const [isSidebarExpanded, setIsSidebarExpanded] = useState(getInitialSidebarExpanded);
     const [isHoverExpanded, setIsHoverExpanded] = useState(false);
+    const [expandOnHover, setExpandOnHover] = useState(() => {
+        if (typeof window === 'undefined') return true;
+        const stored = window.localStorage.getItem('sidebarExpandOnHover');
+        return stored === null ? true : stored === 'true';
+    });
     const profileMenuRef = useRef(null);
     const mobileMenuRef = useRef(null);
     const navigate = useNavigate();
+
+    const isAdmin = Boolean(
+        currentUser && (Number(currentUser.RoleID) === 1 || currentUser.RoleName === 'admin' || currentUser.role_name === 'admin')
+    );
+
+    // Persist expand on hover preference
+    useEffect(() => {
+        localStorage.setItem('sidebarExpandOnHover', String(expandOnHover));
+    }, [expandOnHover]);
 
     // Unified logout function
     const handleLogout = () => {
@@ -176,9 +190,9 @@ export default function Navbar({ isMobileMenuOpen: propIsMobileMenuOpen, setIsMo
         <>
             {/* Desktop Sidebar */}
             <nav
-                onMouseEnter={() => { if (!isSidebarExpanded) setIsHoverExpanded(true); }}
+                onMouseEnter={() => { if (!isSidebarExpanded && expandOnHover) setIsHoverExpanded(true); }}
                 onMouseLeave={() => { if (!isSidebarExpanded) setIsHoverExpanded(false); }}
-                className={`nav-no-zoom hidden lg:flex fixed top-0 left-0 h-screen border-r border-slate-800/80 shadow-2xl z-50 flex-col justify-between p-3.5 overflow-hidden transition-[width] duration-200 ease-in-out ${effectiveExpanded ? 'w-64' : 'w-16'}`}
+                className={`nav-no-zoom hidden lg:flex fixed top-0 left-0 h-screen border-r border-slate-800/80 shadow-2xl z-[60] flex-col justify-between p-3.5 overflow-hidden transition-[width] duration-200 ease-in-out ${effectiveExpanded ? 'w-64' : 'w-16'}`}
                 style={{ background: '#090e1a' }}
             >
                 <div className="flex flex-col space-y-1.5">
@@ -232,7 +246,7 @@ export default function Navbar({ isMobileMenuOpen: propIsMobileMenuOpen, setIsMo
                             <span className="text-[11px] font-extrabold uppercase tracking-wider text-blue-500">Management</span>
                         </div>
 
-                        {(!currentUser || (currentUser.RoleID !== 4 && currentUser.RoleName !== 'Auditor' && !currentUser.isExternalAuditor)) && (
+                        {isAdmin && (
                             <NavLink
                                 to="/home/events"
                                 onClick={(e) => {
@@ -257,26 +271,26 @@ export default function Navbar({ isMobileMenuOpen: propIsMobileMenuOpen, setIsMo
                             className={navLinkClass}
                         >
                             <span className="w-4 text-center shrink-0">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                    <rect x="6" y="5" width="12" height="16" rx="2" strokeWidth="2" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3h6a1 1 0 011 1v2H8V4a1 1 0 011-1z" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 10h6M9 14h6M9 18h4" />
+                                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
                                 </svg>
                             </span>
                             <span className={labelClass} style={labelStyle}>Accreditation</span>
                         </NavLink>
 
-                        <NavLink
-                            to="/home/master-list"
-                            className={navLinkClass}
-                        >
-                            <span className="w-4 text-center shrink-0">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                                </svg>
-                            </span>
-                            <span className={labelClass} style={labelStyle}>Master List</span>
-                        </NavLink>
+                        {isAdmin && (
+                            <NavLink
+                                to="/home/master-list"
+                                className={navLinkClass}
+                            >
+                                <span className="w-4 text-center shrink-0">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                                    </svg>
+                                </span>
+                                <span className={labelClass} style={labelStyle}>Master List</span>
+                            </NavLink>
+                        )}
 
                         <NavLink
                             to="/home/acc-management"
@@ -294,20 +308,18 @@ export default function Navbar({ isMobileMenuOpen: propIsMobileMenuOpen, setIsMo
                         </NavLink>
                     </div>
 
-                    {/* Section: USERS */}
-                    <div className="space-y-1">
-                        <div className={sectionClass} style={sectionStyle}>
-                            <span className="text-[11px] font-extrabold uppercase tracking-wider text-blue-500">Users</span>
-                        </div>
-                        {currentUser && currentUser.RoleID === 1 && (
+                    {/* Section: USERS (Admin only) */}
+                    {isAdmin && (
+                        <div className="space-y-1">
+                            <div className={sectionClass} style={sectionStyle}>
+                                <span className="text-[11px] font-extrabold uppercase tracking-wider text-blue-500">Users</span>
+                            </div>
                             <NavLink to="/home/officehead" className={navLinkClass}>
                                 <span className="w-4 text-center shrink-0">
                                     {renderSharedPeopleIcon()}
                                 </span>
                                 <span className={labelClass} style={labelStyle}>Office Personnel</span>
                             </NavLink>
-                        )}
-                        {currentUser && currentUser.RoleID === 1 && (
                             <NavLink to="/home/external-auditors" className={navLinkClass}>
                                 <span className="w-4 text-center shrink-0">
                                     <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -316,16 +328,14 @@ export default function Navbar({ isMobileMenuOpen: propIsMobileMenuOpen, setIsMo
                                 </span>
                                 <span className={labelClass} style={labelStyle}>External Auditors</span>
                             </NavLink>
-                        )}
-                        {currentUser && currentUser.RoleID === 1 && (
                             <NavLink to="/home/users" className={navLinkClass}>
                                 <span className="w-4 text-center shrink-0">
                                     {renderSingleUserIcon()}
                                 </span>
                                 <span className={labelClass} style={labelStyle}>Users</span>
                             </NavLink>
-                        )}
-                    </div>
+                        </div>
+                    )}
 
                     {/* Section: LOGS */}
                     {currentUser && currentUser.RoleID === 1 && (
@@ -345,8 +355,35 @@ export default function Navbar({ isMobileMenuOpen: propIsMobileMenuOpen, setIsMo
                     )}
                 </div>
 
+                {/* Hover Expand Toggle Preference */}
+                <div className={`mt-auto mb-1.5 p-1.5 rounded-xl bg-slate-800/40 border border-slate-700/40 flex items-center transition-all duration-200 ${effectiveExpanded ? 'justify-between px-2.5' : 'justify-center'}`}>
+                    <div className={`flex items-center gap-2 min-w-0 overflow-hidden transition-[max-width,opacity] duration-200 ${effectiveExpanded ? 'max-w-[10rem] opacity-100' : 'max-w-0 opacity-0'}`}>
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${expandOnHover ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]' : 'bg-slate-500'}`} />
+                        <span className="text-[11px] font-semibold text-slate-300 truncate whitespace-nowrap">Expand on hover</span>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setExpandOnHover(prev => !prev);
+                        }}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border border-slate-600/50 transition-colors duration-200 ease-in-out focus:outline-none ${
+                            expandOnHover ? 'bg-blue-600' : 'bg-slate-700/80'
+                        }`}
+                        title={expandOnHover ? 'Hover expand is ON (click to disable)' : 'Hover expand is OFF (click to enable)'}
+                        aria-label="Toggle expand on hover"
+                    >
+                        <span
+                            aria-hidden="true"
+                            className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out mt-[2px] ${
+                                expandOnHover ? 'translate-x-4 ml-[2px]' : 'translate-x-0.5'
+                            }`}
+                        />
+                    </button>
+                </div>
+
                 {/* Bottom Profile Section */}
-                <div className="relative border-t border-slate-800/80 pt-2.5 mt-auto" ref={profileMenuRef}>
+                <div className="relative border-t border-slate-800/80 pt-2.5" ref={profileMenuRef}>
                     <div className={`flex items-center p-1.5 hover:bg-white/5 rounded-xl transition-colors duration-200 ${effectiveExpanded ? 'justify-between' : 'justify-center'}`}>
                         <NavLink to="/home/Profile" className={`flex items-center ${effectiveExpanded ? 'gap-2.5 flex-1 min-w-0' : 'justify-center'}`}>
                             <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center overflow-hidden shrink-0 border border-slate-700/60 shadow-sm">
@@ -468,25 +505,27 @@ export default function Navbar({ isMobileMenuOpen: propIsMobileMenuOpen, setIsMo
                                 <span className="text-[11px] font-extrabold uppercase tracking-wider text-blue-500">Management</span>
                             </div>
 
-                            <NavLink
-                                to="/home/events"
-                                onClick={(e) => {
-                                    if (window.location.pathname === '/home/officehead') {
-                                        e.preventDefault();
-                                        window.location.href = '/home/events';
-                                        return;
-                                    }
-                                    setIsMobileMenuOpen(false);
-                                }}
-                                className={mobileNavLinkClass}
-                            >
-                                <span className="w-4 text-center">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                    </svg>
-                                </span>
-                                <span className="text-xs font-semibold">Downloads</span>
-                            </NavLink>
+                            {isAdmin && (
+                                <NavLink
+                                    to="/home/events"
+                                    onClick={(e) => {
+                                        if (window.location.pathname === '/home/officehead') {
+                                            e.preventDefault();
+                                            window.location.href = '/home/events';
+                                            return;
+                                        }
+                                        setIsMobileMenuOpen(false);
+                                    }}
+                                    className={mobileNavLinkClass}
+                                >
+                                    <span className="w-4 text-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                    </span>
+                                    <span className="text-xs font-semibold">Downloads</span>
+                                </NavLink>
+                            )}
 
                             <NavLink
                                 to="/home/allc"
@@ -494,28 +533,28 @@ export default function Navbar({ isMobileMenuOpen: propIsMobileMenuOpen, setIsMo
                                 onClick={() => setIsMobileMenuOpen(false)}
                             >
                                 <span className="w-4 text-center">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                        <rect x="6" y="5" width="12" height="16" rx="2" strokeWidth="2" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3h6a1 1 0 011 1v2H8V4a1 1 0 011-1z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 10h6M9 14h6M9 18h4" />
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
                                     </svg>
                                 </span>
                                 <span className="text-xs font-medium">Accreditation</span>
                             </NavLink>
 
-                            <NavLink
-                                to="/home/master-list"
-                                className={mobileNavLinkClass}
-                                onClick={() => setIsMobileMenuOpen(false)}
-                            >
-                                <span className="w-4 text-center">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7a2 2 0 012-2h3l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2H6a2 2 0 01-2-2V7z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6" />
-                                    </svg>
-                                </span>
-                                <span className="text-xs font-medium">Master List</span>
-                            </NavLink>
+                            {isAdmin && (
+                                <NavLink
+                                    to="/home/master-list"
+                                    className={mobileNavLinkClass}
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                >
+                                    <span className="w-4 text-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7a2 2 0 012-2h3l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2H6a2 2 0 01-2-2V7z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6" />
+                                        </svg>
+                                    </span>
+                                    <span className="text-xs font-medium">Master List</span>
+                                </NavLink>
+                            )}
 
                             <NavLink
                                 to="/home/acc-management"
@@ -534,12 +573,12 @@ export default function Navbar({ isMobileMenuOpen: propIsMobileMenuOpen, setIsMo
                             </NavLink>
                         </div>
 
-                        {/* Users */}
-                        <div className="space-y-1">
-                            <div className={mobileSectionClass}>
-                                <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: '#60a5fa' }}>Users</span>
-                            </div>
-                            {currentUser && currentUser.RoleID === 1 && (
+                        {/* Users (Admin only) */}
+                        {isAdmin && (
+                            <div className="space-y-1">
+                                <div className={mobileSectionClass}>
+                                    <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: '#60a5fa' }}>Users</span>
+                                </div>
                                 <NavLink
                                     to="/home/officehead"
                                     className={mobileNavLinkClass}
@@ -548,8 +587,6 @@ export default function Navbar({ isMobileMenuOpen: propIsMobileMenuOpen, setIsMo
                                     <span className="w-4 text-center">{renderSharedPeopleIcon()}</span>
                                     <span className="text-xs font-medium">Office Personnel</span>
                                 </NavLink>
-                            )}
-                            {currentUser && currentUser.RoleID === 1 && (
                                 <NavLink
                                     to="/home/external-auditors"
                                     className={mobileNavLinkClass}
@@ -562,8 +599,6 @@ export default function Navbar({ isMobileMenuOpen: propIsMobileMenuOpen, setIsMo
                                     </span>
                                     <span className="text-xs font-medium">External Auditors</span>
                                 </NavLink>
-                            )}
-                            {currentUser && currentUser.RoleID === 1 && (
                                 <NavLink
                                     to="/home/users"
                                     className={mobileNavLinkClass}
@@ -572,8 +607,8 @@ export default function Navbar({ isMobileMenuOpen: propIsMobileMenuOpen, setIsMo
                                     <span className="w-4 text-center">{renderSingleUserIcon()}</span>
                                     <span className="text-xs font-medium">Users</span>
                                 </NavLink>
-                            )}
-                        </div>
+                            </div>
+                        )}
 
                         {/* Logs */}
                         {currentUser && currentUser.RoleID === 1 && (

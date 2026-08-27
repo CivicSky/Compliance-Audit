@@ -22,6 +22,14 @@ const getFileTypeLabel = (ext) => {
 const isImageExt = (ext) => ['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif'].includes(ext);
 const isVideoExt = (ext) => ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'].includes(ext);
 
+const formatBytes = (bytes) => {
+    if (!bytes || bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+};
+
 export default function YourWorkFileUpload({
     requirementId,
     hasUploaded = false,
@@ -29,6 +37,7 @@ export default function YourWorkFileUpload({
     files = [],
     isLoadingFile = false,
     uploading = false,
+    uploadProgressMap = {},
     unsubmitting = false,
     onUpload,
     onUnsubmit,
@@ -192,7 +201,7 @@ export default function YourWorkFileUpload({
                         <span className="text-sm font-semibold text-slate-800">Evidence Files</span>
                         {localFiles.length > 0 && (
                             <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700">
-                                {localFiles.length} uploaded
+                                {localFiles.length}/40 uploaded
                             </span>
                         )}
                     </div>
@@ -215,6 +224,10 @@ export default function YourWorkFileUpload({
                         const commentText = String(item.comment || '');
                         const isLongComment = commentText.length > 130 || commentText.split('\n').length > 2;
 
+                        const reviewStatus = item.reviewStatus || 'pending';
+                        const isApproved = reviewStatus === 'approved';
+                        const isRejected = reviewStatus === 'rejected';
+
                         return (
                             <div
                                 key={fileIdKey}
@@ -227,9 +240,46 @@ export default function YourWorkFileUpload({
                                 className={`group/card cursor-pointer flex flex-col gap-2.5 rounded-xl border bg-white p-3.5 shadow-2xs transition-all ${
                                     draggedIdx === index ? 'opacity-40 scale-[0.98] border-dashed border-blue-400 bg-blue-50/20' : 
                                     dragOverIdx === index ? 'border-blue-500 ring-2 ring-blue-400/50 shadow-md scale-[1.01]' : 
+                                    isRejected ? 'border-rose-300/80 bg-rose-50/10 hover:border-rose-400 hover:shadow-md' :
+                                    isApproved ? 'border-emerald-200/80 bg-emerald-50/10 hover:border-emerald-400 hover:shadow-md' :
                                     'border-slate-200/90 hover:border-blue-400 hover:shadow-md hover:bg-blue-50/20'
                                 } ${compact ? 'text-xs' : ''}`}
                             >
+                                {/* Top Review Badge Header */}
+                                <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-1.5">
+                                        {isApproved && (
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-2xs">
+                                                <svg className="w-3 h-3 text-emerald-600 stroke-current" fill="none" viewBox="0 0 24 24" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                    <polyline points="20 6 9 17 4 12" />
+                                                </svg>
+                                                Approved
+                                            </span>
+                                        )}
+                                        {isRejected && (
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200 shadow-2xs">
+                                                <svg className="w-3 h-3 text-rose-600 stroke-current" fill="none" viewBox="0 0 24 24" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                                </svg>
+                                                Needs Revision
+                                            </span>
+                                        )}
+                                        {!isApproved && !isRejected && (
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 shadow-2xs">
+                                                <svg className="w-3 h-3 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                                    <circle cx="12" cy="12" r="9"/>
+                                                    <polyline points="12 7 12 12 15 14"/>
+                                                </svg>
+                                                Pending Review
+                                            </span>
+                                        )}
+                                    </div>
+                                    <span className="text-[10px] font-semibold text-slate-400">
+                                        File #{index + 1}
+                                    </span>
+                                </div>
+
                                 <div className="flex items-center justify-between gap-3">
                                     {!readOnly && localFiles.length > 1 && (
                                         <div 
@@ -243,7 +293,11 @@ export default function YourWorkFileUpload({
                                         </div>
                                     )}
                                     <div className="min-w-0 flex-1 flex items-start gap-3">
-                                        <div className="h-11 w-11 shrink-0 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden shadow-2xs group-hover/card:border-blue-300">
+                                        <div className={`h-11 w-11 shrink-0 rounded-lg border bg-slate-50 flex items-center justify-center overflow-hidden shadow-2xs group-hover/card:border-blue-300 ${
+                                            isApproved ? 'border-emerald-200 bg-emerald-50/40' :
+                                            isRejected ? 'border-rose-200 bg-rose-50/40' :
+                                            'border-slate-200'
+                                        }`}>
                                             {isImageExt(ext) && fileUrl ? (
                                                 <img src={fileUrl} alt="" className="h-full w-full object-cover" />
                                             ) : isVideoExt(ext) ? (
@@ -307,49 +361,151 @@ export default function YourWorkFileUpload({
                                     </div>
                                 </div>
 
-                                {/* Dedicated Multi-Line Per-File Comment Section */}
-                                <div 
-                                    className="mt-1.5 pt-2 border-t border-slate-100 flex flex-col gap-1"
-                                    onClick={(e) => e.stopPropagation()}
-                                >
-                                    <div className="flex items-center justify-between text-[11px] font-semibold text-slate-700">
-                                        <span>Comment:</span>
-                                        {isLongComment && !isAdmin && (
-                                            <button
-                                                type="button"
-                                                onClick={(e) => toggleExpandComment(e, fileIdKey)}
-                                                className="text-[10px] font-medium text-blue-600 hover:underline"
-                                            >
-                                                {isExpanded ? 'Show less' : 'Show more'}
-                                            </button>
+                                {/* Rejection Feedback Banner (if rejected) */}
+                                {isRejected && (item.rejectionReason || commentText) ? (
+                                    <div 
+                                        className="rounded-lg bg-rose-50 border border-rose-200/90 p-2.5 text-xs text-rose-900 flex flex-col gap-1 shadow-2xs"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <div className="flex items-center gap-1.5 font-bold text-rose-800 text-[11px]">
+                                            <svg className="w-3.5 h-3.5 shrink-0 text-rose-600" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                            </svg>
+                                            <span>Auditor Revision Feedback:</span>
+                                        </div>
+                                        <p className="text-rose-700 font-medium text-[11px] leading-snug pl-5 whitespace-pre-wrap break-words break-all [overflow-wrap:anywhere]">
+                                            {item.rejectionReason || commentText}
+                                        </p>
+                                        {item.reviewerName && (
+                                            <span className="text-[10px] text-rose-500 pl-5 font-normal">Reviewed by: {item.reviewerName}</span>
                                         )}
                                     </div>
-
-                                    {isAdmin ? (
-                                        <textarea
-                                            rows={2}
-                                            defaultValue={commentText}
-                                            onBlur={(e) => handleSaveComment(item, e.target.value)}
-                                            placeholder="Add auditor feedback comment (supports multiple lines)..."
-                                            className="w-full rounded-lg border border-slate-200 bg-slate-50/80 p-2 text-xs font-medium text-slate-800 shadow-2xs focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder:text-slate-400 resize-y min-h-[54px]"
-                                        />
-                                    ) : (
-                                        <div className="w-full rounded-lg border border-slate-100 bg-slate-50/90 p-2.5 text-xs text-slate-700 font-medium break-words whitespace-pre-wrap leading-relaxed">
-                                            {commentText ? (
-                                                <span className={!isExpanded && isLongComment ? 'line-clamp-2' : ''}>
-                                                    {commentText}
-                                                </span>
-                                            ) : (
-                                                <span className="italic text-slate-400 font-normal">No comment from auditor</span>
+                                ) : (
+                                    /* Dedicated Multi-Line Per-File Comment Section (Only when not rejected) */
+                                    <div 
+                                        className="mt-1.5 pt-2 border-t border-slate-100 flex flex-col gap-1"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <div className="flex items-center justify-between text-[11px] font-semibold text-slate-700">
+                                            <span>{isApproved ? 'Auditor Note:' : 'Comment:'}</span>
+                                            {isLongComment && !isAdmin && (
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => toggleExpandComment(e, fileIdKey)}
+                                                    className="text-[10px] font-medium text-blue-600 hover:underline"
+                                                >
+                                                    {isExpanded ? 'Show less' : 'Show more'}
+                                                </button>
                                             )}
                                         </div>
-                                    )}
-                                </div>
+
+                                        {isAdmin ? (
+                                            <textarea
+                                                rows={2}
+                                                defaultValue={commentText}
+                                                onBlur={(e) => handleSaveComment(item, e.target.value)}
+                                                spellCheck={false}
+                                                autoCorrect="off"
+                                                autoCapitalize="off"
+                                                placeholder="Add auditor feedback comment (supports multiple lines)..."
+                                                className="w-full rounded-lg border border-slate-200 bg-slate-50/80 p-2 text-xs font-medium text-slate-800 shadow-2xs focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder:text-slate-400 resize-y min-h-[54px]"
+                                            />
+                                        ) : (
+                                            <div className="w-full rounded-lg border border-slate-100 bg-slate-50/90 p-2.5 text-xs text-slate-700 font-medium break-words break-all [overflow-wrap:anywhere] whitespace-pre-wrap leading-relaxed">
+                                                {commentText ? (
+                                                    <span className={!isExpanded && isLongComment ? 'line-clamp-2' : ''}>
+                                                        {commentText}
+                                                    </span>
+                                                ) : (
+                                                    <span className="italic text-slate-400 font-normal">No comment from auditor</span>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         );
                     })}
                 </div>
             )}
+
+            {/* Active Uploading Files (Individual standalone cards without outer wrapper) */}
+            {Object.keys(uploadProgressMap).length > 0 ? (
+                Object.values(uploadProgressMap).map((item, idx) => {
+                    const ext = getExtension(item.name);
+                    const isDone = item.percent >= 100 || item.status === 'done';
+                    const isError = item.status === 'error';
+
+                    return (
+                        <div
+                            key={item.name || idx}
+                            className="rounded-xl border border-slate-200 bg-white p-3 shadow-2xs transition-all space-y-2"
+                        >
+                            <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                    <div className="h-8 w-8 rounded-lg bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center shrink-0 font-bold text-[10px] uppercase shadow-2xs">
+                                        {ext.slice(0, 3) || 'DOC'}
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="text-xs font-semibold text-slate-800 truncate max-w-[220px]" title={item.name}>
+                                            {item.name}
+                                        </p>
+                                        <p className="text-[10px] text-slate-400">
+                                            {item.size ? formatBytes(item.size) : 'File'}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="shrink-0 flex items-center gap-1.5">
+                                    {isError ? (
+                                        <span className="inline-flex items-center gap-1 rounded-md bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-700 border border-rose-200">
+                                            Failed
+                                        </span>
+                                    ) : isDone ? (
+                                        <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
+                                            ✓ Ready
+                                        </span>
+                                    ) : (
+                                        <span className="text-[11px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
+                                            {item.percent || 0}%
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Progress Bar Track */}
+                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 border border-slate-200/50">
+                                <div
+                                    className={`h-full rounded-full transition-all duration-300 ${
+                                        isError
+                                            ? 'bg-rose-500'
+                                            : isDone
+                                                ? 'bg-emerald-500'
+                                                : 'bg-gradient-to-r from-blue-500 to-indigo-600'
+                                    }`}
+                                    style={{ width: `${Math.max(4, item.percent || 0)}%` }}
+                                />
+                            </div>
+                        </div>
+                    );
+                })
+            ) : uploading ? (
+                <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-2xs space-y-2">
+                    <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
+                        <span className="flex items-center gap-2">
+                            <span className="relative flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-600"></span>
+                            </span>
+                            Uploading file(s)...
+                        </span>
+                        <span className="text-[11px] text-blue-600 font-bold">Processing...</span>
+                    </div>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                        <div className="h-full w-2/3 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full animate-pulse" />
+                    </div>
+                </div>
+            ) : null}
 
             {/* Upload Button */}
             {!readOnly && (
@@ -363,21 +519,33 @@ export default function YourWorkFileUpload({
                         className="hidden"
                         disabled={uploading}
                     />
-                    <label
-                        htmlFor={inputId}
-                        className={`w-full cursor-pointer items-center justify-center rounded-xl border border-dashed border-blue-300 bg-blue-50/50 font-semibold text-blue-700 hover:border-blue-400 hover:bg-blue-100/60 transition-all ${compact ? 'inline-flex px-3 py-1.5 text-[11px]' : 'flex px-4 py-2.5 text-xs gap-2'}`}
-                    >
-                        {uploading ? (
-                            <span>Uploading files...</span>
-                        ) : (
-                            <>
-                                <svg className="h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                                </svg>
-                                <span>{localFiles.length > 0 ? '+ Add More Evidence Files' : '+ Select Evidence File(s)'}</span>
-                            </>
-                        )}
-                    </label>
+                    {localFiles.length >= 40 ? (
+                        <div className="w-full text-center py-2.5 px-3 rounded-xl border border-slate-200 bg-slate-100/80 text-xs font-semibold text-slate-500">
+                            Maximum limit reached (40/40 files uploaded)
+                        </div>
+                    ) : (
+                        <label
+                            htmlFor={inputId}
+                            className={`w-full cursor-pointer items-center justify-center rounded-xl border border-dashed border-blue-300 bg-blue-50/50 font-semibold text-blue-700 hover:border-blue-400 hover:bg-blue-100/60 transition-all ${compact ? 'inline-flex px-3 py-1.5 text-[11px]' : 'flex px-4 py-2.5 text-xs gap-2'} ${uploading ? 'opacity-60 pointer-events-none' : ''}`}
+                        >
+                            {uploading ? (
+                                <span className="flex items-center gap-2">
+                                    <svg className="animate-spin h-3.5 w-3.5 text-blue-600" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                                    </svg>
+                                    Uploading files in progress...
+                                </span>
+                            ) : (
+                                <>
+                                    <svg className="h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                                    </svg>
+                                    <span>{localFiles.length > 0 ? `+ Add More Evidence Files (${localFiles.length}/40)` : '+ Select Evidence File(s) (Max 40)'}</span>
+                                </>
+                            )}
+                        </label>
+                    )}
                 </>
             )}
         </div>

@@ -251,3 +251,24 @@ exports.deleteItem = async (req, res) => {
   }
 };
 
+exports.deleteMultiple = async (req, res) => {
+  try {
+    const rawIds = req.body?.ids || req.body?.itemIds || req.body?.masterListIds || req.body?.data?.ids || [];
+    const ids = Array.isArray(rawIds) ? rawIds.map(Number).filter(n => Number.isInteger(n) && n > 0) : [];
+    if (ids.length === 0) {
+      return res.status(400).json({ success: false, message: 'No valid IDs provided' });
+    }
+    const placeholders = ids.map(() => '?').join(',');
+    await db.query(`DELETE FROM master_list WHERE id IN (${placeholders})`, ids);
+    if (req.user && req.user.userId) {
+      try {
+        recordLog(req.user.userId, 'MasterListItemsDeleted', { ids });
+      } catch (e) {}
+    }
+    return res.json({ success: true, message: `Successfully deleted ${ids.length} item(s)` });
+  } catch (error) {
+    console.error('Error bulk deleting master list items:', error);
+    return res.status(500).json({ success: false, message: 'Failed to delete selected master list items', error: error.message });
+  }
+};
+

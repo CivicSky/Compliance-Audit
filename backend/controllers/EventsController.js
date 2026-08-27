@@ -445,123 +445,159 @@ const updateEvent = async (req, res) => {
   }
 };
 
-// Get list of downloadable event folders
+// Get list of downloadable event folders (DB-driven — works with Supabase storage)
 const getDownloadableFolders = async (req, res) => {
   try {
-    const eventsBasePath = path.join(__dirname, '..', 'uploads', 'events');
-    
-    // Check if events directory exists
-    if (!fs.existsSync(eventsBasePath)) {
-      return res.json({
-        success: true,
-        folders: []
-      });
-    }
+    // Return events that have at least one uploaded file in the DB
+    const [rows] = await db.query(`
+      SELECT DISTINCT e.EventID, e.EventName, e.EventCode
+      FROM events e
+      WHERE EXISTS (
+        SELECT 1 FROM office_proof_documents opd
+        JOIN offices o ON o.OfficeID = opd.office_id
+        WHERE o.EventID = e.EventID AND opd.file_path IS NOT NULL AND opd.file_path != ''
+      )
+      ORDER BY e.EventName ASC
+    `);
 
-    // Read all directories in uploads/events
-    const entries = fs.readdirSync(eventsBasePath, { withFileTypes: true });
-    const folders = entries
-      .filter(entry => entry.isDirectory())
-      .map(entry => entry.name);
+    // Return both folder name (sanitized EventCode) and the original EventName/Code for display
+    const folders = rows.map(r => sanitizeFolderName(r.EventCode || r.EventName));
 
-    res.json({
-      success: true,
-      folders
-    });
+    res.json({ success: true, folders });
   } catch (error) {
     console.error('Error fetching downloadable folders:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching downloadable folders'
-    });
+    res.status(500).json({ success: false, message: 'Error fetching downloadable folders' });
   }
 };
 
-// Download event folder as zip
+// Download event folder as zip — streams files from DB records (Supabase URLs or local disk)
 const downloadEventZip = async (req, res) => {
   try {
     const { eventName } = req.params;
-
     if (!eventName) {
-      return res.status(400).json({
-        success: false,
-        message: 'Event name is required'
-      });
+      return res.status(400).json({ success: false, message: 'Event name is required' });
     }
 
-    // Sanitize the event name to match folder name
     const sanitizedName = sanitizeFolderName(eventName);
-    const eventsBasePath = path.join(__dirname, '..', 'uploads', 'events');
 
-    // First try exact sanitized folder name
-    let eventFolderPath = path.join(eventsBasePath, sanitizedName);
+    // Look up the event from DB by sanitized EventCode or EventName
+    const [eventRows] = await db.query(
+      `SELECT EventID, EventName, EventCode FROM events WHERE ? IN (EventCode, EventName) OR ? = REGEXP_REPLACE(COALESCE(EventCode, EventName), '[^A-Za-z0-9.-]+', '_') LIMIT 1`,
+      [eventName, sanitizedName]
+    );
 
-    // If exact folder doesn't exist, try to find a folder whose sanitized form matches
-    if (!fs.existsSync(eventFolderPath)) {
-      try {
-        const entries = fs.readdirSync(eventsBasePath, { withFileTypes: true });
-        const matched = entries.find(entry => entry.isDirectory() && sanitizeFolderName(entry.name) === sanitizedName);
-        if (matched) {
-          eventFolderPath = path.join(eventsBasePath, matched.name);
-        }
-      } catch (err) {
-        // ignore and proceed to not-found below
-      }
+    // Fallback: match by sanitized form
+    let event = eventRows[0];
+    if (!event) {
+      const [allEvents] = await db.query('SELECT EventID, EventName, EventCode FROM events');
+      event = allEvents.find(e => sanitizeFolderName(e.EventCode || e.EventName) === sanitizedName);
     }
 
-    // Check if folder exists after matching attempt
-    if (!fs.existsSync(eventFolderPath)) {
-      return res.status(404).json({
-        success: false,
-        message: 'Event folder not found'
-      });
+    if (!event) {
+      return res.status(404).json({ success: false, message: 'Event not found' });
     }
 
-    // Check if folder is actually a directory
-    const stats = fs.statSync(eventFolderPath);
-    if (!stats.isDirectory()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Event path is not a directory'
-      });
+    // Fetch all uploaded evidence files for this event, with office name for folder structure
+    const [files] = await db.query(`
+      SELECT
+        opd.id,
+        opd.file_name,
+        opd.display_name,
+        opd.file_path,
+        opd.requirement_id,
+        o.OfficeName,
+        r.RequirementCode,
+        r.Description AS RequirementDescription
+      FROM office_proof_documents opd
+      JOIN offices o ON o.OfficeID = opd.office_id
+      LEFT JOIN requirements r ON r.RequirementID = opd.requirement_id
+      WHERE o.EventID = ?
+        AND opd.file_path IS NOT NULL
+        AND opd.file_path != ''
+      ORDER BY o.OfficeName, opd.requirement_id, opd.uploaded_at
+    `, [event.EventID]);
+
+    if (!files.length) {
+      return res.status(404).json({ success: false, message: 'No files found for this event' });
     }
 
-    // Set headers for zip download
     const zipFileName = `${sanitizedName}.zip`;
     res.attachment(zipFileName);
     res.contentType('application/zip');
 
-    // Create archiver instance
-    const archive = archiver('zip', {
-      zlib: { level: 9 } // Maximum compression
-    });
+    const archive = archiver('zip', { zlib: { level: 6 } });
 
-    // Handle errors
     archive.on('error', (err) => {
       console.error('Archive error:', err);
       if (!res.headersSent) {
-        res.status(500).json({
-          success: false,
-          message: 'Error creating zip file'
-        });
+        res.status(500).json({ success: false, message: 'Error creating zip file' });
       }
     });
 
-    // Pipe archive data to response
     archive.pipe(res);
 
-    // Add the entire folder to the archive
-    archive.directory(eventFolderPath, false);
+    const https = require('https');
+    const http = require('http');
+    const { Readable } = require('stream');
 
-    // Finalize the archive
+    // Helper: fetch a remote URL and return a readable stream
+    const fetchRemoteStream = (url) => new Promise((resolve, reject) => {
+      const client = url.startsWith('https') ? https : http;
+      client.get(url, (response) => {
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          resolve(response);
+        } else {
+          reject(new Error(`HTTP ${response.statusCode} for ${url}`));
+        }
+      }).on('error', reject);
+    });
+
+    // Safe folder/file name helper
+    const safeName = (s) => String(s || 'Unknown').replace(/[/\\:*?"<>|]/g, '_').trim();
+
+    // Accreditation folder = sanitized event code/name
+    const accreditationFolder = safeName(sanitizedName);
+
+    for (const file of files) {
+      // Office folder
+      const officeFolder = safeName(file.OfficeName);
+      // Evidence file name — prefer display_name, fallback to file_name
+      const evidenceFileName = safeName(file.display_name || file.file_name);
+      // Zip path: accreditation / office / evidence_file
+      const zipPath = `${accreditationFolder}/${officeFolder}/${evidenceFileName}`;
+
+      const filePath = file.file_path;
+
+      try {
+        if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+          // Supabase or remote URL — stream directly into zip
+          const stream = await fetchRemoteStream(filePath);
+          archive.append(stream, { name: zipPath });
+          // Wait for this entry to finish before processing next (avoids overwhelming archiver)
+          await new Promise((resolve, reject) => {
+            stream.on('end', resolve);
+            stream.on('error', reject);
+          });
+        } else {
+          // Local file path
+          const absPath = path.join(__dirname, '..', filePath.replace(/^\//, ''));
+          if (fs.existsSync(absPath)) {
+            archive.file(absPath, { name: zipPath });
+          } else {
+            console.warn('Local file not found, skipping:', absPath);
+          }
+        }
+      } catch (fileErr) {
+        console.warn(`Skipping file ${file.file_name}:`, fileErr.message);
+        // Continue with other files even if one fails
+      }
+    }
+
     await archive.finalize();
   } catch (error) {
     console.error('Error downloading event zip:', error);
     if (!res.headersSent) {
-      res.status(500).json({
-        success: false,
-        message: 'Error downloading event folder'
-      });
+      res.status(500).json({ success: false, message: 'Error downloading event folder' });
     }
   }
 };

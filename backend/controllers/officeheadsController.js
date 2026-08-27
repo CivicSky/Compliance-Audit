@@ -257,7 +257,20 @@ exports.addMultipleHeads = async (req, res) => {
 // Get all office heads with user information from users table
 exports.getAllHeads = async (req, res) => {
   try {
-    console.log('DEBUG: getAllHeads route hit');
+    // Auto-sync approved Personnel (RoleID 3) into headofoffice if missing
+    try {
+      await db.execute(`
+        INSERT INTO headofoffice (UserID, Position)
+        SELECT u.UserID, 'Personnel'
+        FROM users u
+        WHERE u.RoleID = 3 
+          AND (u.approval_status = 'approved' OR u.approval_status IS NULL)
+          AND NOT EXISTS (SELECT 1 FROM headofoffice h WHERE h.UserID = u.UserID)
+      `);
+    } catch (syncErr) {
+      console.warn('Auto-sync headofoffice warning:', syncErr.message);
+    }
+
     const query = `
       SELECT 
         h.HeadID,
@@ -503,66 +516,63 @@ exports.deleteHeads = async (req, res) => {
     // Collect names and user IDs before deletion for readable audit logs and cascading cleanup
     const placeholders = validIds.map(() => '?').join(',');
     const [headsToDelete] = await db.execute(
-      `SELECT h.HeadID, h.UserID, u.FirstName, u.LastName
+      `SELECT h.HeadID, h.UserID, u.FirstName, u.LastName, u.Email
        FROM headofoffice h
        LEFT JOIN users u ON h.UserID = u.UserID
        WHERE h.HeadID IN (${placeholders})`,
       validIds
     );
 
-    const query = `DELETE FROM headofoffice WHERE HeadID IN (${placeholders})`;
-    
-    console.log('Executing query:', query);
-    console.log('With parameters:', validIds);
-
-    const [result] = await db.execute(query, validIds);
-    
-    console.log('Query result:', result);
-
-    if (result.affectedRows === 0) {
+    if (!headsToDelete || headsToDelete.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'No office heads found with the provided IDs'
       });
     }
 
-    // Remove any requirement_user_assignments for the deleted users
+    const userIds = headsToDelete.map(r => r.UserID).filter(id => Number.isInteger(Number(id)) && id > 0);
+
+    // 1. Remove office head assignments
     try {
-      const userIds = headsToDelete.map(r => r.UserID).filter(id => Number.isInteger(Number(id)));
-      if (userIds.length > 0) {
-        const userPlaceholders = userIds.map(() => '?').join(',');
-        await db.execute(`DELETE FROM requirement_user_assignments WHERE UserID IN (${userPlaceholders})`, userIds);
-      }
-    } catch (cleanupErr) {
-      console.error('Failed to cleanup requirement_user_assignments for deleted heads:', cleanupErr);
+      await db.execute(`DELETE FROM office_head_assignments WHERE HeadID IN (${placeholders})`, validIds);
+    } catch (e) {
+      console.warn('Cleanup office_head_assignments warning:', e.message);
     }
 
-    // Revert deleted heads back to regular 'User' role if they no longer have headofoffice entries
-    try {
-      const userIds = headsToDelete.map(r => r.UserID).filter(id => Number.isInteger(Number(id)));
-      if (userIds.length > 0) {
-        const [roleRows] = await db.execute('SELECT RoleID FROM roles WHERE RoleName = ? LIMIT 1', ['User']);
-        const userRoleId = roleRows && roleRows.length > 0 ? roleRows[0].RoleID : 2;
-        const userPlaceholders = userIds.map(() => '?').join(',');
-
-        // Only downgrade non-admins who no longer have a headofoffice row
-        const updateQuery = `
-          UPDATE users u
-          LEFT JOIN headofoffice h ON h.UserID = u.UserID
-          SET u.RoleID = ?
-          WHERE u.UserID IN (${userPlaceholders}) AND u.RoleID != 1 AND h.UserID IS NULL
-        `;
-
-        await db.execute(updateQuery, [userRoleId, ...userIds]);
+    // 2. Remove requirement user assignments
+    if (userIds.length > 0) {
+      const userPlaceholders = userIds.map(() => '?').join(',');
+      try {
+        await db.execute(`DELETE FROM requirement_user_assignments WHERE UserID IN (${userPlaceholders})`, userIds);
+      } catch (e) {
+        console.warn('Cleanup requirement_user_assignments warning:', e.message);
       }
-    } catch (roleErr) {
-      console.error('Failed to revert role to User for deleted heads:', roleErr);
+
+      // 3. Remove notifications
+      try {
+        await db.execute(`DELETE FROM notifications WHERE UserID IN (${userPlaceholders})`, userIds);
+      } catch (e) {
+        console.warn('Cleanup notifications warning:', e.message);
+      }
+    }
+
+    // 4. Delete from headofoffice
+    const [result] = await db.execute(`DELETE FROM headofoffice WHERE HeadID IN (${placeholders})`, validIds);
+
+    // 5. Delete corresponding non-admin user accounts from users table so they don't resurrect
+    if (userIds.length > 0) {
+      const userPlaceholders = userIds.map(() => '?').join(',');
+      try {
+        await db.execute(`DELETE FROM users WHERE UserID IN (${userPlaceholders}) AND RoleID != 1`, userIds);
+      } catch (e) {
+        console.warn('Cleanup users table warning:', e.message);
+      }
     }
 
     res.status(200).json({
       success: true,
-      message: `Successfully deleted ${result.affectedRows} office head(s)`,
-      deletedCount: result.affectedRows
+      message: `Successfully deleted ${result.affectedRows || headsToDelete.length} office personnel`,
+      deletedCount: result.affectedRows || headsToDelete.length
     });
 
     try {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, forwardRef, useImperativeHandle } from "react";
+import React, { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { createPortal } from 'react-dom';
 import user from "../../assets/images/user.svg";
 import { usersAPI } from "../../utils/api";
@@ -102,10 +102,29 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
         };
     }, [actionMenuUserId]);
 
+    const fetchUsers = useCallback(async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            const response = await usersAPI.getAllUsers();
+
+            if (response.success) {
+                setUsers(response.users);
+            } else {
+                setError('Failed to fetch users');
+            }
+        } catch (error) {
+            console.error('Error fetching users:', error);
+            setError('Error loading users. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
     // Fetch users data from database
     useEffect(() => {
         fetchUsers();
-    }, []);
+    }, [fetchUsers]);
 
     // Live syncing on mutations / window focus
     useLiveRefresh(fetchUsers);
@@ -213,25 +232,6 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
                 return { success: false, message: 'Network error. Please check if the backend server is running.' };
             }
             return { success: false, message: `Error deleting users: ${error.message}` };
-        }
-    };
-
-    const fetchUsers = async () => {
-        try {
-            setLoading(true);
-            setError(null);
-            const response = await usersAPI.getAllUsers();
-
-            if (response.success) {
-                setUsers(response.users);
-            } else {
-                setError('Failed to fetch users');
-            }
-        } catch (error) {
-            console.error('Error fetching users:', error);
-            setError('Error loading users. Please try again.');
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -367,19 +367,19 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
                                                 />
                                             </div>
                                         )}
-                                        <div className="h-9 w-9 flex-shrink-0 rounded-xl overflow-hidden relative">
+                                        <div className="h-9 w-9 flex-shrink-0 rounded-full overflow-hidden relative">
                                             {profilePicUrl ? (
                                                 <img
                                                     src={profilePicUrl}
                                                     alt={fullName}
-                                                    className="h-full w-full rounded-xl object-cover ring-2 ring-slate-100"
+                                                    className="h-full w-full rounded-full object-cover ring-2 ring-slate-100"
                                                     onError={e => {
                                                         e.target.style.display = 'none';
                                                         if (e.target.nextElementSibling) e.target.nextElementSibling.style.display = 'flex';
                                                     }}
                                                 />
                                             ) : null}
-                                            <div className={`h-full w-full rounded-xl flex items-center justify-center font-bold text-white text-xs ${avatarStyle.bg} ${profilePicUrl ? 'hidden' : 'flex'}`}>
+                                            <div className={`h-full w-full rounded-full flex items-center justify-center font-bold text-white text-xs ${avatarStyle.bg} ${profilePicUrl ? 'hidden' : 'flex'}`}>
                                                 {initials}
                                             </div>
                                         </div>
@@ -498,14 +498,14 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
                                             <img
                                                 src={profilePicUrl}
                                                 alt={fullName}
-                                                className="h-12 w-12 rounded-xl object-cover ring-2 ring-slate-100 shadow-xs"
+                                                className="h-12 w-12 rounded-full object-cover ring-2 ring-slate-100 shadow-xs"
                                                 onError={e => {
                                                     e.target.style.display = 'none';
                                                     if (e.target.nextElementSibling) e.target.nextElementSibling.style.display = 'flex';
                                                 }}
                                             />
                                         ) : null}
-                                        <div className={`h-12 w-12 rounded-xl flex items-center justify-center font-bold text-white text-sm shadow-xs ring-2 ${avatarStyle.ring} ${avatarStyle.bg} ${profilePicUrl ? 'hidden' : 'flex'}`}>
+                                        <div className={`h-12 w-12 rounded-full flex items-center justify-center font-bold text-white text-sm shadow-xs ring-2 ${avatarStyle.ring} ${avatarStyle.bg} ${profilePicUrl ? 'hidden' : 'flex'}`}>
                                             {initials}
                                         </div>
                                     </div>

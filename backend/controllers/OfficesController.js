@@ -223,8 +223,51 @@ const OfficesController = {
         });
       });
 
+      // Get all auditors assigned to offices via auditor_area_assignments junction
+      let auditorRows = [];
+      try {
+        const [auds] = await db.query(`
+          SELECT DISTINCT 
+            o.OfficeID,
+            u.UserID,
+            u.FirstName,
+            u.MiddleInitial,
+            u.LastName,
+            u.ProfilePic,
+            ar.AreaCode,
+            ar.AreaName
+          FROM auditor_area_assignments aaa
+          JOIN users u ON aaa.auditor_user_id = u.UserID
+          JOIN areas ar ON aaa.area_id = ar.AreaID
+          JOIN offices o ON o.EventID = ar.EventID
+        `);
+        auditorRows = auds;
+      } catch (audErr) {
+        // auditor_area_assignments may not exist or be empty
+      }
+
+      const auditorsByOffice = {};
+      const seenAuditorsByOffice = {};
+      auditorRows.forEach(aud => {
+        if (!auditorsByOffice[aud.OfficeID]) {
+          auditorsByOffice[aud.OfficeID] = [];
+          seenAuditorsByOffice[aud.OfficeID] = new Set();
+        }
+        if (seenAuditorsByOffice[aud.OfficeID].has(aud.UserID)) return;
+        seenAuditorsByOffice[aud.OfficeID].add(aud.UserID);
+        auditorsByOffice[aud.OfficeID].push({
+          UserID: aud.UserID,
+          FirstName: aud.FirstName,
+          MiddleInitial: aud.MiddleInitial,
+          LastName: aud.LastName,
+          ProfilePic: aud.ProfilePic,
+          full_name: aud.FirstName ? `${aud.FirstName} ${aud.MiddleInitial ? aud.MiddleInitial + '.' : ''} ${aud.LastName}`.trim() : 'Auditor'
+        });
+      });
+
       const formatted = officeRows.map(r => {
         const officeHeads = headsByOffice[r.OfficeID] || [];
+        const officeAuditors = auditorsByOffice[r.OfficeID] || [];
         // For backward compatibility, also include primary head info
         const primaryHead = officeHeads[0] || null;
         
@@ -248,6 +291,10 @@ const OfficesController = {
             ? officeHeads.map(h => h.full_name).join(', ')
             : "Unassigned",
           head_profile_pic: primaryHead?.ProfilePic || null,
+          auditors: officeAuditors,
+          auditor_name: officeAuditors.length > 0
+            ? officeAuditors.map(a => a.full_name).join(', ')
+            : null,
           event_id: r.EventID,
           event_name: r.EventName || null,
           EventName: r.EventName || null,
@@ -846,6 +893,40 @@ const OfficesController = {
     } catch (err) {
       console.error("Error deleting office:", err);
       res.status(500).json({ error: "Database error" });
+    }
+  },
+
+  deleteMultiple: async (req, res) => {
+    try {
+      const rawIds = req.body?.ids || req.body?.officeIds || req.body?.data?.ids || [];
+      const ids = Array.isArray(rawIds) ? rawIds.map(Number).filter(n => Number.isInteger(n) && n > 0) : [];
+      if (ids.length === 0) {
+        return res.status(400).json({ success: false, message: 'No valid office IDs provided' });
+      }
+
+      const placeholders = ids.map(() => '?').join(',');
+
+      try {
+        await db.query(`DELETE FROM requirement_user_uploads WHERE requirement_id IN (SELECT RequirementID FROM compliancestatusoffices WHERE OfficeID IN (${placeholders}))`, ids);
+        await db.query(`DELETE FROM office_proof_documents WHERE office_id IN (${placeholders})`, ids);
+        await db.query(`DELETE FROM requirement_user_assignments WHERE OfficeID IN (${placeholders})`, ids);
+        await db.query(`DELETE FROM compliancestatusoffices WHERE OfficeID IN (${placeholders})`, ids);
+        await db.query(`DELETE FROM office_head_assignments WHERE OfficeID IN (${placeholders})`, ids);
+        await db.query(`DELETE FROM OverallOfficeStatus WHERE OfficeID IN (${placeholders})`, ids);
+      } catch (e) {
+        console.warn('Cleanup child records warning during bulk office delete:', e.message);
+      }
+
+      const [result] = await db.query(`DELETE FROM offices WHERE OfficeID IN (${placeholders})`, ids);
+
+      return res.json({
+        success: true,
+        message: `Successfully deleted ${result.affectedRows || ids.length} office(s)`,
+        deletedCount: result.affectedRows || ids.length
+      });
+    } catch (err) {
+      console.error('Error bulk deleting offices:', err);
+      return res.status(500).json({ success: false, message: 'Failed to delete selected offices', error: err.message });
     }
   },
 
@@ -1448,7 +1529,7 @@ const OfficesController = {
           c.CriteriaName,
           pc.CriteriaCode AS ParentCriteriaCode,
           pc.CriteriaName AS ParentCriteriaName,
-          a.AreaID,
+          r.AreaID AS AreaID,
           a.AreaCode,
           a.AreaName,
           cso.Status AS ComplianceStatusID,
@@ -1458,15 +1539,10 @@ const OfficesController = {
         INNER JOIN requirements r ON cso.RequirementID = r.RequirementID
         LEFT JOIN criteria c ON r.CriteriaID = c.CriteriaID
         LEFT JOIN criteria pc ON c.ParentCriteriaID = pc.CriteriaID
-        LEFT JOIN areas a ON c.AreaID = a.AreaID
+        LEFT JOIN areas a ON r.AreaID = a.AreaID
         LEFT JOIN compliancestatustypes cst ON cso.Status = cst.StatusID
         WHERE cso.OfficeID = ?
         ORDER BY
-          COALESCE(a.AreaCode, 'ZZZ') ASC,
-          COALESCE(a.AreaName, 'ZZZ') ASC,
-          COALESCE(COALESCE(pc.CriteriaCode, c.CriteriaCode), 'ZZZ') ASC,
-          COALESCE(c.CriteriaCode, 'ZZZ') ASC,
-          COALESCE(r.RequirementCode, 'ZZZ') ASC,
           r.RequirementID ASC`,
         [officeId]
       );

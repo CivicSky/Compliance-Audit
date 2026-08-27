@@ -1,19 +1,19 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { officesAPI, eventsAPI, areasAPI, requirementsAPI, usersAPI } from '../../utils/api';
-import AccreditationOfficesView from './AccreditationOfficesView';
-import AccreditationMasterList from './AccreditationMasterList';
-import AssignToOfficesModal from './AssignToOfficesModal';
-import ViewReqPasscuModal from '../ViewReqPasscuModal/ViewReqPasscuModal';
-import AddEventModal from '../AddEvent/AddEventModal';
-import AddOfficeModal from '../AddOffice/AddOfficeModal';
-import Organization from '../../pages/Organization.jsx';
-import ALL from '../../pages/ALLC.jsx';
-import { useModal } from '../UI/ModalProvider';
+import { officesAPI, eventsAPI, areasAPI, requirementsAPI, usersAPI } from '../utils/api';
+import AccreditationOfficesView from '../components/ACC/AccreditationOfficesView';
+import AccreditationMasterList from '../components/ACC/AccreditationMasterList';
+import AssignToOfficesModal from '../components/ACC/AssignToOfficesModal';
+import ViewReqPasscuModal from '../components/ViewReqPasscuModal/ViewReqPasscuModal';
+import AddEventModal from '../components/Events/AddEventModal';
+import Organization from './Organization.jsx';
+import ALL from './ALLC';
+import { useModal } from '../components/UI/ModalProvider';
 import { Layers, LayoutGrid, SlidersHorizontal, Loader2, Plus, Calendar } from 'lucide-react';
-import { useLiveRefresh } from '../../utils/liveSync';
+import { useLiveRefresh } from '../utils/liveSync';
 
 import axios from 'axios';
-import { API_BASE_URL } from '../../utils/apiBase';
+import { API_BASE_URL } from '../utils/apiBase';
+import { dataCache } from '../utils/dataCache';
 
 export default function ACCPage() {
   const { showAlert } = useModal();
@@ -79,14 +79,35 @@ export default function ACCPage() {
           }
           return {
             ...crit,
-            requirements: reqs
+            requirements: reqs,
+            children: []
           };
         })
       );
 
+      // Build criteria hierarchy (parent -> children)
+      const criteriaMap = {};
+      criteriaWithReqs.forEach(c => {
+        const cId = String(c.CriteriaID || c.id);
+        criteriaMap[cId] = c;
+      });
+
+      const topLevelCriteria = [];
+      criteriaWithReqs.forEach(c => {
+        const parentId = c.ParentCriteriaID ? String(c.ParentCriteriaID) : null;
+        if (parentId && criteriaMap[parentId]) {
+          if (!c.AreaID && criteriaMap[parentId].AreaID) {
+            c.AreaID = criteriaMap[parentId].AreaID;
+          }
+          criteriaMap[parentId].children.push(c);
+        } else {
+          topLevelCriteria.push(c);
+        }
+      });
+
       // Group criteria by AreaID
       const criteriaByArea = {};
-      criteriaWithReqs.forEach((crit) => {
+      topLevelCriteria.forEach((crit) => {
         const areaId = String(crit.AreaID || crit.area_id || 'no_area');
         if (!criteriaByArea[areaId]) criteriaByArea[areaId] = [];
         criteriaByArea[areaId].push(crit);
@@ -181,6 +202,8 @@ export default function ACCPage() {
       for (const officeId of officeIds) {
         await officesAPI.addOfficeRequirements(officeId, requirementIds);
       }
+
+      dataCache.invalidate('office_reqs_');
 
       setIsAssignModalOpen(false);
 
@@ -372,7 +395,7 @@ export default function ACCPage() {
           />
         ) : (
           /* Master Structure List View - ALL Component occupying all space */
-          <div className="h-full w-full overflow-y-auto p-4">
+          <div className="h-full w-full overflow-hidden">
             <ALL />
           </div>
         )}

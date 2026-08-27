@@ -1,4 +1,4 @@
-import React, { useState, useEffect, forwardRef, useImperativeHandle } from "react";
+import React, { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { useModal } from "../UI/ModalProvider";
 import { useToast } from "../UI/Toast";
 import { eventsAPI } from "../../utils/api";
@@ -29,6 +29,25 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
             .trim();
     };
 
+    const fetchEvents = useCallback(async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            const response = await eventsAPI.getAllEvents();
+
+            if (response.success) {
+                setEvents(response.data);
+            } else {
+                setError('Failed to fetch events');
+            }
+        } catch (error) {
+            console.error('Error fetching events:', error);
+            setError('Error loading events. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
     // Fetch events data from database
     useEffect(() => {
         fetchEvents();
@@ -36,7 +55,7 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
         eventsAPI.getDownloadableFolders().then(res => {
             if (res.success) setDownloadableFolders(res.folders || []);
         });
-    }, []);
+    }, [fetchEvents]);
 
     // Live syncing on mutations / window focus
     useLiveRefresh(fetchEvents);
@@ -141,25 +160,6 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
             }
 
             return { success: false, message: `Error deleting events: ${error.message}` };
-        }
-    };
-
-    const fetchEvents = async () => {
-        try {
-            setLoading(true);
-            setError(null);
-            const response = await eventsAPI.getAllEvents();
-
-            if (response.success) {
-                setEvents(response.data);
-            } else {
-                setError('Failed to fetch events');
-            }
-        } catch (error) {
-            console.error('Error fetching events:', error);
-            setError('Error loading events. Please try again.');
-        } finally {
-            setLoading(false);
         }
     };
 

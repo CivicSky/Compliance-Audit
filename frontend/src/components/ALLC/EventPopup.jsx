@@ -5,8 +5,8 @@ import CriteriaSection from './CriteriaSection';
 import RequirementsSection from './RequirementsSection';
 import AddAreaPop from './addareapop';
 import EditAreaModal from '../EditArea/EditArea';
-import EditCriteriaModal from '../EditCriteria/EditCriteriaModal';
-import EditRequirementsModal from '../EditRequirements/EditRequirementsModal';
+import EditCriteriaModal from '../Criteria/EditCriteriaModal';
+import EditRequirementsModal from '../Requirement/EditRequirementsModal';
 import { usersAPI, officesAPI } from '../../utils/api';
 import { useModal } from "../UI/ModalProvider";
 

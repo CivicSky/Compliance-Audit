@@ -31,7 +31,7 @@ export function useLiveRefresh(refreshCallback, options = {}) {
   const {
     enableSyncEvent = true,
     enableFocus = true,
-    intervalMs = 25000,
+    intervalMs = 0,
     deps = [],
   } = options;
 
@@ -47,13 +47,8 @@ export function useLiveRefresh(refreshCallback, options = {}) {
     if (typeof callbackRef.current !== 'function') return;
 
     const now = Date.now();
-    // Prevent spamming if called multiple times within 1 second unless immediate
-    if (!immediate && now - lastRunRef.current < 1000) {
-      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-      debounceTimerRef.current = setTimeout(() => {
-        lastRunRef.current = Date.now();
-        callbackRef.current?.();
-      }, 1000);
+    // Prevent spamming if called multiple times within 3 seconds unless immediate
+    if (!immediate && now - lastRunRef.current < 3000) {
       return;
     }
 

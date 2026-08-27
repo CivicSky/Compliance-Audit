@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, forwardRef, useImperativeHandle } from "react";
+import React, { useState, useEffect, useMemo, useCallback, forwardRef, useImperativeHandle } from "react";
 import { createPortal } from 'react-dom';
 import { officesAPI, requirementsAPI, usersAPI } from "../../utils/api";
 import { useModal } from "../UI/ModalProvider";
@@ -50,10 +50,20 @@ const OfficesP = forwardRef(
         const [openMenuAnchorRect, setOpenMenuAnchorRect] = useState(null);
         const [activeHighlightOfficeId, setActiveHighlightOfficeId] = useState(null);
         const [myAssignedOfficeCounts, setMyAssignedOfficeCounts] = useState({});
-        const [currentUser, setCurrentUser] = useState(null);
+        const [currentUser, setCurrentUser] = useState(() => {
+            try {
+                const stored = localStorage.getItem('user');
+                return stored ? JSON.parse(stored) : null;
+            } catch {
+                return null;
+            }
+        });
         const { showAlert, showConfirm } = useModal();
 
-        const isAdmin = currentUser?.RoleName === 'admin' || currentUser?.RoleID === 1;
+        const roleId = Number(currentUser?.RoleID);
+        const roleName = String(currentUser?.RoleName || currentUser?.role_name || '').toLowerCase();
+        const isPersonnel = (roleId === 2 || roleId === 3 || roleName.includes('personnel') || roleName.includes('office') || roleName === 'user' || roleName === 'head') && !roleName.includes('auditor') && roleId !== 4 && roleId !== 1 && roleName !== 'admin';
+        const isAdmin = (roleId === 1 || roleName === 'admin') && !isPersonnel;
 
         // Fetch offices from backend
         const fetchOffices = async () => {
@@ -90,7 +100,11 @@ const OfficesP = forwardRef(
             refresh: fetchOffices,
             deleteSelected: async (ids) => {
                 try {
-                    for (let id of ids) await officesAPI.deleteOffice(id);
+                    const targetIds = ids || selectedIds;
+                    if (targetIds && targetIds.length > 0) {
+                        await officesAPI.deleteMultipleOffices(targetIds);
+                    }
+                    setSelectedIds([]);
                     fetchOffices();
                     return { success: true };
                 } catch (err) {
@@ -246,8 +260,66 @@ const OfficesP = forwardRef(
             }
         }, [events]);
 
+        // Helper to check if office is assigned to the current personnel user
+        const isOfficeAssignedToPersonnel = useCallback((o) => {
+            if (!currentUser) return false;
+            const uid = String(currentUser.UserID ?? currentUser.id ?? '');
+            const hid = String(currentUser.HeadID ?? currentUser.head_id ?? '');
+            const officeId = String(o.id ?? o.OfficeID ?? '');
+
+            // 1. Check requirements assignments count
+            if (myAssignedOfficeCounts && Number(myAssignedOfficeCounts[officeId] || 0) > 0) return true;
+
+            // 2. Check heads array
+            if (Array.isArray(o.heads) && o.heads.length > 0) {
+                const matchedHead = o.heads.some(h => {
+                    if (uid && (String(h.UserID ?? '') === uid || String(h.user_id ?? '') === uid)) return true;
+                    if (hid && (String(h.HeadID ?? '') === hid || String(h.head_id ?? '') === hid)) return true;
+                    
+                    const headName = String(h.full_name || `${h.FirstName || ''} ${h.LastName || ''}`).toLowerCase().trim();
+                    const userFirst = String(currentUser.FirstName || currentUser.first_name || '').toLowerCase().trim();
+                    const userLast = String(currentUser.LastName || currentUser.last_name || '').toLowerCase().trim();
+                    if (userFirst && userLast && headName) {
+                        if (headName.includes(userFirst) && headName.includes(userLast)) return true;
+                    } else if (userFirst && headName && headName.includes(userFirst)) {
+                        return true;
+                    }
+                    return false;
+                });
+                if (matchedHead) return true;
+            }
+
+            // 3. Check direct head_id / head_ids
+            if (hid) {
+                if (String(o.head_id ?? '') === hid) return true;
+                if (Array.isArray(o.head_ids) && o.head_ids.some(id => String(id) === hid)) return true;
+            }
+
+            // 4. Check head_name string
+            if (o.head_name && o.head_name !== 'Unassigned' && o.head_name !== 'unassigned') {
+                const headName = String(o.head_name).toLowerCase().trim();
+                const userFirst = String(currentUser.FirstName || currentUser.first_name || '').toLowerCase().trim();
+                const userLast = String(currentUser.LastName || currentUser.last_name || '').toLowerCase().trim();
+                if (userFirst && userLast) {
+                    if (headName.includes(userFirst) && headName.includes(userLast)) return true;
+                } else if (userFirst && headName && headName.includes(userFirst)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }, [currentUser, myAssignedOfficeCounts]);
+
+        // Restrict offices for Personnel users
+        const roleFilteredOffices = useMemo(() => {
+            if (isPersonnel) {
+                return offices.filter(isOfficeAssignedToPersonnel);
+            }
+            return offices;
+        }, [offices, isPersonnel, isOfficeAssignedToPersonnel]);
+
         // Search filter
-        const filteredBySearch = offices.filter((o) => {
+        const filteredBySearch = roleFilteredOffices.filter((o) => {
             const officeName = (o.office_name || '').toLowerCase();
             const headName = (o.head_name || 'unassigned').toLowerCase();
             const officeType = (o.office_type_name || '').toLowerCase();
@@ -368,6 +440,7 @@ const OfficesP = forwardRef(
                             {paginated.map((office) => {
                                 const officeId = String(office?.id ?? office?.OfficeID ?? '');
                                 const officeHeads = office.heads || [];
+                                const officeAuditors = office.auditors || [];
                                 const compliancePercent = Math.max(0, Math.min(100, Number(office.compliance_percent || 0)));
                                 const statusLabel = office.overall_status === 'Partially Complied' ? 'Partial' : office.overall_status;
 
@@ -516,49 +589,107 @@ const OfficesP = forwardRef(
                                                 </div>
                                             </div>
 
-                                            {/* Personnel Section */}
+                                            {/* Personnel & Auditor Section */}
                                             <div className="border-t border-slate-100 pt-1">
-                                                <p className="text-[10px] font-semibold text-slate-500 mb-1">Personnel</p>
-
-                                                {officeHeads.length === 0 ? (
+                                                <div className="flex items-center justify-between mb-1">
                                                     <div className="flex items-center gap-1.5">
-                                                        <div className="w-6 h-6 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center">
-                                                            <img src={userIcon} alt="Unassigned" className="w-4 h-4 opacity-50" />
-                                                        </div>
-                                                        <span className="text-[11px] text-slate-400">Unassigned</span>
-                                                    </div>
-                                                ) : (
-                                                    <div className="space-y-1">
-                                                        <div className="flex items-center justify-between">
-                                                            <div className="flex flex-wrap items-center gap-1">
-                                                                {officeHeads.map((head) => {
-                                                                    const headPicUrl = head.ProfilePic
-                                                                        ? `${API_BASE_URL}/uploads/profile-pics/${head.ProfilePic}`
-                                                                        : userIcon;
-                                                                    return (
-                                                                        <div key={head.HeadID} className="group relative">
-                                                                            <img
-                                                                                src={headPicUrl}
-                                                                                alt={head.full_name}
-                                                                                className="h-6 w-6 rounded-full object-cover border border-white shadow-2xs"
-                                                                                onError={(e) => { e.target.src = userIcon; }}
-                                                                            />
-                                                                            <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1 -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[10px] font-medium text-white opacity-0 shadow transition-opacity duration-150 group-hover:opacity-100">
-                                                                                {head.full_name}
-                                                                            </div>
-                                                                        </div>
-                                                                    );
-                                                                })}
-                                                            </div>
-                                                            <span className="text-[11px] font-medium text-slate-600">
+                                                        <span className="text-[10px] font-semibold text-slate-500">Personnel</span>
+                                                        {officeHeads.length > 0 && (
+                                                            <span className="text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded-full">
                                                                 {officeHeads.length}
                                                             </span>
-                                                        </div>
-                                                        <p className="text-[10px] text-slate-500 truncate" title={officeHeads.map((h) => h.full_name).join(', ')}>
-                                                            {officeHeads.map((h) => h.full_name.split(' ')[0]).join(', ')}
-                                                        </p>
+                                                        )}
                                                     </div>
-                                                )}
+                                                    <div className="flex items-center gap-1">
+                                                        <span className="text-[10px] font-semibold text-sky-600">Auditor</span>
+                                                        {officeAuditors.length > 0 && (
+                                                            <span className="text-[9px] font-bold text-sky-700 bg-sky-50 px-1.5 py-0.2 rounded-full border border-sky-100">
+                                                                {officeAuditors.length}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-start justify-between gap-1.5 pt-0.5">
+                                                    {/* Left: Personnel list */}
+                                                    <div className="flex items-start gap-2 flex-wrap flex-1 min-w-0">
+                                                        {officeHeads.length === 0 ? (
+                                                            <div className="flex flex-col items-center max-w-[52px]">
+                                                                <div className="w-6 h-6 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center">
+                                                                    <img src={userIcon} alt="Unassigned" className="w-3.5 h-3.5 opacity-50" />
+                                                                </div>
+                                                                <span className="text-[9px] text-slate-400 text-center truncate w-full mt-0.5">Unassigned</span>
+                                                            </div>
+                                                        ) : (
+                                                            officeHeads.map((head) => {
+                                                                const headPicUrl = head.ProfilePic
+                                                                    ? `${API_BASE_URL}/uploads/profile-pics/${head.ProfilePic}`
+                                                                    : userIcon;
+                                                                const firstName = (head.full_name || head.FirstName || 'Personnel').split(' ')[0];
+                                                                return (
+                                                                    <div key={head.HeadID} className="group relative flex flex-col items-center max-w-[54px]">
+                                                                        <img
+                                                                            src={headPicUrl}
+                                                                            alt={head.full_name}
+                                                                            className="h-6 w-6 rounded-full object-cover border border-white shadow-2xs"
+                                                                            onError={(e) => { e.target.src = userIcon; }}
+                                                                        />
+                                                                        <span 
+                                                                            className="text-[9px] text-slate-600 text-center truncate w-full mt-0.5 font-medium leading-tight" 
+                                                                            title={head.full_name}
+                                                                        >
+                                                                            {firstName}
+                                                                        </span>
+                                                                        <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1 -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[10px] font-medium text-white opacity-0 shadow transition-opacity duration-150 group-hover:opacity-100">
+                                                                            {head.full_name} (Personnel)
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })
+                                                        )}
+                                                    </div>
+
+                                                    {/* Vertical Separator | */}
+                                                    <div className="self-stretch w-px bg-slate-200 my-0.5 shrink-0" />
+
+                                                    {/* Right: Auditor (o) */}
+                                                    <div className="flex items-start justify-end gap-1.5 shrink-0">
+                                                        {officeAuditors.length === 0 ? (
+                                                            <div className="flex flex-col items-center max-w-[52px]">
+                                                                <div className="w-6 h-6 rounded-full bg-sky-50 border border-sky-100 flex items-center justify-center">
+                                                                    <img src={userIcon} alt="No auditor" className="w-3.5 h-3.5 opacity-40" />
+                                                                </div>
+                                                                <span className="text-[9px] text-slate-400 text-center truncate w-full mt-0.5">None</span>
+                                                            </div>
+                                                        ) : (
+                                                            officeAuditors.map((aud) => {
+                                                                const audPicUrl = aud.ProfilePic
+                                                                    ? `${API_BASE_URL}/uploads/profile-pics/${aud.ProfilePic}`
+                                                                    : userIcon;
+                                                                const firstName = (aud.full_name || aud.FirstName || 'Auditor').split(' ')[0];
+                                                                return (
+                                                                    <div key={aud.UserID} className="group relative flex flex-col items-center max-w-[54px]">
+                                                                        <img
+                                                                            src={audPicUrl}
+                                                                            alt={aud.full_name}
+                                                                            className="h-6 w-6 rounded-full object-cover border-2 border-sky-300 shadow-2xs ring-1 ring-sky-100"
+                                                                            onError={(e) => { e.target.src = userIcon; }}
+                                                                        />
+                                                                        <span 
+                                                                            className="text-[9px] text-sky-700 text-center truncate w-full mt-0.5 font-semibold leading-tight" 
+                                                                            title={aud.full_name}
+                                                                        >
+                                                                            {firstName}
+                                                                        </span>
+                                                                        <div className="pointer-events-none absolute bottom-full right-0 z-50 mb-1 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[10px] font-medium text-white opacity-0 shadow transition-opacity duration-150 group-hover:opacity-100">
+                                                                            {aud.full_name} (Auditor)
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })
+                                                        )}
+                                                    </div>
+                                                </div>
                                             </div>
 
                                         </div>
