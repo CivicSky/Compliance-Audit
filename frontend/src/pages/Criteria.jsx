@@ -9,7 +9,8 @@ import AddReqOffModal from "../components/AddReqOffModal/AddReqOffModal";
 import EditCriteriaModal from "../components/Criteria/EditCriteriaModal";
 import UnifiedSetupWizard from "../components/UnifiedSetupWizard/UnifiedSetupWizard";
 import { useModal } from "../components/UI/ModalProvider";
-import { Wand2 } from "lucide-react";
+import CustomSelect from "../components/UI/CustomSelect";
+import { Wand2, CheckSquare, Plus, Trash2, ChevronDown } from "lucide-react";
 
 export default function Criteria() {
     const [officeTypes, setOfficeTypes] = useState([]);
@@ -90,8 +91,11 @@ export default function Criteria() {
                 if (res && res.success && Array.isArray(res.data)) {
                     setEvents(res.data);
                     if (res.data.length > 0) {
-                        setSelectedEventType(res.data[0].EventName || res.data[0].eventType);
-                        setSelectedEventId(res.data[0].EventID);
+                        const savedId = localStorage.getItem('acc_selected_event_id') || localStorage.getItem('selected_audit_event_id');
+                        const valid = res.data.find(e => String(e.EventID || e.id) === String(savedId));
+                        const target = valid || res.data[0];
+                        setSelectedEventType(target.EventName || target.eventType);
+                        setSelectedEventId(target.EventID || target.id);
                     }
                 } else {
                     setEvents([]);
@@ -199,64 +203,92 @@ export default function Criteria() {
     };
 
     return (
-        <div className="px-4 sm:px-6 pb-6 pt-2 w-full">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-                <Header
-                    pageTitle="Criteria Management"
-                    onAddClick={() => setIsModalOpen(true)}
-                    onSearchChange={setSearchTerm}
-                    searchValue={searchTerm}
-                    onDeleteModeToggle={setDeleteMode}
-                    deleteMode={deleteMode}
-                    selectedCount={selectedCount}
-                    onDeleteSelected={handleDeleteSelected}
-                    hideSortButton={true}
-                    userRole={currentUser?.RoleID}
-                />
-                {isAdmin && (
-                    <button 
-                        onClick={() => setShowWizard(true)}
-                        className="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition text-sm shrink-0 self-start sm:self-auto"
-                        title="Quick setup with wizard"
-                    >
-                        <Wand2 size={18} /> Wizard
-                    </button>
-                )}
-            </div>
+        <div className="w-full flex-1 flex flex-col min-w-0 bg-slate-50/50 overflow-hidden">
+            {/* Top Header Card */}
+            <div className="px-4 sm:px-6 pt-4 pb-3.5 shrink-0 border-b border-slate-200/70 bg-white shadow-2xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-700 text-white shadow-md shadow-indigo-500/20 shrink-0">
+                            <CheckSquare className="w-5 h-5 sm:w-5.5 sm:h-5.5" />
+                        </div>
+                        <div>
+                            <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">Criteria Management</h1>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                                Define assessment criteria, evidence, and compliance metrics.
+                            </p>
+                        </div>
+                    </div>
 
-            <UnifiedSetupWizard 
-                isOpen={showWizard} 
-                onClose={() => setShowWizard(false)}
-                onSuccess={() => {
-                    if (criteriaPRef.current?.refetch) {
-                        criteriaPRef.current.refetch();
-                    }
-                }}
-            />
+                    <div className="flex flex-wrap items-center gap-2">
+                        {/* Event Selector */}
+                        <div className="min-w-[200px] sm:min-w-[240px]">
+                            <CustomSelect
+                                size="md"
+                                value={selectedEventId || ''}
+                                onChange={(val) => {
+                                    const selected = events.find(ev => String(ev.EventID) === val);
+                                    setSelectedEventId(val);
+                                    setSelectedEventType(selected?.EventName || '');
+                                }}
+                                options={events.map(event => ({
+                                    value: String(event.EventID),
+                                    label: event.EventName || event.eventType,
+                                }))}
+                            />
+                        </div>
 
-            {/* Event Type Dropdown */}
-            <div className="mb-4">
-                <div className="relative w-full">
-                    <select
-                        value={selectedEventId || ''}
-                        onChange={e => {
-                            const selected = events.find(ev => String(ev.EventID) === e.target.value);
-                            setSelectedEventId(e.target.value);
-                            setSelectedEventType(selected?.EventName || '');
-                        }}
-                        className="w-full appearance-none px-5 py-3 border-2 border-purple-400 rounded-xl bg-white text-gray-800 font-semibold shadow focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all duration-200 hover:border-purple-600 hover:shadow-lg"
-                    >
-                        {events.map(event => (
-                            <option key={event.EventID} value={event.EventID} className="text-base">
-                                {event.EventName || event.eventType}
-                            </option>
-                        ))}
-                    </select>
-                    <span className="pointer-events-none absolute right-4 top-1/2 transform -translate-y-1/2 text-purple-500">
-                        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                    </span>
+                        {isAdmin && (
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={() => setDeleteMode(prev => !prev)}
+                                    className={`inline-flex h-9 items-center gap-1.5 rounded-xl border px-3.5 text-xs font-semibold shadow-2xs transition active:scale-95 cursor-pointer ${
+                                        deleteMode
+                                            ? 'border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100'
+                                            : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                                    }`}
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                    <span>{deleteMode ? 'Cancel Selection' : 'Delete Mode'}</span>
+                                </button>
+
+                                {deleteMode && selectedIds.length > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={handleDeleteSelected}
+                                        className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-rose-600 px-3.5 text-xs font-semibold text-white shadow-xs transition hover:bg-rose-700 active:scale-95 cursor-pointer"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                        <span>Delete Selected ({selectedIds.length})</span>
+                                    </button>
+                                )}
+
+                                <button
+                                    type="button"
+                                    onClick={() => setIsModalOpen(true)}
+                                    className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 text-xs font-semibold text-white shadow-xs transition hover:bg-emerald-700 active:scale-95 cursor-pointer"
+                                >
+                                    <Plus className="h-4 w-4" />
+                                    <span>Add Criteria</span>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setShowWizard(true)}
+                                    className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50 active:scale-95 cursor-pointer"
+                                    title="Quick setup wizard"
+                                >
+                                    <Wand2 className="h-4 w-4 text-indigo-500" />
+                                    <span>Wizard</span>
+                                </button>
+                            </>
+                        )}
+                    </div>
                 </div>
             </div>
+
+            {/* Main Content Body */}
+            <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 pt-4 pb-12">
 
             <div className="relative z-10">
                 <CriteriaP
@@ -347,6 +379,7 @@ export default function Criteria() {
                     onSave={handleRequirementsSaved}
                 />
             )}
+            </div>
         </div>
     );
 }

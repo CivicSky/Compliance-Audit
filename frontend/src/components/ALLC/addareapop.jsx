@@ -6,6 +6,7 @@ import ToastBanner from './AddAreaPop/ToastBanner';
 import AddAreaForm from './AddAreaPop/AddAreaForm';
 import AddCriteriaForm from './AddAreaPop/AddCriteriaForm';
 import AddRequirementForm from './AddAreaPop/AddRequirementForm';
+import StructureLivePreview from './AddAreaPop/StructureLivePreview';
 import AssignPanel from './AddAreaPop/AssignPanel';
 import { saveButtonClass } from './AddAreaPop/formStyles';
 import { useToast } from '../UI/Toast';
@@ -109,6 +110,36 @@ export default function AddAreaPop({
 		}
 		return '';
 	};
+
+	const resolvedPreviewArea = useMemo(() => {
+		if (mode === 'add-area') {
+			return areaForm;
+		}
+		if (mode === 'add-criteria') {
+			return (areas || []).find((a) => String(a.AreaID) === String(criteriaForm.AreaID)) || null;
+		}
+		if (mode === 'add-requirement') {
+			if (requirementForm.AreaFilter === '__no_area__') return null;
+			return (areas || []).find((a) => String(a.AreaID) === String(requirementForm.AreaFilter)) || null;
+		}
+		return null;
+	}, [mode, areaForm, criteriaForm.AreaID, requirementForm.AreaFilter, areas]);
+
+	const resolvedPreviewCriteria = useMemo(() => {
+		if (mode === 'add-area') return null;
+		if (mode === 'add-criteria') {
+			return criteriaForm;
+		}
+		if (mode === 'add-requirement') {
+			return (criteriaOptions || []).find((c) => String(c.CriteriaID) === String(requirementForm.CriteriaID)) || null;
+		}
+		return null;
+	}, [mode, criteriaForm, requirementForm.CriteriaID, criteriaOptions]);
+
+	const resolvedPreviewRequirement = useMemo(() => {
+		if (mode !== 'add-requirement') return null;
+		return requirementForm;
+	}, [mode, requirementForm]);
 
 	const requirementTree = useMemo(() => {
 		const eventAreas = (areas || [])
@@ -757,7 +788,7 @@ export default function AddAreaPop({
 		<div className="fixed top-4 right-4 bottom-4 z-[50] flex bg-transparent" style={{ left: 'calc(var(--sidebar-width, 0px) + 28px)' }}>
 			<div className="relative flex h-full w-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-2xl">
 				<ModalHeader event={event} onClose={resetAndClose} mainMode={mainMode} />
-				<div className="flex min-h-0 flex-1 gap-4">
+				<div className="flex min-h-0 flex-1">
 					<EventStructureSidebar
 						mainMode={mainMode}
 						mode={mode}
@@ -792,57 +823,67 @@ export default function AddAreaPop({
 						}}
 					/>
 
-				<div className="relative flex min-w-0 flex-1 flex-col bg-slate-50/50">
-
-
+					<div className="relative flex min-w-0 flex-1 flex-col bg-slate-50/50 overflow-y-auto">
 						<div
-							className={`flex min-h-0 flex-1 flex-col overflow-hidden py-4 ${
-								mainMode === 'assign' ? 'px-3 sm:px-4' : 'px-4 sm:px-5'
+							className={`flex min-h-0 flex-1 flex-col ${
+								mainMode === 'assign' ? 'p-3 sm:p-4' : 'p-4 sm:p-6'
 							}`}
 						>
 							{mainMode === 'add' && (
-								<div className="mx-auto w-full max-w-2xl">
-									{mode === 'add-area' && (
-										<AddAreaForm
-											fieldClass={fieldClass}
-											saving={saving}
-											areaForm={areaForm}
-											setAreaForm={setAreaForm}
-											onSubmit={handleAddArea}
+								<div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full items-start">
+									<div className="flex flex-col justify-start">
+										{mode === 'add-area' && (
+											<AddAreaForm
+												fieldClass={fieldClass}
+												saving={saving}
+												areaForm={areaForm}
+												setAreaForm={setAreaForm}
+												onSubmit={handleAddArea}
+											/>
+										)}
+										{mode === 'add-criteria' && (
+											<AddCriteriaForm
+												areas={areas}
+												criteriaForm={criteriaForm}
+												setCriteriaForm={setCriteriaForm}
+												parentCriteriaOptions={parentCriteriaOptions}
+												fieldClass={fieldClass}
+												saving={saving}
+												onSubmit={handleAddCriteria}
+											/>
+										)}
+										{mode === 'add-requirement' && (
+											<AddRequirementForm
+												areas={areas}
+												requirementForm={requirementForm}
+												setRequirementForm={setRequirementForm}
+												filteredCriteriaOptions={filteredCriteriaOptions}
+												handleRequirementCriteriaChange={handleRequirementCriteriaChange}
+												onChildCriteriaChange={(val) => {
+													if (val) loadParentRequirementsFor(val, false, requirementForm.AreaFilter);
+													else if (requirementForm.CriteriaID)
+														loadParentRequirementsFor(requirementForm.CriteriaID, false, requirementForm.AreaFilter);
+												}}
+												childCriteriaOptions={childCriteriaOptions}
+												parentRequirementOptions={parentRequirementOptions}
+												handleParentRequirementChange={handleParentRequirementChange}
+												loadingParents={loadingParents}
+												fieldClass={fieldClass}
+												saving={saving}
+												onSubmit={handleAddRequirement}
+											/>
+										)}
+									</div>
+
+									<div className="flex flex-col justify-start">
+										<StructureLivePreview
+											mode={mode}
+											areaData={resolvedPreviewArea}
+											criteriaData={resolvedPreviewCriteria}
+											requirementData={resolvedPreviewRequirement}
+											event={event}
 										/>
-									)}
-									{mode === 'add-criteria' && (
-										<AddCriteriaForm
-											areas={areas}
-											criteriaForm={criteriaForm}
-											setCriteriaForm={setCriteriaForm}
-											parentCriteriaOptions={parentCriteriaOptions}
-											fieldClass={fieldClass}
-											saving={saving}
-											onSubmit={handleAddCriteria}
-										/>
-									)}
-									{mode === 'add-requirement' && (
-										<AddRequirementForm
-											areas={areas}
-											requirementForm={requirementForm}
-											setRequirementForm={setRequirementForm}
-											filteredCriteriaOptions={filteredCriteriaOptions}
-											handleRequirementCriteriaChange={handleRequirementCriteriaChange}
-											onChildCriteriaChange={(val) => {
-												if (val) loadParentRequirementsFor(val, false, requirementForm.AreaFilter);
-												else if (requirementForm.CriteriaID)
-													loadParentRequirementsFor(requirementForm.CriteriaID, false, requirementForm.AreaFilter);
-											}}
-											childCriteriaOptions={childCriteriaOptions}
-											parentRequirementOptions={parentRequirementOptions}
-											handleParentRequirementChange={handleParentRequirementChange}
-											loadingParents={loadingParents}
-											fieldClass={fieldClass}
-											saving={saving}
-											onSubmit={handleAddRequirement}
-										/>
-									)}
+									</div>
 								</div>
 							)}
 

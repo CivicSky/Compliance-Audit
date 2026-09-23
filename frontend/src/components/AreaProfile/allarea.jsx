@@ -45,14 +45,14 @@ const AreaProfile = forwardRef(function AreaProfile({ eventId, onAreaClick, sele
 
   return (
     <div className="mt-6 w-full space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-1.5 pb-1.5">
         {areas.map(area => {
           const isSelected = selectionMode && selectedAreaIds.includes(area.AreaID);
           return (
             <div
               key={area.AreaID}
-              className={`bg-white rounded-lg shadow-md p-4 hover:border-blue-700 hover:shadow-xl cursor-pointer border-l-4 border-blue-400 border-solid ${isSelected ? 'area-selected-outer' : ''}`}
-              style={isSelected ? { borderLeftWidth: '8px', boxShadow: '0 0 0 4px #2563eb' } : {}}
+              className={`bg-white rounded-xl shadow-2xs p-4 app-card-hover cursor-pointer border border-slate-200 border-l-4 border-l-cyan-500 ${isSelected ? 'area-selected-outer ring-2 ring-indigo-500' : ''}`}
+              style={isSelected ? { borderLeftWidth: '8px' } : {}}
               onClick={() => {
                 if (onAreaClick) {
                   onAreaClick(area);

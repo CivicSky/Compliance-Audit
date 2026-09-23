@@ -381,7 +381,7 @@ export default function DeficiencyTracker({
                                 )}
                             </div>
                             <p className="text-xs text-slate-500 mt-0.5">
-                                Monitor academic programs and non-academic offices with pending or incomplete requirements under each accreditation event.
+                                Monitor academic programs and non-academic offices with pending or incomplete evidence under each accreditation.
                             </p>
                         </div>
                     </div>
@@ -624,7 +624,7 @@ export default function DeficiencyTracker({
                                 </div>
                                 <h3 className="mt-3 text-base font-bold text-slate-800">All Units are 100% Compliant</h3>
                                 <p className="mt-1 max-w-sm text-xs text-slate-500">
-                                    Every academic program and non-academic office has fulfilled their compliance requirements for this event.
+                                    Every academic program and non-academic office has fulfilled their compliance evidence for this accreditation.
                                 </p>
                             </>
                         ) : (
@@ -650,7 +650,7 @@ export default function DeficiencyTracker({
                     </div>
                 ) : viewMode === "grid" ? (
                     /* Cards Grid View */
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 pt-1.5 pb-1.5">
                         {paginatedOffices.map((office) => {
                             const isCompliant = office.percent === 100 && office.totalRequirements > 0;
                             const isCritical = office.percent < 50;
@@ -658,7 +658,7 @@ export default function DeficiencyTracker({
                             return (
                                 <div
                                     key={office.officeId || office.OfficeID}
-                                    className="group relative flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-4 transition-all duration-200 hover:border-slate-300 hover:shadow-md"
+                                    className="group relative flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-4 app-card-hover cursor-pointer"
                                 >
                                     <div>
                                         {/* Top badges row */}
@@ -820,7 +820,7 @@ export default function DeficiencyTracker({
                                             onClick={() => onInspectOffice && onInspectOffice(office)}
                                             className="w-full flex items-center justify-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50/70 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100 hover:border-blue-300 transition cursor-pointer"
                                         >
-                                            <Eye size={13} /> Inspect Requirements
+                                            <Eye size={13} /> Inspect Evidence
                                         </button>
                                     </div>
                                 </div>

@@ -1,16 +1,15 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 
 export default function CopyEventPopup({
 	open,
 	defaultName = "",
 	defaultCode = "",
-	defaultDescription = "",
 	onCancel,
 	onConfirm
 }) {
 	const [eventName, setEventName] = useState(defaultName);
 	const [eventCode, setEventCode] = useState(defaultCode);
-	const [description, setDescription] = useState(defaultDescription);
 	const [submitting, setSubmitting] = useState(false);
 
 	if (!open) return null;
@@ -19,7 +18,7 @@ export default function CopyEventPopup({
 		if (!eventName.trim() || !eventCode.trim() || submitting) return;
 		setSubmitting(true);
 		try {
-			await onConfirm({ eventName, eventCode, description });
+			await onConfirm({ eventName, eventCode, description: null });
 		} catch (e) {
 			console.error(e);
 		} finally {
@@ -27,12 +26,12 @@ export default function CopyEventPopup({
 		}
 	};
 
-	return (
-		<div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out z-[50] flex items-center justify-center bg-black bg-opacity-40">
-			<div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
-				<h2 className="text-xl font-bold mb-4">Copy Event</h2>
+	const modalContent = (
+		<div className="fixed inset-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out z-[60] flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
+			<div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md border border-slate-100 animate-in fade-in zoom-in-95 duration-150">
+				<h2 className="text-xl font-bold mb-4">Copy Accreditation</h2>
 				<div className="mb-3">
-					<label className="block text-sm font-medium mb-1">Event Name</label>
+					<label className="block text-sm font-medium mb-1">Accreditation Name</label>
 					<input
 						className="w-full border rounded px-3 py-2 text-sm disabled:opacity-50"
 						value={eventName}
@@ -41,23 +40,13 @@ export default function CopyEventPopup({
 						autoFocus
 					/>
 				</div>
-				<div className="mb-3">
-					<label className="block text-sm font-medium mb-1">Event Code</label>
+				<div className="mb-4">
+					<label className="block text-sm font-medium mb-1">Accreditation Code</label>
 					<input
 						className="w-full border rounded px-3 py-2 text-sm disabled:opacity-50"
 						value={eventCode}
 						onChange={e => setEventCode(e.target.value)}
 						disabled={submitting}
-					/>
-				</div>
-				<div className="mb-4">
-					<label className="block text-sm font-medium mb-1">Description</label>
-					<textarea
-						className="w-full border rounded px-3 py-2 text-sm disabled:opacity-50"
-						value={description}
-						onChange={e => setDescription(e.target.value)}
-						disabled={submitting}
-						rows={3}
 					/>
 				</div>
 				<div className="flex justify-end gap-2">
@@ -89,5 +78,7 @@ export default function CopyEventPopup({
 			</div>
 		</div>
 	);
+
+	return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : null;
 }
 

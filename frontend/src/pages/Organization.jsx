@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
+import { X } from "lucide-react";
 import Sortoffice from "../components/Organization/sortoffice";
 import CustomDropdown from "../components/UI/CustomDropdown";
 import EventsAddDelete from "../components/ALLC/eventsadddelete";
@@ -13,8 +14,10 @@ import EditOfficeModal from "../components/Organization/EditOfficeModal";
 import ViewReqPasscuModal from "../components/ViewReqPasscuModal/ViewReqPasscuModal";
 import ViewReqPASSCUModal from "../components/ViewReqPASSCUModal/ViewReqPASSCUModal";
 import AddReqOffModal from "../components/AddReqOffModal/AddReqOffModal";
+import { Building2, Plus, Search, LayoutGrid, List } from "lucide-react";
 import { useModal } from "../components/UI/ModalProvider";
 import { useLiveRefresh } from "../utils/liveSync";
+import ViewModeToggle from "../components/UI/ViewModeToggle";
 
 const normalizeOfficeRecord = (office) => {
     if (!office) return null;
@@ -53,16 +56,24 @@ export default function Organization({ selectedEventIdProp, onEventSelect }) {
     const [deleteMode, setDeleteMode] = useState(false);
     const [selectedCount, setSelectedCount] = useState(0);
     const [selectedIds, setSelectedIds] = useState([]);
-    const [selectedEventType, setSelectedEventType] = useState(selectedEventIdProp || ''); // will hold EventID
+    const [selectedEventType, setSelectedEventType] = useState(() => {
+        return selectedEventIdProp || localStorage.getItem('acc_selected_event_id') || localStorage.getItem('selected_audit_event_id') || '';
+    });
 
     useEffect(() => {
         if (selectedEventIdProp) {
             setSelectedEventType(selectedEventIdProp);
+            localStorage.setItem('acc_selected_event_id', String(selectedEventIdProp));
+            localStorage.setItem('selected_audit_event_id', String(selectedEventIdProp));
         }
     }, [selectedEventIdProp]);
 
     const handleEventTabChange = (eventId) => {
         setSelectedEventType(eventId);
+        if (eventId) {
+            localStorage.setItem('acc_selected_event_id', String(eventId));
+            localStorage.setItem('selected_audit_event_id', String(eventId));
+        }
         if (typeof onEventSelect === 'function') {
             onEventSelect(eventId);
         }
@@ -133,6 +144,18 @@ export default function Organization({ selectedEventIdProp, onEventSelect }) {
                 const res = await eventsAPI.getAllEvents();
                 if (res.success && Array.isArray(res.data)) {
                     setEvents(res.data);
+                    if (res.data.length > 0) {
+                        setSelectedEventType((prev) => {
+                            const saved = localStorage.getItem('acc_selected_event_id') || localStorage.getItem('selected_audit_event_id');
+                            const candidate = prev && prev !== 'all' ? prev : saved;
+                            const found = res.data.find(e => String(e.EventID || e.id) === String(candidate));
+                            const target = found || res.data[0];
+                            const targetId = String(target.EventID || target.id);
+                            localStorage.setItem('acc_selected_event_id', targetId);
+                            localStorage.setItem('selected_audit_event_id', targetId);
+                            return targetId;
+                        });
+                    }
                 } else {
                     setEvents([]);
                 }
@@ -210,9 +233,9 @@ export default function Organization({ selectedEventIdProp, onEventSelect }) {
     };
 
     // Real-time live syncing on mutations or window focus
-    const refreshOrgData = useCallback(() => {
+    const refreshOrgData = useCallback((meta = { silent: true }) => {
         if (officesPRef.current?.refresh) {
-            officesPRef.current.refresh();
+            officesPRef.current.refresh({ silent: true });
         }
         if (selectedEventType) {
             fetchAvailableMasterList(selectedEventType);
@@ -508,30 +531,40 @@ export default function Organization({ selectedEventIdProp, onEventSelect }) {
 
 
     return (
-        <div className="w-full h-full flex flex-col bg-app overflow-hidden">
-            {/* Fixed header */}
-            <div ref={headerRef} style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50, background: 'transparent' }}>
-            </div>
-
-            {/* Fixed controls and filters */}
-            <div className="flex flex-col gap-0 px-4 pt-1.5 pb-0" style={{ marginTop: headerRef.current ? headerRef.current.offsetHeight : 0 }}>
-                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
-                    <div ref={controlsRef}>
-                        <h1 className="text-xl font-bold text-gray-800 mb-0.5">Programs &amp; Offices</h1>
-                        <p className="text-[11px] text-gray-500">
-                            {deleteMode
-                                ? ' '
-                                : 'Manage and monitor all academic programs, offices, and compliance assignments.'}
-                        </p>
+        <div className="w-full flex-1 flex flex-col min-w-0 bg-slate-50/50 overflow-hidden">
+            {/* Top Header Card */}
+            <div className="px-4 sm:px-6 pt-4 pb-3.5 shrink-0 border-b border-slate-200/70 bg-white shadow-2xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-blue-700 text-white shadow-md shadow-indigo-500/20 shrink-0">
+                            <Building2 className="w-5 h-5 sm:w-5.5 sm:h-5.5" />
+                        </div>
+                        <div ref={controlsRef}>
+                            <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">Programs &amp; Offices</h1>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                                {deleteMode
+                                    ? 'Select programs or offices to delete.'
+                                    : 'Manage and monitor all academic programs, offices, and compliance assignments.'}
+                            </p>
+                        </div>
                     </div>
+
                     {isAdmin && (
-                        <div className="flex items-center gap-1.5 pt-0.5 self-start sm:self-auto flex-wrap">
+                        <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
                             {deleteMode && (
                                 <button
                                     type="button"
                                     onClick={handleDeleteSelected}
-                                    className="inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-red-400 bg-red-600 text-white hover:bg-red-700"
+                                    disabled={selectedCount === 0}
+                                    className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold shadow-xs transition-all ${
+                                        selectedCount === 0
+                                            ? 'border-red-200 bg-red-50/50 text-red-400 cursor-not-allowed'
+                                            : 'border-red-600 bg-red-600 text-white hover:bg-red-700 active:scale-95 shadow-red-500/20 cursor-pointer'
+                                    }`}
                                 >
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
                                     Delete Selected ({selectedCount})
                                 </button>
                             )}
@@ -548,13 +581,16 @@ export default function Organization({ selectedEventIdProp, onEventSelect }) {
                                     setSelectedCount(0);
                                     setSelectedIds([]);
                                 }}
-                                className={`inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-red-400 ${
+                                className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition-all cursor-pointer ${
                                     deleteMode
-                                        ? 'border-red-300 bg-red-100 text-red-700 hover:bg-red-200'
-                                        : 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100'
+                                        ? 'border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                        : 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100 hover:border-red-300'
                                 }`}
                             >
-                                {deleteMode ? 'Cancel Delete' : 'Delete'}
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={deleteMode ? "M6 18L18 6M6 6l12 12" : "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"} />
+                                </svg>
+                                {deleteMode ? 'Cancel' : 'Delete Mode'}
                             </button>
                             <button
                                 type="button"
@@ -565,40 +601,42 @@ export default function Organization({ selectedEventIdProp, onEventSelect }) {
                                     }
                                     setShowAddSidebar(prev => !prev);
                                 }}
-                                className={`inline-flex h-8 items-center gap-1 rounded-lg px-3 text-[11px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-brand-500 ${
+                                className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-3.5 text-xs font-semibold shadow-xs transition-all active:scale-95 focus:outline-none focus:ring-2 cursor-pointer ${
                                     showAddSidebar
-                                        ? 'bg-slate-200 text-slate-700 hover:bg-slate-350'
-                                        : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                                        ? 'bg-slate-200 text-slate-700 hover:bg-slate-300 focus:ring-slate-400'
+                                        : 'bg-emerald-600 text-white hover:bg-emerald-700 focus:ring-emerald-500/20'
                                 }`}
                             >
-                                <span className="text-sm leading-none">+</span>
-                                {showAddSidebar ? 'Close Panel' : 'Add'}
+                                <Plus className="h-3.5 w-3.5" />
+                                <span>{showAddSidebar ? 'Close Panel' : 'Add to Event'}</span>
                             </button>
                         </div>
                     )}
                 </div>
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5 mt-2 flex-wrap">
-                    <div className="relative w-full md:w-64 lg:w-72">
-                        <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
-                        >
-                            <circle cx="11" cy="11" r="7" />
-                            <path d="m20 20-3.5-3.5" />
-                        </svg>
+
+                {/* Search, Filters & View Mode Toolbar */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mt-3 pt-3 border-t border-slate-100">
+                    <div className="relative w-full sm:w-72 md:w-80">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                         <input
                             type="text"
                             placeholder="Search offices..."
-                            className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs text-slate-800 placeholder-slate-400 shadow-2xs transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                            className="h-9 w-full rounded-xl border border-slate-200/90 bg-slate-50/60 pl-9.5 pr-8 text-xs text-slate-800 placeholder-slate-400 shadow-2xs transition-all focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-slate-300"
                             value={searchTerm}
                             onChange={e => setSearchTerm(e.target.value)}
                         />
+                        {searchTerm && (
+                            <button
+                                type="button"
+                                onClick={() => setSearchTerm('')}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-md cursor-pointer flex items-center justify-center"
+                            >
+                                <X className="w-3.5 h-3.5" />
+                            </button>
+                        )}
                     </div>
-                    <div className="flex items-center gap-2 flex-wrap">
+
+                    <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap">
                         <CustomDropdown
                             value={selectedOfficeTypeFilter}
                             onChange={setSelectedOfficeTypeFilter}
@@ -621,49 +659,21 @@ export default function Organization({ selectedEventIdProp, onEventSelect }) {
                                     label: d.name ?? d.DepartmentName ?? d.Name,
                                 })),
                             ]}
-                            minWidth="min-w-[140px]"
+                            minWidth="min-w-[155px]"
                             size="sm"
                         />
 
                         <div className="relative inline-block">
                             <Sortoffice value={sortStatus} onChange={setSortStatus} />
                         </div>
-                        <div className="flex items-center">
-                            <div className="flex h-7 items-center gap-0.5 rounded-md border border-slate-200 bg-slate-100 p-0.5">
-                                <button
-                                    onClick={() => setViewMode('grid')}
-                                    className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
-                                        viewMode === 'grid'
-                                            ? 'bg-white text-indigo-600'
-                                            : 'text-gray-500 hover:text-gray-700'
-                                    }`}
-                                    title="Grid View"
-                                >
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                                    </svg>
-                                </button>
-                                <button
-                                    onClick={() => setViewMode('list')}
-                                    className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
-                                        viewMode === 'list'
-                                            ? 'bg-white text-indigo-600'
-                                            : 'text-gray-500 hover:text-gray-700'
-                                    }`}
-                                    title="List View"
-                                >
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
+
+                        <ViewModeToggle viewMode={viewMode} onChange={setViewMode} />
                     </div>
                 </div>
             </div>
 
-            {/* Event Tabs (replaces dropdown) */}
-            <div className="px-4 mb-2 mt-0.5 overflow-x-auto">
+            {/* Event Tabs */}
+            <div className="px-4 sm:px-6 pt-2 pb-1 shrink-0 overflow-x-auto">
                 <EventTabs selectedEventId={selectedEventType} onChange={handleEventTabChange} />
             </div>
 

@@ -44,9 +44,9 @@ router.get('/login-status', userController.loginStatus);
 router.post('/login', userController.loginUser);
 router.post('/logout', auth, userController.logoutUser);
 
-// User data routes
-router.get('/', rateLimit({ windowMs: 60 * 1000, max: 30 }), userController.getUsers);
-router.get('/current/:email', userController.getCurrentUser);
+// User data routes (protected)
+router.get('/', auth, requireAdmin, rateLimit({ windowMs: 60 * 1000, max: 30 }), userController.getUsers);
+router.get('/current/:email', auth, userController.getCurrentUser);
 
 // Bulk delete users (admin only)
 router.delete('/', auth, requireAdmin, userController.deleteUsers);

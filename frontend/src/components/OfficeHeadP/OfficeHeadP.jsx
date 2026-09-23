@@ -9,6 +9,131 @@ import OfficeHeaddetails from "../OfficeHead/OfficeHeaddetails.jsx";
 import { API_BASE_URL } from '../../utils/apiBase';
 import { OfficeCardSkeleton } from "../UI/Skeleton";
 import { useLiveRefresh } from "../../utils/liveSync";
+import ServerOfflineState from "../UI/ServerOfflineState";
+
+const STATIC_MOCK_PERSONNEL = [
+    {
+        HeadID: 901,
+        FirstName: "Sarah",
+        MiddleInitial: "M",
+        LastName: "Connor",
+        Position: "Office Head",
+        Email: "s.connor@university.edu",
+        ContactInfo: "s.connor@university.edu",
+        OfficeID: 1,
+        assigned_offices: [{ office_name: "Registrar Office", id: 1 }, { office_name: "Admissions Office", id: 2 }]
+    },
+    {
+        HeadID: 902,
+        FirstName: "James",
+        MiddleInitial: "R",
+        LastName: "Vance",
+        Position: "Personnel",
+        Email: "james.vance@university.edu",
+        ContactInfo: "james.vance@university.edu",
+        OfficeID: 2,
+        assigned_offices: [{ office_name: "Admissions", id: 2 }]
+    },
+    {
+        HeadID: 903,
+        FirstName: "Elena",
+        MiddleInitial: "G",
+        LastName: "Cruz",
+        Position: "Office Head",
+        Email: "elena.cruz@university.edu",
+        ContactInfo: "elena.cruz@university.edu",
+        OfficeID: 3,
+        assigned_offices: [{ office_name: "College of Science", id: 3 }, { office_name: "Biology Dept", id: 4 }, { office_name: "Chemistry Dept", id: 5 }]
+    },
+    {
+        HeadID: 904,
+        FirstName: "Marcus",
+        MiddleInitial: "T",
+        LastName: "Brody",
+        Position: "Personnel",
+        Email: "marcus.brody@university.edu",
+        ContactInfo: "marcus.brody@university.edu",
+        OfficeID: 6,
+        assigned_offices: [{ office_name: "Information Technology", id: 6 }, { office_name: "MIS Unit", id: 7 }]
+    },
+    {
+        HeadID: 905,
+        FirstName: "Maria",
+        MiddleInitial: "D",
+        LastName: "Santos",
+        Position: "Office Head",
+        Email: "maria.santos@university.edu",
+        ContactInfo: "maria.santos@university.edu",
+        OfficeID: 8,
+        assigned_offices: [{ office_name: "Human Resources", id: 8 }]
+    },
+    {
+        HeadID: 906,
+        FirstName: "John",
+        MiddleInitial: "K",
+        LastName: "Miller",
+        Position: "Personnel",
+        Email: "john.miller@university.edu",
+        ContactInfo: "john.miller@university.edu",
+        OfficeID: 9,
+        assigned_offices: [{ office_name: "Finance & Accounting", id: 9 }, { office_name: "Cashier Office", id: 10 }]
+    },
+    {
+        HeadID: 907,
+        FirstName: "Patricia",
+        MiddleInitial: "L",
+        LastName: "Reyes",
+        Position: "Personnel",
+        Email: "patricia.reyes@university.edu",
+        ContactInfo: "patricia.reyes@university.edu",
+        OfficeID: 11,
+        assigned_offices: [{ office_name: "Student Affairs", id: 11 }, { office_name: "Guidance Office", id: 12 }, { office_name: "Scholarship Dept", id: 13 }]
+    },
+    {
+        HeadID: 908,
+        FirstName: "David",
+        MiddleInitial: "W",
+        LastName: "Chen",
+        Position: "Office Head",
+        Email: "david.chen@university.edu",
+        ContactInfo: "david.chen@university.edu",
+        OfficeID: 14,
+        assigned_offices: [{ office_name: "Library Services", id: 14 }]
+    },
+    {
+        HeadID: 909,
+        FirstName: "Anna",
+        MiddleInitial: "V",
+        LastName: "Lopez",
+        Position: "Personnel",
+        Email: "anna.lopez@university.edu",
+        ContactInfo: "anna.lopez@university.edu",
+        OfficeID: 15,
+        assigned_offices: [{ office_name: "Research & Development", id: 15 }, { office_name: "Publications", id: 16 }]
+    },
+    {
+        HeadID: 910,
+        FirstName: "Robert",
+        MiddleInitial: "H",
+        LastName: "Taylor",
+        Position: "Personnel",
+        Email: "robert.taylor@university.edu",
+        ContactInfo: "robert.taylor@university.edu",
+        OfficeID: 17,
+        assigned_offices: [{ office_name: "Guidance Counseling", id: 17 }]
+    },
+    {
+        HeadID: 911,
+        FirstName: "Carmen",
+        MiddleInitial: "S",
+        LastName: "Diaz",
+        Position: "Office Head",
+        Email: "carmen.diaz@university.edu",
+        ContactInfo: "carmen.diaz@university.edu",
+        OfficeID: 18,
+        assigned_offices: [{ office_name: "College of Engineering", id: 18 }, { office_name: "Civil Eng Lab", id: 19 }]
+    }
+];
 
 const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode = false, onSelectionChange, viewMode = 'grid' }, ref) => {
     const [officeHeads, setOfficeHeads] = useState([]);
@@ -72,7 +197,7 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
             filtered = officeHeads.filter(person => {
                 const fullName = `${person.FirstName}${person.MiddleInitial ? ' ' + person.MiddleInitial + '.' : ''} ${person.LastName}`.toLowerCase();
                 const position = person.Position?.toLowerCase() || '';
-                const contact = person.ContactInfo?.toLowerCase() || '';
+                const contact = (person.Email || person.ContactInfo || '').toLowerCase();
                 const searchLower = searchTerm.toLowerCase();
 
                 return fullName.includes(searchLower) ||
@@ -84,13 +209,13 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
         // Apply filtering based on sort type
         switch (sortType) {
             case 'assigned':
-                // Show only assigned office heads (those with OfficeID)
-                filtered = filtered.filter(person => person.OfficeID);
+                // Show only assigned office heads (those with OfficeID or assigned_offices)
+                filtered = filtered.filter(person => person.OfficeID || (person.assigned_offices && person.assigned_offices.length > 0));
                 break;
 
             case 'unassigned':
-                // Show only unassigned office heads (those without OfficeID)
-                filtered = filtered.filter(person => !person.OfficeID);
+                // Show only unassigned office heads
+                filtered = filtered.filter(person => !person.OfficeID && (!person.assigned_offices || person.assigned_offices.length === 0));
                 break;
 
             case 'name':
@@ -178,59 +303,46 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
 
             // Make API call to delete heads
             const response = await officeHeadsAPI.deleteHeads(headIds);
-            console.log('Delete response:', response);
-
-            if (response.success) {
-                // Remove deleted heads from local state
-                setOfficeHeads(prev => prev.filter(head => !headIds.includes(head.HeadID)));
-                setSelectedHeads(new Set());
-                return { success: true };
-            } else {
-                console.error('Delete failed:', response.message);
-                return { success: false, message: response.message || 'Failed to delete office heads' };
-            }
+            return response;
         } catch (error) {
-            console.error('Error deleting office heads:', error);
-            console.error('Error details:', error.response?.data || error.message);
-
-            // Check if it's a network error
-            if (error.code === 'ERR_NETWORK' || error.message.includes('Network Error')) {
-                return { success: false, message: 'Network error. Please check if the backend server is running on port 5000.' };
-            }
-
-            // Check for specific error responses
+            console.error('Error in deleteSelectedHeads:', error);
             if (error.response) {
                 return { success: false, message: `Server error: ${error.response.data?.message || error.response.statusText}` };
             }
-
             return { success: false, message: 'Error deleting office heads. Please try again.' };
         }
     };
 
-    const fetchOfficeHeads = async () => {
+    const [isRetrying, setIsRetrying] = useState(false);
+
+    const fetchOfficeHeads = async (isRetry = false) => {
         try {
-            setLoading(true);
+            if (isRetry) setIsRetrying(true);
+            else setLoading(true);
             setError(null);
             const response = await officeHeadsAPI.getAllHeads();
-            console.log('DEBUG: officeHeadsAPI.getAllHeads() response:', response);
+            let headsList = [];
             if (Array.isArray(response)) {
-                setOfficeHeads(response);
+                headsList = response;
             } else if (response && Array.isArray(response.data)) {
-                setOfficeHeads(response.data);
-            } else {
-                console.error('Unexpected response format:', response);
-                setError('Failed to fetch office heads - unexpected data format');
+                headsList = response.data;
             }
+
+            setOfficeHeads(headsList);
+            setError(null);
         } catch (error) {
             console.error('Error fetching office heads:', error);
-            console.error('Error message:', error.message);
-            console.error('Error response:', error.response?.data);
-            setError('Error loading office heads. Please try again.');
+            setOfficeHeads([]);
+            if (!error.response || error.code === 'ERR_NETWORK' || error.message?.toLowerCase().includes('network error') || error.message?.toLowerCase().includes('failed to fetch')) {
+                setError('Server Offline');
+            } else {
+                setError(error.response?.data?.message || 'Failed to load office personnel.');
+            }
         } finally {
             setLoading(false);
+            setIsRetrying(false);
         }
     };
-
     // Function to refresh data (can be called from parent component)
     const refreshData = () => {
         fetchOfficeHeads();
@@ -312,11 +424,18 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
     const handleSave = async (updated) => {
         try {
             const formData = new FormData();
-            formData.append('FirstName', updated.FirstName || '');
-            formData.append('MiddleInitial', updated.MiddleInitial || '');
-            formData.append('LastName', updated.LastName || '');
-            formData.append('Position', updated.Position || '');
-            formData.append('ContactInfo', updated.ContactInfo || '');
+            const fallbackHead = selectedHead || {};
+            const firstName = (updated.FirstName !== undefined ? updated.FirstName : fallbackHead.FirstName) || '';
+            const middleInitial = (updated.MiddleInitial !== undefined ? updated.MiddleInitial : fallbackHead.MiddleInitial) || '';
+            const lastName = (updated.LastName !== undefined ? updated.LastName : fallbackHead.LastName) || '';
+            const position = (updated.Position !== undefined ? updated.Position : fallbackHead.Position) || '';
+            const contactInfo = (updated.ContactInfo !== undefined ? updated.ContactInfo : fallbackHead.ContactInfo) || '';
+
+            formData.append('FirstName', firstName.trim());
+            formData.append('MiddleInitial', middleInitial.trim());
+            formData.append('LastName', lastName.trim());
+            formData.append('Position', position.trim());
+            formData.append('ContactInfo', contactInfo.trim());
 
             if (updated.ProfilePic && typeof updated.ProfilePic === 'object') {
                 formData.append('profilePic', updated.ProfilePic);
@@ -394,7 +513,7 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
         return false;
     };
 
-    const itemsPerPage = 30; // limit to 30 per page
+    const itemsPerPage = viewMode === 'grid' ? 12 : 20; // 12 for 4x3 grid
     const totalPages = Math.max(1, Math.ceil(filteredOfficeHeads.length / itemsPerPage));
     const startIdx = (currentPage - 1) * itemsPerPage;
     const paginatedOfficeHeads = filteredOfficeHeads.slice(startIdx, startIdx + itemsPerPage);
@@ -417,7 +536,7 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
 
     if (loading) {
         return (
-            <div className="mt-6 w-full">
+            <div className="w-full py-4">
                 <OfficeCardSkeleton count={6} />
             </div>
         );
@@ -425,65 +544,60 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
 
     if (error) {
         return (
-            <div className="mt-6 w-full">
-                <div className="bg-red-50 border border-red-200 rounded-md p-4">
-                    <div className="flex items-center">
-                        <svg className="w-5 h-5 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span className="text-red-700">{error}</span>
-                        <button
-                            onClick={fetchOfficeHeads}
-                            className="ml-4 px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
-                        >
-                            Retry
-                        </button>
-                    </div>
+            <ServerOfflineState
+                onRetry={() => fetchOfficeHeads(true)}
+                isRetrying={isRetrying}
+                title={error === 'Server Offline' ? 'Backend Server Unavailable' : 'Unable to Load Personnel'}
+                message={error === 'Server Offline' 
+                    ? 'The backend server is unreachable or offline. If you stopped the backend server, please start it and click Retry Connection.' 
+                    : error}
+            />
+        );
+    }
+
+    if (filteredOfficeHeads.length === 0) {
+        return (
+            <div className="flex-1 w-full min-h-[350px] flex flex-col items-center justify-center p-8 text-center bg-white/70 border border-dashed border-slate-200 rounded-2xl animate-fadeIn my-auto">
+                <div className="w-16 h-16 bg-slate-100 border border-slate-200 text-slate-400 rounded-2xl flex items-center justify-center mb-3">
+                    <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+                    </svg>
                 </div>
+                <h3 className="text-base font-bold text-slate-800 mb-1">
+                    {searchTerm.trim() ? 'No Personnel Found' : 'No Office Personnel Added'}
+                </h3>
+                <p className="text-xs text-slate-500 max-w-sm">
+                    {searchTerm.trim() 
+                        ? `No office personnel match your search for "${searchTerm}".` 
+                        : 'No office personnel or department heads have been registered yet.'}
+                </p>
             </div>
         );
     }
 
-    if (filteredOfficeHeads.length === 0 && !loading) {
-        if (searchTerm.trim()) {
-            return (
-                <div className="mt-6 w-full">
-                    <div className="bg-gray-50 border border-gray-200 rounded-md p-8 text-center">
-                        <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">No Results Found</h3>
-                        <p className="text-gray-600">No office personnel match your search for "{searchTerm}".</p>
-                        <p className="text-gray-500 text-sm mt-2">Try adjusting your search terms or browse all office personnel.</p>
-                    </div>
-                </div>
-            );
-        } else if (officeHeads.length === 0) {
-            return (
-                <div className="mt-6 w-full">
-                    <div className="bg-gray-50 border border-gray-200 rounded-md p-8 text-center">
-                        <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM9 9a2 2 0 11-4 0 2 2 0 014 0z" />
-                        </svg>
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">No Office Personnel Found</h3>
-                        <p className="text-gray-600">Start by adding your first office personnel using the "Add Office Personnel" button.</p>
-                    </div>
-                </div>
-            );
-        }
-    }
-
     return (
-        <div className={viewMode === 'list' ? 'mt-1 w-full flex flex-col pb-24' : 'mt-1 w-full h-full flex flex-col'}>
+        <div className={viewMode === 'list' ? 'mt-1 w-full flex flex-col pb-24' : 'w-full h-full min-h-0 flex-1 flex flex-col pt-1.5 px-0.5'}>
             {/* Search Results Counter */}
             {searchTerm.trim() && (
-                <div className="text-xs text-gray-600 mb-1">
+                <div className="text-xs text-gray-600 mb-2 shrink-0">
                     Showing {filteredOfficeHeads.length} of {officeHeads.length} office personnel
                     {filteredOfficeHeads.length !== officeHeads.length && ` matching "${searchTerm}"`}
                 </div>
             )}
 
-            <div className={viewMode === 'list' ? 'flex flex-col gap-2' : 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 auto-rows-fr'}>
+            {viewMode === 'list' && (
+                <div
+                    className="grid grid-cols-8 gap-2 px-4 py-3 bg-white border border-slate-200 rounded-xl shadow-sm text-xs font-semibold text-gray-700 sticky z-30 min-w-[720px] mb-2"
+                    style={{ top: 0, zIndex: 3 }}
+                >
+                    <div className="col-span-4 flex items-center">Name</div>
+                    <div className="col-span-2 flex items-center justify-center">Role</div>
+                    <div className="col-span-1 flex items-center justify-center">Status</div>
+                    <div className="col-span-1 flex items-center justify-end">Actions</div>
+                </div>
+            )}
+
+            <div className={viewMode === 'list' ? 'flex flex-col gap-2 pt-1 pb-1' : 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 grid-rows-3 gap-2 sm:gap-2.5 lg:gap-3 flex-1 min-h-0 h-full p-1'}>
                 {visibleOfficeHeads.map((person) => {
                     const fullName = `${person.FirstName || ''}${person.MiddleInitial ? ' ' + person.MiddleInitial + '.' : ''} ${person.LastName || ''}`.trim() || 'Personnel';
                     const initials = `${(person.FirstName || '').trim().charAt(0)}${(person.LastName || '').trim().charAt(0)}`.toUpperCase() || 'OP';
@@ -492,7 +606,9 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                         : person.ProfilePic
                             ? `${API_BASE_URL}/uploads/profile-pics/${person.ProfilePic}`
                             : null;
-                    const assignedOffices = offices.filter((office) => officeHasHead(office, person.HeadID));
+                    const assignedOffices = (person.assigned_offices && person.assigned_offices.length > 0)
+                        ? person.assigned_offices
+                        : offices.filter((office) => officeHasHead(office, person.HeadID));
                     const isAssigned = assignedOffices.length > 0;
                     const statusClass = isAssigned
                         ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80'
@@ -521,8 +637,8 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                                     if (deleteMode) toggleHeadSelection(person.HeadID);
                                     else openDetails(person, assignedOffices);
                                 }}
-                                className={`relative overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xs transition-all duration-150 ${selectedHeads.has(person.HeadID) ? 'ring-2 ring-indigo-500 border-indigo-500' : ''
-                                    } ${deleteMode ? 'cursor-pointer hover:border-gray-300' : 'hover:border-indigo-200 hover:shadow-md'}`}
+                                className={`relative rounded-xl border border-slate-200 bg-white shadow-2xs ${selectedHeads.has(person.HeadID) ? 'ring-2 ring-indigo-500 border-indigo-500' : ''
+                                    } ${deleteMode ? 'cursor-pointer' : 'app-card-hover cursor-pointer'}`}
                             >
                                 <div className="grid grid-cols-8 items-center gap-2 px-4 py-3">
                                     {/* Name column (col-span-4) */}
@@ -600,8 +716,10 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                                                         aria-label="Open office personnel actions"
                                                         title="Actions"
                                                     >
-                                                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6h.01M12 12h.01M12 18h.01" />
+                                                        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                            <circle cx="12" cy="5" r="2" />
+                                                            <circle cx="12" cy="12" r="2" />
+                                                            <circle cx="12" cy="19" r="2" />
                                                         </svg>
                                                     </button>
                                                 </div>
@@ -616,25 +734,25 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                     return (
                         <div
                             key={person.HeadID}
-                            className={`group relative flex flex-col justify-between rounded-2xl border bg-white shadow-xs hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 overflow-hidden ${isSelected
-                                    ? 'border-indigo-500 ring-2 ring-indigo-400/50 bg-indigo-50/15'
-                                    : 'border-slate-200/90 hover:border-indigo-300/80'
-                                }`}
+                            className={`group relative flex flex-col justify-between rounded-2xl bg-white shadow-2xs h-full min-h-0 transition-all duration-200 ${
+                                isSelected
+                                    ? 'border-2 border-rose-500 ring-2 ring-inset ring-rose-400/50 bg-rose-50/25 shadow-sm'
+                                    : deleteMode
+                                        ? 'border border-slate-200/90 hover:border-rose-300 cursor-pointer'
+                                        : 'border border-slate-200/90 app-card-hover'
+                            }`}
                         >
-                            <div className="p-3.5 flex flex-col flex-1 justify-between gap-2.5">
+                            <div className="p-2.5 sm:p-3 flex flex-col flex-1 justify-between gap-1.5 min-h-0 overflow-hidden">
                                 {/* Card Top: Status Badge & Option Menu */}
-                                <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center justify-between gap-2 shrink-0">
                                     {deleteMode ? (
-                                        <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                                            <input
-                                                type="checkbox"
-                                                checked={isSelected}
-                                                onChange={(e) => handleCheckboxChange(person.HeadID, e.target.checked)}
-                                                onClick={(e) => e.stopPropagation()}
-                                                className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                                            />
-                                            <span className="text-[10px] font-semibold text-slate-600">Select</span>
-                                        </label>
+                                        <input
+                                            type="checkbox"
+                                            checked={isSelected}
+                                            onChange={(e) => handleCheckboxChange(person.HeadID, e.target.checked)}
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="h-4 w-4 rounded border-rose-300 text-rose-600 focus:ring-rose-500 cursor-pointer"
+                                        />
                                     ) : (
                                         <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold tracking-wide border ${statusClass}`}>
                                             <span className={`h-1.5 w-1.5 rounded-full ${isAssigned ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'
@@ -658,12 +776,14 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                                                         setActionMenuAnchorRect(rect);
                                                     }
                                                 }}
-                                                className="office-head-actions-button flex h-6 w-6 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition hover:bg-slate-50 hover:text-slate-700"
+                                                className="office-head-actions-button inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200/90 bg-white text-slate-500 transition-all hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 shadow-2xs"
                                                 aria-label="Open office personnel actions"
                                                 title="Actions"
                                             >
-                                                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6h.01M12 12h.01M12 18h.01" />
+                                                <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                    <circle cx="12" cy="5" r="2" />
+                                                    <circle cx="12" cy="12" r="2" />
+                                                    <circle cx="12" cy="19" r="2" />
                                                 </svg>
                                             </button>
                                         </div>
@@ -676,10 +796,10 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                                         if (deleteMode) toggleHeadSelection(person.HeadID);
                                         else openDetails(person, assignedOffices);
                                     }}
-                                    className="cursor-pointer group/content"
+                                    className="cursor-pointer group/content min-h-0 flex-1 flex flex-col justify-center"
                                     title="Click to view details and assigned offices"
                                 >
-                                    <div className="flex items-center gap-2.5">
+                                    <div className="flex items-center gap-2 sm:gap-2.5">
                                         {/* Smart Avatar */}
                                         <div className="relative shrink-0">
                                             {profilePicUrl ? (
@@ -690,11 +810,11 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                                                         e.target.style.display = 'none';
                                                         if (e.target.nextElementSibling) e.target.nextElementSibling.style.display = 'flex';
                                                     }}
-                                                    className="h-10 w-10 rounded-full object-cover ring-2 ring-slate-100 shadow-xs"
+                                                    className="h-8 w-8 sm:h-9 sm:w-9 rounded-full object-cover ring-2 ring-slate-100 shadow-xs"
                                                 />
                                             ) : null}
                                             <div
-                                                className={`h-10 w-10 rounded-full flex items-center justify-center font-bold text-white text-xs shadow-xs ring-2 ${avatarStyle.ring} ${avatarStyle.bg} ${profilePicUrl ? 'hidden' : 'flex'}`}
+                                                className={`h-8 w-8 sm:h-9 sm:w-9 rounded-full flex items-center justify-center font-bold text-white text-[11px] sm:text-xs shadow-xs ring-2 ${avatarStyle.ring} ${avatarStyle.bg} ${profilePicUrl ? 'hidden' : 'flex'}`}
                                             >
                                                 {initials}
                                             </div>
@@ -702,7 +822,7 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
 
                                         {/* Name & Role */}
                                         <div className="min-w-0 flex-1">
-                                            <h3 className="text-[13px] font-bold text-slate-900 truncate group-hover/content:text-indigo-600 transition-colors leading-tight">
+                                            <h3 className="text-xs sm:text-[13px] font-bold text-slate-900 truncate group-hover/content:text-indigo-600 transition-colors leading-tight">
                                                 {fullName}
                                             </h3>
                                             <div className="mt-0.5">
@@ -714,7 +834,7 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                                     </div>
 
                                     {/* Email Strip */}
-                                    <div className="mt-2.5 flex items-center gap-1.5 rounded-lg bg-slate-50/80 px-2 py-1 border border-slate-100 text-[10px] text-slate-600 group-hover/content:bg-slate-100/70 transition-colors">
+                                    <div className="mt-1 sm:mt-1.5 flex items-center gap-1.5 rounded-lg bg-slate-50/80 px-2 py-0.5 border border-slate-100 text-[9px] sm:text-[10px] text-slate-600 group-hover/content:bg-slate-100/70 transition-colors shrink-0">
                                         <svg className="w-3 h-3 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                             <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                                         </svg>
@@ -723,14 +843,14 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                                 </div>
 
                                 {/* Assigned Office(s) Footer */}
-                                <div className="mt-1 pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2">
+                                <div className="mt-0.5 pt-1.5 border-t border-slate-100 flex items-center justify-between gap-1.5 shrink-0">
                                     <div className="min-w-0 flex-1">
-                                        <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">
+                                        <div className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">
                                             Assigned Office(s)
                                         </div>
                                         {assignedOffices.length > 0 ? (
-                                            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-800 truncate" title={assignedOffices.map(o => o.OfficeName || o.office_name).join(', ')}>
-                                                <svg className="w-3.5 h-3.5 text-teal-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <div className="flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold text-slate-800 truncate" title={assignedOffices.map(o => o.OfficeName || o.office_name).join(', ')}>
+                                                <svg className="w-3 h-3 text-teal-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                                     <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                                                 </svg>
                                                 <span className="truncate">
@@ -739,7 +859,7 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                                                 </span>
                                             </div>
                                         ) : (
-                                            <span className="text-[11px] text-slate-400 italic">Not assigned to any office</span>
+                                            <span className="text-[10px] sm:text-[11px] text-slate-400 italic">Not assigned to any office</span>
                                         )}
                                     </div>
 
@@ -750,7 +870,7 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                                                 e.stopPropagation();
                                                 openDetails(person, assignedOffices);
                                             }}
-                                            className="shrink-0 rounded-lg px-2 py-1 text-[10px] font-bold transition flex items-center gap-1 bg-slate-100 text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 border border-slate-200/60"
+                                            className="shrink-0 rounded-lg px-2 py-0.5 text-[9px] sm:text-[10px] font-bold transition flex items-center gap-1 bg-slate-100 text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 border border-slate-200/60"
                                         >
                                             Details
                                         </button>
@@ -792,15 +912,17 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
 
                 if (!menuPerson) return null;
 
-                const menuWidth = 220;
-                const viewportRight = window.scrollX + window.innerWidth - 12;
-                const left = Math.min((actionMenuAnchorRect.right || 0) + window.scrollX - menuWidth, viewportRight - menuWidth);
-                const top = (actionMenuAnchorRect.bottom || 0) + window.scrollY + 8;
+                const zoom = parseFloat(getComputedStyle(document.body).zoom) || 1;
+                const menuWidth = 192;
+                const viewportRight = (window.innerWidth / zoom) - 8;
+                const desiredLeft = (actionMenuAnchorRect.right / zoom) - menuWidth;
+                const left = Math.min(desiredLeft, viewportRight - menuWidth);
+                const top = (actionMenuAnchorRect.bottom / zoom) + 4;
 
                 return createPortal(
                     <div
                         className="office-head-actions-menu"
-                        style={{ position: 'absolute', left, top, width: menuWidth, zIndex: 9999 }}
+                        style={{ position: 'fixed', left: Math.max(8, left), top, zIndex: 9999 }}
                         onMouseDown={(e) => e.stopPropagation()}
                         onClick={(e) => e.stopPropagation()}
                     >

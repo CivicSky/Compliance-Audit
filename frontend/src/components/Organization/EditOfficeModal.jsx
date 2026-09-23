@@ -3,6 +3,7 @@ import { API_BASE_URL } from '../../utils/apiBase';
 import React, { useState, useEffect, useMemo } from "react";
 import { officeHeadsAPI } from "../../utils/api";
 import { useModal } from "../UI/ModalProvider";
+import CustomSelect from "../UI/CustomSelect";
 
 export default function EditOfficeModal({ visible, onClose, office, onSave, officeTypes, userRole = 'user' }) {
     const [officeName, setOfficeName] = useState("");
@@ -256,17 +257,21 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
     const safeHeads = Array.isArray(heads) ? heads : [];
 
     return (
-        <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out z-[50] flex items-center justify-center bg-black/40">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
-                <div className="flex items-center justify-between px-6 py-5 border-b border-slate-200">
-                    <h2 className="text-lg font-bold text-gray-900">{isAdmin ? 'Edit Office' : 'View Office'}</h2>
+        <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out z-[50] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs">
+            <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md mx-4 overflow-hidden">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+                    <div>
+                        <h2 className="text-lg font-bold tracking-tight text-slate-800">{isAdmin ? 'Edit Office' : 'View Office'}</h2>
+                        <p className="mt-0.5 text-xs text-slate-500">Update configuration and details for this entity.</p>
+                    </div>
                     <button 
+                        type="button"
                         onClick={onClose} 
                         disabled={isSaving}
-                        className="text-gray-400 hover:text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed" 
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 active:scale-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" 
                         aria-label="Close"
                     >
-                        <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
@@ -286,58 +291,58 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
                     </div>
 
                     <div>
-                        <label className="block text-sm font-semibold text-gray-800 mb-1">Office Type</label>
-                        <select
+                        <label className="block text-xs font-semibold text-slate-700 mb-1.5">Office Type</label>
+                        <CustomSelect
                             value={officeTypeID}
-                            onChange={(e) => setOfficeTypeID(e.target.value)}
+                            onChange={(val) => setOfficeTypeID(val)}
                             disabled={!isAdmin}
-                            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+                            placeholder="Select Office Type"
+                            options={[
+                                { value: "", label: "Select Office Type" },
+                                ...(officeTypes || []).map((type) => ({
+                                    value: String(type.OfficeTypeID || type.id),
+                                    label: type.TypeName || type.name,
+                                })),
+                            ]}
                             required
-                        >
-                            <option value="">Select Office Type</option>
-                            {officeTypes?.map((type) => (
-                                <option key={type.OfficeTypeID || type.id} value={type.OfficeTypeID || type.id}>
-                                    {type.TypeName || type.name}
-                                </option>
-                            ))}
-                        </select>
+                        />
                     </div>
 
                     {isAcademicType(officeTypeID) && (
                         <>
                             <div>
-                                <label className="block text-sm font-semibold text-gray-800 mb-1">Department</label>
-                                <select
+                                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Department</label>
+                                <CustomSelect
                                     value={selectedDepartmentID}
-                                    onChange={(e) => setSelectedDepartmentID(e.target.value)}
+                                    onChange={(val) => setSelectedDepartmentID(val)}
                                     disabled={!isAdmin}
-                                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
-                                >
-                                    <option value="">Select Department (Optional)</option>
-                                    {departments.map((dept) => (
-                                        <option key={dept.id ?? dept.DepartmentID} value={dept.id ?? dept.DepartmentID}>
-                                            {dept.name || dept.DepartmentName}
-                                        </option>
-                                    ))}
-                                </select>
+                                    placeholder="Select Department (Optional)"
+                                    options={[
+                                        { value: "", label: "Select Department (Optional)" },
+                                        ...departments.map((dept) => ({
+                                            value: String(dept.id ?? dept.DepartmentID),
+                                            label: dept.name || dept.DepartmentName,
+                                        })),
+                                    ]}
+                                />
                             </div>
 
                             {departmentRequiresProgramTypes(departments.find(d => String(d.id ?? d.DepartmentID) === String(selectedDepartmentID))) && (
                                 <div>
-                                    <label className="block text-sm font-semibold text-gray-800 mb-1">Program Type</label>
-                                    <select
+                                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">Program Type</label>
+                                    <CustomSelect
                                         value={selectedProgramTypeID}
-                                        onChange={(e) => setSelectedProgramTypeID(e.target.value)}
+                                        onChange={(val) => setSelectedProgramTypeID(val)}
                                         disabled={!isAdmin}
-                                        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
-                                    >
-                                        <option value="">Select Program Type (Optional)</option>
-                                        {programTypes.map((pt) => (
-                                            <option key={pt.id ?? pt.ProgramTypeID} value={pt.id ?? pt.ProgramTypeID}>
-                                                {pt.name || pt.ProgramTypeName || pt.TypeName}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        placeholder="Select Program Type (Optional)"
+                                        options={[
+                                            { value: "", label: "Select Program Type (Optional)" },
+                                            ...programTypes.map((pt) => ({
+                                                value: String(pt.id ?? pt.ProgramTypeID),
+                                                label: pt.name || pt.ProgramTypeName || pt.TypeName,
+                                            })),
+                                        ]}
+                                    />
                                 </div>
                             )}
                         </>
@@ -424,29 +429,29 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
                         </div>
                     </div>
 
-                    <div className="flex justify-end gap-3 pt-2 border-t border-slate-200">
+                    <div className="flex justify-end gap-2.5 pt-4 border-t border-slate-100">
                         {isAdmin && (
                             <>
                                 <button
                                     type="button"
                                     onClick={onClose}
                                     disabled={isSaving}
-                                    className="rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="inline-flex h-9 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50 active:scale-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={isSaving}
-                                    className="inline-flex items-center gap-2 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+                                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 text-xs font-semibold text-white shadow-xs transition hover:bg-emerald-700 active:scale-95 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                                 >
                                     {isSaving && (
-                                        <svg className="h-4 w-4 animate-spin text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                        <svg className="h-3.5 w-3.5 animate-spin text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                                         </svg>
                                     )}
-                                    <span>{isSaving ? "Saving..." : "Save"}</span>
+                                    <span>{isSaving ? "Saving..." : "Save Changes"}</span>
                                 </button>
                             </>
                         )}
@@ -455,7 +460,7 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
                                 type="button"
                                 onClick={onClose}
                                 disabled={isSaving}
-                                className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="inline-flex h-9 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50 active:scale-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Close
                             </button>

@@ -43,10 +43,16 @@ export default function EventTabs({ selectedEventId, onChange }) {
         const toShow = Array.isArray(active) ? active : [];
         if (mounted) setEvents(toShow);
 
-        // If current selectedEventId is not in toShow list (or empty), pick first available
+        // If current selectedEventId is not in toShow list (or empty), pick persisted or first available
         const currentValid = toShow.some(e => String(e.EventID || e.id) === String(selectedEventId));
         if (!currentValid && toShow.length > 0 && typeof onChange === 'function') {
-          onChange(toShow[0].EventID || toShow[0].id || '');
+          const savedEventId = localStorage.getItem('acc_selected_event_id') || localStorage.getItem('selected_audit_event_id');
+          const validSaved = toShow.find(e => String(e.EventID || e.id) === String(savedEventId));
+          const target = validSaved || toShow[0];
+          const targetId = target.EventID || target.id || '';
+          localStorage.setItem('acc_selected_event_id', String(targetId));
+          localStorage.setItem('selected_audit_event_id', String(targetId));
+          onChange(targetId);
         }
       } catch (err) {
         console.error('Failed to load events for tabs', err);
@@ -59,6 +65,10 @@ export default function EventTabs({ selectedEventId, onChange }) {
 
   const handleSelect = (ev) => {
     const id = ev.EventID || ev.id || ev.EventCode || ev.EventName || ev.name || '';
+    if (id) {
+      localStorage.setItem('acc_selected_event_id', String(id));
+      localStorage.setItem('selected_audit_event_id', String(id));
+    }
     if (typeof onChange === 'function') onChange(id);
   };
 

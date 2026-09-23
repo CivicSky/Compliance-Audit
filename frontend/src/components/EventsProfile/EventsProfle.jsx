@@ -5,19 +5,21 @@ import { eventsAPI } from "../../utils/api";
 import Pagination from "../Pagination/Pagination";
 import { CardListSkeleton } from "../UI/Skeleton";
 import { useLiveRefresh } from "../../utils/liveSync";
+import ServerOfflineState from "../UI/ServerOfflineState";
 
-const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionChange, onEventClick }, ref) => {
+const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, viewMode = 'grid', onSelectionChange, onEventClick }, ref) => {
     const [events, setEvents] = useState([]);
     const [filteredEvents, setFilteredEvents] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [selectedEvents, setSelectedEvents] = useState(new Set());
     const [downloadableFolders, setDownloadableFolders] = useState([]);
+    const [downloadingId, setDownloadingId] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
     const { showAlert } = useModal();
     const { toast } = useToast();
 
-    const itemsPerPage = 30; // limit to 30 per page
+    const itemsPerPage = viewMode === 'grid' ? 12 : 20;
 
     // Helper to normalize folder/event names to a consistent form
     const normalizeName = (s) => {
@@ -29,22 +31,32 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
             .trim();
     };
 
-    const fetchEvents = useCallback(async () => {
+    const [isRetrying, setIsRetrying] = useState(false);
+
+    const fetchEvents = useCallback(async (isRetry = false) => {
         try {
-            setLoading(true);
+            if (isRetry) setIsRetrying(true);
+            else setLoading(true);
             setError(null);
             const response = await eventsAPI.getAllEvents();
 
             if (response.success) {
-                setEvents(response.data);
+                setEvents(response.data || []);
+                setError(null);
             } else {
                 setError('Failed to fetch events');
             }
         } catch (error) {
             console.error('Error fetching events:', error);
-            setError('Error loading events. Please try again.');
+            setEvents([]);
+            if (!error.response || error.code === 'ERR_NETWORK' || error.message?.toLowerCase().includes('network error') || error.message?.toLowerCase().includes('failed to fetch')) {
+                setError('Server Offline');
+            } else {
+                setError(error.response?.data?.message || 'Failed to load events.');
+            }
         } finally {
             setLoading(false);
+            setIsRetrying(false);
         }
     }, []);
 
@@ -102,14 +114,14 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [searchTerm]);
+    }, [searchTerm, viewMode]);
 
     useEffect(() => {
         const pageCount = Math.max(1, Math.ceil(filteredEvents.length / itemsPerPage));
         if (currentPage > pageCount) {
             setCurrentPage(1);
         }
-    }, [filteredEvents.length, currentPage]);
+    }, [filteredEvents.length, currentPage, itemsPerPage]);
 
     const handleCheckboxChange = (eventId, isChecked) => {
         setSelectedEvents(prev => {
@@ -152,7 +164,7 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
             console.error('Error deleting events:', error);
 
             if (error.code === 'ERR_NETWORK' || error.message.includes('Network Error')) {
-                return { success: false, message: 'Network error. Please check if the backend server is running on port 5000.' };
+                return { success: false, message: 'Network error. Please check if the backend server is running.' };
             }
 
             if (error.response) {
@@ -160,6 +172,33 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
             }
 
             return { success: false, message: `Error deleting events: ${error.message}` };
+        }
+    };
+
+    const handleDownloadZip = async (e, event) => {
+        e.stopPropagation();
+        e.preventDefault();
+        try {
+            setDownloadingId(event.EventID);
+            const keyName = event.EventID;
+            const sanitizedName = String(event.EventCode || event.EventName || `event_${event.EventID}`).replace(/[<>:"/\\|?*]/g, '_').trim();
+            const url = await eventsAPI.downloadEventZip(keyName);
+
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${sanitizedName}.zip`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            setTimeout(() => {
+                window.URL.revokeObjectURL(url);
+            }, 1000);
+        } catch (err) {
+            console.error('Download error:', err);
+            await showAlert('Download failed: ' + (err.message || 'Unknown error'));
+        } finally {
+            setDownloadingId(null);
         }
     };
 
@@ -172,65 +211,43 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
         deleteSelected: deleteSelectedEvents
     }));
 
-    // Get status badge style
-    const getStatusStyle = (event) => {
-        if (event.CreatedAt) {
-            return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-        }
-        return 'bg-gray-50 text-gray-600 border-gray-200';
-    };
-
     if (loading) {
         return (
             <div className="w-full py-4">
-                <CardListSkeleton count={4} />
+                <CardListSkeleton count={6} />
             </div>
         );
     }
 
     if (error) {
         return (
-            <div className="w-full py-8">
-                <div className="flex flex-col items-center justify-center">
-                    <div className="w-10 h-10 bg-rose-100 rounded-full flex items-center justify-center mb-3">
-                        <svg className="w-5 h-5 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                    </div>
-                    <p className="text-rose-600 text-sm mb-3">{error}</p>
-                    <button
-                        onClick={fetchEvents}
-                        className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 transition-colors"
-                    >
-                        Try Again
-                    </button>
-                </div>
-            </div>
+            <ServerOfflineState
+                onRetry={() => fetchEvents(true)}
+                isRetrying={isRetrying}
+                title={error === 'Server Offline' ? 'Backend Server Unavailable' : 'Unable to Load Downloads'}
+                message={error === 'Server Offline' 
+                    ? 'The backend server is unreachable or offline. If you stopped the backend server, please start it and click Retry Connection.' 
+                    : error}
+            />
         );
     }
 
-    if (filteredEvents.length === 0 && !loading) {
+    if (filteredEvents.length === 0) {
         return (
-            <div className="w-full py-12">
-                <div className="flex flex-col items-center justify-center max-w-sm mx-auto text-center">
-                    <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3">
-                        <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            {searchTerm ? (
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                            ) : (
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                            )}
-                        </svg>
-                    </div>
-                    <h3 className="text-sm font-medium text-gray-900 mb-1">
-                        {searchTerm ? 'No Results Found' : 'No Events Found'}
-                    </h3>
-                    <p className="text-xs text-gray-500">
-                        {searchTerm
-                            ? `No events match "${searchTerm}"`
-                            : 'No compliance events available yet.'}
-                    </p>
+            <div className="flex-1 w-full min-h-[350px] flex flex-col items-center justify-center p-8 text-center bg-white/70 border border-dashed border-slate-200 rounded-2xl animate-fadeIn my-auto">
+                <div className="w-16 h-16 bg-slate-100 border border-slate-200 text-slate-400 rounded-2xl flex items-center justify-center mb-3">
+                    <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                    </svg>
                 </div>
+                <h3 className="text-base font-bold text-slate-800 mb-1">
+                    {searchTerm ? 'No Downloads Found' : 'No Downloadable Packages Available'}
+                </h3>
+                <p className="text-xs text-slate-500 max-w-sm">
+                    {searchTerm
+                        ? `No events or downloadable packages match "${searchTerm}".`
+                        : 'No compliance events or generated download archives are available yet.'}
+                </p>
             </div>
         );
     }
@@ -240,125 +257,236 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
     const paginatedEvents = filteredEvents.slice(startIdx, startIdx + itemsPerPage);
 
     return (
-        <div className="w-full space-y-2">
+        <div className={viewMode === 'list' ? 'mt-1 w-full flex flex-col pb-24' : 'w-full h-full min-h-0 flex-1 flex flex-col pt-1 px-0.5'}>
             {/* Search Results Counter */}
-            {searchTerm && (
-                <div className="px-3 py-2 text-xs text-gray-500 bg-gray-50 rounded-lg">
-                    Showing {filteredEvents.length} of {events.length} events
+            {searchTerm.trim() && (
+                <div className="text-xs text-slate-500 mb-2 shrink-0">
+                    Showing {filteredEvents.length} of {events.length} event packages matching "{searchTerm}"
                 </div>
             )}
 
-            <div className="space-y-2">
-                {paginatedEvents.map((event) => (
-                    <div
-                        key={event.EventID}
-                        onClick={() => !deleteMode && onEventClick && onEventClick(event)}
-                        className={`
-                            relative bg-white rounded-lg border transition-all duration-200
-                            ${deleteMode
-                                ? 'border-gray-200 hover:border-gray-300'
-                                : 'border-gray-100 hover:border-indigo-200 hover:shadow-sm cursor-pointer'
-                            }
-                            ${selectedEvents.has(event.EventID)
-                                ? 'ring-2 ring-indigo-500 border-indigo-500 bg-indigo-50/30'
-                                : ''
-                            }
-                        `}
-                    >
-                        <div className="px-3 py-2.5">
-                            <div className="flex items-center gap-3">
-                                {/* Checkbox for delete mode */}
-                                {deleteMode && (
-                                    <div className="flex-shrink-0">
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedEvents.has(event.EventID)}
-                                            onChange={(e) => handleCheckboxChange(event.EventID, e.target.checked)}
-                                            className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-brand-500"
-                                            onClick={(e) => e.stopPropagation()}
-                                        />
+            {viewMode === 'list' && (
+                <div className="grid grid-cols-12 items-center gap-3 px-4 py-3 bg-white border border-slate-200 rounded-xl shadow-2xs text-xs font-semibold text-gray-700 sticky top-0 z-30 min-w-[720px] mb-2">
+                    <div className="col-span-5 flex items-center gap-2">
+                        {deleteMode && <span>Select</span>}
+                        <span>Event Name & Code</span>
+                    </div>
+                    <div className="col-span-3 flex items-center justify-center">Status</div>
+                    <div className="col-span-2 flex items-center justify-center">Archive Status</div>
+                    <div className="col-span-2 flex items-center justify-end">Download</div>
+                </div>
+            )}
+
+            <div className={viewMode === 'list' ? 'flex flex-col gap-2 pt-1 pb-1' : 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 flex-1 min-h-0'}>
+                {paginatedEvents.map((event) => {
+                    const isFolderReady = downloadableFolders.some(folder => 
+                        String(folder) === String(event.EventID) ||
+                        normalizeName(folder) === normalizeName(event.EventCode) ||
+                        normalizeName(folder) === normalizeName(event.EventName) ||
+                        normalizeName(folder) === normalizeName(event.EventCode || event.EventName)
+                    );
+                    const isSelected = selectedEvents.has(event.EventID);
+                    const isDownloading = downloadingId === event.EventID;
+
+                    if (viewMode === 'list') {
+                        return (
+                            <div
+                                key={event.EventID}
+                                onClick={() => {
+                                    if (deleteMode) handleCheckboxChange(event.EventID, !isSelected);
+                                    else if (onEventClick) onEventClick(event);
+                                }}
+                                className={`relative rounded-xl border border-slate-200 bg-white shadow-2xs ${
+                                    isSelected ? 'ring-2 ring-rose-500 border-rose-500 bg-rose-50/20' : ''
+                                } ${deleteMode ? 'cursor-pointer hover:border-rose-300' : 'app-card-hover cursor-pointer'}`}
+                            >
+                                <div className="grid grid-cols-12 items-center gap-3 px-4 py-3">
+                                    {/* Event Name & Code (col-span-5) */}
+                                    <div className="flex items-center gap-3 col-span-5 min-w-0">
+                                        {deleteMode && (
+                                            <div className="shrink-0">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isSelected}
+                                                    onChange={(e) => handleCheckboxChange(event.EventID, e.target.checked)}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    className="h-4 w-4 rounded border-rose-300 text-rose-600 focus:ring-rose-500 cursor-pointer"
+                                                />
+                                            </div>
+                                        )}
+                                        <div className="h-9 w-9 shrink-0 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-xs">
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                                            </svg>
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                <h3 className="text-xs font-bold text-slate-900 truncate">{event.EventName}</h3>
+                                                {event.EventCode && (
+                                                    <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-mono font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                                                        {event.EventCode}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            {event.Description && (
+                                                <p className="text-[10px] text-slate-500 truncate mt-0.5">{event.Description}</p>
+                                            )}
+                                        </div>
                                     </div>
-                                )}
 
-                                {/* Icon */}
-                                <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-lg flex items-center justify-center">
-                                    <svg className="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                    </svg>
-                                </div>
-
-                                {/* Event Info - Compact */}
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2">
-                                        <h3 className="text-sm font-medium text-gray-900 truncate">
-                                            {event.EventName}
-                                        </h3>
-                                        <span className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full border ${getStatusStyle(event)}`}>
-                                            {event.status === 'active' ? 'Active' : 'Inactive'}
+                                    {/* Status (col-span-3) */}
+                                    <div className="col-span-3 flex items-center justify-center">
+                                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold tracking-wide border ${
+                                            event.status === 'active' || event.CreatedAt
+                                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                : 'bg-slate-100 text-slate-600 border-slate-200'
+                                        }`}>
+                                            <span className={`h-1.5 w-1.5 rounded-full ${event.status === 'active' || event.CreatedAt ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
+                                            {event.status === 'active' || event.CreatedAt ? 'Active' : 'Archived'}
                                         </span>
                                     </div>
 
-                                    {event.EventCode && (
-                                        <p className="text-xs text-gray-500 mt-0.5">
-                                            {event.EventCode}
-                                        </p>
-                                    )}
+                                    {/* Archive Availability Status (col-span-2) */}
+                                    <div className="col-span-2 flex items-center justify-center">
+                                        {isFolderReady ? (
+                                            <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/80 px-2 py-0.5 text-[10px] font-bold">
+                                                ZIP Ready
+                                            </span>
+                                        ) : (
+                                            <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 text-slate-500 border border-slate-200 px-2 py-0.5 text-[10px] font-medium italic">
+                                                Pending ZIP
+                                            </span>
+                                        )}
+                                    </div>
 
+                                    {/* Action (col-span-2) */}
+                                    <div className="col-span-2 flex items-center justify-end">
+                                        {isFolderReady ? (
+                                            <button
+                                                type="button"
+                                                disabled={isDownloading}
+                                                onClick={(e) => handleDownloadZip(e, event)}
+                                                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white px-3 py-1.5 text-xs font-semibold shadow-xs transition-all disabled:opacity-50 cursor-pointer"
+                                            >
+                                                <svg className={`w-3.5 h-3.5 ${isDownloading ? 'animate-bounce' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                                </svg>
+                                                <span>{isDownloading ? 'Downloading...' : 'Download ZIP'}</span>
+                                            </button>
+                                        ) : (
+                                            <span className="text-[10px] text-slate-400 italic">No package</span>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    }
+
+                    return (
+                        <div
+                            key={event.EventID}
+                            className={`group relative flex flex-col justify-between rounded-2xl bg-white shadow-2xs transition-all duration-200 ${
+                                isSelected
+                                    ? 'border-2 border-rose-500 ring-2 ring-inset ring-rose-400/50 bg-rose-50/25 shadow-sm'
+                                    : deleteMode
+                                        ? 'border border-slate-200/90 hover:border-rose-300 cursor-pointer'
+                                        : 'border border-slate-200/90 app-card-hover'
+                            }`}
+                        >
+                            <div className="p-4 flex flex-col flex-1 justify-between gap-3">
+                                {/* Card Top: Folder Icon + Code + Active Pill */}
+                                <div className="flex items-center justify-between gap-2 shrink-0">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                                            </svg>
+                                        </div>
+                                        {event.EventCode && (
+                                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200 truncate">
+                                                {event.EventCode}
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                        {deleteMode ? (
+                                            <input
+                                                type="checkbox"
+                                                checked={isSelected}
+                                                onChange={(e) => handleCheckboxChange(event.EventID, e.target.checked)}
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="h-4 w-4 rounded border-rose-300 text-rose-600 focus:ring-rose-500 cursor-pointer"
+                                            />
+                                        ) : (
+                                            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold tracking-wide border ${
+                                                event.status === 'active' || event.CreatedAt
+                                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                    : 'bg-slate-100 text-slate-600 border-slate-200'
+                                            }`}>
+                                                <span className={`h-1.5 w-1.5 rounded-full ${event.status === 'active' || event.CreatedAt ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
+                                                {event.status === 'active' || event.CreatedAt ? 'Active' : 'Archived'}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Event Title & Description */}
+                                <div className="min-h-0 flex-1">
+                                    <h3 className="text-sm font-bold text-slate-900 group-hover:text-emerald-600 transition-colors line-clamp-2 leading-snug">
+                                        {event.EventName}
+                                    </h3>
                                     {event.Description && (
-                                        <p className="text-xs text-gray-400 mt-1 line-clamp-1">
+                                        <p className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">
                                             {event.Description}
                                         </p>
                                     )}
                                 </div>
 
-                                {/* Download Button - Only if folder exists */}
-                                {downloadableFolders.some(folder => normalizeName(folder) === normalizeName(event.EventCode || event.EventName)) && (
-                                    <button
-                                        className="flex-shrink-0 px-2 py-1 bg-emerald-50 text-emerald-700 rounded-md text-xs font-medium hover:bg-emerald-100 transition-colors flex items-center gap-1 border border-emerald-200"
-                                        onClick={async (e) => {
-                                            e.stopPropagation();
-                                            e.preventDefault();
-                                            try {
-                                                const keyName = event.EventCode || event.EventName;
-                                                const sanitizedName = String(keyName).replace(/[<>:"/\\|?*]/g, '_').trim();
-                                                const url = await eventsAPI.downloadEventZip(keyName);
+                                {/* Card Footer: Download Status and Action Button */}
+                                <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2 shrink-0">
+                                    <div className="min-w-0 flex-1">
+                                        {isFolderReady ? (
+                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700">
+                                                <svg className="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                                </svg>
+                                                ZIP Available
+                                            </span>
+                                        ) : (
+                                            <span className="text-[10px] text-slate-400 italic">
+                                                No archive generated
+                                            </span>
+                                        )}
+                                    </div>
 
-                                                const link = document.createElement('a');
-                                                link.href = url;
-                                                link.download = `${sanitizedName}.zip`;
-                                                document.body.appendChild(link);
-                                                link.click();
-                                                document.body.removeChild(link);
-
-                                                setTimeout(() => {
-                                                    window.URL.revokeObjectURL(url);
-                                                }, 100);
-                                            } catch (err) {
-                                                console.error('Download error:', err);
-                                                await showAlert('Download failed: ' + (err.message || 'Unknown error'));
-                                            }
-                                        }}
-                                        title="Download event folder"
-                                    >
-                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                        </svg>
-                                        <span className="hidden sm:inline">Download</span>
-                                    </button>
-                                )}
+                                    {isFolderReady && !deleteMode && (
+                                        <button
+                                            type="button"
+                                            disabled={isDownloading}
+                                            onClick={(e) => handleDownloadZip(e, event)}
+                                            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white px-3 py-1.5 text-xs font-semibold shadow-xs transition-all disabled:opacity-50 cursor-pointer shrink-0"
+                                        >
+                                            <svg className={`w-3.5 h-3.5 ${isDownloading ? 'animate-bounce' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                            </svg>
+                                            <span>{isDownloading ? 'Downloading...' : 'Download ZIP'}</span>
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
 
-            <div className="pt-1">
+            <div className="pt-2">
                 <Pagination
                     currentPage={currentPage}
                     totalPages={totalPages}
                     onPageChange={(page) => setCurrentPage(page)}
                     fixed={true}
-                    showWhenSinglePage={true}
+                    showWhenSinglePage={false}
                 />
             </div>
         </div>

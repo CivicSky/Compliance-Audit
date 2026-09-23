@@ -1,5 +1,6 @@
 import React from 'react';
 import { officesAPI } from '../../utils/api';
+import { useModal } from '../UI/ModalProvider';
 
 export default function ModalHeader({
     officeData,
@@ -12,6 +13,7 @@ export default function ModalHeader({
     onClose,
     office,
 }) {
+    const { showAlert } = useModal();
     const isAcademicProgram = (() => {
         const typeId = Number(officeData?.entity_type_id || officeData?.OfficeTypeID || officeData?.type_id);
         if (typeId === 1) return true;
@@ -56,14 +58,18 @@ export default function ModalHeader({
                             {officeData.office_type_name && (
                                 <span className="text-xs font-medium text-slate-500">{officeData.office_type_name}</span>
                             )}
-                            {officeData.event_name && (
-                                <>
-                                    <span className="text-slate-300">·</span>
-                                    <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 border border-indigo-100">
-                                        Event: {officeData.event_code || officeData.EventCode || officeData.event?.code || ''}
-                                    </span>
-                                </>
-                            )}
+                            {(() => {
+                                const eventDisplay = String(officeData.event_code || officeData.EventCode || officeData.event_name || officeData.EventName || '').trim();
+                                if (!eventDisplay) return null;
+                                return (
+                                    <>
+                                        <span className="text-slate-300">·</span>
+                                        <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 border border-indigo-100">
+                                            Event: {eventDisplay}
+                                        </span>
+                                    </>
+                                );
+                            })()}
                             {(officeData.DepartmentName || officeData.department_name) && (
                                 <>
                                     <span className="text-slate-300">·</span>
@@ -81,76 +87,81 @@ export default function ModalHeader({
                             <button
                                 type="button"
                                 onClick={() => setShowMenu(!showMenu)}
-                                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700"
+                                className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-100 hover:text-slate-800 active:scale-95 ${showMenu ? 'bg-slate-100 text-slate-900 border-slate-300' : ''}`}
                                 aria-label="Office actions"
                             >
-                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6h.01M12 12h.01M12 18h.01" />
+                                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <circle cx="12" cy="5" r="2" />
+                                    <circle cx="12" cy="12" r="2" />
+                                    <circle cx="12" cy="19" r="2" />
                                 </svg>
                             </button>
 
                             {showMenu && (
-                                <div className="absolute right-0 top-10 z-30 w-[220px] overflow-hidden rounded-xl border border-slate-200 bg-white py-1.5 shadow-xl shadow-slate-200/60">
-                                    <button
-                                        type="button"
-                                        onClick={() => { setShowMenu(false); onEditOffice(office); }}
-                                        className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-xs text-slate-700 transition hover:bg-indigo-50 whitespace-nowrap"
-                                    >
-                                        <svg className="h-4 w-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                        </svg>
-                                        Edit Office Info
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => { setShowMenu(false); onAddRequirements(office); }}
-                                        className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-xs text-slate-700 transition hover:bg-emerald-50 whitespace-nowrap"
-                                    >
-                                        <svg className="h-4 w-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                        </svg>
-                                        Add Requirements
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={async () => {
-                                            try {
-                                                setShowMenu(false);
-                                                const officeId = office?.id || office?.OfficeID;
-                                                if (!officeId) return;
-                                                const officeName = office?.office_name || office?.OfficeName || `office-${officeId}`;
-                                                const { url, fileName } = await officesAPI.exportOfficeExcel(officeId, officeName);
-                                                const link = document.createElement('a');
-                                                link.href = url;
-                                                link.download = fileName;
-                                                document.body.appendChild(link);
-                                                link.click();
-                                                document.body.removeChild(link);
-                                                setTimeout(() => window.URL.revokeObjectURL(url), 200);
-                                            } catch (err) {
-                                                console.error('Export failed', err);
-                                                 showAlert(err?.message || 'Failed to export office', 'error');
-                                            }
-                                        }}
-                                        className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-xs text-slate-700 transition hover:bg-slate-50 whitespace-nowrap"
-                                    >
-                                        <svg className="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                        </svg>
-                                        Export Excel
-                                    </button>
-                                    <div className="my-1 border-t border-slate-100" />
-                                    <button
-                                        type="button"
-                                        onClick={async () => { setShowMenu(false); await onDeleteOffice?.(office); }}
-                                        className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-xs text-rose-600 transition hover:bg-rose-50 whitespace-nowrap"
-                                    >
-                                        <svg className="h-4 w-4 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
-                                        </svg>
-                                        Delete Office
-                                    </button>
-                                </div>
+                                <>
+                                    <div className="fixed inset-0 z-20" onClick={() => setShowMenu(false)} />
+                                    <div className="absolute right-0 top-10 z-30 w-48 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl animate-in fade-in zoom-in-95 duration-100">
+                                        <button
+                                            type="button"
+                                            onClick={() => { setShowMenu(false); onEditOffice?.(office); }}
+                                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition whitespace-nowrap"
+                                        >
+                                            <svg className="h-4 w-4 text-blue-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                            </svg>
+                                            <span>Edit Office Info</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setShowMenu(false); onAddRequirements?.(office); }}
+                                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 transition whitespace-nowrap"
+                                        >
+                                            <svg className="h-4 w-4 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                            </svg>
+                                            <span>Add Evidence</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={async () => {
+                                                try {
+                                                    setShowMenu(false);
+                                                    const officeId = office?.id || office?.OfficeID;
+                                                    if (!officeId) return;
+                                                    const officeName = office?.office_name || office?.OfficeName || `office-${officeId}`;
+                                                    const { url, fileName } = await officesAPI.exportOfficeExcel(officeId, officeName);
+                                                    const link = document.createElement('a');
+                                                    link.href = url;
+                                                    link.download = fileName;
+                                                    document.body.appendChild(link);
+                                                    link.click();
+                                                    document.body.removeChild(link);
+                                                    setTimeout(() => window.URL.revokeObjectURL(url), 200);
+                                                } catch (err) {
+                                                    console.error('Export failed', err);
+                                                    await showAlert(err?.response?.data?.message || err?.message || 'Failed to export office');
+                                                }
+                                            }}
+                                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 transition whitespace-nowrap"
+                                        >
+                                            <svg className="h-4 w-4 text-indigo-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 16V6m0 0l-4 4m4-4 4 4" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21H3" />
+                                            </svg>
+                                            <span>Export Excel</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={async () => { setShowMenu(false); await onDeleteOffice?.(office); }}
+                                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50 transition whitespace-nowrap"
+                                        >
+                                            <svg className="h-4 w-4 text-rose-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
+                                            </svg>
+                                            <span>Delete Office</span>
+                                        </button>
+                                    </div>
+                                </>
                             )}
                         </div>
                     )}
@@ -158,7 +169,7 @@ export default function ModalHeader({
                     <button
                         type="button"
                         onClick={onClose}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 active:scale-95"
                         aria-label="Close"
                     >
                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

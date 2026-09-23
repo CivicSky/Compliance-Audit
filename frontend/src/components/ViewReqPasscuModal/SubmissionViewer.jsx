@@ -8,6 +8,7 @@ import { useToast } from '../UI/Toast';
 import { useModal } from '../UI/ModalProvider';
 import { API_BASE_URL } from '../../utils/apiBase';
 import { dataCache, CacheKeys } from '../../utils/dataCache';
+import { useLiveRefresh } from '../../utils/liveSync';
 
 GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
 
@@ -151,6 +152,10 @@ export default function SubmissionViewer({
 	unsubmittingFile = false,
 }) {
 	const { showConfirm } = useModal();
+	const isViewerAuditor = Number(viewerRoleId || currentUser?.RoleID || 0) === 4 ||
+		String(currentUser?.RoleName || '').toLowerCase().includes('auditor') ||
+		String(currentUser?.Position || '').toLowerCase().includes('auditor') ||
+		Boolean(currentUser?.isExternalAuditor);
 
 	const [active, setActive] = useState(false);
 	const [shouldRender, setShouldRender] = useState(false);
@@ -247,7 +252,7 @@ export default function SubmissionViewer({
 		const initialLoadingMap = {};
 
 		uploadedUserIds.forEach((id) => {
-			const cacheKey = CacheKeys.userFiles(requirementId, id);
+			const cacheKey = CacheKeys.userFiles(requirementId, id, officeId);
 			const cached = dataCache.get(cacheKey);
 			if (cached && Array.isArray(cached) && cached.length > 0) {
 				initialFilesMap[id] = cached;
@@ -258,9 +263,9 @@ export default function SubmissionViewer({
 			}
 		});
 
-		setFileByUserId(initialFileMap);
-		setFilesByUserId(initialFilesMap);
-		setLoadingByUserId(initialLoadingMap);
+		setFileByUserId((prev) => ({ ...prev, ...initialFileMap }));
+		setFilesByUserId((prev) => ({ ...prev, ...initialFilesMap }));
+		setLoadingByUserId((prev) => ({ ...prev, ...initialLoadingMap }));
 		setThumbByUserId({});
 		setThumbLoadingByUserId({});
 		lastThumbKeyRef.current = '';
@@ -270,7 +275,7 @@ export default function SubmissionViewer({
 				const token = localStorage.getItem('token');
 				const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
 				const res = await fetch(
-					`${API_BASE_URL}/api/requirements/${requirementId}/user-file/${userId}`,
+					`${API_BASE_URL}/api/requirements/${requirementId}/user-file/${userId}${officeId ? `?officeId=${officeId}` : ''}`,
 					{ headers, signal: controller.signal }
 				);
 				if (!res.ok) {
@@ -285,7 +290,7 @@ export default function SubmissionViewer({
 						: (data.file ? [data.file] : []);
 					
 					// Save in dataCache
-					dataCache.set(CacheKeys.userFiles(requirementId, userId), list);
+					dataCache.set(CacheKeys.userFiles(requirementId, userId, officeId), list);
 
 					setFilesByUserId((prev) => ({ ...prev, [userId]: list }));
 					if (data.file || list.length > 0) {
@@ -319,7 +324,129 @@ export default function SubmissionViewer({
 			cancelled = true;
 			controller.abort();
 		};
-	}, [show, requirementId, uploadedUserIdsKey]);
+	}, [show, requirementId, officeId, uploadedUserIdsKey]);
+
+	// Real-time live synchronization for evidence files while drawer is open
+	useLiveRefresh(async () => {
+		if (!show || !requirementId || uploadedUserIds.length === 0) return;
+		for (const userId of uploadedUserIds) {
+			try {
+				const token = localStorage.getItem('token');
+				const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+				const res = await fetch(
+					`${API_BASE_URL}/api/requirements/${requirementId}/user-file/${userId}${officeId ? `?officeId=${officeId}` : ''}`,
+					{ headers }
+				);
+				if (res.ok) {
+					const data = await res.json();
+					if (data?.success) {
+						const list = Array.isArray(data.files) && data.files.length > 0 
+							? data.files 
+							: (data.file ? [data.file] : []);
+						dataCache.set(CacheKeys.userFiles(requirementId, userId, officeId), list);
+						setFilesByUserId((prev) => ({ ...prev, [userId]: list }));
+						if (data.file || list.length > 0) {
+							setFileByUserId((prev) => ({ ...prev, [userId]: data.file || list[list.length - 1] }));
+						}
+					}
+				}
+			} catch (e) {
+				// ignore
+			}
+		}
+	}, { entityTypes: ['requirements', 'compliance', 'documents', 'all'], deps: [show, requirementId, officeId, uploadedUserIdsKey] });
+
+	// Listen for immediate local review and update events to update file review statuses with 0ms delay
+	useEffect(() => {
+		const handleReviewed = (e) => {
+			const { reqId, fileId, status, userId, reason, resData } = e.detail || {};
+			if (reqId && Number(reqId) !== Number(requirementId)) return;
+
+			const targetUserId = userId ? Number(userId) : null;
+			if (targetUserId) {
+				setFilesByUserId((prev) => {
+					const existing = prev[targetUserId] || [];
+					const updated = existing.map((f) => {
+						if (Number(f.id) === Number(fileId)) {
+							return {
+								...f,
+								reviewStatus: status,
+								rejectionReason: status === 'rejected' ? reason : (f.rejectionReason || ''),
+								comment: reason || f.comment,
+								...(resData || {})
+							};
+						}
+						return f;
+					});
+					if (requirementId) {
+						dataCache.set(CacheKeys.userFiles(requirementId, targetUserId), updated);
+					}
+					return { ...prev, [targetUserId]: updated };
+				});
+
+				setFileByUserId((prev) => {
+					const f = prev[targetUserId];
+					if (f && Number(f.id) === Number(fileId)) {
+						const updated = {
+							...f,
+							reviewStatus: status,
+							rejectionReason: status === 'rejected' ? reason : (f.rejectionReason || ''),
+							comment: reason || f.comment,
+							...(resData || {})
+						};
+						return { ...prev, [targetUserId]: updated };
+					}
+					return prev;
+				});
+			} else {
+				// If userId wasn't specified, scan all users
+				setFilesByUserId((prev) => {
+					let changed = false;
+					const next = { ...prev };
+					Object.keys(next).forEach((uid) => {
+						const list = next[uid] || [];
+						const hasFile = list.some((f) => Number(f.id) === Number(fileId));
+						if (hasFile) {
+							changed = true;
+							next[uid] = list.map((f) => Number(f.id) === Number(fileId) ? {
+								...f,
+								reviewStatus: status,
+								rejectionReason: status === 'rejected' ? reason : (f.rejectionReason || ''),
+								comment: reason || f.comment,
+								...(resData || {})
+							} : f);
+							if (requirementId) {
+								dataCache.set(CacheKeys.userFiles(requirementId, uid), next[uid]);
+							}
+						}
+					});
+					return changed ? next : prev;
+				});
+			}
+		};
+
+		const handleFileUpdated = (e) => {
+			const { reqId, userId, files } = e.detail || {};
+			if (reqId && Number(reqId) !== Number(requirementId)) return;
+			if (userId && Array.isArray(files)) {
+				const uid = Number(userId);
+				setFilesByUserId((prev) => ({ ...prev, [uid]: files }));
+				if (files.length > 0) {
+					setFileByUserId((prev) => ({ ...prev, [uid]: files[files.length - 1] }));
+				}
+				if (requirementId) {
+					dataCache.set(CacheKeys.userFiles(requirementId, uid), files);
+				}
+			}
+		};
+
+		window.addEventListener('evidence-file-reviewed', handleReviewed);
+		window.addEventListener('evidence-file-updated', handleFileUpdated);
+		return () => {
+			window.removeEventListener('evidence-file-reviewed', handleReviewed);
+			window.removeEventListener('evidence-file-updated', handleFileUpdated);
+		};
+	}, [requirementId]);
 
 	const handleSaveComment = async () => {
 		if (!show || !requirementId || !officeId) return;
@@ -469,11 +596,12 @@ export default function SubmissionViewer({
 			if (!userId) return;
 			const token = localStorage.getItem('token');
 			const headers = token ? { Authorization: `Bearer ${token}` } : {};
-			const res = await fetch(`${API_BASE_URL}/api/requirements/${requirementId}/user-file/${userId}`, { headers });
+			const res = await fetch(`${API_BASE_URL}/api/requirements/${requirementId}/user-file/${userId}${officeId ? `?officeId=${officeId}` : ''}`, { headers });
 			if (!res.ok) return;
 			const data = await res.json();
 			if (data?.success) {
 				const list = Array.isArray(data.files) && data.files.length > 0 ? data.files : (data.file ? [data.file] : []);
+				dataCache.set(CacheKeys.userFiles(requirementId, userId, officeId), list);
 				setFilesByUserId((prev) => ({ ...prev, [userId]: list }));
 				if (list.length > 0) setFileByUserId((prev) => ({ ...prev, [userId]: list[list.length - 1] }));
 				toast?.({ title: 'Upload complete', description: 'Your files are now available', variant: 'success', duration: 1800 });
@@ -637,7 +765,8 @@ export default function SubmissionViewer({
 						{isYourWorkView && (
 							<YourWorkFileUpload
 								requirementId={requirementId}
-								hasUploaded={workHasUploaded}
+								userId={workUserId}
+								hasUploaded={workHasUploaded || workFiles.length > 0}
 								file={workFile}
 								files={workFiles}
 								thumb={workThumb}
@@ -645,9 +774,53 @@ export default function SubmissionViewer({
 								isLoadingThumb={workLoadingThumb}
 								uploading={uploadingFile}
 								uploadProgressMap={uploadProgressMap}
-								unsubmitting={unsubmittingFile}
-								onUpload={onFileUpload}
-								onUnsubmit={onFileUnsubmit}
+								onReorder={(newFiles) => {
+									if (workUserId) {
+										setFilesByUserId((prev) => ({ ...prev, [workUserId]: newFiles }));
+										if (newFiles && newFiles.length > 0) {
+											setFileByUserId((prev) => ({ ...prev, [workUserId]: newFiles[newFiles.length - 1] }));
+										}
+										if (requirementId) {
+											dataCache.set(CacheKeys.userFiles(requirementId, workUserId), newFiles);
+										}
+									}
+								}}
+								onUpload={(e, reqId) => {
+									onFileUpload?.(e, reqId, (newFile) => {
+										if (!newFile || !workUserId) return;
+										setFilesByUserId((prev) => {
+											const existing = prev[workUserId] || [];
+											const exists = existing.some((f) => ((f.id && newFile.id && f.id === newFile.id) || (f.fileName && newFile.fileName && f.fileName === newFile.fileName)));
+											const updated = exists ? existing : [...existing, newFile];
+											if (requirementId) {
+												dataCache.set(CacheKeys.userFiles(requirementId, workUserId), updated);
+											}
+											return {
+												...prev,
+												[workUserId]: updated,
+											};
+										});
+										setFileByUserId((prev) => ({
+											...prev,
+											[workUserId]: newFile,
+										}));
+									});
+								}}
+								onUnsubmit={async (reqId, fileId) => {
+									if (workUserId) {
+										setFilesByUserId((prev) => ({
+											...prev,
+											[workUserId]: (prev[workUserId] || []).filter((f) => ((f.id && fileId) ? f.id !== fileId : f.fileName !== fileId))
+										}));
+										setFileByUserId((prev) => {
+											const list = (filesByUserId[workUserId] || []).filter((f) => ((f.id && fileId) ? f.id !== fileId : f.fileName !== fileId));
+											return { ...prev, [workUserId]: list[list.length - 1] || null };
+										});
+									}
+									if (onFileUnsubmit) {
+										await onFileUnsubmit(reqId, fileId);
+									}
+								}}
 								onRename={(reqId, fileId, newDisplayName) => {
 									if (workUserId) {
 										setFilesByUserId((prev) => ({
@@ -698,7 +871,14 @@ export default function SubmissionViewer({
 									{users.map((u) => {
 										const displayName = `${u?.FirstName || ''}${u?.LastName ? ' ' + u.LastName : ''}`.trim() || u?.Username || 'User';
 										const userId = u?.UserID ? Number(u.UserID) : null;
-										const userFiles = userId ? (filesByUserId[userId] || (fileByUserId[userId] ? [fileByUserId[userId]] : [])) : [];
+										const cachedFiles = (userId && requirementId) ? dataCache.get(CacheKeys.userFiles(requirementId, userId)) : null;
+										const userFiles = (userId && filesByUserId[userId] && filesByUserId[userId].length > 0)
+											? filesByUserId[userId]
+											: (cachedFiles && Array.isArray(cachedFiles) && cachedFiles.length > 0)
+											? cachedFiles
+											: (u?.userFiles && Array.isArray(u.userFiles) && u.userFiles.length > 0)
+											? u.userFiles
+											: (userId && fileByUserId[userId] ? [fileByUserId[userId]] : []);
 										const hasUploaded = u?.HasUploaded === 1 || u?.HasUploaded === true || userFiles.length > 0;
 										const avatarSrc = u?.ProfilePic
 											? `${API_BASE_URL}/uploads/profile-pics/${u.ProfilePic}`
@@ -754,6 +934,14 @@ export default function SubmissionViewer({
 															}
 															const approvedCount = userFiles.filter(f => f.reviewStatus === 'approved').length;
 															const rejectedCount = userFiles.filter(f => f.reviewStatus === 'rejected').length;
+
+															if (isViewerAuditor) {
+																return (
+																	<span className="shrink-0 rounded-full px-3 py-1 text-[11px] font-bold bg-emerald-100 text-emerald-700 shadow-2xs">
+																		Submitted ({userFiles.length})
+																	</span>
+																);
+															}
 
 															if (rejectedCount > 0) {
 																return (

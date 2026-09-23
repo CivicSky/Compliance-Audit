@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import CustomSelect from '../UI/CustomSelect';
 
 const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, userRole = 'user' }) => {
   const [formData, setFormData] = useState({
@@ -127,7 +128,7 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, use
   const validateForm = () => {
     const newErrors = {};
     if (!formData.RequirementCode.trim()) {
-      newErrors.RequirementCode = 'Requirement code is required';
+      newErrors.RequirementCode = 'Evidence code is required';
     }
     if (!formData.Description.trim()) {
       newErrors.Description = 'Description is required';
@@ -168,17 +169,21 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, use
   if (!visible) return null;
 
   return (
-    <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out bg-black bg-opacity-50 flex items-center justify-center z-[50]">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4 max-h-[95vh] overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-200 bg-white">
-          <h2 className="text-lg font-bold text-gray-900">{isAdmin ? 'Edit Requirement' : 'View Requirement'}</h2>
+    <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-[50]">
+      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl mx-4 max-h-[95vh] overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-white">
+          <div>
+            <h2 className="text-lg font-bold tracking-tight text-slate-800">{isAdmin ? 'Edit Evidence' : 'View Evidence'}</h2>
+            <p className="mt-0.5 text-xs text-slate-500">Configure accreditation evidence parameters.</p>
+          </div>
           <button
+            type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 active:scale-95 cursor-pointer disabled:opacity-50"
             aria-label="Close"
           >
-            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -191,42 +196,34 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, use
             {/* Parent Requirement Dropdown */}
             <div className="mb-4">
               <label htmlFor="ParentRequirementCode" className="block text-sm font-semibold text-gray-800 mb-1">
-                Parent Requirement (Optional)
+                Parent Evidence (Optional)
               </label>
-              <div className="relative">
-                <select
-                  id="ParentRequirementCode"
-                  name="ParentRequirementCode"
-                  value={formData.ParentRequirementCode}
-                  onChange={handleInputChange}
-                  className="h-10 w-full appearance-none rounded-md border border-slate-200 bg-white px-3 pr-9 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                  disabled={isSubmitting || !formData.CriteriaID || !isAdmin}
-                >
-                  <option value="">
-                    {!formData.CriteriaID ? 'Select a criteria first' : 'None (Top-level requirement)'}
-                  </option>
-                  {requirementsList.map((req) => (
-                    <option key={req.RequirementID} value={req.RequirementCode}>
-                      {req.RequirementCode} - {req.Description?.substring(0, 50)}
-                      {req.Description?.length > 50 ? '...' : ''}
-                    </option>
-                  ))}
-                </select>
-                <svg xmlns="http://www.w3.org/2000/svg" className="pointer-events-none absolute right-3 top-1/2 h-2.5 w-2.5 -translate-y-1/2 text-slate-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                  <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
-                </svg>
-              </div>
+              <CustomSelect
+                id="ParentRequirementCode"
+                size="md"
+                value={formData.ParentRequirementCode}
+                onChange={(val) => handleInputChange({ target: { name: 'ParentRequirementCode', value: val } })}
+                options={[
+                  { value: '', label: !formData.CriteriaID ? 'Select a criteria first' : 'None (Top-level evidence)' },
+                  ...requirementsList.map((req) => ({
+                    value: req.RequirementCode,
+                    label: `${req.RequirementCode} - ${req.Description?.substring(0, 50) || ''}${req.Description?.length > 50 ? '...' : ''}`
+                  }))
+                ]}
+                placeholder={!formData.CriteriaID ? 'Select a criteria first' : 'None (Top-level evidence)'}
+                disabled={isSubmitting || !formData.CriteriaID || !isAdmin}
+              />
               {!formData.CriteriaID ? (
                 <p className="text-gray-500 text-xs mt-1">
-                  Select a criteria to see available parent requirements
+                  Select a criteria to see available parent evidence
                 </p>
               ) : requirementsList.length === 0 ? (
                 <p className="text-yellow-600 text-xs mt-1">
-                  No other requirements in this criteria
+                  No other evidence in this criteria
                 </p>
               ) : (
                 <p className="text-green-600 text-xs mt-1">
-                  Loaded {requirementsList.length} requirement{requirementsList.length !== 1 ? 's' : ''} for this criteria
+                  Loaded {requirementsList.length} evidence item{requirementsList.length !== 1 ? 's' : ''} for this criteria
                 </p>
               )}
             </div>
@@ -234,7 +231,7 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, use
             {/* Requirement Code */}
             <div className="mb-4">
               <label htmlFor="RequirementCode" className="block text-sm font-semibold text-gray-800 mb-1">
-                Requirement Code *
+                Evidence Code *
               </label>
               <input
                 type="text"
@@ -272,7 +269,7 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, use
                 className={`w-full rounded-md bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none ${
                   errors.Description ? 'border-red-500' : 'border border-slate-200'
                 }`}
-                placeholder="Enter a detailed description of this requirement"
+                placeholder="Enter a detailed description of this evidence"
                 disabled={isSubmitting || !isAdmin}
               />
               {errors.Description && (
@@ -282,29 +279,29 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, use
           </div>
 
           {/* Form Actions */}
-          <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-200 bg-white">
+          <div className="flex justify-end gap-2.5 px-6 py-4 border-t border-slate-100 bg-white">
             {isAdmin && (
               <>
                 <button
                   type="button"
                   onClick={onClose}
                   disabled={isSubmitting}
-                  className="rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-red-100 disabled:opacity-50"
+                  className="inline-flex h-9 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50 active:scale-95 cursor-pointer disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 text-xs font-semibold text-white shadow-xs transition hover:bg-emerald-700 active:scale-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSubmitting && (
-                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                    <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
                       <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"></circle>
                       <path fill="currentColor" className="opacity-75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
                   )}
-                  {isSubmitting ? 'Saving...' : 'Save Changes'}
+                  <span>{isSubmitting ? 'Saving...' : 'Save Changes'}</span>
                 </button>
               </>
             )}
@@ -312,7 +309,7 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, use
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-red-100"
+                className="inline-flex h-9 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50 active:scale-95 cursor-pointer"
               >
                 Close
               </button>

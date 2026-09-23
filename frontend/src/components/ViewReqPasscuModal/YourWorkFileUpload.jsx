@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { Check } from 'lucide-react';
 import { API_BASE_URL } from '../../utils/apiBase';
 import { useToast } from '../UI/Toast';
 import RenameInline from './RenameInline';
@@ -32,6 +33,7 @@ const formatBytes = (bytes) => {
 
 export default function YourWorkFileUpload({
     requirementId,
+    userId = null,
     hasUploaded = false,
     file = null,
     files = [],
@@ -44,6 +46,7 @@ export default function YourWorkFileUpload({
     onRename,
     onUpdateComment,
     onViewFile,
+    onReorder,
     showHeader = true,
     compact = false,
     readOnly = false,
@@ -67,8 +70,12 @@ export default function YourWorkFileUpload({
     const [dragOverIdx, setDragOverIdx] = useState(null);
 
     useEffect(() => {
-        setLocalFiles(rawFileList);
-    }, [rawFileList]);
+        if (rawFileList.length > 0) {
+            setLocalFiles(rawFileList);
+        } else if (!uploading) {
+            setLocalFiles([]);
+        }
+    }, [rawFileList, uploading]);
 
     const isSubmitted = hasUploaded || localFiles.length > 0;
     const workStatus = isSubmitted ? 'Submitted' : 'Assigned';
@@ -101,14 +108,19 @@ export default function YourWorkFileUpload({
         setDraggedIdx(null);
         setDragOverIdx(null);
 
-        const targetUserId = movedItem.uploaded_by || movedItem.userId;
+        const targetUserId = movedItem?.uploaded_by || movedItem?.userId || userId;
         const orderedIds = updated.map(f => f.id).filter(Boolean);
 
         if (orderedIds.length > 0 && targetUserId && requirementId) {
+            onReorder?.(updated);
             try {
+                const token = localStorage.getItem('token');
                 await fetch(`${API_BASE_URL}/api/requirements/${requirementId}/user-file/${targetUserId}/reorder`, {
                     method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        ...(token ? { Authorization: `Bearer ${token}` } : {})
+                    },
                     body: JSON.stringify({ orderedIds })
                 });
                 toast?.({
@@ -347,10 +359,11 @@ export default function YourWorkFileUpload({
                                                 type="button"
                                                 onClick={(e) => {
                                                     e.stopPropagation();
+                                                    setLocalFiles((prev) => prev.filter((f) => ((f.id && item.id) ? f.id !== item.id : f.fileName !== item.fileName)));
                                                     onUnsubmit?.(requirementId, item.id);
                                                 }}
                                                 disabled={unsubmitting}
-                                                className="h-7 w-7 shrink-0 rounded-md border border-slate-200 bg-white text-slate-400 hover:border-red-200 hover:bg-red-50 hover:text-red-600 flex items-center justify-center transition-colors disabled:opacity-50"
+                                                className="h-7 w-7 shrink-0 rounded-md border border-slate-200 bg-white text-slate-400 hover:border-red-200 hover:bg-red-50 hover:text-red-600 flex items-center justify-center transition-colors disabled:opacity-50 cursor-pointer"
                                                 title="Remove this file"
                                             >
                                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
@@ -429,9 +442,11 @@ export default function YourWorkFileUpload({
                 </div>
             )}
 
-            {/* Active Uploading Files (Individual standalone cards without outer wrapper) */}
+            {/* Active Uploading Files (Only show items still uploading or failed since done ones are already posted above) */}
             {Object.keys(uploadProgressMap).length > 0 ? (
-                Object.values(uploadProgressMap).map((item, idx) => {
+                Object.values(uploadProgressMap)
+                    .filter((item) => item.status !== 'done')
+                    .map((item, idx) => {
                     const ext = getExtension(item.name);
                     const isDone = item.percent >= 100 || item.status === 'done';
                     const isError = item.status === 'error';
@@ -463,7 +478,8 @@ export default function YourWorkFileUpload({
                                         </span>
                                     ) : isDone ? (
                                         <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
-                                            ✓ Ready
+                                            <Check className="w-3 h-3 text-emerald-600 inline" />
+                                            <span>Ready</span>
                                         </span>
                                     ) : (
                                         <span className="text-[11px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">

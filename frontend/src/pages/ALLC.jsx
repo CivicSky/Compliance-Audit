@@ -11,6 +11,10 @@ import { eventsAPI, usersAPI } from '../utils/api';
 import { useModal } from "../components/UI/ModalProvider";
 import { useToast } from '../components/UI/Toast';
 import AddEventModal from '../components/Events/AddEventModal';
+import { StandardsSkeleton } from '../components/UI/Skeleton';
+import ServerOfflineState from '../components/UI/ServerOfflineState';
+import { useLiveRefresh } from '../utils/liveSync';
+import ViewModeToggle from '../components/UI/ViewModeToggle';
 
 function ALL() {
     const [sortStatus, setSortStatus] = useState('active');
@@ -22,6 +26,7 @@ function ALL() {
     const [selectedEventIdsForDelete, setSelectedEventIdsForDelete] = useState(new Set());
     const [isAddEventOpen, setIsAddEventOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
+    const [viewMode, setViewMode] = useState("grid"); // 'grid' | 'list'
     const { showAlert, showConfirm } = useModal();
     const { toast } = useToast() || {};
 
@@ -101,11 +106,11 @@ function ALL() {
     const isAdmin = currentUser?.RoleName === 'admin' || currentUser?.RoleID === 1;
 
     const abortControllersRef = useRef({});
-    const itemsPerPage = 4;
+    const itemsPerPage = viewMode === 'list' ? 8 : 4;
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [sortStatus, searchTerm]);
+    }, [sortStatus, searchTerm, viewMode]);
 
     useEffect(() => {
         fetchEvents();
@@ -175,26 +180,41 @@ function ALL() {
         }
     };
 
-    const fetchEvents = async () => {
+    const [isRetrying, setIsRetrying] = useState(false);
+
+    const fetchEvents = async (options = false) => {
+        const isRetry = options === true;
+        const isSilent = Boolean(options && typeof options === 'object' && options.silent);
+
         try {
-            setLoading(true);
+            if (isRetry) setIsRetrying(true);
+            else if (!isSilent) setLoading(true);
+            
             const token = localStorage.getItem('token');
             const response = await axios.get(`${API_BASE_URL}/api/events`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            setEvents(response.data.data || []);
+            setEvents(response.data?.data || []);
             setError(null);
         } catch (err) {
             console.error('Error fetching events:', err);
-            if (err.response?.status === 429) {
-                setError('Rate limit exceeded (Max 30 requests/min). Please try again later.');
-            } else {
-                setError('Failed to load events');
+            if (!isSilent) {
+                if (err.response?.status === 429) {
+                    setError('Rate limit exceeded (Max 30 requests/min). Please try again later.');
+                } else if (!err.response || err.code === 'ERR_NETWORK' || err.message?.toLowerCase().includes('network error') || err.message?.toLowerCase().includes('failed to fetch')) {
+                    setError('Server Offline');
+                } else {
+                    setError(err.response?.data?.message || 'Failed to load events');
+                }
             }
         } finally {
-            setLoading(false);
+            if (!isSilent) setLoading(false);
+            if (isRetry) setIsRetrying(false);
         }
     };
+
+    // Real-time live synchronization for events
+    useLiveRefresh(fetchEvents);
 
     const fetchAreasForEventSafe = async (eventId) => {
         if (abortControllersRef.current[eventId]) {
@@ -555,26 +575,73 @@ function ALL() {
         setCriteriaOptionsData({});
     };
 
-    if (loading) return <div className="text-center py-8 text-lg">Loading standards...</div>;
-
-    if (error) return <div className="text-center py-8 text-red-600 text-lg">Unable to load standards: {error}</div>;
-
     const totalPages = Math.max(1, Math.ceil(filteredEvents.length / itemsPerPage));
     const startIdx = (currentPage - 1) * itemsPerPage;
     const visibleEvents = filteredEvents.slice(startIdx, startIdx + itemsPerPage);
+    const activeCount = events.filter(e => String(e.status || e.Status || '').toLowerCase().trim() !== 'inactive').length;
+
+    const handleDeleteEvent = async (targetEvent) => {
+        const eventId = Number(targetEvent?.EventID);
+        if (!eventId) return;
+
+        setSelectedEvent(null);
+
+        const confirmed = await showConfirm(`Delete accreditation "${targetEvent?.EventName || targetEvent?.EventCode || eventId}"? This cannot be undone.`);
+        if (!confirmed) return;
+
+        try {
+            const resp = await eventsAPI.deleteEvents([eventId]);
+            if (resp?.success) {
+                toast?.({
+                    title: 'Accreditation Deleted',
+                    description: `Accreditation "${targetEvent?.EventName || targetEvent?.EventCode || eventId}" deleted successfully`,
+                    variant: 'success',
+                    duration: 3000,
+                });
+                await fetchEvents();
+                if (selectedEvent?.EventID === eventId) {
+                    setSelectedEvent(null);
+                }
+            } else {
+                toast?.({
+                    title: 'Delete Failed',
+                    description: resp?.message || 'Failed to delete standard.',
+                    variant: 'error',
+                    duration: 3000,
+                });
+            }
+        } catch (err) {
+            console.error('Delete standard error', err);
+            toast?.({
+                title: 'Delete Error',
+                description: err?.message || 'Error deleting standard.',
+                variant: 'error',
+                duration: 3000,
+            });
+        }
+    };
 
     return (
-        <div className="w-full h-full flex flex-col bg-app overflow-hidden">
-            {/* Header and Controls matching Organization layout */}
-            <div className="flex flex-col gap-0 px-4 pt-1.5 pb-0 shrink-0">
-                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
-                    <div>
-                        <h1 className="text-xl font-bold text-gray-800 mb-0.5">Compliance Standards</h1>
-                        <p className="text-[11px] text-gray-500">Manage event structures, criteria, and requirement flows.</p>
+        <div className="w-full flex-1 flex flex-col min-w-0 bg-slate-50/50 overflow-hidden">
+            {/* Top Header & Metrics */}
+            <div className="px-4 sm:px-6 pt-4 pb-3 shrink-0 border-b border-slate-200/70 bg-white shadow-2xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-md shadow-blue-500/20 shrink-0">
+                            <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">Accreditation & Quality Standards</h1>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                                Manage accreditation frameworks, quality audit criteria, and requirement structures.
+                            </p>
+                        </div>
                     </div>
 
                     {isAdmin && (
-                        <div className="flex items-center gap-1.5 pt-0.5 self-start sm:self-auto flex-wrap">
+                        <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
                             {deleteMode && (
                                 <button
                                     onClick={async () => {
@@ -587,8 +654,8 @@ function ALL() {
                                             const resp = await eventsAPI.deleteEvents(ids);
                                             if (resp && resp.success) {
                                                 toast?.({
-                                                    title: 'Events Deleted',
-                                                    description: resp.message || `${ids.length} event(s) deleted successfully`,
+                                                    title: 'Standards Deleted',
+                                                    description: resp.message || `${ids.length} standard(s) deleted successfully`,
                                                     variant: 'success',
                                                     duration: 3000,
                                                 });
@@ -596,22 +663,29 @@ function ALL() {
                                             } else {
                                                 toast?.({
                                                     title: 'Delete Failed',
-                                                    description: resp?.message || 'Failed to delete selected events.',
+                                                    description: resp?.message || 'Failed to delete selected standards.',
                                                     variant: 'error',
                                                     duration: 3000,
                                                 });
                                             }
                                         } catch (err) {
-                                            console.error('Delete events error', err);
+                                            console.error('Delete standards error', err);
                                             await showAlert(err?.message || 'Error deleting selected standards.');
                                         } finally {
                                             setDeleteMode(false);
                                             setSelectedEventIdsForDelete(new Set());
                                         }
                                     }}
-                                    className={`inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-red-400 bg-red-600 text-white hover:bg-red-700 ${selectedEventIdsForDelete.size === 0 ? 'opacity-60 cursor-not-allowed' : ''}`}
                                     disabled={selectedEventIdsForDelete.size === 0}
+                                    className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold shadow-xs transition-all ${
+                                        selectedEventIdsForDelete.size === 0
+                                            ? 'border-red-200 bg-red-50/50 text-red-400 cursor-not-allowed'
+                                            : 'border-red-600 bg-red-600 text-white hover:bg-red-700 active:scale-95 shadow-red-500/20 cursor-pointer'
+                                    }`}
                                 >
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
                                     Delete Selected ({selectedEventIdsForDelete.size})
                                 </button>
                             )}
@@ -627,154 +701,364 @@ function ALL() {
                                     setDeleteMode(true);
                                     setSelectedEventIdsForDelete(new Set());
                                 }}
-                                className={`inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-red-400 ${deleteMode
-                                        ? 'border-red-300 bg-red-100 text-red-700 hover:bg-red-200'
-                                        : 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100'
-                                    }`}
+                                className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition-all cursor-pointer ${
+                                    deleteMode
+                                        ? 'border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                        : 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100 hover:border-red-300'
+                                }`}
                             >
-                                {deleteMode ? 'Cancel Delete' : 'Delete'}
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={deleteMode ? "M6 18L18 6M6 6l12 12" : "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"} />
+                                </svg>
+                                {deleteMode ? 'Cancel' : 'Delete Mode'}
                             </button>
 
                             <button
                                 type="button"
                                 onClick={() => setIsAddEventOpen(true)}
-                                className="inline-flex h-8 items-center gap-1 rounded-lg bg-emerald-600 px-3 text-[11px] font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                                className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 text-xs font-semibold text-white shadow-xs transition-all hover:bg-emerald-700 active:scale-95 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer"
                             >
-                                <span className="text-sm leading-none">+</span>
-                                Add
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4.5v15m7.5-7.5h-15" />
+                                </svg>
+                                Add Accreditation
                             </button>
                         </div>
                     )}
                 </div>
 
-                <div className="flex w-full items-center justify-between gap-2 py-1.5">
-                    <div className="relative w-full max-w-sm">
-                        <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
-                        >
-                            <circle cx="11" cy="11" r="7" />
-                            <path d="m20 20-3.5-3.5" />
-                        </svg>
-                        <input
-                            type="text"
-                            placeholder="Search events, codes, or descriptions..."
-                            className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs text-slate-800 placeholder-slate-400 shadow-2xs transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                            value={searchTerm}
-                            onChange={handleSearchChange}
-                        />
-                    </div>
-
-                    <div className="flex items-center gap-1">
-                        <div className="flex h-9 items-center justify-end gap-1">
-                            <div className="relative inline-block">
-                                <SortEvents value={sortStatus} onChange={setSortStatus} />
-                            </div>
+                {/* Toolbar: Search, Filter, View Mode */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mt-3 pt-3 border-t border-slate-100">
+                    <div className="flex items-center gap-2 flex-1 max-w-md">
+                        <div className="relative w-full">
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                            >
+                                <circle cx="11" cy="11" r="7" />
+                                <path d="m20 20-3.5-3.5" />
+                            </svg>
+                            <input
+                                type="text"
+                                placeholder="Search accreditations or codes..."
+                                className="h-9 w-full rounded-xl border border-slate-200/90 bg-slate-50/60 pl-9.5 pr-8 text-xs text-slate-800 placeholder-slate-400 shadow-2xs transition-all focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                                value={searchTerm}
+                                onChange={handleSearchChange}
+                            />
+                            {searchTerm && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSearchTerm("")}
+                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-md cursor-pointer"
+                                    aria-label="Clear search"
+                                >
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            )}
                         </div>
                     </div>
+
+                    <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0">
+                        <div className="relative inline-block">
+                            <SortEvents value={sortStatus} onChange={setSortStatus} />
+                        </div>
+
+                        {/* View Switcher: Grid vs List */}
+                        <ViewModeToggle viewMode={viewMode} onChange={setViewMode} />
+                    </div>
                 </div>
             </div>
 
-            {/* Events Grid */}
-            <div className="flex-1 overflow-y-auto px-4 pb-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 mb-4">
-                {visibleEvents.map((event) => {
-                    const eventAssignments = (auditorAssignments?.rawList || []).filter(a => Number(a.EventID) === Number(event.EventID));
-                    return (
-                        <EventCard
-                            key={event.EventID}
-                            event={event}
-                            assignedAreas={eventAssignments}
-                            showCheckbox={deleteMode}
-                            isChecked={selectedEventIdsForDelete.has(Number(event.EventID))}
-                            onToggleSelect={(ev, checked) => {
-                                setSelectedEventIdsForDelete(prev => {
-                                    const next = new Set(prev);
-                                    const id = Number(ev.EventID);
-                                    if (checked) next.add(id);
-                                    else next.delete(id);
-                                    return next;
-                                });
-                            }}
-                            onClick={() => {
-                                if (deleteMode) {
-                                    setSelectedEventIdsForDelete(prev => {
-                                        const next = new Set(prev);
-                                        const id = Number(event.EventID);
-                                        if (next.has(id)) next.delete(id);
-                                        else next.add(id);
-                                        return next;
-                                    });
-                                    return;
-                                }
-                                openEventModal(event);
-                            }}
-                            onCopy={(originalEvent) => {
-                                openCopyModal(originalEvent);
-                            }}
-                            onEdit={(originalEvent) => {
-                                setEditPopup({ open: true, event: originalEvent });
-                            }}
-                            onDelete={async (targetEvent) => {
-                                const eventId = Number(targetEvent?.EventID);
-                                if (!eventId) return;
-
-                                setSelectedEvent(null);
-
-                                const confirmed = await showConfirm(`Delete event "${targetEvent?.EventName || eventId}"? This cannot be undone.`);
-                                if (!confirmed) return;
-
-                                try {
-                                    const resp = await eventsAPI.deleteEvents([eventId]);
-                                    if (resp?.success) {
-                                        toast?.({
-                                            title: 'Event Deleted',
-                                            description: `Event "${targetEvent?.EventName || targetEvent?.EventCode || eventId}" deleted successfully`,
-                                            variant: 'success',
-                                            duration: 3000,
+            {/* Events Grid / List / Skeleton / Offline / Empty View */}
+            <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 pb-16 min-h-0 flex flex-col">
+                {loading ? (
+                    <StandardsSkeleton count={4} />
+                ) : error ? (
+                    <ServerOfflineState
+                        onRetry={() => fetchEvents(true)}
+                        isRetrying={isRetrying}
+                        title={error === 'Server Offline' ? 'Backend Server Unavailable' : 'Unable to Load Standards'}
+                        message={error === 'Server Offline' 
+                            ? 'The backend server is unreachable or offline. If you stopped the backend server, please start it and click Retry Connection.' 
+                            : error}
+                    />
+                ) : filteredEvents.length === 0 ? (
+                    <div className="flex-1 w-full min-h-[360px] flex flex-col items-center justify-center p-8 text-center bg-white border border-dashed border-slate-200 rounded-2xl animate-fadeIn my-auto shadow-2xs">
+                        <div className="h-16 w-16 rounded-2xl bg-blue-50 border border-blue-100 text-blue-500 flex items-center justify-center mb-3.5 shadow-2xs">
+                            <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                            </svg>
+                        </div>
+                        <h3 className="text-base font-bold text-slate-800 mb-1">No Standards Found</h3>
+                        <p className="text-xs text-slate-500 max-w-sm mb-4 leading-relaxed">
+                            {searchTerm ? 'No accreditations match your search query.' : 'No accreditations have been created yet.'}
+                        </p>
+                        {searchTerm ? (
+                            <button
+                                type="button"
+                                onClick={() => setSearchTerm('')}
+                                className="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 transition cursor-pointer"
+                            >
+                                Clear Search Filter
+                            </button>
+                        ) : isAdmin ? (
+                            <button
+                                type="button"
+                                onClick={() => setIsAddEventOpen(true)}
+                                className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-4 py-2 text-xs font-semibold text-white transition shadow-sm cursor-pointer"
+                            >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                                </svg>
+                                Add First Accreditation
+                            </button>
+                        ) : null}
+                    </div>
+                ) : viewMode === 'grid' ? (
+                    /* Grid Layout (2x2 / responsive cards) */
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 min-h-0">
+                        {visibleEvents.map((event) => {
+                            const eventAssignments = (auditorAssignments?.rawList || []).filter(a => Number(a.EventID) === Number(event.EventID));
+                            return (
+                                <EventCard
+                                    key={event.EventID}
+                                    event={event}
+                                    assignedAreas={eventAssignments}
+                                    isAdmin={isAdmin}
+                                    showCheckbox={deleteMode}
+                                    isChecked={selectedEventIdsForDelete.has(Number(event.EventID))}
+                                    onToggleSelect={(ev, checked) => {
+                                        setSelectedEventIdsForDelete(prev => {
+                                            const next = new Set(prev);
+                                            const id = Number(ev.EventID);
+                                            if (checked) next.add(id);
+                                            else next.delete(id);
+                                            return next;
                                         });
-                                        await fetchEvents();
-                                        if (selectedEvent?.EventID === eventId) {
-                                            setSelectedEvent(null);
+                                    }}
+                                    onClick={() => {
+                                        if (deleteMode) {
+                                            setSelectedEventIdsForDelete(prev => {
+                                                const next = new Set(prev);
+                                                const id = Number(event.EventID);
+                                                if (next.has(id)) next.delete(id);
+                                                else next.add(id);
+                                                return next;
+                                            });
+                                            return;
                                         }
-                                    } else {
-                                        toast?.({
-                                            title: 'Delete Failed',
-                                            description: resp?.message || 'Failed to delete event.',
-                                            variant: 'error',
-                                            duration: 3000,
-                                        });
-                                    }
-                                } catch (err) {
-                                    console.error('Delete event error', err);
-                                    toast?.({
-                                        title: 'Delete Error',
-                                        description: err?.message || 'Error deleting event.',
-                                        variant: 'error',
-                                        duration: 3000,
-                                    });
-                                }
-                            }}
-                        />
-                    );
-                })}
-                </div>
+                                        openEventModal(event);
+                                    }}
+                                    onCopy={(originalEvent) => {
+                                        openCopyModal(originalEvent);
+                                    }}
+                                    onEdit={(originalEvent) => {
+                                        setEditPopup({ open: true, event: originalEvent });
+                                    }}
+                                    onDelete={handleDeleteEvent}
+                                />
+                            );
+                        })}
+                    </div>
+                ) : (
+                    /* List / Table Layout */
+                    <div className="flex-1 min-h-0 bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden flex flex-col">
+                        <div className="overflow-x-auto flex-1 custom-scrollbar">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="border-b border-slate-200 bg-slate-50/75 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                                        {deleteMode && <th className="py-3 px-4 w-10 text-center">Select</th>}
+                                        <th className="py-3 px-4">Accreditation & Code</th>
+                                        <th className="py-3 px-4">Level</th>
+                                        <th className="py-3 px-4">Status</th>
+                                        {isAuditor && <th className="py-3 px-4">Assigned Areas</th>}
+                                        <th className="py-3 px-4">Timestamps</th>
+                                        <th className="py-3 px-4 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 text-xs">
+                                    {visibleEvents.map((event) => {
+                                        const eventAssignments = (auditorAssignments?.rawList || []).filter(a => Number(a.EventID) === Number(event.EventID));
+                                        const isActive = String(event.status || event.Status || '').toLowerCase().trim() !== 'inactive';
+                                        const isChecked = selectedEventIdsForDelete.has(Number(event.EventID));
+
+                                        return (
+                                            <tr
+                                                key={event.EventID}
+                                                onClick={() => {
+                                                    if (deleteMode) {
+                                                        setSelectedEventIdsForDelete(prev => {
+                                                            const next = new Set(prev);
+                                                            const id = Number(event.EventID);
+                                                            if (next.has(id)) next.delete(id);
+                                                            else next.add(id);
+                                                            return next;
+                                                        });
+                                                        return;
+                                                    }
+                                                    openEventModal(event);
+                                                }}
+                                                className={`group transition-colors cursor-pointer ${
+                                                    isChecked ? 'bg-blue-50/50' : 'hover:bg-slate-50/80'
+                                                }`}
+                                            >
+                                                {deleteMode && (
+                                                    <td className="py-3.5 px-4 text-center" onClick={(e) => e.stopPropagation()}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isChecked}
+                                                            onChange={(e) => {
+                                                                setSelectedEventIdsForDelete(prev => {
+                                                                    const next = new Set(prev);
+                                                                    const id = Number(event.EventID);
+                                                                    if (e.target.checked) next.add(id);
+                                                                    else next.delete(id);
+                                                                    return next;
+                                                                });
+                                                            }}
+                                                            aria-label={`Select ${event.EventName}`}
+                                                            className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                                        />
+                                                    </td>
+                                                )}
+                                                <td className="py-3.5 px-4">
+                                                    <div className="flex items-center gap-2.5 min-w-0">
+                                                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 border border-blue-100 text-blue-600 shrink-0 font-bold text-xs">
+                                                            {event.EventCode ? event.EventCode.slice(0, 2).toUpperCase() : 'ST'}
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <div className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors truncate">
+                                                                {event.EventName}
+                                                            </div>
+                                                            <div className="text-[11px] text-slate-500 flex items-center gap-1.5 truncate">
+                                                                <span className="font-semibold text-blue-600">{event.EventCode || 'STANDARD'}</span>
+                                                                {event.Description && (
+                                                                    <>
+                                                                        <span>•</span>
+                                                                        <span className="truncate">{event.Description}</span>
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="py-3.5 px-4 whitespace-nowrap">
+                                                    {event.accreditation_level && event.accreditation_level.toUpperCase() !== 'N/A' ? (
+                                                        <span className="inline-flex items-center rounded-md bg-indigo-50 border border-indigo-200/60 px-2 py-0.5 text-[11px] font-bold text-indigo-700">
+                                                            {event.accreditation_level}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-slate-400 text-[11px]">—</span>
+                                                    )}
+                                                </td>
+                                                <td className="py-3.5 px-4 whitespace-nowrap">
+                                                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                                                        isActive
+                                                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
+                                                            : 'bg-slate-100 text-slate-600 border border-slate-200'
+                                                    }`}>
+                                                        <span className={`h-1.5 w-1.5 rounded-full ${isActive ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                                                        {isActive ? 'Active' : 'Inactive'}
+                                                    </span>
+                                                </td>
+                                                {isAuditor && (
+                                                    <td className="py-3.5 px-4">
+                                                        {eventAssignments.length > 0 ? (
+                                                            <div className="flex flex-wrap gap-1 max-w-xs">
+                                                                {eventAssignments.slice(0, 2).map(a => (
+                                                                    <span key={a.id || a.area_id} className="inline-flex items-center rounded bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
+                                                                        {a.AreaCode || a.AreaName}
+                                                                    </span>
+                                                                ))}
+                                                                {eventAssignments.length > 2 && (
+                                                                    <span className="text-[10px] text-slate-500 font-semibold self-center">
+                                                                        +{eventAssignments.length - 2} more
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-slate-400 text-[11px]">—</span>
+                                                        )}
+                                                    </td>
+                                                )}
+                                                <td className="py-3.5 px-4 whitespace-nowrap text-[11px] text-slate-500">
+                                                    <div>{new Date(event.CreatedAt).toLocaleDateString()}</div>
+                                                    <div className="text-[10px] text-slate-400">Updated: {new Date(event.UpdatedAt || event.CreatedAt).toLocaleDateString()}</div>
+                                                </td>
+                                                <td className="py-3.5 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                                                    <div className="flex items-center justify-end gap-1.5">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => openEventModal(event)}
+                                                            className="inline-flex items-center gap-1 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200/60 px-2.5 py-1 text-xs font-semibold text-blue-700 transition cursor-pointer"
+                                                        >
+                                                            Structure
+                                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                                                            </svg>
+                                                        </button>
+                                                        {isAdmin && (
+                                                            <>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setEditPopup({ open: true, event })}
+                                                                    title="Edit Standard"
+                                                                    className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition cursor-pointer"
+                                                                >
+                                                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                                    </svg>
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => openCopyModal(event)}
+                                                                    title="Copy Standard"
+                                                                    className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-emerald-50 hover:text-emerald-600 transition cursor-pointer"
+                                                                >
+                                                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+                                                                    </svg>
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleDeleteEvent(event)}
+                                                                    title="Delete Standard"
+                                                                    className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                                                                >
+                                                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
+                                                                    </svg>
+                                                                </button>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
             </div>
 
-            {/* Pagination */}
-            <div className="w-full flex justify-center py-2 shrink-0 bg-transparent">
+            {/* Pagination Controls */}
+            {!loading && !error && filteredEvents.length > 0 && (
                 <Pagination
                     currentPage={currentPage}
                     totalPages={totalPages}
-                    onPageChange={page => setCurrentPage(page)}
+                    onPageChange={(p) => setCurrentPage(p)}
                     fixed={true}
                     showWhenSinglePage={true}
                 />
-            </div>
+            )}
 
             {/* Edit Event Popup */}
             <EditEventPopup

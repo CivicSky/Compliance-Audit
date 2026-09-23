@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { User } from 'lucide-react';
 import { usersAPI } from '../utils/api';
 import EditProfileModal from '../components/EditProfile/EditProfileModal.jsx';
 import { API_BASE_URL } from '../utils/apiBase';
@@ -104,9 +105,14 @@ export default function Profile() {
 	return (
 		<ProfileShell>
 			<div className="mx-auto mt-4 max-w-4xl">
-				<div className="mb-5">
-					<h1 className="text-2xl font-bold text-slate-900">Profile</h1>
-					<p className="mt-1 text-sm text-slate-500">View and manage your account details.</p>
+				<div className="mb-5 flex items-center gap-3">
+					<div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-md shadow-blue-500/20 shrink-0">
+						<User className="w-5 h-5 sm:w-5.5 sm:h-5.5" />
+					</div>
+					<div>
+						<h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">Profile</h1>
+						<p className="text-xs text-slate-500 mt-0.5">View and manage your account details.</p>
+					</div>
 				</div>
 
 				<article className="rounded-xl border border-slate-200 bg-white shadow-sm">

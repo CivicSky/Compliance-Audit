@@ -1,20 +1,35 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { X } from "lucide-react";
 import Header from "../components/Header/header";
 import Pagination from "../components/Pagination/Pagination";
 import CustomDropdown from "../components/UI/CustomDropdown";
 import { CardListSkeleton } from "../components/UI/Skeleton";
 import AssignAreaModal from "../components/ExternalAuditors/AssignAreaModal";
 import AuditorDetailsModal from "../components/ExternalAuditors/AuditorDetailsModal";
-import { API_BASE_URL } from "../utils/apiBase";
 import { useModal } from "../components/UI/ModalProvider";
 import { usersAPI } from "../utils/api";
+import ServerOfflineState from "../components/UI/ServerOfflineState";
+import ViewModeToggle from "../components/UI/ViewModeToggle";
 
 export default function ExternalAuditors() {
     const [auditors, setAuditors] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
     const [filterStatus, setFilterStatus] = useState("all"); // 'all', 'assigned', 'unassigned'
-    const [viewMode, setViewMode] = useState("grid"); // 'grid' or 'list'
+    const [viewMode, setViewMode] = useState(() => {
+        try {
+            return localStorage.getItem('external_auditors_view_mode') || 'grid';
+        } catch {
+            return 'grid';
+        }
+    });
+
+    const handleSetViewMode = (mode) => {
+        setViewMode(mode);
+        try {
+            localStorage.setItem('external_auditors_view_mode', mode);
+        } catch {}
+    };
     const [deleteMode, setDeleteMode] = useState(false);
     const [selectedIds, setSelectedIds] = useState([]);
     const [currentPage, setCurrentPage] = useState(1);
@@ -22,7 +37,7 @@ export default function ExternalAuditors() {
     const [inviteModalOpen, setInviteModalOpen] = useState(false);
     const [inviteLink, setInviteLink] = useState("");
     const [inviteLoading, setInviteLoading] = useState(false);
-    const [copyLabel, setCopyLabel] = useState("Copy");
+    const [inviteCopied, setInviteCopied] = useState(false);
     const [assignModalOpen, setAssignModalOpen] = useState(false);
     const [selectedAuditorForAssign, setSelectedAuditorForAssign] = useState(null);
     const [detailsModalOpen, setDetailsModalOpen] = useState(false);
@@ -56,32 +71,50 @@ export default function ExternalAuditors() {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    // Fetch External Auditors (RoleID === 3 or position External Auditor)
-    const fetchAuditors = async () => {
-        setLoading(true);
-        try {
-            const res = await fetch("/api/user");
-            if (!res.ok) throw new Error("Failed to fetch users");
-            const data = await res.json();
-            const allUsers = Array.isArray(data) ? data : (data.users || data.data || []);
-            
-            // Filter users who are external auditors (RoleID === 4 or RoleName contains 'auditor')
-            const externalAuditors = allUsers.filter(u => 
-                Number(u.RoleID) === 4 || 
-                (u.RoleName && String(u.RoleName).toLowerCase().includes('auditor')) ||
-                (u.Position && String(u.Position).toLowerCase().includes('auditor')) ||
-                Boolean(u.isExternalAuditor)
-            );
+    const [serverError, setServerError] = useState(null);
+    const [isRetrying, setIsRetrying] = useState(false);
 
-            setAuditors(externalAuditors.map(u => ({
+    // Fetch External Auditors (RoleID === 4 or position External Auditor)
+    const fetchAuditors = async (isRetry = false) => {
+        try {
+            if (isRetry) setIsRetrying(true);
+            else setLoading(true);
+            setServerError(null);
+
+            const res = await usersAPI.getAllUsers();
+            const rawUsers = res?.users || (Array.isArray(res) ? res : res?.data || []);
+            
+            // Filter users where role is auditor or position is external auditor
+            const auditorUsers = rawUsers.filter(u => {
+                const roleId = Number(u.RoleID ?? u.role_id ?? 0);
+                const roleName = String(u.RoleName ?? u.role_name ?? "").toLowerCase();
+                const pos = String(u.Position ?? u.position ?? "").toLowerCase();
+                return roleId === 4 || roleName.includes("auditor") || pos.includes("external auditor") || pos.includes("auditor");
+            }).map(u => ({
                 ...u,
-                status: u.assignedArea ? "Assigned" : "Unassigned"
-            })));
+                UserID: u.UserID || u.id || u.user_id,
+                FirstName: u.FirstName || u.first_name || "",
+                LastName: u.LastName || u.last_name || "",
+                Email: u.Email || u.email || "",
+                assignedArea: u.assignedArea || u.assignedarea || u.assigned_area || u.AssignedAreas || u.assignedareas || u.area_name || u.AreaName || "",
+                lastActive: u.lastActive || u.last_active || u.updated_at || u.created_at || "Recent",
+                status: u.status || u.Status || "Active",
+                avatar: u.avatar || u.ProfileImage || u.profile_image || null
+            }));
+
+            setAuditors(auditorUsers);
+            setServerError(null);
         } catch (err) {
-            console.error("Error loading external auditors:", err);
+            console.error("Error loading auditors:", err);
             setAuditors([]);
+            if (!err.response || err.code === 'ERR_NETWORK' || err.message?.toLowerCase().includes('network error') || err.message?.toLowerCase().includes('failed to fetch')) {
+                setServerError('Server Offline');
+            } else {
+                setServerError(err.response?.data?.message || 'Failed to load external auditors.');
+            }
         } finally {
             setLoading(false);
+            setIsRetrying(false);
         }
     };
 
@@ -89,14 +122,13 @@ export default function ExternalAuditors() {
         fetchAuditors();
     }, []);
 
-    // Filter & search logic
+    // Filter & Search
     const filteredAuditors = useMemo(() => {
+        const q = searchTerm.trim().toLowerCase();
         return auditors.filter(person => {
-            const fullName = `${person.FirstName || ''} ${person.LastName || ''}`.toLowerCase();
-            const email = (person.Email || '').toLowerCase();
-            const area = (person.assignedArea || '').toLowerCase();
-            const q = searchTerm.toLowerCase().trim();
-
+            const fullName = `${person.FirstName || ""} ${person.LastName || ""}`.toLowerCase();
+            const email = (person.Email || "").toLowerCase();
+            const area = (person.assignedArea || "").toLowerCase();
             const matchesSearch = !q || fullName.includes(q) || email.includes(q) || area.includes(q);
             
             let matchesFilter = true;
@@ -158,10 +190,10 @@ export default function ExternalAuditors() {
     const handleCreateInvite = async () => {
         setInviteLoading(true);
         setInviteLink("");
-        setCopyLabel("Copy");
+        setInviteCopied(false);
 
         try {
-            const response = await usersAPI.createRegistrationInvite({ roleId: 4 });
+            const response = await usersAPI.createRegistrationInvite({ roleId: 4, allowAnyEmail: true });
             if (!response.success || !response.inviteUrl) {
                 throw new Error(response.message || "Failed to generate invite link");
             }
@@ -180,7 +212,8 @@ export default function ExternalAuditors() {
 
         try {
             await navigator.clipboard.writeText(inviteLink);
-            setCopyLabel("Copied");
+            setInviteCopied(true);
+            setTimeout(() => setInviteCopied(false), 2500);
         } catch (error) {
             const textArea = document.createElement("textarea");
             textArea.value = inviteLink;
@@ -188,464 +221,616 @@ export default function ExternalAuditors() {
             textArea.select();
             document.execCommand("copy");
             document.body.removeChild(textArea);
-            setCopyLabel("Copied");
+            setInviteCopied(true);
+            setTimeout(() => setInviteCopied(false), 2500);
         }
     };
 
-    return (
-        <div className="h-screen w-full flex flex-col overflow-hidden bg-slate-50/80">
-            <div className="flex-1 overflow-hidden px-4 pt-2 pb-16 flex flex-col gap-4 min-h-0">
-                {/* Title & Top Toolbar */}
-                <div className="flex flex-col gap-3 shrink-0">
-                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
-                        <div>
-                            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">External Auditors</h1>
-                            <p className="text-xs text-slate-500 mt-0.5 font-medium">Manage external auditors and area assignments.</p>
-                        </div>
+    const totalCount = auditors.length;
+    const assignedCount = useMemo(() => auditors.filter(a => !!a.assignedArea).length, [auditors]);
+    const unassignedCount = totalCount - assignedCount;
 
-                        {/* Top Right Actions */}
-                        <div className="flex items-center gap-1.5 pt-0.5 self-start sm:self-auto flex-wrap">
-                            {deleteMode ? (
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={handleDeleteSelected}
-                                        disabled={selectedIds.length === 0}
-                                        className="h-8 px-3 rounded-lg bg-rose-600 text-white text-[11px] font-semibold transition hover:bg-rose-700 disabled:opacity-50"
-                                    >
-                                        Delete Selected ({selectedIds.length})
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setDeleteMode(false);
-                                            setSelectedIds([]);
-                                        }}
-                                        className="h-8 px-3 rounded-lg border border-slate-200 bg-white text-slate-600 text-[11px] font-semibold hover:bg-slate-100 transition"
-                                    >
-                                        Cancel
-                                    </button>
-                                </div>
-                            ) : (
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => setDeleteMode(true)}
-                                        className="h-8 px-3 rounded-lg border border-rose-200 bg-rose-50 text-rose-600 text-[11px] font-semibold transition hover:bg-rose-100"
-                                    >
-                                        Delete
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={handleCreateInvite}
-                                        disabled={inviteLoading}
-                                        className="h-8 px-3 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 text-[11px] font-semibold transition hover:bg-blue-100 disabled:opacity-50"
-                                    >
-                                        {inviteLoading ? "Generating..." : "Invite"}
-                                    </button>
-                                </div>
-                            )}
+    return (
+        <div className="w-full flex-1 flex flex-col min-w-0 bg-slate-50/50 overflow-hidden">
+            {/* Top Header Card */}
+            <div className="px-4 sm:px-6 pt-4 pb-3.5 shrink-0 border-b border-slate-200/70 bg-white shadow-2xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl bg-gradient-to-br from-sky-600 to-indigo-700 text-white shadow-md shadow-sky-500/20 shrink-0">
+                            <svg className="w-5 h-5 sm:w-5.5 sm:h-5.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">External Auditors</h1>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                                {deleteMode ? 'Select auditors to batch remove.' : 'Manage quality assurance evaluators, scope assignments, and evaluation access.'}
+                            </p>
                         </div>
                     </div>
 
-                    {/* Search & Filter Toolbar */}
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5 flex-wrap">
-                        <div className="relative w-full md:w-64 lg:w-72">
-                            <svg
-                                className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={2}
+                    {/* Top Right Actions */}
+                    <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+                        {deleteMode && (
+                            <button
+                                type="button"
+                                onClick={handleDeleteSelected}
+                                disabled={selectedIds.length === 0}
+                                className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold shadow-xs transition-all ${
+                                    selectedIds.length === 0
+                                        ? 'border-red-200 bg-red-50/50 text-red-400 cursor-not-allowed'
+                                        : 'border-red-600 bg-red-600 text-white hover:bg-red-700 active:scale-95 shadow-red-500/20 cursor-pointer'
+                                }`}
                             >
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                                Delete Selected ({selectedIds.length})
+                            </button>
+                        )}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (deleteMode) {
+                                    setDeleteMode(false);
+                                    setSelectedIds([]);
+                                    return;
+                                }
+                                setDeleteMode(true);
+                                setSelectedIds([]);
+                            }}
+                            className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition-all cursor-pointer ${
+                                deleteMode
+                                    ? 'border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                    : 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100 hover:border-red-300'
+                            }`}
+                        >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={deleteMode ? "M6 18L18 6M6 6l12 12" : "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"} />
                             </svg>
-                            <input
-                                type="text"
-                                placeholder="Search auditors, areas, or email..."
-                                className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-8 text-xs text-slate-800 placeholder-slate-400 shadow-2xs transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                            />
-                            {searchTerm && (
-                                <button
-                                    type="button"
-                                    onClick={() => setSearchTerm("")}
-                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
-                                >
-                                    ✕
-                                </button>
-                            )}
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                            {/* Filter Dropdown */}
-                            <CustomDropdown
-                                value={filterStatus}
-                                onChange={setFilterStatus}
-                                options={[
-                                    { value: 'all', label: 'All Auditors' },
-                                    { value: 'assigned', label: 'Assigned' },
-                                    { value: 'unassigned', label: 'Unassigned' },
-                                ]}
-                                minWidth="min-w-[146px]"
-                                size="sm"
-                            />
-
-                            {/* View Mode Toggle Button */}
-                            <div className="flex h-7 items-center gap-0.5 rounded-md border border-slate-200 bg-slate-100 p-0.5">
-                                <button
-                                    type="button"
-                                    onClick={() => setViewMode('grid')}
-                                    className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
-                                        viewMode === 'grid'
-                                            ? 'bg-white text-indigo-600 shadow-2xs'
-                                            : 'text-gray-500 hover:text-gray-700'
-                                    }`}
-                                    title="Grid View"
-                                >
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                                    </svg>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setViewMode('list')}
-                                    className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
-                                        viewMode === 'list'
-                                            ? 'bg-white text-indigo-600 shadow-2xs'
-                                            : 'text-gray-500 hover:text-gray-700'
-                                    }`}
-                                    title="Table List View"
-                                >
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
+                            {deleteMode ? 'Cancel' : 'Delete Mode'}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleCreateInvite}
+                            disabled={inviteLoading}
+                            className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold shadow-xs transition-all cursor-pointer ${
+                                inviteLoading
+                                    ? "cursor-not-allowed border-sky-200 bg-sky-100/50 text-sky-400"
+                                    : "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 hover:border-sky-300 active:scale-95"
+                            }`}
+                        >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                            </svg>
+                            {inviteLoading ? "Generating..." : "Invite Auditor"}
+                        </button>
                     </div>
                 </div>
 
+                {/* Search, Filter Tabs & View Switcher */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mt-3 pt-3 border-t border-slate-100">
+                    {/* Search Input */}
+                    <div className="relative w-full sm:w-72 md:w-80">
+                        <svg
+                            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                        >
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                        </svg>
+                        <input
+                            type="text"
+                            placeholder="Search auditors, areas, email..."
+                            className="h-9 w-full rounded-xl border border-slate-200/90 bg-slate-50/60 pl-9.5 pr-8 text-xs text-slate-800 placeholder-slate-400 shadow-2xs transition-all focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-slate-300"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                        {searchTerm && (
+                            <button
+                                type="button"
+                                onClick={() => setSearchTerm("")}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-md cursor-pointer flex items-center justify-center"
+                            >
+                                <X className="w-3.5 h-3.5" />
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Filter Status + View Mode Toggle */}
+                    <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap">
+                        <CustomDropdown
+                            value={filterStatus}
+                            onChange={setFilterStatus}
+                            options={[
+                                { value: 'all', label: `All Auditors (${totalCount})` },
+                                { value: 'assigned', label: `Assigned (${assignedCount})` },
+                                { value: 'unassigned', label: `Unassigned (${unassignedCount})` },
+                            ]}
+                            minWidth="min-w-[160px]"
+                            size="sm"
+                        />
+
+                        {/* View Mode Toggle */}
+                        <ViewModeToggle viewMode={viewMode} onChange={handleSetViewMode} />
+                    </div>
+                </div>
+            </div>
+
+            <div className="flex-1 overflow-hidden px-4 sm:px-6 pt-3 pb-8 flex flex-col min-h-0">
                 {/* Main Content Area */}
-                <div className="flex-1 overflow-y-auto min-h-0 [contain:content]">
+                <div className={`flex-1 min-h-0 ${viewMode === 'list' && !serverError && visibleAuditors.length > 0 ? 'overflow-y-auto' : 'flex flex-col h-full'}`}>
                     {loading ? (
                         <div className="w-full">
                             <CardListSkeleton count={6} />
                         </div>
+                    ) : serverError ? (
+                        <ServerOfflineState
+                            onRetry={() => fetchAuditors(true)}
+                            isRetrying={isRetrying}
+                            title={serverError === 'Server Offline' ? 'Backend Server Unavailable' : 'Unable to Load Auditors'}
+                            message={serverError === 'Server Offline' 
+                                ? 'The backend server is unreachable or offline. If you stopped the backend server, please start it and click Retry Connection.' 
+                                : serverError}
+                        />
                     ) : visibleAuditors.length === 0 ? (
-                        <div className="rounded-2xl border border-dashed border-slate-300/80 bg-white p-12 text-center text-slate-500">
-                            <p className="text-sm font-bold text-slate-700">No external auditors found</p>
-                            <p className="text-xs text-slate-400 mt-1">No auditors matching your search criteria.</p>
+                        <div className="flex-1 w-full min-h-[350px] flex flex-col items-center justify-center p-8 text-center bg-white/70 border border-dashed border-slate-200 rounded-2xl animate-fadeIn my-auto">
+                            <div className="w-16 h-16 bg-slate-100 border border-slate-200 text-slate-400 rounded-2xl flex items-center justify-center mb-3">
+                                <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+                                </svg>
+                            </div>
+                            <h3 className="text-base font-bold text-slate-800 mb-1">
+                                {searchTerm.trim() || filterStatus !== 'all' ? 'No Auditors Found' : 'No External Auditors Registered'}
+                            </h3>
+                            <p className="text-xs text-slate-500 max-w-sm mb-4">
+                                {searchTerm.trim() || filterStatus !== 'all'
+                                    ? 'No external auditors match your search query or filter.'
+                                    : 'Invite external auditors to evaluate assigned standards and criteria.'}
+                            </p>
+                            {searchTerm.trim() || filterStatus !== 'all' ? (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setSearchTerm('');
+                                        setFilterStatus('all');
+                                    }}
+                                    className="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200 transition cursor-pointer"
+                                >
+                                    Clear Filters
+                                </button>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={handleCreateInvite}
+                                    className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 transition shadow-sm cursor-pointer"
+                                >
+                                    <span>+ Invite External Auditor</span>
+                                </button>
+                            )}
                         </div>
-                    ) : viewMode === 'grid' ? (
-                        /* MODERN GRID VIEW CARDS */
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5 pb-28">
-                            {visibleAuditors.map((auditor) => {
-                                const isAssigned = !!auditor.assignedArea;
-                                const isSelected = selectedIds.includes(auditor.UserID);
-                                const fullName = `${auditor.FirstName || ''} ${auditor.LastName || ''}`.trim() || 'Auditor';
-                                const initials = `${(auditor.FirstName || '').trim().charAt(0)}${(auditor.LastName || '').trim().charAt(0)}`.toUpperCase() || 'EA';
-                                
-                                const avatarPalettes = [
-                                    { bg: 'bg-gradient-to-br from-indigo-500 to-blue-600', ring: 'ring-indigo-100' },
-                                    { bg: 'bg-gradient-to-br from-violet-500 to-purple-600', ring: 'ring-purple-100' },
-                                    { bg: 'bg-gradient-to-br from-sky-500 to-cyan-600', ring: 'ring-sky-100' },
-                                    { bg: 'bg-gradient-to-br from-emerald-500 to-teal-600', ring: 'ring-emerald-100' },
-                                    { bg: 'bg-gradient-to-br from-amber-500 to-orange-600', ring: 'ring-amber-100' },
-                                    { bg: 'bg-gradient-to-br from-rose-500 to-pink-600', ring: 'ring-rose-100' },
-                                ];
-                                let hash = 0;
-                                for (let i = 0; i < fullName.length; i++) hash = fullName.charCodeAt(i) + ((hash << 5) - hash);
-                                const avatarStyle = avatarPalettes[Math.abs(hash) % avatarPalettes.length];
+                    ) : (
+                        <>
+                            {viewMode === 'list' && (
+                                <div className="grid grid-cols-12 items-center gap-3 px-4 py-3 bg-white border border-slate-200 rounded-xl shadow-2xs text-xs font-semibold text-gray-700 sticky top-0 z-30 min-w-[720px] mb-2">
+                                    <div className="col-span-4 flex items-center gap-2">
+                                        {deleteMode && (
+                                            <input
+                                                type="checkbox"
+                                                onChange={(e) => handleSelectAll(e.target.checked)}
+                                                checked={selectedIds.length === visibleAuditors.length && visibleAuditors.length > 0}
+                                                className="h-4 w-4 rounded border-rose-300 text-rose-600 focus:ring-rose-500 cursor-pointer shrink-0"
+                                            />
+                                        )}
+                                        <span>Auditor Name</span>
+                                    </div>
+                                    <div className="col-span-2 flex items-center justify-center">Role</div>
+                                    <div className="col-span-3 flex items-center justify-center">Assigned Area</div>
+                                    <div className="col-span-2 flex items-center justify-center">Status</div>
+                                    <div className="col-span-1 flex items-center justify-end">Actions</div>
+                                </div>
+                            )}
 
-                                return (
-                                    <div
-                                        key={auditor.UserID}
-                                        className={`group relative flex flex-col justify-between rounded-2xl border bg-white shadow-xs hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 overflow-hidden ${
-                                            isSelected 
-                                                ? 'border-indigo-500 ring-2 ring-indigo-400/50 bg-indigo-50/15' 
-                                                : 'border-slate-200/90 hover:border-indigo-300/80'
-                                        }`}
-                                    >
-                                        <div className="p-3.5 flex flex-col flex-1 justify-between gap-2.5">
-                                            {/* Card Top Header: Status Badge & Option Menu */}
-                                            <div className="flex items-center justify-between gap-2">
-                                                {deleteMode ? (
-                                                    <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                            <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 grid-rows-3 gap-2 sm:gap-2.5 lg:gap-3 flex-1 min-h-0 h-full p-1' : 'space-y-2 pt-1 pb-16 min-w-[720px]'}>
+                                {visibleAuditors.map((auditor) => {
+                                    const isAssigned = !!auditor.assignedArea;
+                                    const isSelected = selectedIds.includes(auditor.UserID);
+                                    const fullName = `${auditor.FirstName || ''} ${auditor.LastName || ''}`.trim() || 'Auditor';
+                                    const initials = `${(auditor.FirstName || '').trim().charAt(0)}${(auditor.LastName || '').trim().charAt(0)}`.toUpperCase() || 'EA';
+                                    
+                                    const avatarPalettes = [
+                                        { bg: 'bg-gradient-to-br from-indigo-500 to-blue-600', ring: 'ring-indigo-100' },
+                                        { bg: 'bg-gradient-to-br from-violet-500 to-purple-600', ring: 'ring-purple-100' },
+                                        { bg: 'bg-gradient-to-br from-sky-500 to-cyan-600', ring: 'ring-sky-100' },
+                                        { bg: 'bg-gradient-to-br from-emerald-500 to-teal-600', ring: 'ring-emerald-100' },
+                                        { bg: 'bg-gradient-to-br from-amber-500 to-orange-600', ring: 'ring-amber-100' },
+                                        { bg: 'bg-gradient-to-br from-rose-500 to-pink-600', ring: 'ring-rose-100' },
+                                    ];
+                                    let hash = 0;
+                                    for (let i = 0; i < fullName.length; i++) hash = fullName.charCodeAt(i) + ((hash << 5) - hash);
+                                    const avatarStyle = avatarPalettes[Math.abs(hash) % avatarPalettes.length];
+
+                                    if (viewMode === 'list') {
+                                        return (
+                                            <div
+                                                key={auditor.UserID}
+                                                onClick={() => {
+                                                    if (deleteMode) handleToggleSelect(auditor.UserID);
+                                                    else handleOpenDetails(auditor);
+                                                }}
+                                                className={`relative rounded-xl border border-slate-200 bg-white shadow-2xs ${
+                                                    isSelected ? 'ring-2 ring-rose-500 border-rose-500 bg-rose-50/20' : ''
+                                                } ${deleteMode ? 'cursor-pointer hover:border-rose-300' : 'app-card-hover cursor-pointer'}`}
+                                            >
+                                                <div className="grid grid-cols-12 items-center gap-3 px-4 py-2.5">
+                                                    {/* Auditor Name & Email (col-span-4) */}
+                                                    <div className="flex items-center gap-3 col-span-4 min-w-0">
+                                                        {deleteMode && (
+                                                            <div className="shrink-0">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={isSelected}
+                                                                    onChange={() => handleToggleSelect(auditor.UserID)}
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                    className="h-4 w-4 rounded border-rose-300 text-rose-600 focus:ring-rose-500 cursor-pointer"
+                                                                />
+                                                            </div>
+                                                        )}
+                                                        <div className="h-9 w-9 shrink-0 rounded-full overflow-hidden relative">
+                                                            {auditor.avatar ? (
+                                                                <img
+                                                                    src={auditor.avatar.startsWith('http') || auditor.avatar.startsWith('/uploads') ? (auditor.avatar.startsWith('http') ? auditor.avatar : `${API_BASE_URL}${auditor.avatar}`) : auditor.avatar}
+                                                                    alt={fullName}
+                                                                    onError={(e) => {
+                                                                        e.target.style.display = 'none';
+                                                                        if (e.target.nextElementSibling) e.target.nextElementSibling.style.display = 'flex';
+                                                                    }}
+                                                                    className="h-full w-full rounded-full object-cover ring-2 ring-slate-100"
+                                                                />
+                                                            ) : null}
+                                                            <div className={`h-full w-full rounded-full flex items-center justify-center font-bold text-white text-xs ${avatarStyle.bg} ${auditor.avatar ? 'hidden' : 'flex'}`}>
+                                                                {initials}
+                                                            </div>
+                                                        </div>
+                                                        <div className="min-w-0 flex-1">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className="text-xs font-bold text-slate-800 truncate">
+                                                                    {fullName}
+                                                                </span>
+                                                            </div>
+                                                            <div className="text-[10px] text-slate-500 truncate flex items-center gap-1">
+                                                                <span>{auditor.Email || 'No email provided'}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Role (col-span-2) */}
+                                                    <div className="col-span-2 flex items-center justify-center">
+                                                        <span className="inline-flex items-center rounded-md border px-2.5 py-0.5 text-[10px] font-semibold bg-sky-50 text-sky-700 border-sky-200/60">
+                                                            External Auditor
+                                                        </span>
+                                                    </div>
+
+                                                    {/* Assigned Area (col-span-3) */}
+                                                    <div className="col-span-3 flex items-center justify-center min-w-0 px-2">
+                                                        {auditor.assignedArea ? (
+                                                            <span 
+                                                                className="inline-flex items-center gap-1 max-w-full rounded-md bg-blue-50 border border-blue-200/60 px-2 py-0.5 text-[10px] font-semibold text-blue-700 truncate"
+                                                                title={auditor.assignedArea}
+                                                            >
+                                                                <svg className="w-3 h-3 text-blue-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                                                </svg>
+                                                                <span className="truncate">{auditor.assignedArea}</span>
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-[10px] text-slate-400 italic">None</span>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Status (col-span-2) */}
+                                                    <div className="col-span-2 flex items-center justify-center">
+                                                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold tracking-wide border ${
+                                                            isAssigned ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80' : 'bg-slate-100 text-slate-600 border-slate-200'
+                                                        }`}>
+                                                            <span className={`h-1.5 w-1.5 rounded-full ${isAssigned ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
+                                                            {isAssigned ? 'Assigned' : 'Unassigned'}
+                                                        </span>
+                                                    </div>
+
+                                                    {/* Actions (col-span-1) */}
+                                                    <div className="col-span-1 flex items-center justify-end">
+                                                        <div className="relative">
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setOpenMenuId(openMenuId === auditor.UserID ? null : auditor.UserID);
+                                                                }}
+                                                                className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 shadow-2xs"
+                                                                title="Actions"
+                                                            >
+                                                                <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                                    <circle cx="12" cy="5" r="2" />
+                                                                    <circle cx="12" cy="12" r="2" />
+                                                                    <circle cx="12" cy="19" r="2" />
+                                                                </svg>
+                                                            </button>
+
+                                                            {openMenuId === auditor.UserID && (
+                                                                <div 
+                                                                    ref={menuRef}
+                                                                    className="absolute right-0 top-8 z-40 w-44 rounded-xl border border-slate-200 bg-white p-1 shadow-xl animate-in fade-in zoom-in-95 duration-100"
+                                                                >
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setOpenMenuId(null);
+                                                                            setSelectedAuditorForAssign(auditor);
+                                                                            setAssignModalOpen(true);
+                                                                        }}
+                                                                        className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 transition"
+                                                                    >
+                                                                        <svg className="h-3.5 w-3.5 text-indigo-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                                                        </svg>
+                                                                        <span>Assign Area(s)</span>
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setOpenMenuId(null);
+                                                                            handleOpenDetails(auditor);
+                                                                        }}
+                                                                        className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition"
+                                                                    >
+                                                                        <svg className="h-3.5 w-3.5 text-slate-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                                        </svg>
+                                                                        <span>View Details</span>
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={async (e) => {
+                                                                            e.stopPropagation();
+                                                                            setOpenMenuId(null);
+                                                                            const confirmed = await showConfirm(`Remove ${auditor.FirstName} ${auditor.LastName}?`);
+                                                                            if (confirmed) {
+                                                                                try {
+                                                                                    await usersAPI.deleteUsers([auditor.UserID]);
+                                                                                    fetchAuditors();
+                                                                                } catch (err) {
+                                                                                    console.error('Delete error', err);
+                                                                                }
+                                                                            }
+                                                                        }}
+                                                                        className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50 transition"
+                                                                    >
+                                                                        <svg className="h-3.5 w-3.5 text-rose-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
+                                                                        </svg>
+                                                                        <span>Delete Auditor</span>
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    }
+
+                                    return (
+                                        <div
+                                            key={auditor.UserID}
+                                            className={`group relative flex flex-col justify-between rounded-2xl bg-white shadow-2xs h-full min-h-0 transition-all duration-200 ${
+                                                isSelected 
+                                                    ? 'border-2 border-rose-500 ring-2 ring-inset ring-rose-400/50 bg-rose-50/25 shadow-sm' 
+                                                    : deleteMode
+                                                        ? 'border border-slate-200/90 hover:border-rose-300 cursor-pointer'
+                                                        : 'border border-slate-200/90 app-card-hover'
+                                            }`}
+                                        >
+                                            <div className="p-2.5 sm:p-3 flex flex-col flex-1 justify-between gap-1.5 min-h-0 overflow-hidden">
+                                                {/* Card Top Header: Status Badge & Option Menu */}
+                                                <div className="flex items-center justify-between gap-2 shrink-0 mb-1 sm:mb-1.5">
+                                                    {deleteMode ? (
                                                         <input
                                                             type="checkbox"
                                                             checked={isSelected}
                                                             onChange={() => handleToggleSelect(auditor.UserID)}
-                                                            className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className="h-4 w-4 rounded border-rose-300 text-rose-600 focus:ring-rose-500 cursor-pointer"
                                                         />
-                                                        <span className="text-[10px] font-semibold text-slate-600">Select</span>
-                                                    </label>
-                                                ) : (
-                                                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold tracking-wide border ${
-                                                        isAssigned 
-                                                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80' 
-                                                            : 'bg-slate-100 text-slate-600 border-slate-200'
-                                                    }`}>
-                                                        <span className={`h-1.5 w-1.5 rounded-full ${
-                                                            isAssigned ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'
-                                                        }`} />
-                                                        {isAssigned ? 'Assigned' : 'Unassigned'}
-                                                    </span>
-                                                )}
+                                                    ) : (
+                                                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold tracking-wide border ${
+                                                            isAssigned 
+                                                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80' 
+                                                                : 'bg-slate-100 text-slate-600 border-slate-200'
+                                                        }`}>
+                                                            <span className={`h-1.5 w-1.5 rounded-full ${
+                                                                isAssigned ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'
+                                                            }`} />
+                                                            {isAssigned ? 'Assigned' : 'Unassigned'}
+                                                        </span>
+                                                    )}
 
-                                                {!deleteMode && (
-                                                    <div className="relative">
+                                                    {!deleteMode && (
+                                                        <div className="relative">
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setOpenMenuId(openMenuId === auditor.UserID ? null : auditor.UserID);
+                                                                }}
+                                                                className="flex h-6 w-6 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition hover:bg-slate-50 hover:text-slate-700"
+                                                                title="Options"
+                                                            >
+                                                                <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                                    <circle cx="12" cy="5" r="2" />
+                                                                    <circle cx="12" cy="12" r="2" />
+                                                                    <circle cx="12" cy="19" r="2" />
+                                                                </svg>
+                                                            </button>
+
+                                                            {openMenuId === auditor.UserID && (
+                                                                <div 
+                                                                    ref={menuRef}
+                                                                    className="absolute right-0 top-7 z-30 w-44 rounded-xl border border-slate-200 bg-white p-1 shadow-xl animate-in fade-in zoom-in-95 duration-100"
+                                                                >
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            setOpenMenuId(null);
+                                                                            setSelectedAuditorForAssign(auditor);
+                                                                            setAssignModalOpen(true);
+                                                                        }}
+                                                                        className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 transition"
+                                                                    >
+                                                                        <svg className="h-3.5 w-3.5 text-indigo-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                                                        </svg>
+                                                                        <span>Assign Area(s)</span>
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            setOpenMenuId(null);
+                                                                            handleOpenDetails(auditor);
+                                                                        }}
+                                                                        className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition"
+                                                                    >
+                                                                        <svg className="h-3.5 w-3.5 text-slate-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                                        </svg>
+                                                                        <span>View Details</span>
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={async () => {
+                                                                            setOpenMenuId(null);
+                                                                            const confirmed = await showConfirm(`Remove ${auditor.FirstName} ${auditor.LastName}?`);
+                                                                            if (confirmed) {
+                                                                                try {
+                                                                                    await usersAPI.deleteUsers([auditor.UserID]);
+                                                                                    fetchAuditors();
+                                                                                } catch (err) {
+                                                                                    console.error('Delete error', err);
+                                                                                }
+                                                                            }
+                                                                        }}
+                                                                        className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50 transition"
+                                                                    >
+                                                                        <svg className="h-3.5 w-3.5 text-rose-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
+                                                                        </svg>
+                                                                        <span>Delete Auditor</span>
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Profile Main Info */}
+                                                <div 
+                                                    onClick={() => {
+                                                        if (deleteMode) handleToggleSelect(auditor.UserID);
+                                                        else handleOpenDetails(auditor);
+                                                    }}
+                                                    className="cursor-pointer group/content min-h-0 flex-1 flex flex-col justify-center my-0.5"
+                                                    title="Click to view full details"
+                                                >
+                                                    <div className="flex items-center gap-2 sm:gap-2.5">
+                                                        {/* Avatar */}
+                                                        <div className="relative shrink-0">
+                                                            {auditor.avatar ? (
+                                                                <img
+                                                                    src={auditor.avatar.startsWith('http') || auditor.avatar.startsWith('/uploads') ? (auditor.avatar.startsWith('http') ? auditor.avatar : `${API_BASE_URL}${auditor.avatar}`) : auditor.avatar}
+                                                                    alt={fullName}
+                                                                    onError={(e) => {
+                                                                        e.target.style.display = 'none';
+                                                                        if (e.target.nextElementSibling) e.target.nextElementSibling.style.display = 'flex';
+                                                                    }}
+                                                                    className="h-8 w-8 sm:h-9 sm:w-9 rounded-full object-cover ring-2 ring-slate-100 shadow-xs"
+                                                                />
+                                                            ) : null}
+                                                            <div
+                                                                className={`h-8 w-8 sm:h-9 sm:w-9 rounded-full flex items-center justify-center font-bold text-white text-[11px] sm:text-xs shadow-xs ring-2 ${avatarStyle.ring} ${avatarStyle.bg} ${auditor.avatar ? 'hidden' : 'flex'}`}
+                                                            >
+                                                                {initials}
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="min-w-0 flex-1">
+                                                            <h3 className="text-xs sm:text-[13px] font-bold text-slate-900 truncate group-hover/content:text-indigo-600 transition-colors leading-tight">
+                                                                {fullName}
+                                                            </h3>
+                                                            <div className="mt-0.5">
+                                                                <span className="inline-flex items-center rounded bg-sky-50 px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-sky-700 border border-sky-200/60 uppercase">
+                                                                    External Auditor
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Email Strip */}
+                                                    <div className="mt-1 sm:mt-1.5 flex items-center gap-1.5 rounded-lg bg-slate-50/80 px-2 py-0.5 border border-slate-100 text-[9px] sm:text-[10px] text-slate-600 group-hover/content:bg-slate-100/70 transition-colors shrink-0">
+                                                        <svg className="w-3 h-3 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                                        </svg>
+                                                        <span className="truncate font-medium">{auditor.Email || 'No email provided'}</span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Assigned Scope / Quick Action Footer */}
+                                                <div className="mt-0.5 pt-1.5 border-t border-slate-100 flex items-center justify-between gap-1.5 shrink-0">
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">
+                                                            Assigned Scope
+                                                        </div>
+                                                        {auditor.assignedArea ? (
+                                                            <div className="flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold text-slate-800 truncate" title={auditor.assignedArea}>
+                                                                <svg className="w-3 h-3 text-indigo-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                                                </svg>
+                                                                <span className="truncate">{auditor.assignedArea}</span>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-[10px] sm:text-[11px] text-slate-400 italic">No areas assigned</span>
+                                                        )}
+                                                    </div>
+
+                                                    {!deleteMode && (
                                                         <button
                                                             type="button"
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                setOpenMenuId(openMenuId === auditor.UserID ? null : auditor.UserID);
+                                                                setSelectedAuditorForAssign(auditor);
+                                                                setAssignModalOpen(true);
                                                             }}
-                                                            className="flex h-6 w-6 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition hover:bg-slate-50 hover:text-slate-700"
-                                                            title="Options"
+                                                            className={`shrink-0 rounded-lg px-2 py-0.5 text-[9px] sm:text-[10px] font-bold transition flex items-center gap-1 ${
+                                                                auditor.assignedArea
+                                                                    ? 'bg-slate-100 text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 border border-slate-200/60'
+                                                                    : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white border border-indigo-200/80 shadow-2xs'
+                                                            }`}
                                                         >
-                                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                                                            </svg>
+                                                            {auditor.assignedArea ? 'Change' : '+ Assign'}
                                                         </button>
-
-                                                        {openMenuId === auditor.UserID && (
-                                                            <div 
-                                                                ref={menuRef}
-                                                                className="absolute right-0 top-7 z-30 w-44 rounded-xl border border-slate-200 bg-white p-1 shadow-xl animate-in fade-in zoom-in-95 duration-100"
-                                                            >
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => {
-                                                                        setOpenMenuId(null);
-                                                                        setSelectedAuditorForAssign(auditor);
-                                                                        setAssignModalOpen(true);
-                                                                    }}
-                                                                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 transition"
-                                                                >
-                                                                    <svg className="h-3.5 w-3.5 text-indigo-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                                                                    </svg>
-                                                                    <span>Assign Area(s)</span>
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => {
-                                                                        setOpenMenuId(null);
-                                                                        handleOpenDetails(auditor);
-                                                                    }}
-                                                                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition"
-                                                                >
-                                                                    <svg className="h-3.5 w-3.5 text-slate-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                                                    </svg>
-                                                                    <span>View Details</span>
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={async () => {
-                                                                        setOpenMenuId(null);
-                                                                        const confirmed = await showConfirm(`Remove ${auditor.FirstName} ${auditor.LastName}?`);
-                                                                        if (confirmed) {
-                                                                            setAuditors(prev => prev.filter(a => a.UserID !== auditor.UserID));
-                                                                        }
-                                                                    }}
-                                                                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50 transition"
-                                                                >
-                                                                    <svg className="h-3.5 w-3.5 text-rose-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
-                                                                    </svg>
-                                                                    <span>Remove Auditor</span>
-                                                                </button>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {/* Profile Information (Clickable to view modal) */}
-                                            <div 
-                                                onClick={() => handleOpenDetails(auditor)}
-                                                className="cursor-pointer group/content"
-                                                title="Click to view details and assigned areas"
-                                            >
-                                                <div className="flex items-center gap-2.5">
-                                                    {/* Smart Avatar */}
-                                                    <div className="relative shrink-0">
-                                                        {auditor.ProfilePic ? (
-                                                            <img
-                                                                src={`${API_BASE_URL}/uploads/profile-pics/${auditor.ProfilePic}`}
-                                                                alt={fullName}
-                                                                onError={(e) => { 
-                                                                    e.target.style.display = 'none'; 
-                                                                    if (e.target.nextElementSibling) e.target.nextElementSibling.style.display = 'flex'; 
-                                                                }}
-                                                                className="h-10 w-10 rounded-full object-cover ring-2 ring-slate-100 shadow-xs"
-                                                            />
-                                                        ) : null}
-                                                        <div
-                                                            className={`h-10 w-10 rounded-full flex items-center justify-center font-bold text-white text-xs shadow-xs ring-2 ${avatarStyle.ring} ${avatarStyle.bg} ${auditor.ProfilePic ? 'hidden' : 'flex'}`}
-                                                        >
-                                                            {initials}
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Name & Role */}
-                                                    <div className="min-w-0 flex-1">
-                                                        <h3 className="text-[13px] font-bold text-slate-900 truncate group-hover/content:text-indigo-600 transition-colors leading-tight">
-                                                            {fullName}
-                                                        </h3>
-                                                        <div className="mt-0.5">
-                                                            <span className="inline-flex items-center rounded bg-sky-50 px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-sky-700 border border-sky-200/60 uppercase">
-                                                                External Auditor
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                {/* Email Strip */}
-                                                <div className="mt-2.5 flex items-center gap-1.5 rounded-lg bg-slate-50/80 px-2 py-1 border border-slate-100 text-[10px] text-slate-600 group-hover/content:bg-slate-100/70 transition-colors">
-                                                    <svg className="w-3 h-3 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                                                    </svg>
-                                                    <span className="truncate font-medium">{auditor.Email || 'No email provided'}</span>
-                                                </div>
-                                            </div>
-
-                                            {/* Assigned Scope / Quick Action Footer */}
-                                            <div className="mt-1 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                                                <div className="min-w-0 flex-1">
-                                                    <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">
-                                                        Assigned Scope
-                                                    </div>
-                                                    {auditor.assignedArea ? (
-                                                        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-800 truncate" title={auditor.assignedArea}>
-                                                            <svg className="w-3.5 h-3.5 text-indigo-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                                                            </svg>
-                                                            <span className="truncate">{auditor.assignedArea}</span>
-                                                        </div>
-                                                    ) : (
-                                                        <span className="text-[11px] text-slate-400 italic">No areas assigned</span>
                                                     )}
                                                 </div>
-
-                                                {!deleteMode && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setSelectedAuditorForAssign(auditor);
-                                                            setAssignModalOpen(true);
-                                                        }}
-                                                        className={`shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-bold transition flex items-center gap-1 ${
-                                                            auditor.assignedArea
-                                                                ? 'bg-slate-100 text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 border border-slate-200/60'
-                                                                : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white border border-indigo-200/80 shadow-2xs'
-                                                        }`}
-                                                    >
-                                                        {auditor.assignedArea ? 'Change' : '+ Assign'}
-                                                    </button>
-                                                )}
                                             </div>
                                         </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    ) : (
-                        /* TABLE LIST VIEW */
-                        <div className="rounded-2xl border border-slate-200/90 bg-white overflow-hidden shadow-2xs">
-                            <table className="w-full text-left text-xs text-slate-700">
-                                <thead className="border-b border-slate-200 bg-slate-50/70 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                                    <tr>
-                                        {deleteMode && (
-                                            <th className="px-4 py-3 w-10">
-                                                <input
-                                                    type="checkbox"
-                                                    onChange={(e) => handleSelectAll(e.target.checked)}
-                                                    checked={selectedIds.length === visibleAuditors.length && visibleAuditors.length > 0}
-                                                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                                                />
-                                            </th>
-                                        )}
-                                        <th className="px-4 py-3">Auditor Name</th>
-                                        <th className="px-4 py-3">Role</th>
-                                        <th className="px-4 py-3">Email</th>
-                                        <th className="px-4 py-3">Assigned Area</th>
-                                        <th className="px-4 py-3">Status</th>
-                                        <th className="px-4 py-3 text-right">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100 font-medium">
-                                    {visibleAuditors.map((auditor) => {
-                                        const isAssigned = !!auditor.assignedArea;
-                                        const isSelected = selectedIds.includes(auditor.UserID);
-
-                                        return (
-                                            <tr key={auditor.UserID} className="hover:bg-slate-50/80 transition">
-                                                {deleteMode && (
-                                                    <td className="px-4 py-3">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={isSelected}
-                                                            onChange={() => handleToggleSelect(auditor.UserID)}
-                                                            className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                                                        />
-                                                    </td>
-                                                )}
-                                                <td className="px-4 py-3 font-bold text-slate-900">
-                                                    {auditor.FirstName} {auditor.LastName}
-                                                </td>
-                                                <td className="px-4 py-3 text-sky-600 font-bold text-[10px] tracking-wider">
-                                                    EXTERNAL AUDITOR
-                                                </td>
-                                                <td className="px-4 py-3 text-slate-600">{auditor.Email}</td>
-                                                <td className="px-4 py-3 text-slate-800">
-                                                    {auditor.assignedArea ? (
-                                                        <span className="rounded-md bg-blue-50 px-2 py-0.5 font-semibold text-blue-700">
-                                                            {auditor.assignedArea}
-                                                        </span>
-                                                    ) : (
-                                                        <span className="italic text-slate-400">None</span>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
-                                                        isAssigned ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
-                                                    }`}>
-                                                        {isAssigned ? 'Assigned' : 'Unassigned'}
-                                                    </span>
-                                                </td>
-                                                <td className="px-4 py-3 text-right">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleOpenDetails(auditor)}
-                                                        className="mr-3 text-xs font-bold text-sky-600 hover:underline"
-                                                    >
-                                                        View Details
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={async () => {
-                                                            const confirmed = await showConfirm(`Remove ${auditor.FirstName} ${auditor.LastName}?`);
-                                                            if (confirmed) {
-                                                                setAuditors(prev => prev.filter(a => a.UserID !== auditor.UserID));
-                                                            }
-                                                        }}
-                                                        className="text-xs font-bold text-rose-600 hover:underline"
-                                                    >
-                                                        Remove
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
+                                    );
+                                })}
+                            </div>
+                        </>
                     )}
                 </div>
             </div>
@@ -680,38 +865,91 @@ export default function ExternalAuditors() {
                 onSaveSuccess={fetchAuditors}
             />
 
-            {/* Invite Link Modal (Matching User Screenshot 100%) */}
+            {/* Invite Link Modal */}
             {inviteModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-                    <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl transition-all border border-slate-100">
-                        <h2 className="text-xl font-bold text-slate-900">Invite Link</h2>
-                        <p className="mt-1 text-xs text-slate-500 font-medium">
-                            This external auditor invite expires in 10 minutes.
-                        </p>
-
-                        <div className="mt-4 flex items-center gap-2">
-                            <input
-                                type="text"
-                                readOnly
-                                value={inviteLink}
-                                className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs text-slate-700 font-medium select-all focus:outline-none"
-                            />
-                            <button
-                                type="button"
-                                onClick={handleCopyInvite}
-                                className="h-10 px-4 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition shrink-0"
-                            >
-                                {copyLabel}
-                            </button>
-                        </div>
-
-                        <div className="mt-6 flex justify-end">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs px-4">
+                    <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl border border-slate-200/80 animate-in fade-in zoom-in-95 duration-150">
+                        <div className="flex items-start justify-between gap-3 mb-4 pb-3 border-b border-slate-100">
+                            <div className="flex items-center gap-3">
+                                <div className="h-10 w-10 rounded-xl bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-600">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h2 className="text-base font-bold text-slate-900">External Auditor Registration Invite</h2>
+                                    <p className="text-xs text-slate-500 mt-0.5">
+                                        Active for 10 minutes. Distribute this link to external quality auditors.
+                                    </p>
+                                </div>
+                            </div>
                             <button
                                 type="button"
                                 onClick={() => setInviteModalOpen(false)}
-                                className="h-9 px-5 rounded-xl bg-slate-100 text-slate-700 text-xs font-semibold hover:bg-slate-200 transition"
+                                className="h-8 w-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition cursor-pointer"
                             >
-                                Close
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        <div className="space-y-3.5">
+                            {/* External Auditor Invite */}
+                            <div className="rounded-xl border border-sky-200/80 bg-sky-50/40 p-4 transition hover:border-sky-300">
+                                <div className="flex items-center justify-between gap-2 mb-1.5">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs font-bold text-sky-950">Auditor Registration Link</span>
+                                        <span className="inline-flex items-center rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-bold text-sky-800 border border-sky-200">
+                                            Any Valid Email
+                                        </span>
+                                    </div>
+                                </div>
+                                <p className="text-[11px] text-slate-600 mb-2.5">
+                                    Allows prospective external auditors to register with either an institutional account or personal email.
+                                </p>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        readOnly
+                                        value={inviteLink}
+                                        className="h-9 min-w-0 flex-1 rounded-lg border border-sky-200 bg-white px-3 text-xs text-slate-700 shadow-2xs select-all font-mono"
+                                        onFocus={(event) => event.target.select()}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={handleCopyInvite}
+                                        className={`h-9 px-3.5 rounded-lg text-xs font-semibold transition-all shadow-2xs flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                                            inviteCopied
+                                                ? 'bg-emerald-600 text-white'
+                                                : 'bg-sky-600 hover:bg-sky-700 active:scale-95 text-white'
+                                        }`}
+                                    >
+                                        {inviteCopied ? (
+                                            <>
+                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                                </svg>
+                                                Copied
+                                            </>
+                                        ) : (
+                                            <>
+                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                                </svg>
+                                                Copy Link
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="mt-5 flex justify-end">
+                            <button
+                                type="button"
+                                onClick={() => setInviteModalOpen(false)}
+                                className="rounded-xl border border-slate-200 bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-200 active:scale-95 cursor-pointer"
+                            >
+                                Done
                             </button>
                         </div>
                     </div>

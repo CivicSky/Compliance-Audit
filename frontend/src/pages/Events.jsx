@@ -1,28 +1,15 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Navigate } from "react-router-dom";
+import { X } from "lucide-react";
 import EventsP from "../components/EventsProfile/EventsProfle";
-import AddEventModal from "../components/Events/AddEventModal";
-import UnifiedSetupWizard from "../components/UnifiedSetupWizard/UnifiedSetupWizard";
-import { Wand2 } from "lucide-react";
 import { usersAPI } from "../utils/api";
-import { useModal } from "../components/UI/ModalProvider";
-import { useToast } from "../components/UI/Toast";
 import Header from "../components/Header/header";
+import ViewModeToggle from "../components/UI/ViewModeToggle";
 
 export default function Events() {
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [showWizard, setShowWizard] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    const [deleteMode, setDeleteMode] = useState(false);
-    const [selectedCount, setSelectedCount] = useState(0);
-    const [selectedIds, setSelectedIds] = useState([]);
     const [currentUser, setCurrentUser] = useState(null);
     const eventsPRef = useRef();
-    const { showAlert, showConfirm } = useModal();
-    const { toast } = useToast() || {};
-
-    // Default to admin (show features) until we confirm otherwise
-    const isAdmin = !!(currentUser && (currentUser.RoleName === 'admin' || currentUser.RoleID === 1));
 
     const isAuditor = currentUser?.RoleID === 4 || 
                       String(currentUser?.RoleName || '').toLowerCase().includes('auditor') || 
@@ -46,171 +33,91 @@ export default function Events() {
         return <Navigate to="/home" replace />;
     }
 
-    // Reset all states when component unmounts or navigation happens
-    useEffect(() => {
-        // Clear any blocking states when component mounts
-        setDeleteMode(false);
-        setSelectedCount(0);
-        setSelectedIds([]);
-        
-        return () => {
-            // Cleanup function
-            setDeleteMode(false);
-            setSelectedCount(0);
-            setSelectedIds([]);
-            setIsModalOpen(false);
-        };
-    }, []);
-
-    const handleSuccess = (newEvent) => {
-        console.log('New event added:', newEvent);
-        
-        // Refresh the EventsP component to show the new data
-        if (eventsPRef.current && eventsPRef.current.refresh) {
-            eventsPRef.current.refresh();
-        }
-    };
-
-    const handleEditSave = async (updatedEvent) => {
+    const [viewMode, setViewMode] = useState(() => {
         try {
-            const { eventsAPI } = await import('../utils/api');
-            
-            // Call API to update event
-            const response = await eventsAPI.updateEvent(updatedEvent.EventID, {
-                EventCode: updatedEvent.EventCode,
-                EventName: updatedEvent.EventName,
-                Description: updatedEvent.Description,
-                status: updatedEvent.status
-            });
-
-            if (response.success) {
-                console.log('Event updated successfully');
-                // Refresh the list
-                if (eventsPRef.current && eventsPRef.current.refresh) {
-                    eventsPRef.current.refresh();
-                }
-                // Close modal and reset selected event after successful save
-                await showAlert('Event updated successfully!');
-                return true; // Return success status
-            } else {
-                await showAlert(response.message || 'Failed to update event');
-                return false; // Return failure status
-            }
-        } catch (error) {
-            console.error('Error updating event:', error);
-            await showAlert('An error occurred while updating the event');
-            return false; // Return failure status
+            return localStorage.getItem('events_view_mode') || 'grid';
+        } catch {
+            return 'grid';
         }
-    };
+    });
 
-    const handleSearchChange = (term) => {
-        setSearchTerm(term);
-    };
-
-    const handleDeleteModeToggle = (mode) => {
-        setDeleteMode(mode);
-        if (!mode) {
-            setSelectedCount(0);
-            setSelectedIds([]);
-        }
-    };
-
-    // Memoize handleSelectionChange to prevent infinite loops
-    const handleSelectionChange = useCallback((count, ids) => {
-        setSelectedCount(count);
-        setSelectedIds(ids);
-    }, []);
-
-    const handleDeleteSelected = async () => {
-        if (selectedIds.length === 0 || !eventsPRef.current) return;
-        
-        // Confirm deletion
-        const confirmed = await showConfirm(`Are you sure you want to delete ${selectedIds.length} event(s)? This action cannot be undone.`);
-        if (!confirmed) return;
-        
+    const handleSetViewMode = (mode) => {
+        setViewMode(mode);
         try {
-            const result = await eventsPRef.current.deleteSelected(selectedIds);
-            if (result.success) {
-                // Reset selection state
-                setSelectedCount(0);
-                setSelectedIds([]);
-                setDeleteMode(false);
-                // Show success message
-                toast?.({
-                    title: 'Events Deleted',
-                    description: `Successfully deleted ${selectedIds.length} event(s)`,
-                    variant: 'success',
-                    duration: 3000,
-                });
-            } else {
-                // Show error message
-                toast?.({
-                    title: 'Delete Failed',
-                    description: result.message || 'Failed to delete events',
-                    variant: 'error',
-                    duration: 3000,
-                });
-            }
-        } catch (error) {
-            console.error('Error deleting events:', error);
-            toast?.({
-                title: 'Delete Error',
-                description: 'An error occurred while deleting events',
-                variant: 'error',
-                duration: 3000,
-            });
-        }
+            localStorage.setItem('events_view_mode', mode);
+        } catch {}
     };
 
     return (
-        <div className="px-4 sm:px-6 pb-6 pt-2 w-full">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-                <Header 
-                    pageTitle="Events" 
-                    onAddClick={() => setIsModalOpen(true)}
-                    onSearchChange={handleSearchChange}
-                    searchValue={searchTerm}
-                    onDeleteModeToggle={handleDeleteModeToggle}
-                    deleteMode={deleteMode}
-                    selectedCount={selectedCount}
-                    onDeleteSelected={handleDeleteSelected}
-                    hideSortButton={true}
-                    userRole={currentUser?.RoleID}
-                />
-                {isAdmin && (
-                    <button 
-                        onClick={() => setShowWizard(true)}
-                        className="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition text-sm shrink-0 self-start sm:self-auto"
-                        title="Quick setup with wizard"
-                    >
-                        <Wand2 size={18} /> Wizard
-                    </button>
-                )}
+        <div className="w-full flex-1 flex flex-col min-w-0 bg-slate-50/50 overflow-hidden">
+            {/* Top Header Card */}
+            <div className="px-4 sm:px-6 pt-4 pb-3.5 shrink-0 border-b border-slate-200/70 bg-white shadow-2xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white shadow-md shadow-emerald-500/20 shrink-0">
+                            <svg className="w-5 h-5 sm:w-5.5 sm:h-5.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">Accreditation Archives & Downloads</h1>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                                Download complete zipped evidence packages, master trees, and office folders by event.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Toolbar: Search & View Mode Switcher */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mt-3 pt-3 border-t border-slate-100">
+                    <div className="relative w-full sm:w-72 md:w-80">
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                        >
+                            <circle cx="11" cy="11" r="7" />
+                            <path d="m20 20-3.5-3.5" />
+                        </svg>
+                        <input
+                            type="text"
+                            placeholder="Search event packages, code..."
+                            className="h-9 w-full rounded-xl border border-slate-200/90 bg-slate-50/60 pl-9.5 pr-8 text-xs text-slate-800 placeholder-slate-400 shadow-2xs transition-all focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-slate-300"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                        {searchTerm && (
+                            <button
+                                type="button"
+                                onClick={() => setSearchTerm('')}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs p-0.5 rounded-md cursor-pointer flex items-center justify-center"
+                            >
+                                <X className="w-3.5 h-3.5" />
+                            </button>
+                        )}
+                    </div>
+
+                    {/* View Switcher: Segmented Toggle */}
+                    <ViewModeToggle viewMode={viewMode} onChange={handleSetViewMode} className="self-end sm:self-auto" />
+                </div>
             </div>
 
-            <UnifiedSetupWizard 
-                isOpen={showWizard} 
-                onClose={() => setShowWizard(false)}
-                onSuccess={handleSuccess}
-            />
-
-            <div className="relative z-10">
-                <EventsP 
-                    ref={eventsPRef} 
-                    searchTerm={searchTerm}
-                    deleteMode={deleteMode}
-                    onSelectionChange={handleSelectionChange}
-                />
+            {/* Content area */}
+            <div className="flex-1 min-h-0 px-4 sm:px-6 pt-3 pb-8 flex flex-col overflow-hidden">
+                <div className={`relative z-10 flex-1 min-h-0 ${viewMode === 'list' ? 'overflow-y-auto pr-1' : 'flex flex-col h-full'} overflow-x-auto`}>
+                    <div className={`${viewMode === 'list' ? 'flex flex-col gap-0 min-w-[720px]' : 'flex-1 min-h-0 h-full flex flex-col'}`}>
+                        <EventsP 
+                            ref={eventsPRef} 
+                            searchTerm={searchTerm} 
+                            deleteMode={false}
+                            viewMode={viewMode}
+                        />
+                    </div>
+                </div>
             </div>
-
-            {/* Add Modal */}
-            {isModalOpen && (
-                <AddEventModal 
-                    isOpen={isModalOpen} 
-                    onClose={() => setIsModalOpen(false)}
-                    onSuccess={handleSuccess}
-                />
-            )}
         </div>
     );
-};
+}

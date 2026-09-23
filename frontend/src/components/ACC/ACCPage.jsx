@@ -167,8 +167,14 @@ export default function ACCPage() {
       OfficeID: office.OfficeID ?? office.id,
       office_name: office.office_name ?? office.OfficeName,
       OfficeName: office.OfficeName ?? office.office_name,
-      event_id: office.event_id ?? office.EventID,
-      EventID: office.EventID ?? office.event_id,
+      event_id: office.event_id ?? office.EventID ?? selectedEventId,
+      EventID: office.EventID ?? office.event_id ?? selectedEventId,
+      event_code: office.event_code ?? office.EventCode ?? selectedEvent?.EventCode ?? selectedEvent?.EventName,
+      EventCode: office.EventCode ?? office.event_code ?? selectedEvent?.EventCode ?? selectedEvent?.EventName,
+      event_name: office.event_name ?? office.EventName ?? selectedEvent?.EventName,
+      EventName: office.EventName ?? office.event_name ?? selectedEvent?.EventName,
+      department_name: office.department_name ?? office.DepartmentName,
+      DepartmentName: office.DepartmentName ?? office.department_name,
     };
     setSelectedOffice(normalized);
     setIsInspectionOpen(true);
@@ -235,7 +241,7 @@ export default function ACCPage() {
   return (
     <div className="relative w-full h-[calc(100vh-3.5rem)] bg-slate-100 font-sans overflow-hidden flex">
       {/* Left Sub-Navigation Sidebar */}
-      <aside className="fixed top-14 bottom-0 left-[var(--sidebar-width)] w-60 bg-white border-r border-slate-200 shadow-xs z-20 flex flex-col justify-between p-4 transition-[left] duration-200">
+      <aside className="fixed top-14 bottom-0 left-0 lg:left-[var(--sidebar-width)] w-60 bg-white border-r border-slate-200 shadow-xs z-20 flex flex-col justify-between p-4 transition-[left] duration-200">
         <div className="space-y-4">
           {/* Header Title */}
           <div className="px-2 pt-1 pb-1 border-b border-slate-100">
@@ -301,7 +307,7 @@ export default function ACCPage() {
                 <LayoutGrid className="h-4 w-4" />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="truncate font-bold">Category Management</div>
+                <div className="truncate font-bold">Programs & Offices</div>
                 <div
                   className={`text-[10px] truncate ${
                     activeTab === 'categories' ? 'text-blue-100' : 'text-slate-400'

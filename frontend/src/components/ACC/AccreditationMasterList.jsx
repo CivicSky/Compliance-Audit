@@ -63,14 +63,14 @@ export default function AccreditationMasterList({
   const filteredOffices = useMemo(() => {
     let list = offices || [];
     if (activeOfficeTab === 'Programs') {
-      list = list.filter(o => 
-        o.entity_type_id === 1 || 
+      list = list.filter(o =>
+        o.entity_type_id === 1 ||
         String(o.category_name || o.TypeName || '').toLowerCase().includes('program') ||
         String(o.office_type_name || o.office_type || '').toLowerCase().includes('academic')
       );
     } else if (activeOfficeTab === 'Offices') {
-      list = list.filter(o => 
-        o.entity_type_id === 2 || 
+      list = list.filter(o =>
+        o.entity_type_id === 2 ||
         String(o.category_name || o.TypeName || '').toLowerCase().includes('office') ||
         String(o.office_type_name || o.office_type || '').toLowerCase().includes('non-academic')
       );
@@ -95,7 +95,7 @@ export default function AccreditationMasterList({
       const areaMatch = String(area.name || '').toLowerCase().includes(q) || String(area.code || '').toLowerCase().includes(q);
       const matchingCriteria = (area.criteria || []).filter(c => {
         const critMatch = String(c.name || '').toLowerCase().includes(q) || String(c.code || '').toLowerCase().includes(q);
-        const reqMatch = (c.requirements || []).some(r => 
+        const reqMatch = (c.requirements || []).some(r =>
           String(r.description || r.Description || '').toLowerCase().includes(q) ||
           String(r.code || r.RequirementCode || '').toLowerCase().includes(q)
         );
@@ -115,47 +115,47 @@ export default function AccreditationMasterList({
   return (
     <div className="flex flex-col h-full bg-slate-50 border border-slate-200 rounded-2xl shadow-sm overflow-hidden font-sans">
       {/* Header Bar */}
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-xs">
-        <div>
+      <div className="bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shadow-xs shrink-0">
+        <div className="min-w-0">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-black tracking-tight text-slate-900 uppercase">
+            <h1 className="text-xl font-bold tracking-tight text-slate-800 uppercase truncate">
               {event?.EventCode || event?.code || event?.EventName || event?.title || 'PAASCU-COPY'}
             </h1>
             {onOpenAssignToOffices && (
               <button
                 type="button"
                 onClick={onOpenAssignToOffices}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-bold border border-blue-200 hover:bg-blue-100 transition-colors shadow-2xs cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 text-[11px] font-bold border border-blue-200 hover:bg-blue-100 transition-colors shadow-2xs cursor-pointer"
               >
-                <SlidersHorizontal className="h-3.5 w-3.5" />
+                <SlidersHorizontal className="h-3 w-3" />
                 <span>ASSIGN TO OFFICES</span>
               </button>
             )}
           </div>
-          <p className="text-sm font-medium text-slate-500 mt-0.5">
+          <p className="text-[11px] font-medium text-slate-500 mt-0.5 truncate">
             {event?.Description || 'Philippine Accrediting Association of Schools, Colleges and Universities (Copy)'}
           </p>
-          <div className="flex items-center gap-2 mt-2">
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+          <div className="flex items-center gap-2 mt-1.5 text-[10px]">
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-50 text-slate-600 border border-slate-200">
               Created: {formatDateString(event?.CreatedAt || event?.created_at)}
             </span>
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-50 text-slate-600 border border-slate-200">
               Updated: {formatDateString(event?.UpdatedAt || event?.updated_at)}
             </span>
           </div>
         </div>
 
         {/* Top Actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 shrink-0">
           {/* Action Menu */}
           <div className="relative">
             <button
               type="button"
               onClick={() => setIsHeaderMenuOpen(!isHeaderMenuOpen)}
-              className="h-9 w-9 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 flex items-center justify-center transition-colors shadow-2xs"
+              className="h-8 w-8 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 flex items-center justify-center transition-colors shadow-2xs"
               title="Options"
             >
-              <MoreVertical className="h-4 w-4" />
+              <MoreVertical className="h-3.5 w-3.5" />
             </button>
 
             {isHeaderMenuOpen && (
@@ -450,7 +450,7 @@ export default function AccreditationMasterList({
           {/* Header & Tabs */}
           <div className="p-4 border-b border-slate-200 bg-white">
             <h3 className="text-sm font-bold text-slate-900 mb-3">Programs and Offices</h3>
-            
+
             {/* Search Input */}
             <div className="relative mb-3">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
@@ -470,11 +470,10 @@ export default function AccreditationMasterList({
                   key={tab}
                   type="button"
                   onClick={() => setActiveOfficeTab(tab)}
-                  className={`pb-1.5 transition-colors relative cursor-pointer ${
-                    activeOfficeTab === tab
+                  className={`pb-1.5 transition-colors relative cursor-pointer ${activeOfficeTab === tab
                       ? 'text-blue-600 font-bold'
                       : 'text-slate-500 hover:text-slate-800'
-                  }`}
+                    }`}
                 >
                   {tab}
                   {activeOfficeTab === tab && (
@@ -493,21 +492,20 @@ export default function AccreditationMasterList({
               </div>
             ) : (
               filteredOffices.map((office) => {
-                const isAcademic = office.entity_type_id === 1 || 
+                const isAcademic = office.entity_type_id === 1 ||
                   String(office.category_name || office.TypeName || office.office_type || '').toLowerCase().includes('academic') ||
                   String(office.category_name || office.TypeName || office.office_type || '').toLowerCase().includes('program');
-                
+
                 return (
                   <div
                     key={office.OfficeID || office.id}
                     onClick={() => onSelectOffice && onSelectOffice(office)}
-                    className="p-3.5 rounded-xl border border-slate-200 bg-white hover:border-blue-400 hover:shadow-md transition-all cursor-pointer group"
+                    className="p-3.5 rounded-xl border border-slate-200 bg-white app-card-hover cursor-pointer group"
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
-                        <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 border ${
-                          isAcademic ? 'bg-cyan-50 text-cyan-600 border-cyan-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'
-                        }`}>
+                        <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 border ${isAcademic ? 'bg-cyan-50 text-cyan-600 border-cyan-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                          }`}>
                           {isAcademic ? (
                             <GraduationCap className="h-5 w-5" />
                           ) : (
@@ -528,7 +526,8 @@ export default function AccreditationMasterList({
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); }}
-                        className="text-slate-400 hover:text-slate-600 p-1 rounded-md hover:bg-slate-100"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200/90 bg-white text-slate-400 hover:text-slate-700 hover:border-slate-300 shadow-2xs transition-all"
+                        aria-label="Options"
                       >
                         <MoreVertical className="h-3.5 w-3.5" />
                       </button>

@@ -756,6 +756,27 @@ const deleteRequirements = async (req, res) => {
       console.error('Failed to cleanup office_proof_documents before deleting requirements:', cleanupErr);
     }
 
+    // Capture requirement details before deletion for verbose logging
+    let deletedRequirements = [];
+    try {
+      const placeholders2 = requirementIds.map(() => '?').join(',');
+      const [reqRows] = await db.query(
+        `SELECT r.RequirementID, r.RequirementCode, r.Description, c.CriteriaCode, c.CriteriaName, e.EventName
+         FROM requirements r
+         LEFT JOIN criteria c ON r.CriteriaID = c.CriteriaID
+         LEFT JOIN Events e ON c.EventID = e.EventID
+         WHERE r.RequirementID IN (${placeholders2})`,
+        requirementIds
+      );
+      deletedRequirements = reqRows.map(r => ({
+        RequirementCode: r.RequirementCode,
+        Description: r.Description,
+        CriteriaCode: r.CriteriaCode,
+        CriteriaName: r.CriteriaName,
+        EventName: r.EventName,
+      }));
+    } catch (e) { console.warn('Could not fetch requirement details before deletion:', e.message); }
+
     // Delete requirements
     const placeholders = requirementIds.map(() => '?').join(',');
     const [result] = await db.query(
@@ -769,7 +790,7 @@ const deleteRequirements = async (req, res) => {
       deletedCount: result.affectedRows
     });
     if (req.user && req.user.userId) {
-      try { recordLog(req.user.userId, 'RequirementDeleted', { requirementIds }); } catch (e) {}
+      try { recordLog(req.user.userId, 'RequirementDeleted', { requirementIds, deletedRequirements, deletedCount: result.affectedRows }); } catch (e) {}
     }
   } catch (error) {
     console.error('Error deleting requirements:', error);
@@ -913,6 +934,7 @@ const getAssignedUsers = async (req, res) => {
   try {
     const { requirementId } = req.params;
     const { officeId } = req.query;
+    const numOfficeId = officeId ? Number(officeId) : null;
 
     let query = `
       SELECT 
@@ -922,7 +944,7 @@ const getAssignedUsers = async (req, res) => {
         rua.UserID,
         MIN(rua.AssignedAt) AS AssignedAt,
         MAX(rua.AssignedBy) AS AssignedBy,
-        bool_or(rua.HasUploaded) AS HasUploaded,
+        COALESCE(bool_or(rua.HasUploaded), false) AS HasUploaded,
         u.FirstName,
         u.MiddleInitial,
         u.LastName,
@@ -932,7 +954,7 @@ const getAssignedUsers = async (req, res) => {
         SELECT 
           AssignmentID, RequirementID, OfficeID, UserID, AssignedAt, AssignedBy, HasUploaded
         FROM requirement_user_assignments
-        WHERE RequirementID = ?
+        WHERE RequirementID = ? ${numOfficeId ? 'AND OfficeID = ?' : ''}
         UNION
         SELECT 
           NULL AS AssignmentID, 
@@ -943,14 +965,17 @@ const getAssignedUsers = async (req, res) => {
           NULL AS AssignedBy, 
           TRUE AS HasUploaded
         FROM office_proof_documents
-        WHERE requirement_id = ?
+        WHERE requirement_id = ? ${numOfficeId ? 'AND office_id = ?' : ''}
       ) rua
       JOIN users u ON rua.UserID = u.UserID
     `;
-    const params = [requirementId, requirementId];
-    if (officeId) {
+    const params = numOfficeId 
+      ? [requirementId, numOfficeId, requirementId, numOfficeId] 
+      : [requirementId, requirementId];
+
+    if (numOfficeId) {
       query += ' WHERE rua.OfficeID = ?';
-      params.push(officeId);
+      params.push(numOfficeId);
     }
     query += ' GROUP BY rua.UserID, rua.RequirementID, rua.OfficeID, u.FirstName, u.MiddleInitial, u.LastName, u.Email, u.ProfilePic';
     query += ' ORDER BY AssignedAt DESC';
@@ -959,7 +984,8 @@ const getAssignedUsers = async (req, res) => {
 
     res.json({
       success: true,
-      data: assignments
+      data: assignments,
+      users: assignments
     });
   } catch (error) {
     console.error('Error fetching assigned users:', error);

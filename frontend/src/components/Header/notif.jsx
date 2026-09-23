@@ -58,9 +58,11 @@ export default function Header() {
     };
     fetchUnread();
     window.addEventListener('notificationsUpdated', fetchUnread);
+    window.addEventListener('app:data-sync', fetchUnread);
     const interval = setInterval(fetchUnread, 15000); // poll every 15s
     return () => {
       window.removeEventListener('notificationsUpdated', fetchUnread);
+      window.removeEventListener('app:data-sync', fetchUnread);
       clearInterval(interval);
     };
   }, []);
@@ -127,14 +129,17 @@ export default function Header() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 15V11a6 6 0 10-12 0v4c0 .386-.146.735-.405 1.005L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
               </svg>
               {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] rounded-full px-1 py-0.5 min-w-[16px] text-center font-bold">
+                <span 
+                  className="absolute -top-1.5 -right-1.5 min-w-[19px] h-[19px] px-1 bg-rose-600 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-md select-none pointer-events-none transform transition-transform scale-100"
+                  style={{ lineHeight: 1 }}
+                >
                   {unreadCount > 99 ? '99+' : unreadCount}
                 </span>
               )}
             </button>
             {/* Notification Popup */}
             {showNotifications && (
-              <div className="absolute right-0 mt-2 w-[420px] max-h-[560px] bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden z-50">
+              <div className="absolute right-0 z-50 mt-2 flex w-[360px] sm:w-[390px] max-h-[min(540px,calc(100vh-5.5rem))] flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-2xl animate-fadeIn">
                 <NotificationPopup onClose={() => setShowNotifications(false)} />
               </div>
             )}

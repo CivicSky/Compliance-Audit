@@ -1,13 +1,13 @@
 export default function ModalHeader({ event, onClose, mainMode }) {
 	const subtitle =
 		mainMode === 'assign'
-			? 'Assign requirements from your event structure to one or more offices.'
-			: 'Create and organize areas, criteria, and requirements.';
+			? 'Assign evidence from your accreditation structure to one or more offices.'
+			: 'Create and organize areas, criteria, and evidence.';
 
 	return (
 		<header className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200/60 bg-white px-6 py-5">
 			<div className="min-w-0">
-				<h2 className="text-lg font-bold tracking-tight text-slate-900 leading-normal">Manage event structure</h2>
+				<h2 className="text-lg font-bold tracking-tight text-slate-900 leading-normal">Manage accreditation structure</h2>
 				<p className="mt-0.5 text-xs text-slate-500 leading-normal">{subtitle}</p>
 				{event && (
 					<div className="mt-1.5">

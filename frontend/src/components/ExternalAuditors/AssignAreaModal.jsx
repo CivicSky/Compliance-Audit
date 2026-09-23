@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { API_BASE_URL } from "../../utils/apiBase";
 import { useModal } from "../UI/ModalProvider";
+import CustomSelect from "../UI/CustomSelect";
 
 export default function AssignAreaModal({ show, auditor, onClose, onSaveSuccess }) {
     const [events, setEvents] = useState([]);
@@ -25,7 +26,7 @@ export default function AssignAreaModal({ show, auditor, onClose, onSaveSuccess 
                 const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
 
                 // 1. Fetch Events & filter only active ones
-                const eventsRes = await fetch('/api/events', { headers });
+                const eventsRes = await fetch(`${API_BASE_URL}/api/events`, { headers });
                 const eventsData = await eventsRes.json();
                 const fetchedEvents = Array.isArray(eventsData) ? eventsData : (eventsData.events || eventsData.data || []);
                 
@@ -36,7 +37,7 @@ export default function AssignAreaModal({ show, auditor, onClose, onSaveSuccess 
                 if (mounted) setEvents(activeEvents);
 
                 // 2. Fetch All Areas & filter active ones under active events
-                const areasRes = await fetch('/api/areas', { headers });
+                const areasRes = await fetch(`${API_BASE_URL}/api/areas`, { headers });
                 const areasData = await areasRes.json();
                 const fetchedAreas = Array.isArray(areasData) ? areasData : (areasData.data || []);
                 
@@ -49,12 +50,13 @@ export default function AssignAreaModal({ show, auditor, onClose, onSaveSuccess 
                 if (mounted) setAreas(activeAreas);
 
                 // 3. Fetch current auditor's assigned areas
-                if (auditor.UserID) {
-                    const assignRes = await fetch(`/api/areas/assignments/${auditor.UserID}`, { headers });
+                const targetUserId = auditor.UserID ?? auditor.id ?? auditor.user_id;
+                if (targetUserId) {
+                    const assignRes = await fetch(`${API_BASE_URL}/api/areas/assignments/${targetUserId}`, { headers });
                     if (assignRes.ok) {
                         const assignData = await assignRes.json();
                         const existingAssigned = assignData.assignments || [];
-                        const assignedIds = new Set(existingAssigned.map(a => Number(a.area_id)));
+                        const assignedIds = new Set(existingAssigned.map(a => Number(a.area_id ?? a.AreaID)));
                         if (mounted) setSelectedAreaIds(assignedIds);
                     }
                 }
@@ -114,14 +116,15 @@ export default function AssignAreaModal({ show, auditor, onClose, onSaveSuccess 
         setSaving(true);
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch('/api/areas/assign', {
+            const targetUserId = auditor.UserID ?? auditor.id ?? auditor.user_id;
+            const res = await fetch(`${API_BASE_URL}/api/areas/assign`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': token ? `Bearer ${token}` : ''
                 },
                 body: JSON.stringify({
-                    userId: auditor.UserID,
+                    userId: targetUserId,
                     areaIds: Array.from(selectedAreaIds)
                 })
             });
@@ -181,18 +184,18 @@ export default function AssignAreaModal({ show, auditor, onClose, onSaveSuccess 
                     {/* Event Filter */}
                     <div className="flex-1 min-w-[200px]">
                         <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block mb-1">Filter Event</label>
-                        <select
+                        <CustomSelect
                             value={selectedEventId}
-                            onChange={(e) => setSelectedEventId(e.target.value)}
-                            className="w-full h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-700 font-medium focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-xs"
-                        >
-                            <option value="all">All Accreditation Events ({events.length})</option>
-                            {events.map(ev => (
-                                <option key={ev.EventID} value={ev.EventID}>
-                                    {ev.EventCode ? `${ev.EventCode}: ` : ''}{ev.EventName}
-                                </option>
-                            ))}
-                        </select>
+                            onChange={(val) => setSelectedEventId(val)}
+                            options={[
+                                { value: "all", label: `All Accreditation Events (${events.length})` },
+                                ...events.map(ev => ({
+                                    value: String(ev.EventID),
+                                    label: `${ev.EventCode ? `${ev.EventCode}: ` : ''}${ev.EventName}`
+                                }))
+                            ]}
+                            size="sm"
+                        />
                     </div>
 
                     {/* Search Bar */}

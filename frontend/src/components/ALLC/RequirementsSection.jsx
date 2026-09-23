@@ -10,11 +10,11 @@ export default function RequirementsSection({
     onDeleteClick
 }) {
     if (isLoading) {
-        return <p className="text-gray-500 text-sm ml-4 my-2">Loading requirements...</p>;
+        return <p className="text-gray-500 text-sm ml-4 my-2">Loading evidence...</p>;
     }
 
     if (!requirements || requirements.length === 0) {
-        return <p className="text-gray-500 text-sm ml-4 my-2">No requirements</p>;
+        return <p className="text-gray-500 text-sm ml-4 my-2">No evidence</p>;
     }
 
     return (

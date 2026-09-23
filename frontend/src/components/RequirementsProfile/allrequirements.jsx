@@ -213,8 +213,8 @@ const RequirementsP = forwardRef(
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
               <h3 className="text-lg font-medium text-gray-900 mb-2">No Results Found</h3>
-              <p className="text-gray-600">No requirements match your search for "{searchTerm}".</p>
-              <p className="text-gray-500 text-sm mt-2">Try adjusting your search terms or browse all requirements.</p>
+              <p className="text-gray-600">No evidence matches your search for "{searchTerm}".</p>
+              <p className="text-gray-500 text-sm mt-2">Try adjusting your search terms or browse all evidence.</p>
             </div>
           </div>
         );
@@ -225,8 +225,8 @@ const RequirementsP = forwardRef(
               <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No Requirements Found</h3>
-              <p className="text-gray-600">No requirements available yet.</p>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No Evidence Found</h3>
+              <p className="text-gray-600">No evidence available yet.</p>
             </div>
           </div>
         );
@@ -239,7 +239,7 @@ const RequirementsP = forwardRef(
         {/* Search Results Counter */}
         {searchTerm.trim() && (
           <div className="text-sm text-gray-600 mb-4">
-            Showing {filteredRequirements.length} of {requirements.length} requirements
+            Showing {filteredRequirements.length} of {requirements.length} evidence items
             {filteredRequirements.length !== requirements.length && ` matching "${searchTerm}"`}
           </div>
         )}
@@ -290,15 +290,15 @@ const RequirementsP = forwardRef(
                       </div>
 
                       {/* Requirements */}
-                      <div className="ml-4 space-y-2">
+                      <div className="ml-4 space-y-2 pt-1 pb-1">
                         {criteriaData.requirements.map((requirement) => (
                           <div
                             key={requirement.RequirementID}
                             onClick={() => !deleteMode && onRequirementClick && onRequirementClick(requirement)}
                             className={`
-                              bg-white rounded-lg shadow-md border-l-4 border-indigo-200 transition-all duration-200
-                              ${deleteMode ? "hover:shadow-lg" : "hover:shadow-lg hover:border-indigo-400 cursor-pointer"}
-                              ${selectedRequirements.has(requirement.RequirementID) ? "ring-2 ring-blue-500 bg-blue-50" : ""}
+                              bg-white rounded-xl shadow-2xs border border-slate-200 border-l-4 border-l-cyan-500
+                              ${deleteMode ? "cursor-pointer hover:border-rose-300" : "app-card-hover cursor-pointer"}
+                              ${selectedRequirements.has(requirement.RequirementID) ? "ring-2 ring-rose-500 border-rose-500 bg-rose-50/25" : ""}
                             `}
                           >
                             <div className="flex items-center justify-between p-4">
@@ -311,7 +311,7 @@ const RequirementsP = forwardRef(
                                     onChange={(e) =>
                                       handleCheckboxChange(requirement.RequirementID, e.target.checked)
                                     }
-                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                    className="w-4 h-4 text-rose-600 border-rose-300 rounded focus:ring-rose-500"
                                     onClick={(e) => e.stopPropagation()}
                                   />
                                 )}

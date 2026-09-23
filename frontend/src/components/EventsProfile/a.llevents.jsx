@@ -1,7 +1,8 @@
-import React, { useState, useEffect, forwardRef, useImperativeHandle } from "react";
+import React, { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { eventsAPI } from "../../utils/api";
 import { useModal } from "../UI/ModalProvider";
 import { useToast } from "../UI/Toast";
+import ServerOfflineState from "../UI/ServerOfflineState";
 
 const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionChange, onEventClick }, ref) => {
     const [events, setEvents] = useState([]);
@@ -114,24 +115,34 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
         }
     };
 
-    const fetchEvents = async () => {
+    const [isRetrying, setIsRetrying] = useState(false);
+
+    const fetchEvents = useCallback(async (isRetry = false) => {
         try {
-            setLoading(true);
+            if (isRetry) setIsRetrying(true);
+            else setLoading(true);
             setError(null);
             const response = await eventsAPI.getAllEvents();
             
             if (response.success) {
-                setEvents(response.data);
+                setEvents(response.data || []);
+                setError(null);
             } else {
                 setError('Failed to fetch events');
             }
         } catch (error) {
             console.error('Error fetching events:', error);
-            setError('Error loading events. Please try again.');
+            setEvents([]);
+            if (!error.response || error.code === 'ERR_NETWORK' || error.message?.toLowerCase().includes('network error') || error.message?.toLowerCase().includes('failed to fetch')) {
+                setError('Server Offline');
+            } else {
+                setError(error.response?.data?.message || 'Failed to load events.');
+            }
         } finally {
             setLoading(false);
+            setIsRetrying(false);
         }
-    };
+    }, []);
 
     const refreshData = () => {
         fetchEvents();
@@ -163,22 +174,14 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
 
     if (error) {
         return (
-            <div className="w-full py-8">
-                <div className="flex flex-col items-center justify-center">
-                    <div className="w-10 h-10 bg-rose-100 rounded-full flex items-center justify-center mb-3">
-                        <svg className="w-5 h-5 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                    </div>
-                    <p className="text-rose-600 text-sm mb-3">{error}</p>
-                    <button 
-                        onClick={fetchEvents}
-                        className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 transition-colors"
-                    >
-                        Try Again
-                    </button>
-                </div>
-            </div>
+            <ServerOfflineState
+                onRetry={() => fetchEvents(true)}
+                isRetrying={isRetrying}
+                title={error === 'Server Offline' ? 'Backend Server Unavailable' : 'Unable to Load Events'}
+                message={error === 'Server Offline' 
+                    ? 'The backend server is unreachable or offline. If you stopped the backend server, please start it and click Retry Connection.' 
+                    : error}
+            />
         );
     }
 
@@ -217,16 +220,16 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
                 </div>
             )}
             
-            <div className="space-y-2">
+            <div className="space-y-2 pt-1 pb-1">
                 {filteredEvents.map((event) => (
                     <div 
                         key={event.EventID}
                         onClick={() => !deleteMode && onEventClick && onEventClick(event)}
                         className={`
-                            relative bg-white rounded-lg border transition-all duration-200
+                            relative bg-white rounded-lg border
                             ${deleteMode 
-                                ? 'border-gray-200 hover:border-gray-300' 
-                                : 'border-gray-100 hover:border-indigo-200 hover:shadow-sm cursor-pointer'
+                                ? 'border-slate-200' 
+                                : 'border-slate-200/80 app-card-hover cursor-pointer'
                             }
                             ${selectedEvents.has(event.EventID) 
                                 ? 'ring-2 ring-indigo-500 border-indigo-500 bg-indigo-50/30' 

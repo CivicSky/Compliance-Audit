@@ -72,6 +72,17 @@ const createNotifications = async ({
     }
   }
 
+  try {
+    const { emitDataChange } = require('../socket');
+    emitDataChange('notifications', {
+      userIds: recipients,
+      title: String(title).trim(),
+      type: normalizedType,
+    });
+  } catch (socketErr) {
+    // Non-fatal if socket not ready
+  }
+
   return { inserted: recipients.length, skipped: 0 };
 };
 

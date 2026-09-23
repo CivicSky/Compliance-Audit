@@ -9,6 +9,14 @@ const dbUrl = (rawUrl && rawUrl.startsWith('postgres'))
 const sql = postgres(dbUrl, {
   ssl: {
     rejectUnauthorized: false
+  },
+  types: {
+    date: {
+      to: 1114,
+      from: [1114],
+      serialize: (x) => x,
+      parse: (x) => (x ? new Date(x.replace(' ', 'T') + 'Z') : null)
+    }
   }
 });
 

@@ -149,11 +149,91 @@ const copyEvent = async (req, res) => {
   }
 };
 
-// Get all events
+// Get all events (with role-based scoping for Personnel and Auditors)
 const getAllEvents = async (req, res) => {
   try {
-    const [events] = await db.query('SELECT * FROM Events ORDER BY CreatedAt DESC');
-    res.json({
+    const userId = Number(req.user?.userId);
+    let roleId = Number(req.user?.roleId);
+
+    // If roleId not present on req.user, look up user's role from DB
+    if (!roleId && userId) {
+      const [[userRow]] = await db.query('SELECT RoleID FROM users WHERE UserID = ?', [userId]);
+      if (userRow) roleId = Number(userRow.RoleID);
+    }
+
+    const isAdmin = roleId === 1;
+
+    // Admins see all events
+    if (isAdmin || !userId) {
+      const [events] = await db.query('SELECT * FROM Events ORDER BY CreatedAt DESC');
+      return res.json({
+        success: true,
+        data: events
+      });
+    }
+
+    // Auditor: only see events where they have area assignments
+    if (roleId === 4) {
+      const [events] = await db.query(
+        `SELECT DISTINCT e.*
+         FROM Events e
+         JOIN areas ar ON ar.EventID = e.EventID
+         JOIN auditor_area_assignments aaa ON aaa.area_id = ar.AreaID
+         WHERE aaa.auditor_user_id = ?
+         ORDER BY e.CreatedAt DESC`,
+        [userId]
+      );
+      return res.json({
+        success: true,
+        data: events
+      });
+    }
+
+    // Personnel / Office Head / Officer (RoleID 2, 3, etc.):
+    // Only see events where the user is managing an office/program or assigned requirements under that specific accreditation
+    const [events] = await db.query(
+      `SELECT DISTINCT e.*
+       FROM Events e
+       WHERE e.EventID IN (
+         -- 1. Direct office assignment via office_head_assignments (joined with headofoffice)
+         SELECT o.EventID
+         FROM office_head_assignments oha
+         JOIN headofoffice h ON oha.HeadID = h.HeadID
+         JOIN offices o ON oha.OfficeID = o.OfficeID
+         WHERE h.UserID = ? AND o.EventID IS NOT NULL
+
+         UNION
+
+         -- 2. Direct requirement assignments to user on an office under the event
+         SELECT o.EventID
+         FROM requirement_user_assignments rua
+         JOIN offices o ON rua.OfficeID = o.OfficeID
+         WHERE rua.UserID = ? AND o.EventID IS NOT NULL
+
+         UNION
+
+         -- 3. Direct requirement assignments linked to criteria under the event
+         SELECT c.EventID
+         FROM requirement_user_assignments rua
+         JOIN requirements r ON rua.RequirementID = r.RequirementID
+         JOIN criteria c ON r.CriteriaID = c.CriteriaID
+         WHERE rua.UserID = ? AND c.EventID IS NOT NULL
+
+         UNION
+
+         -- 4. Direct requirement assignments linked to criteria -> area under the event
+         SELECT a.EventID
+         FROM requirement_user_assignments rua
+         JOIN requirements r ON rua.RequirementID = r.RequirementID
+         JOIN criteria c ON r.CriteriaID = c.CriteriaID
+         JOIN areas a ON c.AreaID = a.AreaID
+         WHERE rua.UserID = ? AND a.EventID IS NOT NULL
+       )
+       ORDER BY e.CreatedAt DESC`,
+      [userId, userId, userId, userId]
+    );
+
+    return res.json({
       success: true,
       data: events
     });
@@ -385,7 +465,12 @@ const updateEvent = async (req, res) => {
 
     console.log('Event updated successfully for id:', id);
     if (req.user && req.user.userId) {
-      try { recordLog(req.user.userId, 'EventUpdated', { EventID: id, EventName, EventCode }); } catch (e) {}
+      try {
+        const changes = {};
+        if (existingEventName && existingEventName !== EventName) changes.EventName = { from: existingEventName, to: EventName };
+        if (existingEventCode && existingEventCode !== EventCode) changes.EventCode = { from: existingEventCode, to: EventCode };
+        recordLog(req.user.userId, 'EventUpdated', { EventID: id, EventName, EventCode, changes });
+      } catch (e) {}
     }
     // If the event name changed, attempt to rename its uploads folder to match new sanitized name
     try {
@@ -448,22 +533,35 @@ const updateEvent = async (req, res) => {
 // Get list of downloadable event folders (DB-driven — works with Supabase storage)
 const getDownloadableFolders = async (req, res) => {
   try {
-    // Return events that have at least one uploaded file in the DB
+    // Return events that have at least one approved uploaded file in the DB
     const [rows] = await db.query(`
       SELECT DISTINCT e.EventID, e.EventName, e.EventCode
       FROM events e
       WHERE EXISTS (
         SELECT 1 FROM office_proof_documents opd
         JOIN offices o ON o.OfficeID = opd.office_id
-        WHERE o.EventID = e.EventID AND opd.file_path IS NOT NULL AND opd.file_path != ''
+        WHERE o.EventID = e.EventID 
+          AND opd.file_path IS NOT NULL 
+          AND opd.file_path != ''
+          AND LOWER(COALESCE(opd.review_status, '')) = 'approved'
       )
       ORDER BY e.EventName ASC
     `);
 
-    // Return both folder name (sanitized EventCode) and the original EventName/Code for display
-    const folders = rows.map(r => sanitizeFolderName(r.EventCode || r.EventName));
+    const folders = [];
+    rows.forEach(r => {
+      if (r.EventID) folders.push(String(r.EventID));
+      if (r.EventCode) {
+        folders.push(r.EventCode);
+        folders.push(sanitizeFolderName(r.EventCode));
+      }
+      if (r.EventName) {
+        folders.push(r.EventName);
+        folders.push(sanitizeFolderName(r.EventName));
+      }
+    });
 
-    res.json({ success: true, folders });
+    res.json({ success: true, folders, eventIds: rows.map(r => r.EventID) });
   } catch (error) {
     console.error('Error fetching downloadable folders:', error);
     res.status(500).json({ success: false, message: 'Error fetching downloadable folders' });
@@ -480,24 +578,34 @@ const downloadEventZip = async (req, res) => {
 
     const sanitizedName = sanitizeFolderName(eventName);
 
-    // Look up the event from DB by sanitized EventCode or EventName
-    const [eventRows] = await db.query(
-      `SELECT EventID, EventName, EventCode FROM events WHERE ? IN (EventCode, EventName) OR ? = REGEXP_REPLACE(COALESCE(EventCode, EventName), '[^A-Za-z0-9.-]+', '_') LIMIT 1`,
-      [eventName, sanitizedName]
-    );
-
-    // Fallback: match by sanitized form
-    let event = eventRows[0];
+    // Look up the event from DB by ID, EventCode, EventName, or sanitized name
+    let event = null;
+    if (!isNaN(Number(eventName)) && Number(eventName) > 0) {
+      const [byId] = await db.query('SELECT EventID, EventName, EventCode FROM events WHERE EventID = ? LIMIT 1', [Number(eventName)]);
+      if (byId && byId.length > 0) event = byId[0];
+    }
+    if (!event) {
+      const [eventRows] = await db.query(
+        `SELECT EventID, EventName, EventCode FROM events WHERE EventCode = ? OR EventName = ? LIMIT 1`,
+        [eventName, eventName]
+      );
+      if (eventRows && eventRows.length > 0) event = eventRows[0];
+    }
     if (!event) {
       const [allEvents] = await db.query('SELECT EventID, EventName, EventCode FROM events');
-      event = allEvents.find(e => sanitizeFolderName(e.EventCode || e.EventName) === sanitizedName);
+      event = allEvents.find(e => 
+        sanitizeFolderName(e.EventCode || e.EventName) === sanitizedName ||
+        sanitizeFolderName(e.EventName) === sanitizedName ||
+        sanitizeFolderName(e.EventCode) === sanitizedName ||
+        String(e.EventID) === String(eventName)
+      );
     }
 
     if (!event) {
       return res.status(404).json({ success: false, message: 'Event not found' });
     }
 
-    // Fetch all uploaded evidence files for this event, with office name for folder structure
+    // Fetch all APPROVED uploaded evidence files for this event, with office name for folder structure
     const [files] = await db.query(`
       SELECT
         opd.id,
@@ -514,14 +622,16 @@ const downloadEventZip = async (req, res) => {
       WHERE o.EventID = ?
         AND opd.file_path IS NOT NULL
         AND opd.file_path != ''
+        AND LOWER(COALESCE(opd.review_status, '')) = 'approved'
       ORDER BY o.OfficeName, opd.requirement_id, opd.uploaded_at
     `, [event.EventID]);
 
     if (!files.length) {
-      return res.status(404).json({ success: false, message: 'No files found for this event' });
+      return res.status(404).json({ success: false, message: 'No approved evidence files found for this event' });
     }
 
-    const zipFileName = `${sanitizedName}.zip`;
+    const zipDisplayName = sanitizeFolderName(event.EventCode || event.EventName || sanitizedName);
+    const zipFileName = `${zipDisplayName}.zip`;
     res.attachment(zipFileName);
     res.contentType('application/zip');
 
@@ -536,33 +646,24 @@ const downloadEventZip = async (req, res) => {
 
     archive.pipe(res);
 
-    const https = require('https');
-    const http = require('http');
-    const { Readable } = require('stream');
-
-    // Helper: fetch a remote URL and return a readable stream
-    const fetchRemoteStream = (url) => new Promise((resolve, reject) => {
-      const client = url.startsWith('https') ? https : http;
-      client.get(url, (response) => {
-        if (response.statusCode >= 200 && response.statusCode < 300) {
-          resolve(response);
-        } else {
-          reject(new Error(`HTTP ${response.statusCode} for ${url}`));
-        }
-      }).on('error', reject);
-    });
+    const axios = require('axios');
 
     // Safe folder/file name helper
     const safeName = (s) => String(s || 'Unknown').replace(/[/\\:*?"<>|]/g, '_').trim();
 
     // Accreditation folder = sanitized event code/name
-    const accreditationFolder = safeName(sanitizedName);
+    const accreditationFolder = safeName(zipDisplayName);
 
     for (const file of files) {
       // Office folder
-      const officeFolder = safeName(file.OfficeName);
+      const officeFolder = safeName(file.OfficeName || 'Office');
       // Evidence file name — prefer display_name, fallback to file_name
-      const evidenceFileName = safeName(file.display_name || file.file_name);
+      let rawFileName = file.display_name || file.file_name || 'evidence';
+      const ext = path.extname(file.file_name || file.file_path || '') || '';
+      if (ext && !rawFileName.toLowerCase().endsWith(ext.toLowerCase())) {
+        rawFileName = `${rawFileName}${ext}`;
+      }
+      const evidenceFileName = safeName(rawFileName);
       // Zip path: accreditation / office / evidence_file
       const zipPath = `${accreditationFolder}/${officeFolder}/${evidenceFileName}`;
 
@@ -570,14 +671,12 @@ const downloadEventZip = async (req, res) => {
 
       try {
         if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
-          // Supabase or remote URL — stream directly into zip
-          const stream = await fetchRemoteStream(filePath);
-          archive.append(stream, { name: zipPath });
-          // Wait for this entry to finish before processing next (avoids overwhelming archiver)
-          await new Promise((resolve, reject) => {
-            stream.on('end', resolve);
-            stream.on('error', reject);
+          // Fetch remote file buffer (handles 301/302 redirects automatically)
+          const resp = await axios.get(filePath, { 
+            responseType: 'arraybuffer', 
+            timeout: 30000 
           });
+          archive.append(Buffer.from(resp.data), { name: zipPath });
         } else {
           // Local file path
           const absPath = path.join(__dirname, '..', filePath.replace(/^\//, ''));
@@ -589,7 +688,6 @@ const downloadEventZip = async (req, res) => {
         }
       } catch (fileErr) {
         console.warn(`Skipping file ${file.file_name}:`, fileErr.message);
-        // Continue with other files even if one fails
       }
     }
 

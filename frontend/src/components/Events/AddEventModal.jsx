@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
+import { X, Loader2 } from 'lucide-react';
 import { useModal } from "../UI/ModalProvider";
+import CustomSelect from "../UI/CustomSelect";
 
 export default function AddEventModal({ isOpen, onClose, onSuccess }) {
     const [formData, setFormData] = useState({
         EventCode: '',
         EventName: '',
-        Description: ''
+        accreditation_level: 'N/A'
     });
 
     const [errors, setErrors] = useState({});
@@ -31,10 +33,10 @@ export default function AddEventModal({ isOpen, onClose, onSuccess }) {
         const newErrors = {};
         
         if (!formData.EventCode.trim()) {
-            newErrors.EventCode = 'Event code is required';
+            newErrors.EventCode = 'Accreditation code is required';
         }
         if (!formData.EventName.trim()) {
-            newErrors.EventName = 'Event name is required';
+            newErrors.EventName = 'Accreditation name is required';
         }
 
         setErrors(newErrors);
@@ -54,22 +56,21 @@ export default function AddEventModal({ isOpen, onClose, onSuccess }) {
             // Import eventsAPI
             const { eventsAPI } = await import('../../utils/api');
             
-            // Add event to database
+            // Add accreditation to database
             const response = await eventsAPI.addEvent({
                 EventCode: formData.EventCode,
                 EventName: formData.EventName,
-                Description: formData.Description || null,
+                Description: null,
                 accreditation_level: formData.accreditation_level || 'N/A'
             });
 
             if (response.success) {
-                console.log('Event added successfully:', response.data);
+                console.log('Accreditation added successfully:', response.data);
                 
                 // Reset form and close modal
                 setFormData({
                     EventCode: '',
                     EventName: '',
-                    Description: '',
                     accreditation_level: 'N/A'
                 });
                 
@@ -79,14 +80,14 @@ export default function AddEventModal({ isOpen, onClose, onSuccess }) {
                 }
                 
                 onClose();
-                await showAlert('Event added successfully!');
+                await showAlert('Accreditation added successfully!');
             } else {
-                await showAlert(response.message || 'Failed to add event');
+                await showAlert(response.message || 'Failed to add accreditation');
             }
             
         } catch (error) {
             console.error('Error submitting form:', error);
-            await showAlert('An error occurred while adding the event. Please try again.');
+            await showAlert('An error occurred while adding the accreditation. Please try again.');
         } finally {
             setIsSubmitting(false);
         }
@@ -98,7 +99,7 @@ export default function AddEventModal({ isOpen, onClose, onSuccess }) {
             setFormData({
                 EventCode: '',
                 EventName: '',
-                Description: ''
+                accreditation_level: 'N/A'
             });
             setErrors({});
             onClose();
@@ -108,28 +109,30 @@ export default function AddEventModal({ isOpen, onClose, onSuccess }) {
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out bg-black bg-opacity-50 flex items-center justify-center z-[50]">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4">
+        <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-[50] p-4">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-lg overflow-hidden flex flex-col">
                 {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b">
-                    <h2 className="text-xl font-semibold text-gray-800">Add New Event</h2>
+                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-white">
+                    <div>
+                        <h2 className="text-base font-bold text-slate-900">Add New Accreditation</h2>
+                        <p className="text-xs text-slate-500 mt-0.5">Register a new accreditation cycle</p>
+                    </div>
                     <button
+                        type="button"
                         onClick={handleClose}
                         disabled={isSubmitting}
-                        className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 hover:bg-slate-100 hover:text-slate-700 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
                     >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
+                        <X className="h-4 w-4" />
                     </button>
                 </div>
 
                 {/* Form */}
-                <form onSubmit={handleSubmit} className="p-6">
-                    {/* Event Code */}
-                    <div className="mb-6">
-                        <label htmlFor="EventCode" className="block text-sm font-medium text-gray-700 mb-2">
-                            Event Code *
+                <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                    {/* Accreditation Code */}
+                    <div>
+                        <label htmlFor="EventCode" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                            Accreditation Code *
                         </label>
                         <input
                             type="text"
@@ -137,21 +140,21 @@ export default function AddEventModal({ isOpen, onClose, onSuccess }) {
                             name="EventCode"
                             value={formData.EventCode}
                             onChange={handleInputChange}
-                            className={`w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                                errors.EventCode ? 'border-red-500' : 'border-gray-300'
+                            className={`w-full px-3 py-2 text-xs border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ${
+                                errors.EventCode ? 'border-red-400' : 'border-slate-200'
                             }`}
-                            placeholder="e.g., PPSG, PPJSD, SDE"
+                            placeholder="e.g., PAASCU, PACUCOA, CHED RQAT"
                             disabled={isSubmitting}
                         />
                         {errors.EventCode && (
-                            <p className="text-red-500 text-sm mt-1">{errors.EventCode}</p>
+                            <p className="text-red-500 text-[11px] mt-1">{errors.EventCode}</p>
                         )}
                     </div>
 
-                    {/* Event Name */}
-                    <div className="mb-6">
-                        <label htmlFor="EventName" className="block text-sm font-medium text-gray-700 mb-2">
-                            Event Name *
+                    {/* Accreditation Name */}
+                    <div>
+                        <label htmlFor="EventName" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                            Accreditation Name *
                         </label>
                         <input
                             type="text"
@@ -159,77 +162,56 @@ export default function AddEventModal({ isOpen, onClose, onSuccess }) {
                             name="EventName"
                             value={formData.EventName}
                             onChange={handleInputChange}
-                            className={`w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                                errors.EventName ? 'border-red-500' : 'border-gray-300'
+                            className={`w-full px-3 py-2 text-xs border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ${
+                                errors.EventName ? 'border-red-400' : 'border-slate-200'
                             }`}
-                            placeholder="e.g., PPSG Event, Financial Reporting"
+                            placeholder="e.g., Philippine Accrediting Association of Schools, Colleges and Universities"
                             disabled={isSubmitting}
                         />
                         {errors.EventName && (
-                            <p className="text-red-500 text-sm mt-1">{errors.EventName}</p>
+                            <p className="text-red-500 text-[11px] mt-1">{errors.EventName}</p>
                         )}
                     </div>
 
                     {/* Accreditation Level */}
-                    <div className="mb-6">
-                        <label htmlFor="accreditation_level" className="block text-sm font-medium text-gray-700 mb-2">
+                    <div>
+                        <label htmlFor="accreditation_level" className="block text-xs font-semibold text-slate-700 mb-1.5">
                             Accreditation Level
                         </label>
-                        <select
-                            id="accreditation_level"
-                            name="accreditation_level"
+                        <CustomSelect
+                            size="md"
                             value={formData.accreditation_level || 'N/A'}
-                            onChange={handleInputChange}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                            onChange={(val) => setFormData(prev => ({ ...prev, accreditation_level: val }))}
                             disabled={isSubmitting}
-                        >
-                            <option value="Level I">Level I</option>
-                            <option value="Level II">Level II</option>
-                            <option value="Level III">Level III</option>
-                            <option value="Level IV">Level IV</option>
-                            <option value="N/A">N/A</option>
-                        </select>
-                    </div>
-
-                    {/* Description */}
-                    <div className="mb-6">
-                        <label htmlFor="Description" className="block text-sm font-medium text-gray-700 mb-2">
-                            Description
-                        </label>
-                        <textarea
-                            id="Description"
-                            name="Description"
-                            value={formData.Description}
-                            onChange={handleInputChange}
-                            rows="4"
-                            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                            placeholder="Enter a detailed description of this event (optional)"
-                            disabled={isSubmitting}
+                            options={[
+                                { value: 'Level I', label: 'Level I' },
+                                { value: 'Level II', label: 'Level II' },
+                                { value: 'Level III', label: 'Level III' },
+                                { value: 'Level IV', label: 'Level IV' },
+                                { value: 'N/A', label: 'N/A' },
+                            ]}
                         />
                     </div>
 
                     {/* Form Actions */}
-                    <div className="flex justify-end space-x-3 pt-4 border-t">
+                    <div className="flex justify-end gap-2.5 pt-4 border-t border-slate-200">
                         <button
                             type="button"
                             onClick={handleClose}
                             disabled={isSubmitting}
-                            className="px-4 py-2 text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors disabled:opacity-50"
+                            className="inline-flex h-9 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
                             disabled={isSubmitting}
-                            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-4 text-xs font-semibold text-white shadow-2xs hover:bg-blue-700 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                         >
                             {isSubmitting && (
-                                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"></circle>
-                                    <path fill="currentColor" className="opacity-75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
                             )}
-                            {isSubmitting ? 'Adding...' : 'Add Event'}
+                            {isSubmitting ? 'Adding...' : 'Add Accreditation'}
                         </button>
                     </div>
                 </form>

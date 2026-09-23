@@ -162,12 +162,18 @@ class NotificationController {
             `, [userId]);
             
             const c = counts && counts[0] ? counts[0] : { total: 0, unread: 0, read: 0 };
+            const unreadNum = Number(c.unread || 0);
+            const totalNum = Number(c.total || 0);
+            const readNum = Number(c.read || 0);
             res.json({
                 success: true,
+                unread: unreadNum,
+                total: totalNum,
+                read: readNum,
                 data: {
-                    total: Number(c.total || 0),
-                    unread: Number(c.unread || 0),
-                    read: Number(c.read || 0)
+                    total: totalNum,
+                    unread: unreadNum,
+                    read: readNum
                 }
             });
         } catch (error) {

@@ -40,23 +40,24 @@ export default function RowActionMenu({
 
     const position = useMemo(() => {
         if (!anchorRect) return null;
-        const menuWidth = 220;
+        const zoom = (typeof document !== 'undefined' && parseFloat(getComputedStyle(document.body).zoom)) || 1;
+        const menuWidth = 192; // w-48
         const menuHeight = Math.max(44, (menuItems.length * 40) + 8);
         const padding = 8;
 
-        const desiredLeft = anchorRect.right - menuWidth;
+        const desiredLeft = (anchorRect.right / zoom) - menuWidth;
         const left = Math.min(
             Math.max(padding, desiredLeft),
-            Math.max(padding, window.innerWidth - menuWidth - padding)
+            Math.max(padding, (window.innerWidth / zoom) - menuWidth - padding)
         );
-        const desiredTop = anchorRect.bottom + 8;
+        const desiredTop = (anchorRect.bottom / zoom) + 4;
         const top = Math.min(
             Math.max(padding, desiredTop),
-            Math.max(padding, window.innerHeight - menuHeight - padding)
+            Math.max(padding, (window.innerHeight / zoom) - menuHeight - padding)
         );
 
         return { left, top };
-    }, [anchorRect]);
+    }, [anchorRect, menuItems.length]);
 
     const close = () => setOpen(false);
 
@@ -149,10 +150,12 @@ export default function RowActionMenu({
                 }}
                 aria-label="Actions"
                 title="Actions"
-                className={buttonClassName || 'office-card-actions-button inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-100'}
+                className={buttonClassName || 'office-card-actions-button inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200/80 bg-white text-slate-500 transition-all hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 shadow-2xs'}
             >
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.25} d="M12 6h.01M12 12h.01M12 18h.01" />
+                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="12" cy="5" r="2" />
+                    <circle cx="12" cy="12" r="2" />
+                    <circle cx="12" cy="19" r="2" />
                 </svg>
             </button>
             {menu ? createPortal(menu, document.body) : null}

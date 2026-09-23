@@ -129,6 +129,8 @@ const OfficesController = {
           o.master_list_id,
           o.OfficeTypeID,
           o.EventID,
+          o.event_department_id,
+          ed.accreditation_level,
           m.entity_type_id,
           m.department_id,
           COALESCE(o.created_at, m.created_at) AS created_at,
@@ -140,6 +142,7 @@ const OfficesController = {
             ELSE 'Unknown'
           END AS category_name,
           e.EventName,
+          e.EventCode,
           ot.TypeName,
           os.OverallStatus,
           os.CompliancePercent,
@@ -150,6 +153,7 @@ const OfficesController = {
         FROM offices o
         LEFT JOIN master_list m ON o.master_list_id = m.id
         LEFT JOIN departments d ON m.department_id = d.id
+        LEFT JOIN event_departments ed ON o.event_department_id = ed.id
         LEFT JOIN Events e ON o.EventID = e.EventID
         LEFT JOIN officetypes ot ON o.OfficeTypeID = ot.OfficeTypeID
         LEFT JOIN (
@@ -282,6 +286,8 @@ const OfficesController = {
           office_type_name: r.TypeName || "Unknown Type",
           department_id: r.department_id || null,
           department_name: r.department_name || null,
+          event_department_id: r.event_department_id || null,
+          accreditation_level: r.accreditation_level || null,
           entity_type_id: r.entity_type_id || null,
           category_name: r.category_name || null,
           head_id: primaryHead?.HeadID || null,
@@ -298,6 +304,8 @@ const OfficesController = {
           event_id: r.EventID,
           event_name: r.EventName || null,
           EventName: r.EventName || null,
+          event_code: r.EventCode || r.EventName || null,
+          EventCode: r.EventCode || r.EventName || null,
           overall_status: r.OverallStatus || 'Not Complied',
           compliance_percent: r.CompliancePercent || 0,
           total_requirements: r.TotalRequirements || 0,
@@ -468,9 +476,10 @@ const OfficesController = {
 
     let nameToSave = OfficeName;
     let typeIdToSave = OfficeTypeID;
+    let eventDeptId = req.body.event_department_id ? Number(req.body.event_department_id) : null;
 
     if (master_list_id) {
-      const [mlRows] = await db.query('SELECT entity_type_id, entity_name FROM master_list WHERE id = ?', [master_list_id]);
+      const [mlRows] = await db.query('SELECT entity_type_id, entity_name, department_id FROM master_list WHERE id = ?', [master_list_id]);
       if (mlRows.length > 0) {
         nameToSave = mlRows[0].entity_name;
         if (!typeIdToSave) {
@@ -481,20 +490,44 @@ const OfficesController = {
           );
           typeIdToSave = typeRows[0]?.OfficeTypeID || (isAcademic ? 2 : 1);
         }
+
+        // Link academic program to event_departments
+        if (mlRows[0].entity_type_id === 1 && mlRows[0].department_id && EventID) {
+          if (!eventDeptId) {
+            const reqLevel = req.body.accreditation_level || 'Level I';
+            const [existingEd] = await db.query(
+              'SELECT id FROM event_departments WHERE event_id = ? AND department_id = ? LIMIT 1',
+              [EventID, mlRows[0].department_id]
+            );
+            if (existingEd.length > 0) {
+              eventDeptId = existingEd[0].id;
+              if (req.body.accreditation_level) {
+                await db.query('UPDATE event_departments SET accreditation_level = ? WHERE id = ?', [req.body.accreditation_level, eventDeptId]);
+              }
+            } else {
+              const [newEd] = await db.query(
+                'INSERT INTO event_departments (event_id, department_id, accreditation_level) VALUES (?, ?, ?) RETURNING id',
+                [EventID, mlRows[0].department_id, reqLevel]
+              );
+              eventDeptId = newEd[0]?.id || newEd.insertId;
+            }
+          }
+        }
       }
     }
 
-    console.log('Received create office request:', { master_list_id, OfficeName: nameToSave, OfficeTypeID: typeIdToSave, headIdArray, EventID });
+    console.log('Received create office request:', { master_list_id, OfficeName: nameToSave, OfficeTypeID: typeIdToSave, headIdArray, EventID, eventDeptId });
 
     try {
       const [result] = await db.query(
-        `INSERT INTO offices (OfficeName, master_list_id, OfficeTypeID, EventID)
-         VALUES (?, ?, ?, ?)`,
+        `INSERT INTO offices (OfficeName, master_list_id, OfficeTypeID, EventID, event_department_id)
+         VALUES (?, ?, ?, ?, ?)`,
         [
           nameToSave || '',
           master_list_id ? Number(master_list_id) : null,
           typeIdToSave || null,
-          EventID || null
+          EventID || null,
+          eventDeptId || null
         ]
       );
 

@@ -1,4 +1,5 @@
-﻿import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
+import CustomSelect from "../UI/CustomSelect";
 
 export default function EditMasterListModal({ isOpen, onClose, onSubmit, item, departments = [] }) {
   const [name, setName] = useState("");
@@ -37,15 +38,21 @@ export default function EditMasterListModal({ isOpen, onClose, onSubmit, item, d
   };
 
   return (
-    <div className="fixed inset-0 z-[50] flex items-center justify-center bg-black/50 px-4">
-      <div className="mx-4 w-full max-w-md overflow-hidden rounded-xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs px-4">
+      <div className="mx-4 w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl border border-slate-200">
+        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
           <div>
-            <h2 className="text-xl font-semibold text-gray-800">Edit Master List Item</h2>
-            <p className="mt-1 text-sm text-gray-500">Update the name, type, or department of this entry.</p>
+            <h2 className="text-lg font-bold tracking-tight text-slate-800">Edit Master List Item</h2>
+            <p className="mt-0.5 text-xs text-slate-500">Update the name, type, or department of this entry.</p>
           </div>
-          <button type="button" onClick={onClose} disabled={loading} className="text-gray-400 transition hover:text-gray-600 disabled:opacity-50">
-            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 active:scale-95 cursor-pointer disabled:opacity-50"
+            aria-label="Close"
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -53,61 +60,67 @@ export default function EditMasterListModal({ isOpen, onClose, onSubmit, item, d
 
         <form onSubmit={handleSubmit} className="space-y-4 px-6 py-5">
           <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">Name *</label>
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-600">Name *</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="h-10 w-full rounded-md border border-gray-300 bg-white px-4 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="h-10 w-full rounded-xl border border-slate-200/90 bg-slate-50/50 px-3.5 text-xs sm:text-sm text-slate-800 placeholder-slate-400 shadow-2xs transition-all focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-slate-300"
               placeholder="e.g. BSIT"
               required
             />
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">Type *</label>
-            <div className="relative">
-              <select
-                value={type}
-                onChange={(e) => { setType(e.target.value); if (e.target.value !== "Academic Program") setDepartmentId(""); }}
-                className="h-10 w-full appearance-none rounded-md border border-gray-300 bg-white px-4 pr-10 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="Academic Program">Academic Program</option>
-                <option value="Non-Academic Office">Non-Academic Office</option>
-              </select>
-              <svg xmlns="http://www.w3.org/2000/svg" className="pointer-events-none absolute right-3 top-1/2 h-2.5 w-2.5 -translate-y-1/2 text-slate-500" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
-              </svg>
-            </div>
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-600">Type *</label>
+            <CustomSelect
+              value={type}
+              onChange={(val) => {
+                setType(val);
+                if (val !== "Academic Program") {
+                  setDepartmentId("");
+                }
+              }}
+              options={[
+                { value: "Academic Program", label: "Academic Program" },
+                { value: "Non-Academic Office", label: "Non-Academic Office" },
+              ]}
+            />
           </div>
 
           {isAcademic && (
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">Department *</label>
-              <div className="relative">
-                <select
-                  value={departmentId}
-                  onChange={(e) => setDepartmentId(e.target.value)}
-                  className="h-10 w-full appearance-none rounded-md border border-gray-300 bg-white px-4 pr-10 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required={isAcademic}
-                >
-                  <option value="">Select Department</option>
-                  {departments.map((dept) => (
-                    <option key={dept.id} value={String(dept.id)}>{dept.name}</option>
-                  ))}
-                </select>
-                <svg xmlns="http://www.w3.org/2000/svg" className="pointer-events-none absolute right-3 top-1/2 h-2.5 w-2.5 -translate-y-1/2 text-slate-500" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
-                </svg>
-              </div>
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-600">Department *</label>
+              <CustomSelect
+                value={departmentId}
+                onChange={(val) => setDepartmentId(val)}
+                placeholder="Select Department"
+                options={[
+                  { value: "", label: "Select Department" },
+                  ...departments.map((dept) => ({
+                    value: String(dept.id),
+                    label: dept.name,
+                  })),
+                ]}
+                required={isAcademic}
+              />
             </div>
           )}
 
-          <div className="flex justify-end gap-3 border-t border-slate-200 pt-3">
-            <button type="button" onClick={onClose} disabled={loading} className="rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-red-100 disabled:opacity-50">
+          <div className="flex justify-end gap-2.5 border-t border-slate-100 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={loading}
+              className="inline-flex h-9 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50 active:scale-95 cursor-pointer disabled:opacity-50"
+            >
               Cancel
             </button>
-            <button type="submit" disabled={loading} className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-400">
+            <button
+              type="submit"
+              disabled={loading}
+              className="inline-flex h-9 items-center justify-center rounded-xl bg-blue-600 px-4 text-xs font-semibold text-white shadow-xs transition hover:bg-blue-700 active:scale-95 cursor-pointer disabled:cursor-not-allowed disabled:bg-blue-400"
+            >
               {loading ? "Saving..." : "Save Changes"}
             </button>
           </div>

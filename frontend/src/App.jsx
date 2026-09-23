@@ -89,10 +89,26 @@ export default function App() {
       ],
     },
   
-    { path: "/", element: <Navigate to="/login" replace /> },
+    { path: "/dashboard", element: <Navigate to="/home" replace /> },
+    { path: "/organizations", element: <Navigate to="/home/organizations" replace /> },
+    { path: "/audit", element: <Navigate to="/home/audit" replace /> },
+    { path: "/requirements", element: <Navigate to="/home/requirements" replace /> },
+    { path: "/officehead", element: <Navigate to="/home/officehead" replace /> },
+    { path: "/users", element: <Navigate to="/home/users" replace /> },
+    { path: "/events", element: <Navigate to="/home/events" replace /> },
+    { path: "/criteria", element: <Navigate to="/home/criteria" replace /> },
+    { path: "/audit-logs", element: <Navigate to="/home/audit-logs" replace /> },
+    { path: "/profile", element: <Navigate to="/home/profile" replace /> },
+    { path: "/area", element: <Navigate to="/home/area" replace /> },
+    { path: "/setup", element: <Navigate to="/home/setup" replace /> },
+    { path: "/allc", element: <Navigate to="/home/allc" replace /> },
+    { path: "/acc-management", element: <Navigate to="/home/acc-management" replace /> },
+    { path: "/master-list", element: <Navigate to="/home/master-list" replace /> },
+    { path: "/external-auditors", element: <Navigate to="/home/external-auditors" replace /> },
+
+    { path: "/", element: <Navigate to="/home" replace /> },
     { path: '*', element: <NotFound /> }
   ]);
 
-
-  return <RouterProvider router={router} />
+  return <RouterProvider router={router} />;
 }

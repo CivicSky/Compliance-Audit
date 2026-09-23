@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import LongSelectPreview from './LongSelectPreview';
 import { formShellClass, saveButtonClass, formFooterClass } from './formStyles';
+import CustomSelect from '../../UI/CustomSelect';
 
 export default function AddCriteriaForm({
 	areas,
@@ -25,25 +26,21 @@ export default function AddCriteriaForm({
 		<form onSubmit={onSubmit} className={formShellClass}>
 			<div>
 				<label className="mb-1 block text-xs font-semibold text-stone-600">Area</label>
-				<select
-					className={fieldClass}
+				<CustomSelect
+					size="md"
 					value={criteriaForm.AreaID}
-					onChange={(e) => {
-						const v = e.target.value;
+					onChange={(v) => {
 						setCriteriaForm((prev) => ({ ...prev, AreaID: v, ParentCriteriaID: v ? prev.ParentCriteriaID : '' }));
 					}}
-				>
-					<option value="">No area (optional)</option>
-					{(areas || []).map((area) => (
-						<option
-							key={area.AreaID}
-							value={area.AreaID}
-							title={area.AreaCode ? `${area.AreaCode} - ${area.AreaName}` : area.AreaName}
-						>
-							{area.AreaCode ? `${area.AreaCode} - ${area.AreaName}` : area.AreaName}
-						</option>
-					))}
-				</select>
+					options={[
+						{ value: '', label: 'No area (optional)' },
+						...(areas || []).map((area) => ({
+							value: String(area.AreaID),
+							label: area.AreaCode ? `${area.AreaCode} - ${area.AreaName}` : area.AreaName
+						}))
+					]}
+					placeholder="No area (optional)"
+				/>
 				{selectedArea && (
 					<div className="mt-2">
 						<LongSelectPreview
@@ -56,23 +53,20 @@ export default function AddCriteriaForm({
 
 			<div>
 				<label className="mb-1 block text-xs font-semibold text-stone-600">Parent criteria (optional)</label>
-				<select
-					className={fieldClass}
+				<CustomSelect
+					size="md"
 					value={criteriaForm.ParentCriteriaID}
-					onChange={(e) => setCriteriaForm((prev) => ({ ...prev, ParentCriteriaID: e.target.value }))}
+					onChange={(val) => setCriteriaForm((prev) => ({ ...prev, ParentCriteriaID: val }))}
 					disabled={!criteriaForm.AreaID}
-					title={!criteriaForm.AreaID ? 'Select an area first to choose a parent criteria' : ''}
-				>
-					<option value="">No parent (optional)</option>
-					{parentCriteriaOptions.map((crit) => {
-						const text = crit.CriteriaCode ? `${crit.CriteriaCode} - ${crit.CriteriaName}` : crit.CriteriaName;
-						return (
-							<option key={crit.CriteriaID} value={crit.CriteriaID} title={text}>
-								{text}
-							</option>
-						);
-					})}
-				</select>
+					options={[
+						{ value: '', label: 'No parent (optional)' },
+						...parentCriteriaOptions.map((crit) => ({
+							value: String(crit.CriteriaID),
+							label: crit.CriteriaCode ? `${crit.CriteriaCode} - ${crit.CriteriaName}` : crit.CriteriaName
+						}))
+					]}
+					placeholder="No parent (optional)"
+				/>
 				<div className="mt-2">
 					<LongSelectPreview
 						label="Selected parent criteria"

@@ -392,11 +392,17 @@ exports.updateHead = async (req, res) => {
 
     const current = rows[0];
 
-    const nextFirstName = String(FirstName ?? current.FirstName ?? '').trim();
-    const nextLastName = String(LastName ?? current.LastName ?? '').trim();
-    const nextMiddleInitialRaw = String(MiddleInitial ?? current.MiddleInitial ?? '').trim();
+    const trimmedFirst = typeof FirstName === 'string' ? FirstName.trim() : '';
+    const trimmedLast = typeof LastName === 'string' ? LastName.trim() : '';
+    const trimmedPosition = typeof Position === 'string' ? Position.trim() : '';
+
+    const nextFirstName = trimmedFirst || (current.FirstName || '').trim();
+    const nextLastName = trimmedLast || (current.LastName || '').trim();
+    const nextMiddleInitialRaw = MiddleInitial !== undefined
+      ? String(MiddleInitial || '').trim()
+      : String(current.MiddleInitial || '').trim();
     const nextMiddleInitial = nextMiddleInitialRaw ? nextMiddleInitialRaw.charAt(0) : null;
-    const nextPosition = String(Position ?? current.Position ?? '').trim();
+    const nextPosition = trimmedPosition || (current.Position || '').trim();
     const nextContactInfoRaw = ContactInfo !== undefined
       ? String(ContactInfo ?? '').trim()
       : String(current.ContactInfo ?? '').trim();
@@ -410,12 +416,14 @@ exports.updateHead = async (req, res) => {
       });
     }
 
-    await db.execute(
-      `UPDATE users
-       SET FirstName = ?, MiddleInitial = ?, LastName = ?, ProfilePic = ?
-       WHERE UserID = ?`,
-      [nextFirstName, nextMiddleInitial, nextLastName, nextProfilePic, current.UserID]
-    );
+    if (current.UserID) {
+      await db.execute(
+        `UPDATE users
+         SET FirstName = ?, MiddleInitial = ?, LastName = ?, ProfilePic = ?
+         WHERE UserID = ?`,
+        [nextFirstName, nextMiddleInitial, nextLastName, nextProfilePic, current.UserID]
+      );
+    }
 
     await db.execute(
       `UPDATE headofoffice
@@ -464,8 +472,26 @@ exports.updateHead = async (req, res) => {
           changes,
         });
       }
+
+      // Notify the personnel if their position was changed
+      if ((current.Position || '') !== nextPosition && current.UserID) {
+        await createNotifications({
+          userIds: [Number(current.UserID)],
+          adminId: actorId || null,
+          title: 'Position Updated',
+          message: `Your position has been updated from "${current.Position || 'N/A'}" to "${nextPosition}".`,
+          type: 'info',
+          relatedTable: 'office_head',
+          relatedId: Number(id),
+          meta: {
+            headId: Number(id),
+            previousPosition: current.Position || null,
+            newPosition: nextPosition,
+          },
+        });
+      }
     } catch (logErr) {
-      console.error('Failed to record office head update log:', logErr);
+      console.error('Failed to record office head update log or notification:', logErr);
     }
   } catch (error) {
     console.error('Error updating office head:', error);

@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { Bell, Menu } from 'lucide-react';
 import { usersAPI } from '../../utils/api';
 import NotificationPopup from '../notif/notif';
 import { API_BASE_URL } from '../../utils/apiBase';
@@ -25,15 +26,48 @@ function readStoredDisplayName() {
   }
 }
 
+function readStoredUserRole() {
+  try {
+    const raw = localStorage.getItem('user');
+    if (!raw) return '';
+    const u = JSON.parse(raw);
+    if (u.RoleName) return u.RoleName;
+    const roleId = Number(u.RoleID);
+    if (roleId === 1) return 'Administrator';
+    if (roleId === 4) return 'Auditor';
+    if (roleId === 3) return 'Office Head';
+    if (roleId === 2) return 'Staff';
+    return '';
+  } catch {
+    return '';
+  }
+}
+
 export default function Header({ onToggleMobileMenu }) {
   const [dateTime, setDateTime] = useState(new Date());
   const [name, setName] = useState('');
+  const [role, setRole] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  const notificationButtonRef = useRef(null);
-  // Fetch unread count from NotificationPopup logic
+  const notificationWrapperRef = useRef(null);
+
+  // Close notifications dropdown when clicking outside
   useEffect(() => {
-    // Get current user from localStorage
+    const handleClickOutside = (e) => {
+      if (notificationWrapperRef.current && !notificationWrapperRef.current.contains(e.target)) {
+        setShowNotifications(false);
+      }
+    };
+    if (showNotifications) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showNotifications]);
+
+  // Fetch unread count
+  useEffect(() => {
     const token = localStorage.getItem('token');
     let userId = null;
     if (token) {
@@ -45,6 +79,7 @@ export default function Header({ onToggleMobileMenu }) {
       }
     }
     if (!userId) return;
+
     const fetchUnread = async () => {
       try {
         const response = await fetch(`${API_BASE_URL}/api/notifications/user/${userId}/counts`, {
@@ -55,28 +90,30 @@ export default function Header({ onToggleMobileMenu }) {
         });
         if (response.ok) {
           const data = await response.json();
-          setUnreadCount(data.unread || 0);
+          const unread = Number(data?.data?.unread ?? data?.unread ?? 0);
+          setUnreadCount(Number.isFinite(unread) ? unread : 0);
         }
       } catch (err) {
         // silent fail
       }
     };
     fetchUnread();
-    const interval = setInterval(fetchUnread, 30000); // poll every 30s
+    const interval = setInterval(fetchUnread, 15000);
 
-    const onNotificationsUpdated = () => {
-      fetchUnread();
-    };
-
+    const onNotificationsUpdated = () => fetchUnread();
     window.addEventListener('notificationsUpdated', onNotificationsUpdated);
+    window.addEventListener('app:data-sync', onNotificationsUpdated);
     return () => {
       clearInterval(interval);
       window.removeEventListener('notificationsUpdated', onNotificationsUpdated);
+      window.removeEventListener('app:data-sync', onNotificationsUpdated);
     };
   }, []);
 
+  // User profile and clock sync
   useEffect(() => {
     setName(readStoredDisplayName());
+    setRole(readStoredUserRole());
 
     const refreshFromServer = async () => {
       try {
@@ -84,18 +121,21 @@ export default function Header({ onToggleMobileMenu }) {
         if (response.success && response.user) {
           const n = displayNameFromUser(response.user);
           if (n) setName(n);
+          if (response.user.RoleName) setRole(response.user.RoleName);
         }
       } catch {
         setName(readStoredDisplayName());
+        setRole(readStoredUserRole());
       }
     };
     refreshFromServer();
 
-    const onProfileUpdated = () => {
-      refreshFromServer();
-    };
+    const onProfileUpdated = () => refreshFromServer();
     const onStorage = (e) => {
-      if (e.key === 'user' || e.key === 'name') setName(readStoredDisplayName());
+      if (e.key === 'user' || e.key === 'name') {
+        setName(readStoredDisplayName());
+        setRole(readStoredUserRole());
+      }
     };
     window.addEventListener('profileUpdated', onProfileUpdated);
     window.addEventListener('storage', onStorage);
@@ -103,6 +143,7 @@ export default function Header({ onToggleMobileMenu }) {
     const timer = setInterval(() => {
       setDateTime(new Date());
     }, 1000);
+
     return () => {
       clearInterval(timer);
       window.removeEventListener('profileUpdated', onProfileUpdated);
@@ -110,25 +151,25 @@ export default function Header({ onToggleMobileMenu }) {
     };
   }, []);
 
-  const formattedDate = dateTime.toLocaleDateString();
-  const formattedTime = dateTime.toLocaleTimeString();
+  // Calm, human-friendly date & time formatting
+  const formattedDate = dateTime.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+  const formattedTime = dateTime.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 
   return (
-    <div
+    <header
       className="fixed top-0 left-0 w-full z-40 lg:left-[var(--sidebar-width)] lg:w-[calc(100%-var(--sidebar-width))] transition-[left,width] duration-200"
       style={{ height: '56px' }}
     >
-      {/* Blue-tinted glass header bar */}
-      <div
-        className="flex items-center justify-between h-full px-4 sm:px-5 w-full"
-        style={{
-          background: 'linear-gradient(90deg, #ffffff 0%, #f0f5ff 100%)',
-          borderBottom: '1px solid #dbeafe',
-          boxShadow: '0 1px 8px rgba(37,99,235,0.08)',
-        }}
-      >
-        {/* Left Side: Mobile Hamburger Menu + Greeting */}
-        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+      <div className="flex items-center justify-between h-full px-4 sm:px-6 w-full bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-2xs">
+        {/* Left Side: Mobile Hamburger Menu + Human Context & Greeting */}
+        <div className="flex items-center gap-3 min-w-0">
           {/* Mobile Hamburger Button */}
           <button
             type="button"
@@ -140,59 +181,65 @@ export default function Header({ onToggleMobileMenu }) {
                 toggleMobileNavbar();
               }
             }}
-            className="lg:hidden p-1.5 -ml-1 rounded-lg text-slate-700 hover:text-blue-600 hover:bg-blue-50 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400 shrink-0 cursor-pointer"
+            className="lg:hidden p-1.5 -ml-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-300 shrink-0 cursor-pointer"
             aria-label="Open navigation menu"
             title="Open navigation menu"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
+            <Menu className="w-5 h-5" />
           </button>
 
-          <div className="h-6 w-1 rounded-full shrink-0" style={{ background: 'linear-gradient(180deg, #2563eb, #60a5fa)' }} />
-          <div className="text-sm sm:text-base font-semibold truncate" style={{ color: '#1e3a8a' }}>
-            Hello{name ? `, ${name}` : ''}
+          {/* Clean User Identity Breadcrumb */}
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-xs font-semibold text-slate-400 hidden sm:inline select-none tracking-wide uppercase">
+              Auditrack
+            </span>
+            <span className="text-slate-300 hidden sm:inline select-none">/</span>
+            <span className="text-sm font-semibold text-slate-800 truncate">
+              {name ? `Hello, ${name}` : 'Welcome'}
+            </span>
+            {role && (
+              <span className="hidden md:inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide uppercase bg-slate-100 text-slate-600 border border-slate-200/80 select-none">
+                {role}
+              </span>
+            )}
           </div>
         </div>
 
-        {/* Right side */}
-        <div className="flex items-center gap-3">
-          <div className="text-xs font-medium px-3 py-1.5 rounded-lg" style={{ color: '#475569', background: '#f1f5f9', border: '1px solid #e2e8f0' }}>
-            {formattedDate} · {formattedTime}
+        {/* Right Side: Neutral Date/Time Pill + Refined Notification Bell */}
+        <div className="flex items-center gap-2.5 sm:gap-3">
+          {/* Human-formatted Live Date/Time */}
+          <div className="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-50/80 border border-slate-200/70 text-xs text-slate-600 font-medium select-none shadow-2xs">
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.4)]" title="Connected" />
+            <span className="text-slate-700 font-semibold">{formattedDate}</span>
+            <span className="text-slate-300 font-light">·</span>
+            <span className="text-slate-500 font-medium">{formattedTime}</span>
           </div>
 
           {/* Notification Bell */}
-          <div className="relative">
+          <div className="relative" ref={notificationWrapperRef}>
             <button
-              ref={notificationButtonRef}
-              className="relative focus:outline-none rounded-lg p-1.5 transition-all duration-200 flex items-center justify-center"
+              className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200/90 bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 hover:border-slate-300 transition-all active:scale-95 shadow-xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-300"
               onClick={() => setShowNotifications((v) => !v)}
               aria-label="Show notifications"
-              style={{
-                background: '#eff6ff',
-                border: '1px solid #bfdbfe',
-                boxShadow: '0 1px 4px rgba(37,99,235,0.12)',
-              }}
+              title={unreadCount > 0 ? `${unreadCount} unread notification${unreadCount > 1 ? 's' : ''}` : 'Notifications'}
             >
-              {/* Bell Icon */}
-              <svg className="w-4.5 h-4.5" style={{ color: '#2563eb', width: '18px', height: '18px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 15V11a6 6 0 10-12 0v4c0 .386-.146.735-.405 1.005L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-              </svg>
+              <Bell className="w-[18px] h-[18px] text-slate-600" />
               {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] rounded-full px-1 py-0.5 min-w-[16px] text-center font-bold">
+                <span className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-bold text-white ring-2 ring-white shadow-xs pointer-events-none select-none leading-none">
                   {unreadCount > 99 ? '99+' : unreadCount}
                 </span>
               )}
             </button>
+
             {/* Notification Popup */}
             {showNotifications && (
-              <div className="absolute right-0 z-50 mt-2 flex w-[420px] max-h-[min(560px,calc(100vh-5.5rem))] flex-col overflow-hidden rounded-xl border border-blue-100 bg-white shadow-2xl">
+              <div className="absolute right-0 z-50 mt-2 flex w-[360px] sm:w-[390px] max-h-[min(540px,calc(100vh-5.5rem))] flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-xl animate-in fade-in zoom-in-95 duration-100">
                 <NotificationPopup onClose={() => setShowNotifications(false)} />
               </div>
             )}
           </div>
         </div>
       </div>
-    </div>
+    </header>
   );
 }

@@ -31,7 +31,7 @@ const Card = forwardRef(({
     <div
       ref={ref}
       style={style}
-      className={`card bg-app-surface rounded-xl border border-app-border ${hover ? 'hover:shadow-md transition-shadow' : ''} ${paddingClasses[padding] || paddingClasses.md} ${accentClass} ${className}`}
+      className={`card bg-app-surface rounded-xl border border-app-border ${hover ? 'app-card-hover' : ''} ${paddingClasses[padding] || paddingClasses.md} ${accentClass} ${className}`}
       {...rest}
     >
       {children}

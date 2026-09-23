@@ -31,7 +31,7 @@ export default function AvatarPopupMenu({
                         {avatarPopup.user.FirstName} {avatarPopup.user.LastName}
                     </p>
                     <p className={`mt-0.5 text-[10px] font-medium ${hasUploaded ? 'text-emerald-600' : 'text-rose-500'}`}>
-                        {hasUploaded ? '✓ Uploaded' : '✗ Not uploaded'}
+                        {hasUploaded ? 'Uploaded' : 'Not uploaded'}
                     </p>
                 </div>
 
@@ -49,7 +49,7 @@ export default function AvatarPopupMenu({
                     </button>
                 )}
 
-                {hasUploaded && (
+                {hasUploaded && !isAuditor && (
                     <button
                         type="button"
                         onClick={() => onDownloadUserFile(avatarPopup.user, avatarPopup.requirementId)}

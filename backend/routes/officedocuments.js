@@ -224,7 +224,7 @@ router.post('/:id/proof', auth, upload.single('file'), async (req, res) => {
 
 
 // Get the latest proof document for an office (filter by requirement_id IS NULL to only get proof documents, not requirement files)
-router.get('/:id/proof', async (req, res) => {
+router.get('/:id/proof', auth, async (req, res) => {
   try {
     const [rows] = await db.query(
       `SELECT * FROM office_proof_documents WHERE office_id = ? AND requirement_id IS NULL ORDER BY uploaded_at DESC LIMIT 1`,

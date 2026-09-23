@@ -1,8 +1,22 @@
 import React, { useState, useEffect } from 'react';
 
+const stripExtension = (name) => {
+    if (!name) return '';
+    const str = String(name);
+    const lastDot = str.lastIndexOf('.');
+    if (lastDot > 0 && lastDot > str.lastIndexOf('/')) {
+        return str.substring(0, lastDot);
+    }
+    return str;
+};
+
 export default function RenameInline({ item, onRename, forceEditing = false, onCancel, onStart }) {
     const [editing, setEditing] = useState(false);
-    const [value, setValue] = useState(item.displayName || item.fileName || '');
+    const [value, setValue] = useState(() => stripExtension(item.displayName || item.fileName || ''));
+
+    useEffect(() => {
+        setValue(stripExtension(item.displayName || item.fileName || ''));
+    }, [item.displayName, item.fileName]);
 
     useEffect(() => {
         if (forceEditing) setEditing(true);
@@ -15,7 +29,16 @@ export default function RenameInline({ item, onRename, forceEditing = false, onC
     const isEditing = forceEditing || editing;
 
     const doCancel = () => {
-        setValue(item.displayName || item.fileName || '');
+        setValue(stripExtension(item.displayName || item.fileName || ''));
+        setEditing(false);
+        if (typeof onCancel === 'function') onCancel();
+    };
+
+    const handleSave = () => {
+        const cleaned = stripExtension(value.trim());
+        if (cleaned) {
+            onRename?.(cleaned);
+        }
         setEditing(false);
         if (typeof onCancel === 'function') onCancel();
     };
@@ -30,8 +53,7 @@ export default function RenameInline({ item, onRename, forceEditing = false, onC
                         onChange={(e) => setValue(e.target.value)}
                         onKeyDown={(e) => {
                             if (e.key === 'Enter') {
-                                onRename?.(value.trim());
-                                setEditing(false);
+                                handleSave();
                             }
                             if (e.key === 'Escape') {
                                 doCancel();
@@ -44,8 +66,8 @@ export default function RenameInline({ item, onRename, forceEditing = false, onC
                     />
                     <button
                         type="button"
-                        onClick={(e) => { e.stopPropagation(); onRename?.(value.trim()); setEditing(false); if (typeof onCancel === 'function') onCancel(); }}
-                        className="rounded-md bg-blue-600 text-white px-2.5 py-1 text-xs"
+                        onClick={(e) => { e.stopPropagation(); handleSave(); }}
+                        className="rounded-md bg-blue-600 text-white px-2.5 py-1 text-xs cursor-pointer hover:bg-blue-700 transition"
                     >Save</button>
                     {/* Cancel via Escape key or clicking outside; explicit cancel button removed per request */}
                 </div>

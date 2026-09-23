@@ -291,8 +291,8 @@ export default function Register() {
                                     borderRadius: '10px', color: '#1d4ed8', fontSize: '0.77rem',
                                 }}>
                                     {inviteInfo.allowAnyEmail
-                                        ? "✓ Standard Email Invite verified — any valid email accepted."
-                                        : "✓ Institutional Invite verified — @lccbonline.edu.ph required."}
+                                        ? "Standard Email Invite verified — any valid email accepted."
+                                        : "Institutional Invite verified — @lccbonline.edu.ph required."}
                                 </div>
                             )}
 
@@ -329,7 +329,7 @@ export default function Register() {
                                     type="text" id="middleInitial" name="middleInitial" maxLength="1"
                                     value={formData.middleInitial} onChange={handleChange}
                                     placeholder="e.g. A"
-                                    style={{ ...inputStyle(), width: '80px' }}
+                                    style={inputStyle()}
                                     onFocus={e => { e.target.style.borderColor = '#2563eb'; e.target.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.12)'; }}
                                     onBlur={e => { e.target.style.borderColor = '#e2e8f0'; e.target.style.boxShadow = 'none'; }}
                                 />

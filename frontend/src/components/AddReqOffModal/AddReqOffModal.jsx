@@ -73,14 +73,14 @@ export default function AddReqOffModal({ isOpen, onClose, office, onSave }) {
 
             dataCache.invalidate('office_reqs_');
 
-            await showAlert(`Successfully added ${selectedRequirements.length} requirement(s) to ${office.office_name || office.OfficeName || 'office'}.`, 'success');
+            await showAlert(`Successfully added ${selectedRequirements.length} evidence item(s) to ${office.office_name || office.OfficeName || 'office'}.`, 'success');
             
             onSave();
-            setSelectedRequirements([]);
             onClose();
+            setSelectedRequirements([]);
         } catch (error) {
             console.error('Error adding requirements:', error);
-            await showAlert('Failed to add requirements. Please try again.');
+            await showAlert('Failed to add evidence. Please try again.');
         } finally {
             setSaving(false);
         }
@@ -111,7 +111,7 @@ export default function AddReqOffModal({ isOpen, onClose, office, onSave }) {
                                 </svg>
                             </div>
                             <div>
-                                <h2 className="text-xl font-bold">Add Requirements to Office</h2>
+                                <h2 className="text-xl font-bold">Add Evidence to Office</h2>
                                 <p className="text-sm text-green-100">{office.office_name}</p>
                             </div>
                         </div>
@@ -133,7 +133,7 @@ export default function AddReqOffModal({ isOpen, onClose, office, onSave }) {
                         <div className="relative">
                             <input
                                 type="text"
-                                placeholder="Search requirements by code, description, or criteria..."
+                                placeholder="Search evidence by code, description, or criteria..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 className="bg-gray-100 w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
@@ -174,7 +174,7 @@ export default function AddReqOffModal({ isOpen, onClose, office, onSave }) {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                 </svg>
                                 <p className="text-gray-500 font-medium">
-                                    {searchTerm ? 'No requirements match your search' : 'All requirements are already assigned'}
+                                    {searchTerm ? 'No evidence matches your search' : 'All evidence is already assigned'}
                                 </p>
                             </div>
                         ) : office.event_id === 8 ? (
@@ -471,7 +471,7 @@ export default function AddReqOffModal({ isOpen, onClose, office, onSave }) {
                 {/* Footer */}
                     <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between flex-shrink-0">
                         <p className="text-sm text-gray-600">
-                            {selectedRequirements.length} requirement{selectedRequirements.length !== 1 ? 's' : ''} selected
+                            {selectedRequirements.length} evidence item{selectedRequirements.length !== 1 ? 's' : ''} selected
                         </p>
                         <div className="flex gap-3">
                             <button
@@ -495,7 +495,7 @@ export default function AddReqOffModal({ isOpen, onClose, office, onSave }) {
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                                         </svg>
-                                        Add Requirements
+                                        Add Evidence
                                     </>
                                 )}
                             </button>

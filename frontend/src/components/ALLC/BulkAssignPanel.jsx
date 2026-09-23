@@ -186,9 +186,9 @@ export default function BulkAssignPanel({
 
 				{critExpanded && (
 					<div className="mt-2 space-y-2 pb-2 pl-5">
-						{loading && <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">Loading requirements...</p>}
+						{loading && <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">Loading evidence...</p>}
 						{!loading && requirementsLoaded && (node.requirements || []).length === 0 && (
-							<p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">No requirements</p>
+							<p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">No evidence</p>
 						)}
 						{(node.requirements || []).map((req) => {
 							const reqId = Number(req.RequirementID);
@@ -418,13 +418,13 @@ export default function BulkAssignPanel({
 						<section className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-stone-200/90 bg-app-surface">
 							<div className="border-b border-slate-100/80 px-4 py-3.5 bg-slate-50/50">
 								<div className="flex items-center justify-between gap-2">
-									<h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">2. Select requirements</h3>
+									<h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">2. Select evidence</h3>
 									<label className="flex cursor-pointer items-center gap-1.5 text-[11px] font-semibold text-slate-500 hover:text-slate-700 transition">
 										<Checkbox checked={allRequirementsSelected} onChange={(event) => toggleRequirementBatch(allRequirementIds, event.target.checked)} />
 										All
 									</label>
 								</div>
-								<p className="mt-1 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Area &gt; Criteria &gt; Requirement</p>
+								<p className="mt-1 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Area &gt; Criteria &gt; Evidence</p>
 								<div className="mt-3">
 									<input
 										type="search"
@@ -437,7 +437,7 @@ export default function BulkAssignPanel({
 							</div>
 							<div className="flex-1 space-y-3 overflow-y-auto p-3 [scrollbar-width:thin]">
 								{requirementTree.length === 0 ? (
-									<p className="py-8 text-center text-xs text-slate-500">No areas for this event.</p>
+									<p className="py-8 text-center text-xs text-slate-500">No areas for this accreditation.</p>
 								) : treesWithRoots.length === 0 ? (
 									<p className="py-8 text-center text-xs text-slate-500">No matches in loaded hierarchy.</p>
 								) : (
@@ -494,7 +494,7 @@ export default function BulkAssignPanel({
 								<span className="text-slate-400 font-bold uppercase tracking-wider text-[9px] mr-1.5">Offices</span> {officeCount}
 							</span>
 							<span className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-1.5 font-semibold text-slate-700 shadow-sm">
-								<span className="text-slate-400 font-bold uppercase tracking-wider text-[9px] mr-1.5">Requirements</span> {reqCount}
+								<span className="text-slate-400 font-bold uppercase tracking-wider text-[9px] mr-1.5">Evidence</span> {reqCount}
 							</span>
 							{(error || success) && (
 								<p className={`text-xs font-medium ${error ? 'text-rose-700' : 'text-emerald-700'}`}>{error || success}</p>

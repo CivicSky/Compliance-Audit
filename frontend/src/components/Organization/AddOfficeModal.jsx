@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { officesAPI, officeHeadsAPI, masterlistAPI } from "../../utils/api";
+import { officesAPI, officeHeadsAPI, masterlistAPI, departmentsAPI, eventDepartmentsAPI } from "../../utils/api";
 import { useModal } from "../UI/ModalProvider";
+import CustomSelect from "../UI/CustomSelect";
 import { API_BASE_URL } from '../../utils/apiBase';
 
 const MAX_HEADS = 4;
+const ACCREDITATION_LEVELS = ['None', 'Candidate', 'Level I', 'Level II', 'Level III', 'Level IV'];
 
 export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes, events }) {
     const [selectedMasterListIds, setSelectedMasterListIds] = useState([]);
@@ -17,6 +19,10 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
     const [categorySearchTerm, setCategorySearchTerm] = useState("");
     const [isDraggingOver, setIsDraggingOver] = useState(false);
     const [activeCategoryTab, setActiveCategoryTab] = useState("All");
+    const [departments, setDepartments] = useState([]);
+    const [selectedDeptFilter, setSelectedDeptFilter] = useState("All");
+    const [existingEventDepartments, setExistingEventDepartments] = useState([]);
+    const [deptAccreditationLevels, setDeptAccreditationLevels] = useState({});
 
     const { showAlert } = useModal();
 
@@ -57,6 +63,9 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
 
         if (activeCategoryTab === "Programs") {
             items = items.filter(item => item.entityTypeId === 1 || item.type === 'Academic Program');
+            if (selectedDeptFilter !== "All") {
+                items = items.filter(item => String(item.departmentId) === String(selectedDeptFilter) || String(item.department) === String(selectedDeptFilter));
+            }
         } else if (activeCategoryTab === "Offices") {
             items = items.filter(item => item.entityTypeId !== 1 && item.type !== 'Academic Program');
         }
@@ -70,7 +79,7 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
             const dept = String(item.department || "").toLowerCase();
             return name.includes(query) || type.includes(query) || dept.includes(query);
         });
-    }, [masterListItems, categorySearchTerm, activeCategoryTab]);
+    }, [masterListItems, categorySearchTerm, activeCategoryTab, selectedDeptFilter]);
 
     // Reset form when modal opens
     useEffect(() => {
@@ -81,7 +90,9 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
             setCategorySearchTerm("");
             setIsDraggingOver(false);
             setActiveCategoryTab("All");
+            setSelectedDeptFilter("All");
             setMasterListItems([]);
+            setDeptAccreditationLevels({});
 
             // Auto-select the first active event if available
             const defaultEvent = activeEvents.length > 0 ? String(activeEvents[0].EventID) : "";
@@ -97,15 +108,29 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
                     setHeads([]);
                 }
             };
+
+            const fetchDepartments = async () => {
+                try {
+                    const res = await departmentsAPI.getAll();
+                    const data = Array.isArray(res) ? res : (res?.data || []);
+                    setDepartments(data);
+                } catch (err) {
+                    console.error("Failed to fetch departments:", err);
+                    setDepartments([]);
+                }
+            };
+
             fetchHeads();
+            fetchDepartments();
         }
     }, [isOpen, activeEvents]);
 
-    // Fetch available master list items when eventID changes
+    // Fetch available master list items and event departments when eventID changes
     useEffect(() => {
         if (!isOpen || !eventID) {
             setMasterListItems([]);
             setSelectedMasterListIds([]);
+            setExistingEventDepartments([]);
             return;
         }
 
@@ -123,13 +148,57 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
             }
         };
 
+        const fetchExistingEventDepts = async () => {
+            try {
+                const res = await eventDepartmentsAPI.getByEvent(eventID);
+                const data = Array.isArray(res?.data) ? res.data : [];
+                setExistingEventDepartments(data);
+
+                // Pre-populate levels from existing event departments
+                const existingLevels = {};
+                data.forEach((ed) => {
+                    if (ed.department_id && ed.accreditation_level) {
+                        existingLevels[ed.department_id] = ed.accreditation_level;
+                    }
+                });
+                setDeptAccreditationLevels((prev) => ({ ...existingLevels, ...prev }));
+            } catch (err) {
+                console.error("Failed to fetch event departments:", err);
+                setExistingEventDepartments([]);
+            }
+        };
+
         fetchAvailableMasterList();
+        fetchExistingEventDepts();
     }, [isOpen, eventID]);
 
     // Selected master list items helper
     const selectedMasterItems = useMemo(() => {
         return masterListItems.filter(item => selectedMasterListIds.includes(String(item.id)));
     }, [masterListItems, selectedMasterListIds]);
+
+    // Compute academic departments involved in current selection
+    const involvedDepartments = useMemo(() => {
+        const map = new Map();
+        selectedMasterItems.forEach(item => {
+            const isAcademic = item.entityTypeId === 1 || item.type === 'Academic Program';
+            if (isAcademic && (item.departmentId || item.department)) {
+                const deptId = item.departmentId || item.department;
+                if (!map.has(deptId)) {
+                    const existingEd = existingEventDepartments.find(
+                        ed => Number(ed.department_id) === Number(item.departmentId)
+                    );
+                    map.set(deptId, {
+                        id: item.departmentId,
+                        name: item.department || (departments.find(d => String(d.id) === String(item.departmentId))?.name) || `Department #${item.departmentId}`,
+                        existingLevel: existingEd?.accreditation_level || null,
+                        isExisting: !!existingEd
+                    });
+                }
+            }
+        });
+        return Array.from(map.values());
+    }, [selectedMasterItems, existingEventDepartments, departments]);
 
     const getOfficeTypeIdForCategory = (item) => {
         if (!item || !Array.isArray(officeTypes) || officeTypes.length === 0) return null;
@@ -195,12 +264,18 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
             // Loop through all selected category IDs and call createOffice for each
             const creationPromises = selectedMasterItems.map(async (item) => {
                 const typeId = getOfficeTypeIdForCategory(item);
+                const isAcademic = item.entityTypeId === 1 || item.type === 'Academic Program';
+                const deptLevel = isAcademic && item.departmentId
+                    ? (deptAccreditationLevels[item.departmentId] || 'Level I')
+                    : null;
+
                 const payload = {
                     master_list_id: parseInt(item.id),
                     OfficeName: item.name || "",
                     OfficeTypeID: parseInt(typeId),
                     HeadIDs: selectedHeadIDs.map(id => parseInt(id)),
-                    EventID: parseInt(eventID)
+                    EventID: parseInt(eventID),
+                    accreditation_level: deptLevel
                 };
                 return officesAPI.createOffice(payload);
             });
@@ -230,17 +305,21 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out z-[50] flex items-center justify-center bg-black/50">
-            <div className="mx-4 w-full max-w-5xl overflow-hidden rounded-xl bg-white shadow-xl flex flex-col max-h-[90vh]">
+        <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out z-[50] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs">
+            <div className="mx-4 w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-2xl border border-slate-200 flex flex-col max-h-[90vh]">
                 <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 shrink-0">
-                    <h2 className="text-xl font-bold text-gray-800">Add Category to Audit</h2>
+                    <div>
+                        <h2 className="text-lg font-bold tracking-tight text-slate-800">Add Category to Audit</h2>
+                        <p className="mt-0.5 text-xs text-slate-500">Configure program or office categories under the current accreditation event.</p>
+                    </div>
                     <button
                         type="button"
                         onClick={onClose}
                         disabled={loading}
-                        className="text-gray-400 transition hover:text-gray-600 disabled:opacity-50"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 active:scale-95 cursor-pointer disabled:opacity-50"
+                        aria-label="Close"
                     >
-                        <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
@@ -266,25 +345,44 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
                                 />
                                 
                                 {/* Category Type Filter Tabs */}
-                                <div className="flex border-b border-slate-200">
-                                    {["All", "Programs", "Offices"].map((tab) => {
-                                        const isSelected = activeCategoryTab === tab;
-                                        return (
-                                            <button
-                                                key={tab}
-                                                type="button"
-                                                onClick={() => setActiveCategoryTab(tab)}
-                                                className={`pb-1.5 px-3 text-[11px] font-semibold transition-all border-b-2 -mb-[1px] ${
-                                                    isSelected 
-                                                        ? 'border-blue-600 text-blue-600' 
-                                                        : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-350'
-                                                }`}
+                                <div className="flex items-center justify-between border-b border-slate-200 pb-1">
+                                    <div className="flex">
+                                        {["All", "Programs", "Offices"].map((tab) => {
+                                            const isSelected = activeCategoryTab === tab;
+                                            return (
+                                                <button
+                                                    key={tab}
+                                                    type="button"
+                                                    onClick={() => setActiveCategoryTab(tab)}
+                                                    className={`pb-1 px-2.5 text-[11px] font-semibold transition-all border-b-2 -mb-[5px] ${
+                                                        isSelected 
+                                                            ? 'border-blue-600 text-blue-600' 
+                                                            : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-350'
+                                                    }`}
+                                                    disabled={!eventID || masterListLoading}
+                                                >
+                                                    {tab}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                    {activeCategoryTab === "Programs" && departments.length > 0 && (
+                                        <div className="w-28 shrink-0">
+                                            <CustomSelect
+                                                size="sm"
+                                                value={selectedDeptFilter}
+                                                onChange={(val) => setSelectedDeptFilter(val)}
                                                 disabled={!eventID || masterListLoading}
-                                            >
-                                                {tab}
-                                            </button>
-                                        );
-                                    })}
+                                                options={[
+                                                    { value: "All", label: "All Depts" },
+                                                    ...departments.map((d) => ({
+                                                        value: String(d.id),
+                                                        label: d.name,
+                                                    })),
+                                                ]}
+                                            />
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                             
@@ -463,6 +561,71 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
                                 </div>
                             </div>
 
+                            {/* Department Accreditation Level Configuration (when academic programs are selected) */}
+                            {involvedDepartments.length > 0 && (
+                                <div className="rounded-xl border border-blue-250 bg-gradient-to-r from-blue-50/70 to-indigo-50/50 p-3.5 space-y-2 shadow-2xs">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <div className="h-5 w-5 rounded-md bg-blue-600 text-white flex items-center justify-center">
+                                                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                                </svg>
+                                            </div>
+                                            <span className="text-xs font-bold text-blue-900">
+                                                Department Accreditation Level for this Event
+                                            </span>
+                                        </div>
+                                        <span className="text-[10px] font-semibold text-blue-700 bg-blue-100/80 px-2 py-0.5 rounded-full">
+                                            {involvedDepartments.length} {involvedDepartments.length === 1 ? 'Dept' : 'Depts'}
+                                        </span>
+                                    </div>
+                                    <p className="text-[11px] text-slate-600">
+                                        Selected academic programs will belong to their department's accreditation level in this audit.
+                                    </p>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                                        {involvedDepartments.map((dept) => {
+                                            const currentLevel = deptAccreditationLevels[dept.id] || dept.existingLevel || 'Level I';
+                                            return (
+                                                <div
+                                                    key={dept.id || dept.name}
+                                                    className="flex items-center justify-between gap-2 p-2 bg-white rounded-lg border border-blue-200/80 shadow-2xs"
+                                                >
+                                                    <div className="min-w-0 flex-1">
+                                                        <span className="text-xs font-bold text-slate-800 block truncate">
+                                                            {dept.name}
+                                                        </span>
+                                                        {dept.isExisting ? (
+                                                            <span className="text-[10px] font-medium text-emerald-600 flex items-center gap-1">
+                                                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                                                                Already in event ({dept.existingLevel})
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-[10px] text-slate-400">
+                                                                New department in event
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="w-32 shrink-0">
+                                                        <CustomSelect
+                                                            size="sm"
+                                                            value={currentLevel}
+                                                            onChange={(val) => setDeptAccreditationLevels(prev => ({
+                                                                ...prev,
+                                                                [dept.id]: val
+                                                            }))}
+                                                            options={ACCREDITATION_LEVELS.map((lvl) => ({
+                                                                value: lvl,
+                                                                label: lvl,
+                                                            }))}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Heads Selection */}
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -546,17 +709,17 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
                         </div>
                     </div>
 
-                    <div className="flex justify-end gap-3 pt-3 border-t border-slate-200 shrink-0">
+                    <div className="flex justify-end gap-2.5 pt-4 border-t border-slate-100 shrink-0">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-red-100"
+                            className="inline-flex h-9 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50 active:scale-95 cursor-pointer"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
-                            className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-green-400"
+                            className="inline-flex h-9 items-center justify-center rounded-xl bg-emerald-600 px-4 text-xs font-semibold text-white shadow-xs transition hover:bg-emerald-700 active:scale-95 cursor-pointer disabled:cursor-not-allowed disabled:bg-emerald-400"
                             disabled={loading}
                         >
                             {loading ? (
@@ -565,7 +728,7 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
                                     <path fill="currentColor" className="opacity-75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                 </svg>
                             ) : (
-                                "Add"
+                                "Add Category"
                             )}
                         </button>
                     </div>

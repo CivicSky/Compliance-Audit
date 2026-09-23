@@ -5,10 +5,10 @@ const { auth, restrictAuditor, restrictAuditorDownloads } = require('../middlewa
 const rateLimit = require('../middleware/rateLimit');
 
 // Get all events
-router.get('/', eventsController.getAllEvents);
+router.get('/', auth, eventsController.getAllEvents);
 
 // Get accreditation levels
-router.get('/accreditation-levels', eventsController.getAccreditationLevels);
+router.get('/accreditation-levels', auth, eventsController.getAccreditationLevels);
 
 // Add new event
 router.post('/add', auth, restrictAuditor, eventsController.addEvent);

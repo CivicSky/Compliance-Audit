@@ -763,17 +763,28 @@ exports.getUsers = async (req, res) => {
        ) audAreas ON audAreas.UserID = u.UserID`
     );
 
-    const usersWithFullName = users.map((user) => ({
-      ...user,
-      FullName: `${user.FirstName}${user.MiddleInitial ? " " + user.MiddleInitial + "." : ""} ${user.LastName}`,
-      assignedArea: user.assignedArea || null,
-      AssignedOffices: Array.from(
-        new Set([
-          ...String(user.RequirementAssignedOffices || '').split('||').filter(Boolean),
-          ...String(user.PersonnelAssignedOffices || '').split('||').filter(Boolean),
-        ])
-      ),
-    }));
+    const usersWithFullName = users.map((user) => {
+      const first = user.FirstName || user.firstname || '';
+      const middle = user.MiddleInitial || user.middleinitial ? ` ${user.MiddleInitial || user.middleinitial}.` : '';
+      const last = user.LastName || user.lastname || '';
+      const area = user.assignedArea || user.assignedarea || user.AssignedAreas || user.assignedareas || null;
+
+      return {
+        ...user,
+        UserID: user.UserID ?? user.userid ?? user.id,
+        FirstName: first,
+        MiddleInitial: user.MiddleInitial || user.middleinitial || null,
+        LastName: last,
+        FullName: `${first}${middle} ${last}`.trim() || 'Unknown',
+        assignedArea: area,
+        AssignedOffices: Array.from(
+          new Set([
+            ...String(user.RequirementAssignedOffices || user.requirementassignedoffices || '').split('||').filter(Boolean),
+            ...String(user.PersonnelAssignedOffices || user.personnelassignedoffices || '').split('||').filter(Boolean),
+          ])
+        ),
+      };
+    });
 
     res.json({
       success: true,
@@ -789,14 +800,22 @@ exports.getUsers = async (req, res) => {
 };
 
 exports.getLoggedInUser = async (req, res) => {
-
   try {
     const userId = req.user.userId; // from decoded token
 
     const [rows] = await db.query(
-      `SELECT u.UserID, u.FirstName, u.MiddleInitial, u.LastName, u.Email, u.RoleID, u.ProfilePic, u.approval_status, r.RoleName
+      `SELECT u.UserID, u.FirstName, u.MiddleInitial, u.LastName, u.Email, u.RoleID, u.ProfilePic, u.approval_status, r.RoleName,
+              audAreas.AssignedAreas AS assignedArea
        FROM users u
        LEFT JOIN roles r ON u.RoleID = r.RoleID
+       LEFT JOIN (
+         SELECT
+           aaa.auditor_user_id AS UserID,
+           string_agg(DISTINCT CONCAT(ar.AreaCode, ': ', ar.AreaName), ', ' ORDER BY CONCAT(ar.AreaCode, ': ', ar.AreaName)) AS AssignedAreas
+         FROM auditor_area_assignments aaa
+         JOIN areas ar ON aaa.area_id = ar.AreaID
+         GROUP BY aaa.auditor_user_id
+       ) audAreas ON audAreas.UserID = u.UserID
        WHERE u.UserID = ?`,
       [userId]
     );
@@ -805,9 +824,19 @@ exports.getLoggedInUser = async (req, res) => {
       return res.status(404).json({ success: false, message: "User not found" });
     }
 
+    const row = rows[0];
+    const userObj = {
+      ...row,
+      UserID: row.UserID ?? row.userid ?? row.id,
+      FirstName: row.FirstName || row.firstname || '',
+      MiddleInitial: row.MiddleInitial || row.middleinitial || null,
+      LastName: row.LastName || row.lastname || '',
+      assignedArea: row.assignedArea || row.assignedarea || row.AssignedAreas || row.assignedareas || null,
+    };
+
     res.json({
       success: true,
-      user: rows[0],
+      user: userObj,
     });
 
   } catch (error) {

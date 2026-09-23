@@ -1,5 +1,5 @@
 import React from 'react';
-import axios from 'axios';
+import api from '../../utils/api';
 import { API_BASE_URL } from '../../utils/apiBase';
 import { useToast } from '../UI/Toast';
 
@@ -138,7 +138,7 @@ export default function ProofFooterBar({
                                             setProofFileUrl('');
                                             try { await fetchOfficeRequirements(); } catch (e) { /* ignore */ }
                                             try {
-                                                const res2 = await axios.get(`${API_BASE_URL}/api/officedocuments/${officeId}/proof`);
+                                                const res2 = await api.get(`/api/officedocuments/${officeId}/proof`);
                                                 if (res2.data && res2.data.success) {
                                                     setPersistedProof({ fileName: res2.data.file_name, url: `${API_BASE_URL}${res2.data.url}` });
                                                     setProofFileName(res2.data.file_name);

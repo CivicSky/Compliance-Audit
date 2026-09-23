@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, forwardRef, useImperativeHandle } from "react";
 import { createPortal } from 'react-dom';
-import { officesAPI, requirementsAPI, usersAPI } from "../../utils/api";
+import { officesAPI, requirementsAPI, usersAPI, eventDepartmentsAPI } from "../../utils/api";
 import { useModal } from "../UI/ModalProvider";
 import userIcon from "../../assets/images/user.svg";
 import Pagination from "../Pagination/Pagination";
@@ -8,6 +8,8 @@ import { API_BASE_URL } from '../../utils/apiBase';
 import { formatDateTime } from '../../utils/formatDateTime';
 import { OfficeCardSkeleton } from "../UI/Skeleton";
 import { useLiveRefresh } from "../../utils/liveSync";
+import ServerOfflineState from "../UI/ServerOfflineState";
+import { GraduationCap, Building2, ChevronDown, Award, Layers } from "lucide-react";
 
 const renderOfficeIcon = (office, deleteMode = false) => {
     const isAcademic = office.entity_type_id === 1 || String(office.category_name || office.TypeName || office.office_type_name || office.office_type || "").toLowerCase().includes("academic program") || String(office.category_name || office.TypeName || office.office_type_name || office.office_type || "").toLowerCase().includes("program");
@@ -65,10 +67,17 @@ const OfficesP = forwardRef(
         const isPersonnel = (roleId === 2 || roleId === 3 || roleName.includes('personnel') || roleName.includes('office') || roleName === 'user' || roleName === 'head') && !roleName.includes('auditor') && roleId !== 4 && roleId !== 1 && roleName !== 'admin';
         const isAdmin = (roleId === 1 || roleName === 'admin') && !isPersonnel;
 
+        const [serverError, setServerError] = useState(null);
+        const [isRetrying, setIsRetrying] = useState(false);
+
         // Fetch offices from backend
-        const fetchOffices = async () => {
+        const fetchOffices = async (options = false) => {
+            const isRetry = options === true;
+            const isSilent = Boolean(options && typeof options === 'object' && options.silent) || (offices && offices.length > 0 && !isRetry);
             try {
-                setLoading(true);
+                if (isRetry) setIsRetrying(true);
+                else if (!isSilent) setLoading(true);
+                setServerError(null);
                 const [res, myAssignmentsRes] = await Promise.all([
                     officesAPI.getAll(),
                     requirementsAPI.getMyAssignments().catch(() => null),
@@ -85,19 +94,81 @@ const OfficesP = forwardRef(
 
                 setOffices(officesData);
                 setMyAssignedOfficeCounts(countsByOffice);
-                setSelectedIds([]);
+                if (!isSilent) {
+                    setSelectedIds([]);
+                }
+                setServerError(null);
             } catch (err) {
                 console.error("Failed to load offices:", err);
-                setOffices([]);
-                setMyAssignedOfficeCounts({});
+                if (!isSilent) {
+                    setOffices([]);
+                    setMyAssignedOfficeCounts({});
+                    if (!err.response || err.code === 'ERR_NETWORK' || err.message?.toLowerCase().includes('network error') || err.message?.toLowerCase().includes('failed to fetch')) {
+                        setServerError('Server Offline');
+                    } else {
+                        setServerError(err.response?.data?.message || 'Failed to load offices.');
+                    }
+                }
             } finally {
-                setLoading(false);
+                if (!isSilent) setLoading(false);
+                if (isRetry) setIsRetrying(false);
+            }
+        };
+
+        const [eventDepartments, setEventDepartments] = useState([]);
+        const [loadingDeptLevel, setLoadingDeptLevel] = useState(null);
+
+        const fetchEventDepartments = useCallback(async () => {
+            if (!eventType || eventType === 'all') {
+                setEventDepartments([]);
+                return;
+            }
+            try {
+                const res = await eventDepartmentsAPI.getByEvent(eventType);
+                setEventDepartments(Array.isArray(res?.data) ? res.data : []);
+            } catch (err) {
+                console.error("Failed to load event departments:", err);
+                setEventDepartments([]);
+            }
+        }, [eventType]);
+
+        useEffect(() => {
+            fetchEventDepartments();
+        }, [fetchEventDepartments]);
+
+        const handleUpdateDepartmentLevel = async (eventDeptId, deptId, newLevel) => {
+            try {
+                setLoadingDeptLevel(deptId);
+                if (eventDeptId) {
+                    await eventDepartmentsAPI.updateLevel(eventDeptId, newLevel);
+                } else if (eventType && deptId) {
+                    await eventDepartmentsAPI.assignDepartment({
+                        event_id: Number(eventType),
+                        department_id: Number(deptId),
+                        accreditation_level: newLevel,
+                    });
+                }
+                await fetchEventDepartments();
+                await fetchOffices({ silent: true });
+                if (showAlert) {
+                    showAlert(`Updated accreditation level to ${newLevel}`, 'success');
+                }
+            } catch (err) {
+                console.error("Failed to update accreditation level:", err);
+                if (showAlert) {
+                    showAlert("Failed to update accreditation level", 'error');
+                }
+            } finally {
+                setLoadingDeptLevel(null);
             }
         };
 
         // Expose refresh + delete via ref
         useImperativeHandle(ref, () => ({
-            refresh: fetchOffices,
+            refresh: (opts) => {
+                fetchOffices(opts || { silent: true });
+                fetchEventDepartments();
+            },
             deleteSelected: async (ids) => {
                 try {
                     const targetIds = ids || selectedIds;
@@ -388,6 +459,69 @@ const OfficesP = forwardRef(
             filtered = programFiltered.filter((o) => !isAcademicLabel(o.office_type_name || o.office_type || o.officeTypeName || ''));
         }
 
+        const ACCREDITATION_LEVELS = [
+            'None',
+            'Candidate',
+            'Level I',
+            'Level II',
+            'Level III',
+            'Level IV',
+        ];
+
+        const isAcademicOffice = (o) => {
+            return o.entity_type_id === 1 || isAcademicLabel(o.office_type_name || o.office_type || o.TypeName || o.category_name || '');
+        };
+
+        const academicOffices = useMemo(() => {
+            return filtered.filter(isAcademicOffice);
+        }, [filtered]);
+
+        const nonAcademicOffices = useMemo(() => {
+            return filtered.filter(o => !isAcademicOffice(o));
+        }, [filtered]);
+
+        const academicByDept = useMemo(() => {
+            const map = new Map();
+
+            // Populate from known eventDepartments for this event
+            for (const ed of eventDepartments) {
+                map.set(String(ed.department_id), {
+                    deptId: ed.department_id,
+                    deptName: ed.department_name,
+                    eventDeptId: ed.id,
+                    level: ed.accreditation_level || 'Level I',
+                    programs: [],
+                });
+            }
+
+            // Populate academic offices into their department groups
+            for (const office of academicOffices) {
+                const deptKey = String(office.department_id || 'unassigned');
+                const deptName = office.department_name || 'Unassigned Department';
+
+                if (!map.has(deptKey)) {
+                    map.set(deptKey, {
+                        deptId: office.department_id || null,
+                        deptName,
+                        eventDeptId: office.event_department_id || null,
+                        level: office.accreditation_level || 'Level I',
+                        programs: [],
+                    });
+                }
+
+                const entry = map.get(deptKey);
+                entry.programs.push(office);
+                if (office.event_department_id && !entry.eventDeptId) {
+                    entry.eventDeptId = office.event_department_id;
+                }
+                if (office.accreditation_level && (!entry.level || entry.level === 'Level I')) {
+                    entry.level = office.accreditation_level;
+                }
+            }
+
+            return Array.from(map.values()).filter(group => group.programs.length > 0);
+        }, [academicOffices, eventDepartments]);
+
         // Pagination (cap list view at 30 items per page)
         const [currentPage, setCurrentPage] = useState(1);
         const itemsPerPageGrid = 6; // used only in grid view
@@ -409,467 +543,582 @@ const OfficesP = forwardRef(
             );
         }
 
+        if (serverError) {
+            return (
+                <ServerOfflineState
+                    onRetry={() => fetchOffices(true)}
+                    isRetrying={isRetrying}
+                    title={serverError === 'Server Offline' ? 'Backend Server Unavailable' : 'Unable to Load Offices'}
+                    message={serverError === 'Server Offline' 
+                        ? 'The backend server is unreachable or offline. If you stopped the backend server, please start it and click Retry Connection.' 
+                        : serverError}
+                />
+            );
+        }
+
         if (filtered.length === 0) {
             return (
-                <div className="w-full py-12">
-                    <div className="flex flex-col items-center justify-center max-w-sm mx-auto text-center">
-                        <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mb-3">
-                            <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                            </svg>
-                        </div>
-                        <h3 className="text-sm font-medium text-gray-900 mb-1">No matching offices</h3>
-                        <p className="text-xs text-gray-500">
-                            {searchTerm ? 'Try broadening your search terms.' : 'No offices are assigned to the selected event yet.'}
-                        </p>
+                <div className="flex-1 w-full min-h-[350px] flex flex-col items-center justify-center p-8 text-center bg-white/70 border border-dashed border-slate-200 rounded-2xl animate-fadeIn my-auto">
+                    <div className="w-16 h-16 bg-slate-100 border border-slate-200 text-slate-400 rounded-2xl flex items-center justify-center mb-3">
+                        <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        </svg>
                     </div>
+                    <h3 className="text-base font-bold text-slate-800 mb-1">No Matching Offices</h3>
+                    <p className="text-xs text-slate-500 max-w-sm">
+                        {searchTerm ? 'No programs or offices match your current search or filter.' : 'No offices or programs are assigned to the selected event yet.'}
+                    </p>
                 </div>
             );
         }
 
-        const containerClass = viewMode === 'list' 
-            ? 'space-y-2 relative pb-16 h-full overflow-auto' 
-            : 'h-full flex flex-col justify-between overflow-hidden relative pb-8';
+        // Helper to render individual Office Card (Grid View)
+        const renderOfficeCard = (office) => {
+            const officeId = String(office?.id ?? office?.OfficeID ?? '');
+            const officeHeads = office.heads || [];
+            const officeAuditors = office.auditors || [];
+            const compliancePercent = Math.max(0, Math.min(100, Number(office.compliance_percent || 0)));
+            const statusLabel = office.overall_status === 'Partially Complied' ? 'Partial' : office.overall_status;
+
+            const isSelected = selectedIds.includes(office.id);
+            const isHighlighted = officeId && officeId === String(activeHighlightOfficeId || '');
+            const isAssignedToMe = (myAssignedOfficeCounts[officeId] || 0) > 0;
+
+            const officeEventId = String(office.event_id ?? office.EventID ?? office.eventId ?? '');
+            const matchedEvent = eventsMap.get(officeEventId);
+            const eventCode = matchedEvent?.EventCode ?? matchedEvent?.event_code ?? matchedEvent?.eventCode ?? office.EventCode ?? office.event_code ?? '';
+
+            return (
+                <div
+                    key={office.id}
+                    onClick={() => deleteMode ? handleCheckboxChange(office.id, !isSelected) : onOfficeClick(office)}
+                    className={`
+                        relative rounded-xl bg-white shadow-2xs transition-all duration-200
+                        ${isSelected
+                            ? 'border-2 border-rose-500 ring-2 ring-inset ring-rose-400/50 bg-rose-50/25 shadow-sm'
+                            : deleteMode
+                                ? 'border border-gray-200 hover:border-rose-300 cursor-pointer'
+                                : isAssignedToMe
+                                    ? 'border-cyan-400 bg-cyan-50/40 ring-1 ring-cyan-200 hover:border-cyan-400 cursor-pointer hover:shadow-md'
+                                    : isHighlighted
+                                        ? 'ring-2 ring-cyan-500 border-cyan-300 shadow-[0_0_0_3px_rgba(6,182,212,0.15)] cursor-pointer'
+                                        : 'border border-gray-200 hover:border-cyan-200 hover:shadow-md cursor-pointer'
+                        }
+                    `}
+                >
+                    <div className="h-full p-2.5 rounded-xl overflow-visible bg-gradient-to-b from-white via-white to-slate-50/60 flex flex-col justify-between">
+                        {/* Header */}
+                        <div className="flex items-start justify-between gap-1.5 mb-0.5">
+                            <div className="min-w-0 flex items-start gap-1.5 relative">
+                                {/* Animated checkbox */}
+                                <div
+                                    className="absolute left-0 top-2"
+                                    style={{
+                                        transform: deleteMode ? 'translateX(0)' : 'translateX(-2.5rem)',
+                                        opacity: deleteMode ? 1 : 0,
+                                        transition: 'transform 220ms cubic-bezier(0.2,0.8,0.2,1), opacity 180ms ease',
+                                        pointerEvents: deleteMode ? 'auto' : 'none'
+                                    }}
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked={isSelected}
+                                        onClick={(e) => e.stopPropagation()}
+                                        onChange={(e) => {
+                                            e.stopPropagation();
+                                            handleCheckboxChange(office.id, e.target.checked);
+                                        }}
+                                        className="h-3.5 w-3.5 text-rose-600 rounded border-rose-300 focus:ring-rose-500"
+                                        aria-label="Select office for deletion"
+                                    />
+                                </div>
+
+                                {/* When deleteMode is active translate content */}
+                                <div
+                                    className="flex items-start gap-1.5"
+                                    style={{
+                                        transform: deleteMode ? 'translateX(1.75rem)' : 'translateX(0)',
+                                        transition: 'transform 220ms cubic-bezier(0.2,0.8,0.2,1)'
+                                    }}
+                                >
+                                    {renderOfficeIcon(office, false)}
+                                    <div className="min-w-0">
+                                        <h3 className="text-sm font-semibold text-slate-900 truncate leading-tight">
+                                            {office.office_name}
+                                        </h3>
+                                        <p className="text-[10px] text-slate-500 truncate leading-tight mt-0.5">
+                                            {eventCode || (officeEventId ? `#${officeEventId}` : 'No event')}
+                                        </p>
+                                        {(office.department_name || office.program_type_name) && (
+                                            <p className="text-[10px] text-slate-400 truncate leading-tight">
+                                                {office.department_name ? office.department_name : ''}
+                                                {office.department_name && office.program_type_name ? ' • ' : ''}
+                                                {office.program_type_name ? office.program_type_name : ''}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex items-start gap-1 shrink-0">
+                                <span className="px-1.5 py-0.5 text-[10px] font-medium bg-indigo-50 text-indigo-700 rounded-md border border-indigo-100 overflow-hidden max-w-[7.5rem] truncate">
+                                    {office.office_type_name}
+                                </span>
+
+                                {!deleteMode && isAdmin && (
+                                    <div className="relative z-40">
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                const rect = e.currentTarget.getBoundingClientRect();
+                                                setOpenMenuOfficeId((prev) => (prev === office.id ? null : office.id));
+                                                setOpenMenuAnchorRect((prev) => (prev && String(openMenuOfficeId) === String(office.id) ? null : rect));
+                                            }}
+                                            className="office-card-actions-button inline-flex h-6 w-6 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-100 z-40"
+                                            aria-label="Open office actions"
+                                        >
+                                            <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                <circle cx="12" cy="5" r="2" />
+                                                <circle cx="12" cy="12" r="2" />
+                                                <circle cx="12" cy="19" r="2" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Created & Updated Timestamps */}
+                        <div className="mt-1 mb-1 flex items-center justify-between text-[10px] text-slate-500 border-t border-slate-100 pt-1 px-0.5">
+                            <div className="truncate">
+                                <span className="font-semibold uppercase text-slate-400 text-[9px]">Created: </span>
+                                <span className="font-medium text-slate-600">{formatDateTime(office.created_at)}</span>
+                            </div>
+                            <div className="truncate text-right">
+                                <span className="font-semibold uppercase text-slate-400 text-[9px]">Updated: </span>
+                                <span className="font-medium text-slate-600">{formatDateTime(office.updated_at || office.created_at)}</span>
+                            </div>
+                        </div>
+
+                        {/* Requirement and status */}
+                        <div className="rounded-lg border border-slate-200/90 bg-white/90 px-2 py-1 mb-1">
+                            <div className="flex items-center justify-between">
+                                <span className="text-[11px] text-slate-500">
+                                    {office.total_requirements || 0} requirements
+                                </span>
+                                <span className={`
+                                    inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold rounded-full border
+                                    ${getStatusStyle(office.overall_status)}
+                                `}>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${getStatusDot(office.overall_status)}`}></span>
+                                    {statusLabel}
+                                </span>
+                            </div>
+                            <div className="mt-1">
+                                <div className="flex items-center justify-between text-[10px] text-slate-500 mb-0.5">
+                                    <span>Compliance</span>
+                                    <span className="font-bold text-slate-700">{compliancePercent.toFixed(0)}%</span>
+                                </div>
+                                <div className="h-1 rounded-full bg-slate-200 overflow-hidden">
+                                    <div
+                                        className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-indigo-500"
+                                        style={{ width: `${compliancePercent}%` }}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Personnel & Auditor Section */}
+                        <div className="border-t border-slate-100 pt-1">
+                            <div className="flex items-center justify-between mb-1">
+                                <div className="flex items-center gap-1.5">
+                                    <span className="text-[10px] font-semibold text-slate-500">Personnel</span>
+                                    {officeHeads.length > 0 && (
+                                        <span className="text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded-full">
+                                            {officeHeads.length}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <span className="text-[10px] font-semibold text-sky-600">Auditor</span>
+                                    {officeAuditors.length > 0 && (
+                                        <span className="text-[9px] font-bold text-sky-700 bg-sky-50 px-1.5 py-0.2 rounded-full border border-sky-100">
+                                            {officeAuditors.length}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="flex items-start justify-between gap-1.5 pt-0.5">
+                                {/* Left: Personnel list */}
+                                <div className="flex items-start gap-2 flex-wrap flex-1 min-w-0">
+                                    {officeHeads.length === 0 ? (
+                                        <div className="flex flex-col items-center max-w-[52px]">
+                                            <div className="w-6 h-6 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center">
+                                                <img src={userIcon} alt="Unassigned" className="w-3.5 h-3.5 opacity-50" />
+                                            </div>
+                                            <span className="text-[9px] text-slate-400 text-center truncate w-full mt-0.5">Unassigned</span>
+                                        </div>
+                                    ) : (
+                                        officeHeads.map((head) => {
+                                            const headPicUrl = head.ProfilePic
+                                                ? `${API_BASE_URL}/uploads/profile-pics/${head.ProfilePic}`
+                                                : userIcon;
+                                            const firstName = (head.full_name || head.FirstName || 'Personnel').split(' ')[0];
+                                            return (
+                                                <div key={head.HeadID} className="group relative flex flex-col items-center max-w-[54px]">
+                                                    <img
+                                                        src={headPicUrl}
+                                                        alt={head.full_name}
+                                                        className="h-6 w-6 rounded-full object-cover border border-white shadow-2xs"
+                                                        onError={(e) => { e.target.src = userIcon; }}
+                                                    />
+                                                    <span 
+                                                        className="text-[9px] text-slate-600 text-center truncate w-full mt-0.5 font-medium leading-tight" 
+                                                        title={head.full_name}
+                                                    >
+                                                        {firstName}
+                                                    </span>
+                                                    <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1 -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[10px] font-medium text-white opacity-0 shadow transition-opacity duration-150 group-hover:opacity-100">
+                                                        {head.full_name} (Personnel)
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
+                                    )}
+                                </div>
+
+                                {/* Vertical Separator */}
+                                <div className="self-stretch w-px bg-slate-200 my-0.5 shrink-0" />
+
+                                {/* Right: Auditor */}
+                                <div className="flex items-start justify-end gap-1.5 shrink-0">
+                                    {officeAuditors.length === 0 ? (
+                                        <div className="flex flex-col items-center max-w-[52px]">
+                                            <div className="w-6 h-6 rounded-full bg-sky-50 border border-sky-100 flex items-center justify-center">
+                                                <img src={userIcon} alt="No auditor" className="w-3.5 h-3.5 opacity-40" />
+                                            </div>
+                                            <span className="text-[9px] text-slate-400 text-center truncate w-full mt-0.5">None</span>
+                                        </div>
+                                    ) : (
+                                        officeAuditors.map((aud) => {
+                                            const audPicUrl = aud.ProfilePic
+                                                ? `${API_BASE_URL}/uploads/profile-pics/${aud.ProfilePic}`
+                                                : userIcon;
+                                            const firstName = (aud.full_name || aud.FirstName || 'Auditor').split(' ')[0];
+                                            return (
+                                                <div key={aud.UserID} className="group relative flex flex-col items-center max-w-[54px]">
+                                                    <img
+                                                        src={audPicUrl}
+                                                        alt={aud.full_name}
+                                                        className="h-6 w-6 rounded-full object-cover border-2 border-sky-300 shadow-2xs ring-1 ring-sky-100"
+                                                        onError={(e) => { e.target.src = userIcon; }}
+                                                    />
+                                                    <span 
+                                                        className="text-[9px] text-sky-700 text-center truncate w-full mt-0.5 font-semibold leading-tight" 
+                                                        title={aud.full_name}
+                                                    >
+                                                        {firstName}
+                                                    </span>
+                                                    <div className="pointer-events-none absolute bottom-full right-0 z-50 mb-1 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[10px] font-medium text-white opacity-0 shadow transition-opacity duration-150 group-hover:opacity-100">
+                                                        {aud.full_name} (Auditor)
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Helper to render individual Office List Row (List View)
+        const renderOfficeListRow = (office) => {
+            const officeHeads = office.heads || [];
+            const officeId = String(office?.id ?? office?.OfficeID ?? '');
+            const officeEventId = String(office.event_id ?? office.EventID ?? office.eventId ?? '');
+            const matchedEvent = eventsMap.get(officeEventId);
+            const eventCode = matchedEvent?.EventCode ?? matchedEvent?.event_code ?? matchedEvent?.eventCode ?? office.EventCode ?? office.event_code ?? '';
+
+            const isSelected = selectedIds.includes(office.id);
+            const isHighlighted = officeId && officeId === String(activeHighlightOfficeId || '');
+            const isAssignedToMe = (myAssignedOfficeCounts[officeId] || 0) > 0;
+
+            return (
+                <div
+                    key={office.id}
+                    onClick={() => deleteMode ? handleCheckboxChange(office.id, !isSelected) : onOfficeClick(office)}
+                    className={`
+                        relative rounded-xl bg-white shadow-sm transition-all duration-200
+                        ${isSelected
+                            ? 'border-2 border-rose-500 ring-2 ring-inset ring-rose-400/50 bg-rose-50/25 shadow-sm'
+                            : deleteMode
+                                ? 'border border-gray-200 hover:border-rose-300 cursor-pointer'
+                                : isAssignedToMe
+                                    ? 'border-cyan-400 bg-cyan-50/40 ring-1 ring-cyan-200 hover:border-cyan-400 cursor-pointer hover:shadow-md'
+                                    : isHighlighted
+                                        ? 'ring-2 ring-cyan-500 border-cyan-300 bg-cyan-50/40 cursor-pointer'
+                                        : 'border border-gray-200 hover:border-indigo-200 hover:shadow-md cursor-pointer'
+                        }
+                    `}
+                >
+                    <div className="grid grid-cols-[minmax(120px,1fr)_160px_160px_100px_140px_80px] gap-6 items-center px-6 py-4">
+                        {/* Office Name */}
+                        <div className="flex items-center gap-3 min-w-0 relative">
+                            <div
+                                className="absolute left-0 top-3"
+                                style={{
+                                    transform: deleteMode ? 'translateX(0)' : 'translateX(-2.5rem)',
+                                    opacity: deleteMode ? 1 : 0,
+                                    transition: 'transform 220ms cubic-bezier(0.2,0.8,0.2,1), opacity 180ms ease',
+                                    pointerEvents: deleteMode ? 'auto' : 'none'
+                                }}
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onChange={(e) => { e.stopPropagation(); handleCheckboxChange(office.id, e.target.checked); }}
+                                    className="h-4 w-4 text-rose-600 rounded border-rose-300 focus:ring-rose-500"
+                                />
+                            </div>
+
+                            {renderOfficeIcon(office, deleteMode)}
+
+                            <div className="min-w-0">
+                                <div className="text-sm font-semibold text-slate-900 truncate">{office.office_name}</div>
+                                <div className="text-xs text-slate-500 truncate">{eventCode}</div>
+                                {(office.department_name || office.program_type_name) && (
+                                    <div className="text-xs text-slate-400 truncate">{office.department_name ? office.department_name : ''}{office.department_name && office.program_type_name ? ' • ' : ''}{office.program_type_name ? office.program_type_name : ''}</div>
+                                )}
+                                <div className="text-[10px] text-slate-400 truncate mt-0.5">
+                                    <span className="font-semibold text-slate-400 uppercase">Created:</span> {formatDateTime(office.created_at)} • <span className="font-semibold text-slate-400 uppercase">Updated:</span> {formatDateTime(office.updated_at || office.created_at)}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Office Type */}
+                        <div className="flex items-center justify-center text-sm text-slate-700">
+                            <div className="inline-block px-2 py-0.5 text-xs font-medium bg-indigo-50 text-indigo-700 rounded-full border">{office.office_type_name}</div>
+                        </div>
+
+                        {/* Compliance Status */}
+                        <div className="flex items-center justify-center">
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full border ${getStatusStyle(office.overall_status)}`}>
+                                <span className={`w-2 h-2 rounded-full ${getStatusDot(office.overall_status)}`}></span>
+                                {office.overall_status}
+                            </span>
+                        </div>
+
+                        {/* Requirements */}
+                        <div className="flex items-center justify-center">
+                            <div className="text-sm font-medium text-slate-800">{office.total_requirements || 0}</div>
+                        </div>
+
+                        {/* Personnel */}
+                        <div className="flex items-center justify-start">
+                            <div className="flex items-center space-x-3">
+                                {officeHeads.slice(0, 4).map((head, idx) => (
+                                    <img
+                                        key={head.HeadID || idx}
+                                        src={head.ProfilePic ? `${API_BASE_URL}/uploads/profile-pics/${head.ProfilePic}` : userIcon}
+                                        alt={head.full_name}
+                                        className="w-8 h-8 rounded-full object-cover border-2 border-white shadow-sm"
+                                        onError={(e) => { e.target.src = userIcon; }}
+                                    />
+                                ))}
+                                {officeHeads.length > 4 && (
+                                    <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-medium text-slate-600 border-2 border-white">
+                                        +{officeHeads.length - 4}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center justify-end pr-3">
+                            {!deleteMode && isAdmin && (
+                                <div className="relative">
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            const rect = e.currentTarget.getBoundingClientRect();
+                                            setOpenMenuOfficeId((prev) => (prev === office.id ? null : office.id));
+                                            setOpenMenuAnchorRect((prev) => (prev && String(openMenuOfficeId) === String(office.id) ? null : rect));
+                                        }}
+                                        className="office-card-actions-button inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-100 ml-2"
+                                        aria-label="Open office actions"
+                                    >
+                                        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                            <circle cx="12" cy="5" r="2" />
+                                            <circle cx="12" cy="12" r="2" />
+                                            <circle cx="12" cy="19" r="2" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Controls whether bottom pagination is visible. Set to true if pagination is needed again in the future.
+        const SHOW_PAGINATION = false;
+        const containerClass = `space-y-4 relative ${SHOW_PAGINATION ? 'pb-16' : 'pb-6'} h-full overflow-auto pr-1`;
 
         return (
             <div className={containerClass}>
-                {/* Grid View */}
-                {viewMode === 'grid' && (
-                    <>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pb-1">
-                            {paginated.map((office) => {
-                                const officeId = String(office?.id ?? office?.OfficeID ?? '');
-                                const officeHeads = office.heads || [];
-                                const officeAuditors = office.auditors || [];
-                                const compliancePercent = Math.max(0, Math.min(100, Number(office.compliance_percent || 0)));
-                                const statusLabel = office.overall_status === 'Partially Complied' ? 'Partial' : office.overall_status;
-
-                                const isSelected = selectedIds.includes(office.id);
-                                const isHighlighted = officeId && officeId === String(activeHighlightOfficeId || '');
-                                const isMenuOpen = openMenuOfficeId === office.id;
-                                const isAssignedToMe = (myAssignedOfficeCounts[officeId] || 0) > 0;
-
-                                const officeEventId = String(office.event_id ?? office.EventID ?? office.eventId ?? '');
-                                const matchedEvent = eventsMap.get(officeEventId);
-                                const eventCode = matchedEvent?.EventCode ?? matchedEvent?.event_code ?? matchedEvent?.eventCode ?? office.EventCode ?? office.event_code ?? '';
-                                const displayEvent = eventCode || (officeEventId ? `#${officeEventId}` : 'No event');
-
-                                return (
-                                    <div
-                                        key={office.id}
-                                        onClick={() => !deleteMode && onOfficeClick(office)}
-                                        className={`
-                                        relative overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xs transition-all duration-200
-                                        ${deleteMode
-                                                ? 'hover:border-gray-300'
-                                                : 'hover:border-cyan-200 hover:shadow-md cursor-pointer'
-                                            }
-                                        ${isAssignedToMe ? 'border-cyan-400 bg-cyan-50/40 ring-1 ring-cyan-200' : ''}
-                                        ${isSelected ? 'ring-2 ring-indigo-500 border-indigo-500 bg-indigo-50/30' : ''}
-                                        ${isHighlighted ? 'ring-2 ring-cyan-500 border-cyan-300 shadow-[0_0_0_3px_rgba(6,182,212,0.15)]' : ''}
-                                    `}
-                                    >
-                                        <div className="h-full p-2.5 rounded-xl overflow-visible bg-gradient-to-b from-white via-white to-slate-50/60 flex flex-col justify-between">
-                                            {/* Header */}
-                                            <div className="flex items-start justify-between gap-1.5 mb-0.5">
-                                                <div className={`min-w-0 flex items-start gap-1.5 relative`}>
-                                                    {/* Animated checkbox */}
-                                                    <div
-                                                        className={`absolute left-0 top-2`}
-                                                        style={{
-                                                            transform: deleteMode ? 'translateX(0)' : 'translateX(-2.5rem)',
-                                                            opacity: deleteMode ? 1 : 0,
-                                                            transition: 'transform 220ms cubic-bezier(0.2,0.8,0.2,1), opacity 180ms ease',
-                                                            pointerEvents: deleteMode ? 'auto' : 'none'
-                                                        }}
-                                                    >
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={isSelected}
-                                                            onClick={(e) => e.stopPropagation()}
-                                                            onChange={(e) => {
-                                                                e.stopPropagation();
-                                                                handleCheckboxChange(office.id, e.target.checked);
-                                                            }}
-                                                            className="h-3.5 w-3.5 text-indigo-600 rounded border-gray-300 focus:ring-brand-500"
-                                                            aria-label="Select office for deletion"
-                                                        />
-                                                    </div>
-
-                                                    {/* When deleteMode is active translate content */}
-                                                    <div
-                                                        className={`flex items-start gap-1.5`}
-                                                        style={{
-                                                            transform: deleteMode ? 'translateX(1.75rem)' : 'translateX(0)',
-                                                            transition: 'transform 220ms cubic-bezier(0.2,0.8,0.2,1)'
-                                                        }}
-                                                    >
-                                                        {renderOfficeIcon(office, false)}
-                                                        <div className="min-w-0">
-                                                            <h3 className={`text-sm font-semibold text-slate-900 truncate leading-tight`}>
-                                                                {office.office_name}
-                                                            </h3>
-                                                            <p className="text-[10px] text-slate-500 truncate leading-tight mt-0.5">
-                                                                {eventCode || (officeEventId ? `#${officeEventId}` : 'No event')}
-                                                            </p>
-                                                            {(office.department_name || office.program_type_name) && (
-                                                                <p className="text-[10px] text-slate-400 truncate leading-tight">
-                                                                    {office.department_name ? office.department_name : ''}
-                                                                    {office.department_name && office.program_type_name ? ' • ' : ''}
-                                                                    {office.program_type_name ? office.program_type_name : ''}
-                                                                </p>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-start gap-1 shrink-0">
-                                                    <span className="px-1.5 py-0.5 text-[10px] font-medium bg-indigo-50 text-indigo-700 rounded-md border border-indigo-100 overflow-hidden max-w-[7.5rem] truncate">
-                                                        {office.office_type_name}
-                                                    </span>
-
-                                                    {!deleteMode && isAdmin && (
-                                                        <div className="relative z-40">
-                                                            <button
-                                                                type="button"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    const rect = e.currentTarget.getBoundingClientRect();
-                                                                    setOpenMenuOfficeId((prev) => (prev === office.id ? null : office.id));
-                                                                    setOpenMenuAnchorRect((prev) => (prev && String(openMenuOfficeId) === String(office.id) ? null : rect));
-                                                                }}
-                                                                className="office-card-actions-button inline-flex h-6 w-6 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-100 z-40"
-                                                                aria-label="Open office actions"
-                                                            >
-                                                                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6h.01M12 12h.01M12 18h.01" />
-                                                                </svg>
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            {/* Created & Updated Timestamps */}
-                                            <div className="mt-1 mb-1 flex items-center justify-between text-[10px] text-slate-500 border-t border-slate-100 pt-1 px-0.5">
-                                                <div className="truncate">
-                                                    <span className="font-semibold uppercase text-slate-400 text-[9px]">Created: </span>
-                                                    <span className="font-medium text-slate-600">{formatDateTime(office.created_at)}</span>
-                                                </div>
-                                                <div className="truncate text-right">
-                                                    <span className="font-semibold uppercase text-slate-400 text-[9px]">Updated: </span>
-                                                    <span className="font-medium text-slate-600">{formatDateTime(office.updated_at || office.created_at)}</span>
-                                                </div>
-                                            </div>
-
-                                            {/* Requirement and status */}
-                                            <div className="rounded-lg border border-slate-200/90 bg-white/90 px-2 py-1 mb-1">
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-[11px] text-slate-500">
-                                                        {office.total_requirements || 0} requirements
-                                                    </span>
-                                                    <span className={`
-                                                    inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold rounded-full border
-                                                    ${getStatusStyle(office.overall_status)}
-                                                `}>
-                                                        <span className={`w-1.5 h-1.5 rounded-full ${getStatusDot(office.overall_status)}`}></span>
-                                                        {statusLabel}
-                                                    </span>
-                                                </div>
-                                                <div className="mt-1">
-                                                    <div className="flex items-center justify-between text-[10px] text-slate-500 mb-0.5">
-                                                        <span>Compliance</span>
-                                                        <span className="font-bold text-slate-700">{compliancePercent.toFixed(0)}%</span>
-                                                    </div>
-                                                    <div className="h-1 rounded-full bg-slate-200 overflow-hidden">
-                                                        <div
-                                                            className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-indigo-500"
-                                                            style={{ width: `${compliancePercent}%` }}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* Personnel & Auditor Section */}
-                                            <div className="border-t border-slate-100 pt-1">
-                                                <div className="flex items-center justify-between mb-1">
-                                                    <div className="flex items-center gap-1.5">
-                                                        <span className="text-[10px] font-semibold text-slate-500">Personnel</span>
-                                                        {officeHeads.length > 0 && (
-                                                            <span className="text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded-full">
-                                                                {officeHeads.length}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                    <div className="flex items-center gap-1">
-                                                        <span className="text-[10px] font-semibold text-sky-600">Auditor</span>
-                                                        {officeAuditors.length > 0 && (
-                                                            <span className="text-[9px] font-bold text-sky-700 bg-sky-50 px-1.5 py-0.2 rounded-full border border-sky-100">
-                                                                {officeAuditors.length}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </div>
-
-                                                <div className="flex items-start justify-between gap-1.5 pt-0.5">
-                                                    {/* Left: Personnel list */}
-                                                    <div className="flex items-start gap-2 flex-wrap flex-1 min-w-0">
-                                                        {officeHeads.length === 0 ? (
-                                                            <div className="flex flex-col items-center max-w-[52px]">
-                                                                <div className="w-6 h-6 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center">
-                                                                    <img src={userIcon} alt="Unassigned" className="w-3.5 h-3.5 opacity-50" />
-                                                                </div>
-                                                                <span className="text-[9px] text-slate-400 text-center truncate w-full mt-0.5">Unassigned</span>
-                                                            </div>
-                                                        ) : (
-                                                            officeHeads.map((head) => {
-                                                                const headPicUrl = head.ProfilePic
-                                                                    ? `${API_BASE_URL}/uploads/profile-pics/${head.ProfilePic}`
-                                                                    : userIcon;
-                                                                const firstName = (head.full_name || head.FirstName || 'Personnel').split(' ')[0];
-                                                                return (
-                                                                    <div key={head.HeadID} className="group relative flex flex-col items-center max-w-[54px]">
-                                                                        <img
-                                                                            src={headPicUrl}
-                                                                            alt={head.full_name}
-                                                                            className="h-6 w-6 rounded-full object-cover border border-white shadow-2xs"
-                                                                            onError={(e) => { e.target.src = userIcon; }}
-                                                                        />
-                                                                        <span 
-                                                                            className="text-[9px] text-slate-600 text-center truncate w-full mt-0.5 font-medium leading-tight" 
-                                                                            title={head.full_name}
-                                                                        >
-                                                                            {firstName}
-                                                                        </span>
-                                                                        <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1 -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[10px] font-medium text-white opacity-0 shadow transition-opacity duration-150 group-hover:opacity-100">
-                                                                            {head.full_name} (Personnel)
-                                                                        </div>
-                                                                    </div>
-                                                                );
-                                                            })
-                                                        )}
-                                                    </div>
-
-                                                    {/* Vertical Separator | */}
-                                                    <div className="self-stretch w-px bg-slate-200 my-0.5 shrink-0" />
-
-                                                    {/* Right: Auditor (o) */}
-                                                    <div className="flex items-start justify-end gap-1.5 shrink-0">
-                                                        {officeAuditors.length === 0 ? (
-                                                            <div className="flex flex-col items-center max-w-[52px]">
-                                                                <div className="w-6 h-6 rounded-full bg-sky-50 border border-sky-100 flex items-center justify-center">
-                                                                    <img src={userIcon} alt="No auditor" className="w-3.5 h-3.5 opacity-40" />
-                                                                </div>
-                                                                <span className="text-[9px] text-slate-400 text-center truncate w-full mt-0.5">None</span>
-                                                            </div>
-                                                        ) : (
-                                                            officeAuditors.map((aud) => {
-                                                                const audPicUrl = aud.ProfilePic
-                                                                    ? `${API_BASE_URL}/uploads/profile-pics/${aud.ProfilePic}`
-                                                                    : userIcon;
-                                                                const firstName = (aud.full_name || aud.FirstName || 'Auditor').split(' ')[0];
-                                                                return (
-                                                                    <div key={aud.UserID} className="group relative flex flex-col items-center max-w-[54px]">
-                                                                        <img
-                                                                            src={audPicUrl}
-                                                                            alt={aud.full_name}
-                                                                            className="h-6 w-6 rounded-full object-cover border-2 border-sky-300 shadow-2xs ring-1 ring-sky-100"
-                                                                            onError={(e) => { e.target.src = userIcon; }}
-                                                                        />
-                                                                        <span 
-                                                                            className="text-[9px] text-sky-700 text-center truncate w-full mt-0.5 font-semibold leading-tight" 
-                                                                            title={aud.full_name}
-                                                                        >
-                                                                            {firstName}
-                                                                        </span>
-                                                                        <div className="pointer-events-none absolute bottom-full right-0 z-50 mb-1 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[10px] font-medium text-white opacity-0 shadow transition-opacity duration-150 group-hover:opacity-100">
-                                                                            {aud.full_name} (Auditor)
-                                                                        </div>
-                                                                    </div>
-                                                                );
-                                                            })
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </>
-                )}
-
-                {/* List View - table-like header + rows */}
-                {viewMode === 'list' && (
-                    <>
-                        <div className="space-y-2">
-                            {/* Header Row (sticky when rendered here) */}
-                            {!hideHeader && (
-                                <div className="hidden md:grid grid-cols-[minmax(120px,1fr)_160px_160px_100px_140px_80px] gap-6 px-4 py-3 bg-white border border-slate-200 rounded-xl shadow-sm text-xs font-semibold text-gray-700 sticky top-0 z-30" style={{ minWidth: '800px' }}>
-                                    <div className="flex items-center">Office Name</div>
-                                    <div className="flex items-center justify-center">Office Type</div>
-                                    <div className="flex items-center justify-center">Compliance Status</div>
-                                    <div className="flex items-center justify-center">Requirements</div>
-                                    <div className="flex items-center justify-center">Personnel</div>
-                                    <div className="flex items-center justify-end">Actions</div>
+                {/* ── ACADEMIC DEPARTMENTS & PROGRAMS SECTION ── */}
+                {academicByDept.length > 0 && (
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between px-1">
+                            <div className="flex items-center gap-2">
+                                <div className="h-6 w-6 rounded-md bg-blue-100 text-blue-700 flex items-center justify-center">
+                                    <GraduationCap className="h-3.5 w-3.5" />
                                 </div>
-                            )}
+                                <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
+                                    Academic Departments & Programs
+                                </h2>
+                                <span className="text-[11px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200/80">
+                                    {academicByDept.length} {academicByDept.length === 1 ? 'Department' : 'Departments'}
+                                </span>
+                            </div>
+                        </div>
 
-                            {paginated.map((office) => {
-                                const officeHeads = office.heads || [];
-                                const officeId = String(office?.id ?? office?.OfficeID ?? '');
-                                const officeEventId = String(office.event_id ?? office.EventID ?? office.eventId ?? '');
-                                const matchedEvent = eventsMap.get(officeEventId);
-                                const eventCode = matchedEvent?.EventCode ?? matchedEvent?.event_code ?? matchedEvent?.eventCode ?? office.EventCode ?? office.event_code ?? '';
-
-                                const isSelected = selectedIds.includes(office.id);
-                                const isHighlighted = officeId && officeId === String(activeHighlightOfficeId || '');
-                                const isAssignedToMe = (myAssignedOfficeCounts[officeId] || 0) > 0;
-
-                                return (
-                                    <div
-                                        key={office.id}
-                                        onClick={() => !deleteMode && onOfficeClick(office)}
-                                        className={`
-                                            relative ${viewMode === 'list' ? 'overflow-visible' : 'overflow-hidden'} rounded-xl border border-gray-200 bg-white shadow-sm transition-all duration-200
-                                            ${deleteMode ? 'hover:border-gray-300' : 'hover:border-indigo-200 hover:shadow-md cursor-pointer'}
-                                            ${isAssignedToMe ? 'border-cyan-400 bg-cyan-50/40 ring-1 ring-cyan-200' : ''}
-                                            ${isSelected ? 'ring-2 ring-indigo-500 border-indigo-500 bg-indigo-50/30' : ''}
-                                            ${isHighlighted ? 'ring-2 ring-cyan-500 border-cyan-300 bg-cyan-50/40' : ''}
-                                        `}
-                                    >
-                                        <div className="grid grid-cols-[minmax(120px,1fr)_160px_160px_100px_140px_80px] gap-6 items-center px-6 py-4">
-                                            {/* Office Name */}
-                                            <div className="flex items-center gap-3 min-w-0 relative">
-                                                {/* Animated checkbox: absolute so no reserved space when hidden */}
-                                                <div
-                                                    className={`absolute left-0 top-3`}
-                                                    style={{
-                                                        transform: deleteMode ? 'translateX(0)' : 'translateX(-2.5rem)',
-                                                        opacity: deleteMode ? 1 : 0,
-                                                        transition: 'transform 220ms cubic-bezier(0.2,0.8,0.2,1), opacity 180ms ease',
-                                                        pointerEvents: deleteMode ? 'auto' : 'none'
-                                                    }}
-                                                >
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={isSelected}
-                                                        onClick={(e) => e.stopPropagation()}
-                                                        onChange={(e) => { e.stopPropagation(); handleCheckboxChange(office.id, e.target.checked); }}
-                                                        className="h-4 w-4 text-indigo-600 rounded border-gray-300"
-                                                    />
-                                                </div>
-
-                                                {renderOfficeIcon(office, deleteMode)}
-
-                                                <div className="min-w-0">
-                                                    <div className="text-sm font-semibold text-slate-900 truncate">{office.office_name}</div>
-                                                    <div className="text-xs text-slate-500 truncate">{eventCode}</div>
-                                                    {(office.department_name || office.program_type_name) && (
-                                                        <div className="text-xs text-slate-400 truncate">{office.department_name ? office.department_name : ''}{office.department_name && office.program_type_name ? ' • ' : ''}{office.program_type_name ? office.program_type_name : ''}</div>
-                                                    )}
-                                                    <div className="text-[10px] text-slate-400 truncate mt-0.5">
-                                                        <span className="font-semibold text-slate-400 uppercase">Created:</span> {formatDateTime(office.created_at)} • <span className="font-semibold text-slate-400 uppercase">Updated:</span> {formatDateTime(office.updated_at || office.created_at)}
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* Office Type */}
-                                            <div className="flex items-center justify-center text-sm text-slate-700">
-                                                <div className="inline-block px-2 py-0.5 text-xs font-medium bg-indigo-50 text-indigo-700 rounded-full border">{office.office_type_name}</div>
-                                            </div>
-
-                                            {/* Compliance Status */}
-                                            <div className="flex items-center justify-center">
-                                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full border ${getStatusStyle(office.overall_status)}`}>
-                                                    <span className={`w-2 h-2 rounded-full ${getStatusDot(office.overall_status)}`}></span>
-                                                    {office.overall_status}
+                        {academicByDept.map((deptGroup) => (
+                            <div
+                                key={deptGroup.deptId || deptGroup.deptName}
+                                className="rounded-2xl border border-slate-200/90 bg-white shadow-2xs overflow-hidden transition-all"
+                            >
+                                {/* Department Header Banner */}
+                                <div className="bg-gradient-to-r from-slate-50 via-slate-50 to-blue-50/40 px-4 py-3 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                    <div className="flex items-center gap-3">
+                                        <div className="h-9 w-9 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-2xs">
+                                            <GraduationCap className="h-5 w-5" />
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <h3 className="text-base font-bold text-slate-900 tracking-tight">
+                                                    {deptGroup.deptName}
+                                                </h3>
+                                                <span className="text-[10px] font-semibold text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-md">
+                                                    {deptGroup.programs.length} {deptGroup.programs.length === 1 ? 'Program' : 'Programs'}
                                                 </span>
                                             </div>
-
-                                            {/* Requirements */}
-                                            <div className="flex items-center justify-center">
-                                                <div className="text-sm font-medium text-slate-800">{office.total_requirements || 0}</div>
-                                            </div>
-
-                                            {/* Personnel */}
-                                            <div className="flex items-center justify-start">
-                                                <div className="flex items-center space-x-3">
-                                                    {officeHeads.slice(0, 4).map((head, idx) => (
-                                                        <img
-                                                            key={head.HeadID || idx}
-                                                            src={head.ProfilePic ? `${API_BASE_URL}/uploads/profile-pics/${head.ProfilePic}` : userIcon}
-                                                            alt={head.full_name}
-                                                            className="w-8 h-8 rounded-full object-cover border-2 border-white shadow-sm"
-                                                            onError={(e) => { e.target.src = userIcon; }}
-                                                        />
-                                                    ))}
-                                                    {officeHeads.length > 4 && (
-                                                        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-medium text-slate-600 border-2 border-white">
-                                                            +{officeHeads.length - 4}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            {/* Actions & Delete Checkbox (far right) */}
-                                            <div className="flex items-center justify-end pr-3">
-                                                {!deleteMode && isAdmin && (
-                                                    <div className="relative">
-                                                        <button
-                                                            type="button"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                const rect = e.currentTarget.getBoundingClientRect();
-                                                                setOpenMenuOfficeId((prev) => (prev === office.id ? null : office.id));
-                                                                setOpenMenuAnchorRect((prev) => (prev && String(openMenuOfficeId) === String(office.id) ? null : rect));
-                                                            }}
-                                                            className="office-card-actions-button inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-100 ml-2"
-                                                            aria-label="Open office actions"
-                                                        >
-                                                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6h.01M12 12h.01M12 18h.01" />
-                                                            </svg>
-                                                        </button>
-
-                                                        {/* menu rendered in portal to avoid clipping */}
-                                                    </div>
-                                                )}
-
-                                                {/* delete checkbox moved to left side of name column and animated there */}
-                                            </div>
+                                            <p className="text-[10px] text-slate-400">Department</p>
                                         </div>
                                     </div>
-                                );
-                            })}
-                        </div>
-                    </>
+
+                                    {/* Level Badge - Fixed to department's accreditation level in green */}
+                                    <div className="flex items-center gap-2 self-start sm:self-auto">
+                                        <span className="text-xs font-semibold text-slate-500">Accreditation Level:</span>
+                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg shadow-2xs">
+                                            <Award className="h-3.5 w-3.5 text-emerald-600" />
+                                            {deptGroup.level || 'Level I'}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Department Programs List/Grid */}
+                                <div className="p-3 bg-slate-50/20">
+                                    {viewMode === 'grid' ? (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                            {deptGroup.programs.map(renderOfficeCard)}
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {deptGroup.programs.map(renderOfficeListRow)}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 )}
 
-                {/* Pagination controls */}
-                <Pagination
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    onPageChange={(p) => setCurrentPage(p)}
-                    fixed={viewMode !== 'list'}
-                    showWhenSinglePage={true}
-                />
+                {/* ── NON-ACADEMIC OFFICES SECTION ── */}
+                {nonAcademicOffices.length > 0 && (
+                    <div className="space-y-4 pt-2">
+                        <div className="flex items-center justify-between px-1">
+                            <div className="flex items-center gap-2">
+                                <div className="h-6 w-6 rounded-md bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                                    <Building2 className="h-3.5 w-3.5" />
+                                </div>
+                                <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
+                                    Non-Academic Offices
+                                </h2>
+                                <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/80">
+                                    {nonAcademicOffices.length} {nonAcademicOffices.length === 1 ? 'Office' : 'Offices'}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div className="rounded-2xl border border-slate-200/90 bg-white shadow-2xs overflow-hidden">
+                            {/* Non-Academic Banner */}
+                            <div className="bg-gradient-to-r from-slate-50 via-slate-50 to-emerald-50/40 px-4 py-3 border-b border-slate-200/80 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="h-9 w-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold shadow-2xs">
+                                        <Building2 className="h-5 w-5" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-base font-bold text-slate-900 tracking-tight">
+                                            Institutional Units & Offices
+                                        </h3>
+                                        <p className="text-[10px] text-slate-400">Evaluated independently of academic departments</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Non-Academic Programs List/Grid */}
+                            <div className="p-3 bg-slate-50/20">
+                                {viewMode === 'grid' ? (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                        {nonAcademicOffices.map(renderOfficeCard)}
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {nonAcademicOffices.map(renderOfficeListRow)}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Pagination controls - hidden per request as academic & non-academic views render all grouped items. Set SHOW_PAGINATION to true to re-enable */}
+                {SHOW_PAGINATION && (
+                    <Pagination
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        onPageChange={(p) => setCurrentPage(p)}
+                        fixed={viewMode !== 'list'}
+                        showWhenSinglePage={true}
+                    />
+                )}
 
                 {/* Portal menu to avoid clipping inside card/list containers */}
                 {openMenuOfficeId && openMenuAnchorRect && (() => {
                     try {
                         const menuOffice = offices.find(o => String(o.id ?? o.OfficeID ?? '') === String(openMenuOfficeId));
                         if (!menuOffice) return null;
+                        const zoom = parseFloat(getComputedStyle(document.body).zoom) || 1;
                         const menuWidth = 192; // 12rem = 192px (w-48)
-                        const viewportRight = window.innerWidth - 8;
-                        const left = Math.min((openMenuAnchorRect.right || 0) - menuWidth + window.scrollX, viewportRight - menuWidth);
-                        const top = (openMenuAnchorRect.bottom || 0) + window.scrollY + 4;
+                        const viewportRight = (window.innerWidth / zoom) - 8;
+                        const desiredLeft = (openMenuAnchorRect.right / zoom) - menuWidth;
+                        const left = Math.min(desiredLeft, viewportRight - menuWidth);
+                        const top = (openMenuAnchorRect.bottom / zoom) + 4;
 
                         return createPortal(
                             <div
                                 className="office-card-actions-menu"
-                                style={{ position: 'fixed', top: top, left: Math.max(8, left), width: menuWidth, zIndex: 9999 }}
+                                style={{ position: 'fixed', top: top, left: Math.max(8, left), zIndex: 9999 }}
+                                onMouseDown={(e) => e.stopPropagation()}
+                                onClick={(e) => e.stopPropagation()}
                             >
                                 <div className="w-48 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl animate-in fade-in zoom-in-95 duration-100">
                                     <button

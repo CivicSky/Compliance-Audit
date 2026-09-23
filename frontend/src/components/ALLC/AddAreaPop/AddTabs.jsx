@@ -8,7 +8,7 @@ export default function AddTabs({ mode, setMode, tabClass }) {
 				Add Criteria
 			</button>
 			<button onClick={() => setMode('add-requirement')} className={tabClass(mode === 'add-requirement')}>
-				Add Requirement
+				Add Evidence
 			</button>
 		</div>
 	);

@@ -25,7 +25,7 @@ const ensureAssignmentsTable = async () => {
 ensureAssignmentsTable();
 
 // GET assigned areas for an auditor user
-router.get('/assignments/:userId', async (req, res) => {
+router.get('/assignments/:userId', auth, async (req, res) => {
     try {
         await ensureAssignmentsTable();
         const { userId } = req.params;
@@ -37,7 +37,18 @@ router.get('/assignments/:userId', async (req, res) => {
              WHERE a.auditor_user_id = ?`,
             [userId]
         );
-        res.json({ success: true, assignments: rows });
+        const formatted = (rows || []).map(r => ({
+            id: r.id,
+            auditor_user_id: r.auditor_user_id,
+            area_id: r.area_id ?? r.AreaID ?? r.areaid,
+            AreaID: r.area_id ?? r.AreaID ?? r.areaid,
+            AreaCode: r.AreaCode ?? r.areacode ?? '',
+            AreaName: r.AreaName ?? r.areaname ?? '',
+            EventID: r.EventID ?? r.eventid,
+            EventName: r.EventName ?? r.eventname ?? '',
+            created_at: r.created_at,
+        }));
+        res.json({ success: true, assignments: formatted });
     } catch (err) {
         console.error('Error fetching auditor assignments:', err);
         res.status(500).json({ success: false, message: 'Failed to fetch assignments', error: err.message });
@@ -45,7 +56,7 @@ router.get('/assignments/:userId', async (req, res) => {
 });
 
 // GET auditors assigned to an office (via area assignments)
-router.get('/auditors/office/:officeId', async (req, res) => {
+router.get('/auditors/office/:officeId', auth, async (req, res) => {
     try {
         await ensureAssignmentsTable();
         const { officeId } = req.params;
@@ -58,7 +69,16 @@ router.get('/auditors/office/:officeId', async (req, res) => {
              WHERE o.OfficeID = ?`,
             [officeId]
         );
-        res.json({ success: true, auditors: rows });
+        const formatted = (rows || []).map(r => ({
+            UserID: r.UserID ?? r.userid ?? r.id,
+            FirstName: r.FirstName ?? r.firstname ?? '',
+            LastName: r.LastName ?? r.lastname ?? '',
+            Email: r.Email ?? r.email ?? '',
+            ProfilePic: r.ProfilePic ?? r.profilepic ?? null,
+            AreaCode: r.AreaCode ?? r.areacode ?? '',
+            AreaName: r.AreaName ?? r.areaname ?? '',
+        }));
+        res.json({ success: true, auditors: formatted });
     } catch (err) {
         console.error('Error fetching office auditors:', err);
         res.status(500).json({ success: false, auditors: [] });
@@ -98,30 +118,68 @@ router.post('/assign', auth, restrictAuditor, async (req, res) => {
 
         if (req.user?.userId) {
             try {
+                const [auditorUserRows] = await db.query(
+                    'SELECT FirstName, LastName, Email FROM users WHERE UserID = ?',
+                    [userId]
+                );
+                const auditorRow = auditorUserRows?.[0];
+                const auditorName = auditorRow 
+                    ? `${auditorRow.FirstName || ''} ${auditorRow.LastName || ''}`.trim() || auditorRow.Email
+                    : `Auditor #${userId}`;
+
                 recordLog(req.user.userId, 'AuditorAssignedAreas', {
-                    AuditorUserID: userId,
+                    AuditorUserID: Number(userId),
+                    AuditorName: auditorName,
                     AssignedAreaCount: areaIds.length,
                     Areas: assignedAreas
                 });
-            } catch (e) {}
+            } catch (e) {
+                console.error('Failed to record AuditorAssignedAreas log:', e);
+            }
         }
 
         try {
             const { createNotifications } = require('../utils/notificationService');
-            const areaNames = assignedAreas.map(a => a.AreaCode || a.AreaName || '').filter(Boolean).join(', ');
-            await createNotifications({
-                userIds: [userId],
-                adminId: req.user?.userId || null,
-                title: 'New Area Assignments',
-                message: `You have been assigned as the auditor for: ${areaNames || 'no areas'}.`,
-                type: 'info',
-                relatedTable: 'auditor_assignments',
-                relatedId: Number(userId),
-                meta: {
-                    userId: Number(userId),
-                    openSubmission: false
-                }
-            });
+            const targetAuditorId = Number(userId);
+
+            if (assignedAreas.length > 0) {
+                const areaNames = assignedAreas
+                    .map(a => a.AreaCode ? (a.AreaName ? `${a.AreaCode} (${a.AreaName})` : a.AreaCode) : a.AreaName)
+                    .filter(Boolean)
+                    .join(', ');
+
+                await createNotifications({
+                    userIds: [targetAuditorId],
+                    adminId: req.user?.userId || null,
+                    title: 'Auditor Area Assignment',
+                    message: `You have been assigned as the external auditor for: ${areaNames}.`,
+                    type: 'info',
+                    relatedTable: 'auditor_assignments',
+                    relatedId: targetAuditorId,
+                    meta: {
+                        userId: targetAuditorId,
+                        assignedCount: assignedAreas.length,
+                        areaIds: assignedAreas.map(a => Number(a.AreaID)),
+                        openSubmission: false
+                    }
+                });
+            } else {
+                await createNotifications({
+                    userIds: [targetAuditorId],
+                    adminId: req.user?.userId || null,
+                    title: 'Auditor Assignments Updated',
+                    message: 'Your assigned areas have been updated (no active areas currently assigned).',
+                    type: 'info',
+                    relatedTable: 'auditor_assignments',
+                    relatedId: targetAuditorId,
+                    meta: {
+                        userId: targetAuditorId,
+                        assignedCount: 0,
+                        areaIds: [],
+                        openSubmission: false
+                    }
+                });
+            }
         } catch (notifErr) {
             console.error('Failed to notify auditor about area assignments:', notifErr);
         }
@@ -210,7 +268,7 @@ router.put('/:areaId', auth, restrictAuditor, async (req, res) => {
 });
 
 // GET all areas
-router.get('/', async (req, res) => {
+router.get('/', auth, async (req, res) => {
     try {
         const [areas] = await db.query(`
             SELECT 
@@ -241,7 +299,7 @@ router.get('/', async (req, res) => {
 });
 
 // GET areas by event ID
-router.get('/event/:eventId', async (req, res) => {
+router.get('/event/:eventId', auth, async (req, res) => {
     try {
         const { eventId } = req.params;
         const [areas] = await db.query(`
@@ -274,7 +332,7 @@ router.get('/event/:eventId', async (req, res) => {
 });
 
 // GET area by ID
-router.get('/:areaId', async (req, res) => {
+router.get('/:areaId', auth, async (req, res) => {
     try {
         const { areaId } = req.params;
         const [areas] = await db.query(`

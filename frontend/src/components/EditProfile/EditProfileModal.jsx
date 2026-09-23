@@ -1,5 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
+import { X, Loader2 } from "lucide-react";
 import { usersAPI } from "../../utils/api";
+import ImageCropModal from "./ImageCropModal";
 
 const EditProfileModal = ({ user, isOpen, onClose, onUpdate }) => {
     const [formData, setFormData] = useState({
@@ -10,7 +12,10 @@ const EditProfileModal = ({ user, isOpen, onClose, onUpdate }) => {
         profilePic: null
     });
     const [profilePicPreview, setProfilePicPreview] = useState("");
+    const [rawImageForCrop, setRawImageForCrop] = useState("");
+    const [isCropModalOpen, setIsCropModalOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const fileInputRef = useRef(null);
 
     useEffect(() => {
         if (user) {
@@ -23,6 +28,8 @@ const EditProfileModal = ({ user, isOpen, onClose, onUpdate }) => {
             });
             // Always use the same logic as office head: if ProfilePic exists, use /uploads/profile-pics/filename
             setProfilePicPreview(user.ProfilePic ? `/uploads/profile-pics/${user.ProfilePic}` : "/default-avatar.png");
+            setRawImageForCrop("");
+            setIsCropModalOpen(false);
         }
     }, [user]);
 
@@ -35,10 +42,18 @@ const EditProfileModal = ({ user, isOpen, onClose, onUpdate }) => {
 
     const handleFileChange = (e) => {
         const file = e.target.files[0];
-        setFormData(prev => ({ ...prev, profilePic: file }));
         if (file) {
-            setProfilePicPreview(URL.createObjectURL(file));
+            const objectUrl = URL.createObjectURL(file);
+            setRawImageForCrop(objectUrl);
+            setIsCropModalOpen(true);
         }
+        e.target.value = '';
+    };
+
+    const handleCropComplete = (croppedFile, finalPreview) => {
+        setFormData(prev => ({ ...prev, profilePic: croppedFile }));
+        setProfilePicPreview(finalPreview);
+        setIsCropModalOpen(false);
     };
 
     const handleSubmit = async (e) => {
@@ -78,19 +93,21 @@ const EditProfileModal = ({ user, isOpen, onClose, onUpdate }) => {
 
 
     return (
-        <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out bg-black bg-opacity-50 flex items-center justify-center z-[50]">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4">
+        <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-[50] p-4">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-lg overflow-hidden flex flex-col">
                 {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b">
-                    <h2 className="text-xl font-semibold text-gray-800">Edit Profile</h2>
+                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-white">
+                    <div>
+                        <h2 className="text-base font-bold text-slate-900">Edit Profile</h2>
+                        <p className="text-xs text-slate-500 mt-0.5">Manage your personal details and avatar</p>
+                    </div>
                     <button
+                        type="button"
                         onClick={onClose}
                         disabled={isSubmitting}
-                        className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 hover:bg-slate-100 hover:text-slate-700 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
                     >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
+                        <X className="h-4 w-4" />
                     </button>
                 </div>
 
@@ -98,13 +115,13 @@ const EditProfileModal = ({ user, isOpen, onClose, onUpdate }) => {
                 <form onSubmit={handleSubmit} className="p-6 space-y-4">
                     {/* First Name */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1.5">First Name *</label>
                         <input
                             type="text"
                             name="firstName"
                             value={formData.firstName}
                             onChange={handleInputChange}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
                             required
                             disabled={isSubmitting}
                         />
@@ -112,27 +129,27 @@ const EditProfileModal = ({ user, isOpen, onClose, onUpdate }) => {
 
                     {/* Middle Initial */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Middle Initial</label>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1.5">Middle Initial</label>
                         <input
                             type="text"
                             name="middleInitial"
                             value={formData.middleInitial}
                             onChange={handleInputChange}
                             maxLength={1}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
                             disabled={isSubmitting}
                         />
                     </div>
 
                     {/* Last Name */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Last Name *</label>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1.5">Last Name *</label>
                         <input
                             type="text"
                             name="lastName"
                             value={formData.lastName}
                             onChange={handleInputChange}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
                             required
                             disabled={isSubmitting}
                         />
@@ -140,13 +157,13 @@ const EditProfileModal = ({ user, isOpen, onClose, onUpdate }) => {
 
                     {/* Email */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1.5">Email *</label>
                         <input
                             type="email"
                             name="email"
                             value={formData.email}
                             onChange={handleInputChange}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
                             required
                             disabled={isSubmitting}
                         />
@@ -154,56 +171,73 @@ const EditProfileModal = ({ user, isOpen, onClose, onUpdate }) => {
 
                     {/* Profile Picture */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Profile Picture</label>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1.5">Profile Picture</label>
                         <div className="flex items-start gap-3">
-                            <div className="flex-shrink-0 -mt-0.5">
+                            <div className="shrink-0 -mt-0.5">
                                 <img
                                     src={profilePicPreview}
                                     alt="Preview"
-                                    className="w-12 h-12 rounded-full object-cover border-2 border-gray-300"
+                                    className="w-12 h-12 rounded-full object-cover border border-slate-200 shadow-2xs"
                                     onError={e => { e.target.onerror = null; e.target.src = "/default-avatar.png"; }}
                                 />
                             </div>
 
                             <div className="flex-1">
                                 <input
+                                    ref={fileInputRef}
                                     type="file"
                                     onChange={handleFileChange}
                                     accept="image/*"
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                                    className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 file:mr-3 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition-colors"
                                     disabled={isSubmitting}
                                 />
-                                <p className="text-xs text-gray-500 mt-1">Upload an image file (JPG, PNG, etc.)</p>
+                                <div className="flex items-center justify-between mt-1.5">
+                                    <p className="text-[11px] text-slate-400">Upload an image file (JPG, PNG)</p>
+                                    {rawImageForCrop && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsCropModalOpen(true)}
+                                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-800 transition cursor-pointer"
+                                        >
+                                            <span>Crop / Adjust</span>
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>
 
                     {/* Form Actions */}
-                    <div className="flex justify-end space-x-3 pt-4 border-t">
+                    <div className="flex justify-end gap-2.5 pt-4 border-t border-slate-200">
                         <button
                             type="button"
                             onClick={onClose}
                             disabled={isSubmitting}
-                            className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors disabled:opacity-50"
+                            className="inline-flex h-9 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
                             disabled={isSubmitting}
-                            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-4 text-xs font-semibold text-white shadow-2xs hover:bg-blue-700 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                         >
                             {isSubmitting && (
-                                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"></circle>
-                                    <path fill="currentColor" className="opacity-75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
                             )}
                             {isSubmitting ? "Saving..." : "Save Changes"}
                         </button>
                     </div>
                 </form>
             </div>
+
+            {/* Image Crop Modal */}
+            <ImageCropModal
+                isOpen={isCropModalOpen}
+                imageSrc={rawImageForCrop}
+                onClose={() => setIsCropModalOpen(false)}
+                onCropComplete={handleCropComplete}
+            />
         </div>
     );
 };

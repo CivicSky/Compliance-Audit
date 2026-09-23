@@ -4,6 +4,7 @@ import { API_BASE_URL } from '../../utils/apiBase';
 
 export default function OfficeInfoBar({ officeData, isAssignedInCurrentOffice, assignedRequirementCount }) {
     const [auditors, setAuditors] = useState([]);
+    const [fetchedHeads, setFetchedHeads] = useState([]);
     const compliance = officeData?.compliance_percent ? Number(officeData.compliance_percent).toFixed(1) : '0';
     const complianceNum = parseFloat(compliance);
     const statusId =
@@ -11,15 +12,43 @@ export default function OfficeInfoBar({ officeData, isAssignedInCurrentOffice, a
         officeData?.overall_status === 'Partially Complied' ? 4 : 3;
 
     useEffect(() => {
-        const officeId = officeData?.office_id || officeData?.OfficeID;
+        const officeId = officeData?.office_id || officeData?.OfficeID || officeData?.id;
         if (!officeId) return;
         let mounted = true;
-        fetch(`${API_BASE_URL}/api/areas/auditors/office/${officeId}`)
+
+        const token = localStorage.getItem('token');
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+        // Fetch auditors
+        fetch(`${API_BASE_URL}/api/areas/auditors/office/${officeId}`, { headers })
             .then(res => res.json())
             .then(data => {
                 if (mounted && data.success) setAuditors(data.auditors || []);
             })
             .catch(() => {});
+
+        // Fetch office heads if not directly present
+        const existingHeads = officeData?.heads || officeData?.Heads;
+        if (!Array.isArray(existingHeads) || existingHeads.length === 0) {
+            fetch(`${API_BASE_URL}/api/officeheads/all`, { headers })
+                .then(res => res.json())
+                .then(data => {
+                    if (!mounted) return;
+                    const allHeads = Array.isArray(data) ? data : (data.data || []);
+                    const matching = allHeads.filter(h => {
+                        if (Number(h.OfficeID) === Number(officeId)) return true;
+                        if (Array.isArray(h.assigned_offices)) {
+                            return h.assigned_offices.some(o => Number(o.id || o.OfficeID || o.office_id) === Number(officeId));
+                        }
+                        return false;
+                    });
+                    if (matching.length > 0) {
+                        setFetchedHeads(matching);
+                    }
+                })
+                .catch(() => {});
+        }
+
         return () => { mounted = false; };
     }, [officeData]);
 
@@ -30,6 +59,29 @@ export default function OfficeInfoBar({ officeData, isAssignedInCurrentOffice, a
             ? 'text-amber-600'
             : 'text-rose-600';
 
+    // Compute heads
+    const rawHeads = (Array.isArray(officeData?.heads) && officeData.heads.length > 0)
+        ? officeData.heads
+        : (Array.isArray(officeData?.Heads) && officeData.Heads.length > 0)
+        ? officeData.Heads
+        : (fetchedHeads.length > 0)
+        ? fetchedHeads
+        : [];
+
+    let officeHeads = [...rawHeads];
+
+    if (officeHeads.length === 0 && (officeData?.head_name || officeData?.HeadName)) {
+        const name = officeData.head_name || officeData.HeadName;
+        if (name && name !== 'Unassigned' && name !== 'Unknown Head') {
+            officeHeads = [{
+                HeadID: officeData.head_id || officeData.HeadID || 1,
+                full_name: name,
+                FirstName: name,
+                ProfilePic: officeData.head_profile_pic || officeData.HeadProfilePic || null
+            }];
+        }
+    }
+
     return (
         <div className="border-b border-slate-200/70 bg-gradient-to-r from-slate-50 via-white to-slate-50 px-5 py-3">
             <div className="flex flex-wrap items-center justify-between gap-4">
@@ -37,8 +89,6 @@ export default function OfficeInfoBar({ officeData, isAssignedInCurrentOffice, a
                 <div className="flex min-w-0 flex-wrap items-center gap-4">
                     {/* Personnel */}
                     {(() => {
-                        const officeHeads = officeData?.heads || [];
-
                         if (officeHeads.length === 0) {
                             return (
                                 <div className="flex items-center gap-2.5">
@@ -63,7 +113,7 @@ export default function OfficeInfoBar({ officeData, isAssignedInCurrentOffice, a
                                                 : '/src/assets/images/user.svg';
                                             return (
                                                 <img
-                                                    key={head.HeadID}
+                                                    key={head.HeadID || head.id || Math.random()}
                                                     src={headPicUrl}
                                                     alt={head.FirstName || head.full_name}
                                                     title={head.FirstName || head.full_name}
@@ -75,7 +125,9 @@ export default function OfficeInfoBar({ officeData, isAssignedInCurrentOffice, a
                                     </div>
                                     <div>
                                         <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Personnel</p>
-                                        <p className="text-xs font-semibold text-slate-700">{officeHeads.length} members</p>
+                                        <p className="text-xs font-semibold text-slate-700">
+                                            {officeHeads.map(h => h.FirstName || h.full_name).filter(Boolean).join(', ') || `${officeHeads.length} members`}
+                                        </p>
                                     </div>
                                 </div>
                             );
@@ -85,17 +137,18 @@ export default function OfficeInfoBar({ officeData, isAssignedInCurrentOffice, a
                         const headPicUrl = primaryHead?.ProfilePic
                             ? `${API_BASE_URL}/uploads/profile-pics/${primaryHead.ProfilePic}`
                             : '/src/assets/images/user.svg';
+                        const headDisplayName = primaryHead?.full_name || `${primaryHead?.FirstName || ''} ${primaryHead?.LastName || ''}`.trim() || primaryHead?.FirstName || 'Assigned';
                         return (
                             <div className="flex items-center gap-2.5">
                                 <img
                                     src={headPicUrl}
-                                    alt={primaryHead?.full_name}
+                                    alt={headDisplayName}
                                     className="h-8 w-8 rounded-full border-2 border-white object-cover shadow-sm ring-1 ring-slate-200"
                                     onError={(e) => { e.target.src = '/src/assets/images/user.svg'; }}
                                 />
                                 <div>
                                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Personnel</p>
-                                    <p className="text-xs font-semibold text-slate-700">{primaryHead?.FirstName || primaryHead?.full_name || '1 person'}</p>
+                                    <p className="text-xs font-semibold text-slate-700">{headDisplayName}</p>
                                 </div>
                             </div>
                         );

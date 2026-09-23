@@ -1,6 +1,6 @@
 import RowActionMenu from './RowActionMenu';
 import { formatDateTime } from '../../utils/formatDateTime';
-import { ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Loader2, Check } from 'lucide-react';
 
 export default function AreaItem({
     area,
@@ -19,7 +19,7 @@ export default function AreaItem({
     const handleEdit = onEditClick || onMenuClick;
     return (
         <div
-            className="bg-blue-500 text-white p-3 rounded-lg cursor-pointer hover:bg-blue-600 transition flex items-center gap-3"
+            className="bg-blue-600 hover:bg-blue-700 text-white p-3.5 rounded-xl shadow-sm cursor-pointer transition-all flex items-center gap-3"
             onClick={onToggle}
         >
             {showCheckbox && (
@@ -28,7 +28,7 @@ export default function AreaItem({
                     checked={isChecked}
                     onClick={(e) => e.stopPropagation()}
                     onChange={(e) => onToggleSelect?.(e.target.checked)}
-                    className="h-4 w-4 accent-white"
+                    className="h-4 w-4 accent-white cursor-pointer"
                 />
             )}
             {isExpanded ? (
@@ -38,12 +38,13 @@ export default function AreaItem({
             )}
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium truncate block">
+                    <span className="font-semibold text-sm truncate block">
                         {`${area.AreaCode || ''}: ${area.AreaName || ''}`}
                     </span>
                     {isAssigned && (
-                        <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-600/90 px-2 py-0.5 text-[9px] font-bold text-white border border-emerald-500/30 shadow-2xs whitespace-nowrap">
-                            ✓ Assigned to you
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600/90 px-2 py-0.5 text-[9px] font-bold text-white border border-emerald-500/30 shadow-2xs whitespace-nowrap">
+                            <Check className="w-2.5 h-2.5" />
+                            <span>Assigned to you</span>
                         </span>
                     )}
                 </div>
@@ -56,7 +57,7 @@ export default function AreaItem({
             <RowActionMenu
                 onEdit={handleEdit ? () => handleEdit(area) : undefined}
                 onDelete={onDeleteClick ? () => onDeleteClick(area) : undefined}
-                buttonClassName="office-card-actions-button inline-flex h-10 w-10 items-center justify-center rounded-xl border-2 border-white/90 bg-transparent text-white transition hover:border-white hover:bg-white/10"
+                buttonClassName="office-card-actions-button inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/60 bg-white/10 text-white transition hover:border-white hover:bg-white/20 shadow-2xs"
             />
         </div>
     );

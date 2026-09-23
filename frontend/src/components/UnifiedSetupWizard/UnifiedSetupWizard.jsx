@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronRight, ChevronLeft, X, Check, Plus, Wand2 } from 'lucide-react';
+import { ChevronRight, ChevronLeft, X, Check, Plus, Wand2, Award, MapPin, BarChart2, FileCheck, CheckCircle2 } from 'lucide-react';
 import { API_BASE_URL } from '../../utils/apiBase';
 import { useToast } from '../UI/Toast';
+import CustomSelect from '../UI/CustomSelect';
 
 export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
     const { toast } = useToast();
@@ -258,14 +259,14 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
 
             if (response.success) {
                 setCreatedIds(prev => ({ ...prev, eventId: response.data.id || response.data.EventID }));
-                toast({ title: 'Success', description: 'Event created successfully', variant: 'success' });
-                setSuccessMessage(`✓ Event created`);
+                toast({ title: 'Success', description: 'Accreditation created successfully', variant: 'success' });
+                setSuccessMessage('Accreditation created');
                 setTimeout(() => {
                     setSuccessMessage('');
                     setCurrentStep(2);
                 }, 1000);
             } else {
-                toast({ title: 'Error', description: response.message || 'Failed to add event', variant: 'error' });
+                toast({ title: 'Error', description: response.message || 'Failed to add accreditation', variant: 'error' });
             }
         } catch (error) {
             console.error('Error:', error);
@@ -293,7 +294,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                 setCreatedIds(prev => ({ ...prev, areaId }));
                 setCriteriaData(prev => ({ ...prev, AreaID: areaId }));
                 toast({ title: 'Success', description: 'Area created successfully', variant: 'success' });
-                setSuccessMessage(`✓ Area created`);
+                setSuccessMessage('Area created');
                 setTimeout(() => {
                     setSuccessMessage('');
                     setCurrentStep(3);
@@ -327,7 +328,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
             if (response.success) {
                 setCreatedIds(prev => ({ ...prev, criteriaId: response.data.id || response.data.CriteriaID }));
                 toast({ title: 'Success', description: 'Criteria created successfully', variant: 'success' });
-                setSuccessMessage(`✓ Criteria created`);
+                setSuccessMessage('Criteria created');
                 setTimeout(() => {
                     setSuccessMessage('');
                     setCurrentStep(4);
@@ -369,14 +370,14 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
 
             if (response.success) {
                 setCreatedIds(prev => ({ ...prev, requirementId: response.data.id || response.data.RequirementID }));
-                toast({ title: 'Success', description: 'Requirement created successfully', variant: 'success' });
-                setSuccessMessage(`✓ Requirement created`);
+                toast({ title: 'Success', description: 'Evidence created successfully', variant: 'success' });
+                setSuccessMessage('Evidence created');
                 setTimeout(() => {
                     setSuccessMessage('');
                     setCurrentStep(5);
                 }, 1000);
             } else {
-                toast({ title: 'Error', description: response.message || 'Failed to add requirement', variant: 'error' });
+                toast({ title: 'Error', description: response.message || 'Failed to add evidence', variant: 'error' });
             }
         } catch (error) {
             console.error('Error:', error);
@@ -392,7 +393,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                 handleAddEvent();
             } else if (eventMode === 'select') {
                 if (!createdIds.eventId) {
-                    toast({ title: 'Warning', description: 'Please select an event', variant: 'warning' });
+                    toast({ title: 'Warning', description: 'Please select an accreditation', variant: 'warning' });
                     return;
                 }
                 setCurrentStep(2);
@@ -448,11 +449,11 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
 
     // Step configurations
     const steps = [
-        { number: 1, label: 'Event', icon: '📋' },
-        { number: 2, label: 'Area', icon: '📍' },
-        { number: 3, label: 'Criteria', icon: '📊' },
-        { number: 4, label: 'Requirement', icon: '✅' },
-        { number: 5, label: 'Complete', icon: '🎉' }
+        { number: 1, label: 'Accreditation' },
+        { number: 2, label: 'Area' },
+        { number: 3, label: 'Criteria' },
+        { number: 4, label: 'Evidence' },
+        { number: 5, label: 'Complete' }
     ];
 
     return (
@@ -496,7 +497,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                                 : 'bg-gray-100 text-gray-400'
                                             }
                                         `}>
-                                            {step.number < visualStep ? <Check size={16} /> : step.icon}
+                                            {step.number < visualStep ? <Check size={16} /> : step.number}
                                         </div>
                                         <span className={`
                                             text-xs font-medium
@@ -587,10 +588,10 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                         Select Event
                                     </label>
                                     {availableEvents.length > 0 ? (
-                                        <select
+                                        <CustomSelect
                                             value={eventData.EventId || ''}
-                                            onChange={(e) => {
-                                                const selected = availableEvents.find(ev => ev.EventID === parseInt(e.target.value));
+                                            onChange={(val) => {
+                                                const selected = availableEvents.find(ev => ev.EventID === parseInt(val));
                                                 if (selected) {
                                                     setEventData({
                                                         ...eventData,
@@ -602,15 +603,13 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                                     setCreatedIds(prev => ({ ...prev, eventId: selected.EventID }));
                                                 }
                                             }}
-                                            className="w-full px-3 py-2 text-sm border border-blue-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
-                                        >
-                                            <option value="">-- Select an event --</option>
-                                            {availableEvents.map((event) => (
-                                                <option key={event.EventID} value={event.EventID}>
-                                                    {event.EventCode} - {event.EventName}
-                                                </option>
-                                            ))}
-                                        </select>
+                                            options={availableEvents.map((event) => ({
+                                                value: String(event.EventID),
+                                                label: `${event.EventCode} - ${event.EventName}`
+                                            }))}
+                                            placeholder="Select an event"
+                                            size="md"
+                                        />
                                     ) : (
                                         <p className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">
                                             No events available. Create a new one.
@@ -736,10 +735,10 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                         Select Area
                                     </label>
                                     {availableAreas.length > 0 ? (
-                                        <select
+                                        <CustomSelect
                                             value={areaData.AreaCode || ''}
-                                            onChange={(e) => {
-                                                const selected = availableAreas.find(ar => ar.AreaCode === e.target.value);
+                                            onChange={(val) => {
+                                                const selected = availableAreas.find(ar => ar.AreaCode === val);
                                                 if (selected) {
                                                     setAreaData({
                                                         ...areaData,
@@ -751,15 +750,13 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                                     setCriteriaData(prev => ({ ...prev, AreaID: selected.AreaID }));
                                                 }
                                             }}
-                                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                                        >
-                                            <option value="">-- Select an area --</option>
-                                            {availableAreas.map((area) => (
-                                                <option key={area.AreaID} value={area.AreaCode}>
-                                                    {area.AreaName} ({area.AreaCode})
-                                                </option>
-                                            ))}
-                                        </select>
+                                            options={availableAreas.map((area) => ({
+                                                value: area.AreaCode,
+                                                label: `${area.AreaName} (${area.AreaCode})`
+                                            }))}
+                                            placeholder="Select an area"
+                                            size="md"
+                                        />
                                     ) : (
                                         <p className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">
                                             No areas available. Create a new one.
@@ -886,10 +883,10 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                     </label>
                                     {criteriaData.AreaID ? (
                                         availableCriteria.filter(c => String(c.AreaID) === String(criteriaData.AreaID)).length > 0 ? (
-                                            <select
+                                            <CustomSelect
                                                 value={criteriaData.CriteriaCode || ''}
-                                                onChange={(e) => {
-                                                    const selected = availableCriteria.find(c => c.CriteriaCode === e.target.value);
+                                                onChange={(val) => {
+                                                    const selected = availableCriteria.find(c => c.CriteriaCode === val);
                                                     if (selected) {
                                                         setCriteriaData({
                                                             ...criteriaData,
@@ -901,17 +898,15 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                                         });
                                                     }
                                                 }}
-                                                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                                            >
-                                                <option value="">-- Select a criteria --</option>
-                                                {availableCriteria
+                                                options={availableCriteria
                                                     .filter(c => String(c.AreaID) === String(criteriaData.AreaID))
-                                                    .map((crit) => (
-                                                        <option key={crit.CriteriaID} value={crit.CriteriaCode}>
-                                                            {crit.CriteriaCode} - {crit.CriteriaName}
-                                                        </option>
-                                                    ))}
-                                            </select>
+                                                    .map((crit) => ({
+                                                        value: crit.CriteriaCode,
+                                                        label: `${crit.CriteriaCode} - ${crit.CriteriaName}`
+                                                    }))}
+                                                placeholder="Select a criteria"
+                                                size="md"
+                                            />
                                         ) : (
                                             <p className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">
                                                 No criteria available for this area.
@@ -979,21 +974,21 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                             <label className="block text-xs font-medium text-gray-700 mb-1.5">
                                                 Parent Criteria <span className="text-gray-400">(optional)</span>
                                             </label>
-                                            <select
-                                                name="ParentCriteriaID"
+                                            <CustomSelect
                                                 value={criteriaData.ParentCriteriaID}
-                                                onChange={handleCriteriaChange}
-                                                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                                            >
-                                                <option value="">None (Top-level)</option>
-                                                {parentCriteria
-                                                    .filter(c => String(c.AreaID) === String(criteriaData.AreaID))
-                                                    .map(c => (
-                                                        <option key={c.CriteriaID} value={c.CriteriaID}>
-                                                            {c.CriteriaCode} - {c.CriteriaName}
-                                                        </option>
-                                                    ))}
-                                            </select>
+                                                onChange={(val) => handleCriteriaChange({ target: { name: 'ParentCriteriaID', value: val } })}
+                                                options={[
+                                                    { value: '', label: 'None (Top-level)' },
+                                                    ...parentCriteria
+                                                        .filter(c => String(c.AreaID) === String(criteriaData.AreaID))
+                                                        .map(c => ({
+                                                            value: String(c.CriteriaID),
+                                                            label: `${c.CriteriaCode} - ${c.CriteriaName}`
+                                                        }))
+                                                ]}
+                                                placeholder="None (Top-level)"
+                                                size="md"
+                                            />
                                         </div>
                                     )}
 
@@ -1019,13 +1014,13 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                     {currentStep === 4 && (
                         <div className="space-y-5">
                             <div>
-                                <h3 className="text-base font-semibold text-gray-900">Choose Requirement</h3>
-                                <p className="text-sm text-gray-500 mt-1">Add a new requirement</p>
+                                <h3 className="text-base font-semibold text-gray-900">Choose Evidence</h3>
+                                <p className="text-sm text-gray-500 mt-1">Add new evidence</p>
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">
                                 {[
-                                    { mode: 'create', icon: Plus, label: 'Standalone', desc: 'New requirement' },
+                                    { mode: 'create', icon: Plus, label: 'Standalone', desc: 'New evidence' },
                                     { mode: 'select', icon: Wand2, label: 'Child', desc: 'Link to parent' }
                                 ].map(({ mode, icon: Icon, label, desc }) => (
                                     <button
@@ -1058,7 +1053,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                     {requirementMode === 'select' && (
                                         <div>
                                             <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                                                Parent Requirement
+                                                Parent Evidence
                                             </label>
                                             {(() => {
                                                 const criteriaRequirements = availableRequirements.filter(
@@ -1066,21 +1061,22 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                                 );
                                                 
                                                 return criteriaRequirements.length > 0 ? (
-                                                    <select
+                                                    <CustomSelect
                                                         value={requirementData.ParentRequirementCode || ''}
-                                                        onChange={(e) => setRequirementData(prev => ({ ...prev, ParentRequirementCode: e.target.value }))}
-                                                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                                                    >
-                                                        <option value="">-- Select a parent --</option>
-                                                        {criteriaRequirements.map((req) => (
-                                                            <option key={req.RequirementID} value={req.RequirementCode}>
-                                                                {req.RequirementCode}
-                                                            </option>
-                                                        ))}
-                                                    </select>
+                                                        onChange={(val) => setRequirementData(prev => ({ ...prev, ParentRequirementCode: val }))}
+                                                        options={[
+                                                            { value: '', label: '-- Select a parent --' },
+                                                            ...criteriaRequirements.map((req) => ({
+                                                                value: req.RequirementCode,
+                                                                label: req.RequirementCode
+                                                            }))
+                                                        ]}
+                                                        placeholder="Select a parent"
+                                                        size="md"
+                                                    />
                                                 ) : (
                                                     <p className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">
-                                                        No requirements available
+                                                        No evidence available
                                                     </p>
                                                 );
                                             })()}
@@ -1089,7 +1085,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
 
                                     <div>
                                         <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                                            Requirement Code <span className="text-rose-500">*</span>
+                                            Evidence Code <span className="text-rose-500">*</span>
                                         </label>
                                         <input
                                             type="text"
@@ -1118,7 +1114,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                             name="Description"
                                             value={requirementData.Description}
                                             onChange={handleRequirementChange}
-                                            placeholder="Describe the requirement..."
+                                            placeholder="Describe the evidence..."
                                             rows={2}
                                             className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                                         />
@@ -1141,7 +1137,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                             <div className="bg-gray-50 rounded-xl p-4 text-left space-y-2 text-sm border border-gray-100">
                                 <p className="flex items-center gap-2">
                                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                    <strong>Event:</strong> {eventData.EventName}
+                                    <strong>Accreditation:</strong> {eventData.EventName}
                                 </p>
                                 {areaData.AreaName && (
                                     <p className="flex items-center gap-2">
@@ -1157,7 +1153,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                 )}
                                 <p className="flex items-center gap-2">
                                     <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-                                    <strong>Requirement:</strong> {requirementData.RequirementCode}
+                                    <strong>Evidence:</strong> {requirementData.RequirementCode}
                                 </p>
                             </div>
                         </div>
@@ -1189,7 +1185,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                             </svg>
                                         </div>
-                                        <p className="text-sm text-gray-500">Select an event to start</p>
+                                        <p className="text-sm text-gray-500">Select an accreditation to start</p>
                                         <p className="text-xs text-gray-400 mt-1">Preview will appear here</p>
                                     </div>
                                 ) : (
@@ -1197,9 +1193,9 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                         {/* Event Header */}
                                         <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-3 py-2.5 rounded-lg shadow-md">
                                             <div className="flex items-center gap-2">
-                                                <span className="text-sm">📋</span>
+                                                <Award size={16} className="text-blue-200 shrink-0" />
                                                 <div className="flex-1 min-w-0">
-                                                    <p className="text-[10px] font-medium text-blue-100 uppercase">Event</p>
+                                                    <p className="text-[10px] font-medium text-blue-100 uppercase">Accreditation</p>
                                                     <p className="text-sm font-semibold truncate">{eventData.EventName}</p>
                                                 </div>
                                                 <Check size={14} className="text-blue-200 flex-shrink-0" />
@@ -1214,7 +1210,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                             {areaData.AreaName ? (
                                                 <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-3 py-2.5 rounded-lg shadow-md">
                                                     <div className="flex items-center gap-2">
-                                                        <span className="text-sm">📍</span>
+                                                        <MapPin size={16} className="text-blue-200 shrink-0" />
                                                         <div className="flex-1 min-w-0">
                                                             <p className="text-[10px] font-medium text-blue-100 uppercase">Area</p>
                                                             <p className="text-sm font-semibold truncate">{areaData.AreaName}</p>
@@ -1228,7 +1224,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                             ) : (
                                                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 bg-white">
                                                     <div className="flex items-center gap-2 text-gray-400">
-                                                        <span className="text-sm">📍</span>
+                                                        <MapPin size={16} className="text-gray-400 shrink-0" />
                                                         <div className="flex-1">
                                                             <p className="text-[10px] font-medium uppercase">Area</p>
                                                             <p className="text-xs">Not selected</p>
@@ -1242,7 +1238,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                                 {criteriaData.CriteriaName ? (
                                                     <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-3 py-2.5 rounded-lg shadow-md">
                                                         <div className="flex items-center gap-2">
-                                                            <span className="text-sm">📊</span>
+                                                            <BarChart2 size={16} className="text-blue-200 shrink-0" />
                                                             <div className="flex-1 min-w-0">
                                                                 <p className="text-[10px] font-medium text-blue-100 uppercase">Criteria</p>
                                                                 <p className="text-sm font-semibold truncate">{criteriaData.CriteriaName}</p>
@@ -1256,7 +1252,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                                 ) : (
                                                     <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 bg-white">
                                                         <div className="flex items-center gap-2 text-gray-400">
-                                                            <span className="text-sm">📊</span>
+                                                            <BarChart2 size={16} className="text-gray-400 shrink-0" />
                                                             <div className="flex-1">
                                                                 <p className="text-[10px] font-medium uppercase">Criteria</p>
                                                                 <p className="text-xs">Not selected</p>
@@ -1274,7 +1270,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                                                     <Check size={12} className="text-emerald-600" />
                                                                 </div>
                                                                 <div className="flex-1 min-w-0">
-                                                                    <p className="text-[10px] font-medium text-emerald-600 uppercase">Requirement</p>
+                                                                    <p className="text-[10px] font-medium text-emerald-600 uppercase">Evidence</p>
                                                                     <p className="text-sm font-semibold text-gray-800 truncate">{requirementData.RequirementCode}</p>
                                                                 </div>
                                                             </div>
@@ -1285,9 +1281,9 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                                     ) : (
                                                         <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 bg-white">
                                                             <div className="flex items-center gap-2 text-gray-400">
-                                                                <span className="text-sm">✅</span>
+                                                                <FileCheck size={16} className="text-gray-400 shrink-0" />
                                                                 <div className="flex-1">
-                                                                    <p className="text-[10px] font-medium uppercase">Requirement</p>
+                                                                    <p className="text-[10px] font-medium uppercase">Evidence</p>
                                                                     <p className="text-xs">Not created</p>
                                                                 </div>
                                                             </div>

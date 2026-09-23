@@ -40,7 +40,7 @@ export default function EventStructureSidebar({
 							Criteria
 						</button>
 						<button type="button" onClick={onSelectAddRequirement} className={subNavBtn(mode === 'add-requirement')}>
-							Requirement
+							Evidence
 						</button>
 					</div>
 				)}
@@ -56,8 +56,8 @@ export default function EventStructureSidebar({
 			<div className="border-t border-slate-100 p-3">
 				<p className="text-[11px] leading-relaxed text-slate-500">
 					{mainMode === 'assign'
-						? 'Pick offices on the left, then requirements on the right.'
-						: 'Add areas, then criteria, then requirements.'}
+						? 'Pick offices on the left, then evidence on the right.'
+						: 'Add areas, then criteria, then evidence.'}
 				</p>
 			</div>
 		</aside>

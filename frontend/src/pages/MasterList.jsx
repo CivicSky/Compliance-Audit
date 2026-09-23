@@ -1,22 +1,39 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { Search, GraduationCap, Building2, LayoutGrid, List, Plus, Trash2, MoreVertical, Edit2, Layers, X } from 'lucide-react';
 import AddMasterListModal from '../components/MasterList/AddMasterListModal';
 import EditMasterListModal from '../components/MasterList/EditMasterListModal';
 import Pagination from '../components/Pagination/Pagination';
 import NotificationToast from '../components/Notification/NotificationToast';
+import CustomDropdown from '../components/UI/CustomDropdown';
 import { departmentsAPI, masterlistAPI, usersAPI } from '../utils/api';
 import { formatDateTime } from '../utils/formatDateTime';
 import { MasterListSkeleton } from '../components/UI/Skeleton';
 import { useLiveRefresh } from '../utils/liveSync';
 import { useModal } from '../components/UI/ModalProvider';
+import ServerOfflineState from '../components/UI/ServerOfflineState';
+import ViewModeToggle from '../components/UI/ViewModeToggle';
 
 const DEFAULT_DEPARTMENTS = [];
-const ITEMS_PER_PAGE = 9;
+const ITEMS_PER_PAGE = 12;
 
 export default function MasterList() {
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [departmentFilter, setDepartmentFilter] = useState('all');
-  const [viewMode, setViewMode] = useState('grid');
+  const [viewMode, setViewMode] = useState(() => {
+    try {
+      return localStorage.getItem('masterlist_view_mode') || 'grid';
+    } catch {
+      return 'grid';
+    }
+  });
+
+  const handleSetViewMode = (mode) => {
+    setViewMode(mode);
+    try {
+      localStorage.setItem('masterlist_view_mode', mode);
+    } catch {}
+  };
   const [deleteMode, setDeleteMode] = useState(false);
   const [notice, setNotice] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -25,14 +42,13 @@ export default function MasterList() {
   const [departments, setDepartments] = useState(DEFAULT_DEPARTMENTS);
   const [loadingItems, setLoadingItems] = useState(true);
   const [isNoticeVisible, setIsNoticeVisible] = useState(false);
-  const headerRef = useRef(null);
-  const controlsRef = useRef(null);
-  const [contentHeight, setContentHeight] = useState(null);
   const [openMenuId, setOpenMenuId] = useState(null);
   const [editItem, setEditItem] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const dotBtnRefs = useRef({});
+  const [selectedIds, setSelectedIds] = useState([]);
+
+  const { showConfirm } = useModal();
 
   const [currentUser, setCurrentUser] = useState(() => {
     try {
@@ -57,38 +73,40 @@ export default function MasterList() {
 
   const isAdmin = currentUser?.RoleName === 'admin' || currentUser?.RoleID === 1;
 
+  // Close context menu on outside click
   useEffect(() => {
-    const updateContentHeight = () => {
-      const headerH = headerRef.current ? headerRef.current.offsetHeight : 0;
-      const controlsH = controlsRef.current ? controlsRef.current.offsetHeight : 0;
-      const gap = 16;
-      const h = Math.max(240, window.innerHeight - headerH - controlsH - gap);
-      setContentHeight(h);
+    const handleClickOutside = (e) => {
+      if (openMenuId && !e.target.closest('.masterlist-menu-container')) {
+        setOpenMenuId(null);
+      }
     };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [openMenuId]);
 
-    updateContentHeight();
-    const rafId = requestAnimationFrame(() => updateContentHeight());
-    window.addEventListener('resize', updateContentHeight);
-    return () => {
-      cancelAnimationFrame(rafId);
-      window.removeEventListener('resize', updateContentHeight);
-    };
-  }, []);
+  const [serverError, setServerError] = useState(null);
+  const [isRetrying, setIsRetrying] = useState(false);
 
-  const loadMasterList = useCallback(async () => {
+  const loadMasterList = useCallback(async (isRetry = false) => {
     try {
-      setLoadingItems(true);
+      if (isRetry) setIsRetrying(true);
+      else setLoadingItems(true);
+      setServerError(null);
       const response = await masterlistAPI.getAll();
       setItems(response.data || response);
+      setServerError(null);
     } catch (error) {
       console.error('Failed to load master list items:', error);
       if (error.response?.status === 429) {
         setNotice('Rate limit exceeded (Max 30 requests/min). Please try again later.');
+      } else if (!error.response || error.code === 'ERR_NETWORK' || error.message?.toLowerCase().includes('network error') || error.message?.toLowerCase().includes('failed to fetch')) {
+        setServerError('Server Offline');
       } else {
-        setNotice('Failed to load master list items.');
+        setServerError(error.response?.data?.message || 'Failed to load master list items.');
       }
     } finally {
       setLoadingItems(false);
+      setIsRetrying(false);
     }
   }, []);
 
@@ -150,21 +168,17 @@ export default function MasterList() {
   const paginatedItems = filteredItems.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   const renderItemIcon = (type) => {
-    const isAcademic = type === 'Academic Program';
+    const isAcademic = type === 'Academic Program' || String(type).toLowerCase().includes('academic');
     if (isAcademic) {
       return (
-        <div className="h-9 w-9 rounded-full bg-cyan-50 text-cyan-600 flex items-center justify-center shrink-0 border border-cyan-100">
-          <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.436 60.436 0 00-.491 6.347A48.62 48.62 0 0112 20.904a48.62 48.62 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.57 50.57 0 00-2.658-.813A59.905 59.905 0 0112 3.493a59.902 59.902 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0112 13.489a50.702 50.702 0 017.74-3.342M6.75 15a.75.75 0 100-1.5.75.75 0 000 1.5zm0 0v-3.675A57.778 57.778 0 0012 13.5" />
-          </svg>
+        <div className="h-9 w-9 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center shrink-0 border border-cyan-100 shadow-2xs">
+          <GraduationCap className="h-5 w-5" />
         </div>
       );
     }
     return (
-      <div className="h-9 w-9 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
-        <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 16.5h1.5m3 0H15M9 21v-3a1 1 0 011-1h4a1 1 0 011 1v3" />
-        </svg>
+      <div className="h-9 w-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100 shadow-2xs">
+        <Building2 className="h-5 w-5" />
       </div>
     );
   };
@@ -203,74 +217,100 @@ export default function MasterList() {
 
   const handleDeleteItem = async () => {
     if (!deleteTarget) return;
-    setDeleteLoading(true);
     try {
+      setDeleteLoading(true);
       await masterlistAPI.deleteItem(deleteTarget.id);
       setItems((prev) => prev.filter((i) => i.id !== deleteTarget.id));
-      setNotice(`"${deleteTarget.name}" deleted successfully.`);
+      setNotice(`"${deleteTarget.name}" deleted.`);
       setDeleteTarget(null);
     } catch (error) {
       console.error('Failed to delete master list item:', error);
       setNotice('Failed to delete item.');
-      setDeleteTarget(null);
     } finally {
       setDeleteLoading(false);
     }
   };
 
-  const [selectedIds, setSelectedIds] = useState([]);
-
   const toggleSelect = (id) => {
     setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((itemId) => itemId !== id) : [...prev, id]
     );
   };
 
-  const { showConfirm, showAlert } = useModal();
-
   const handleBulkDelete = async () => {
     if (selectedIds.length === 0) return;
-    const confirmed = await showConfirm(`Delete ${selectedIds.length} selected item(s)? This action cannot be undone.`);
+    const confirmed = await showConfirm(`Are you sure you want to delete ${selectedIds.length} selected item(s)?`);
     if (!confirmed) return;
+
     try {
       setDeleteLoading(true);
-      await masterlistAPI.deleteMultiple(selectedIds);
+      const res = await (masterlistAPI.deleteMultiple ? masterlistAPI.deleteMultiple(selectedIds) : masterlistAPI.bulkDelete(selectedIds));
+      if (res && res.success === false) {
+        throw new Error(res.message || 'Failed to delete selected items.');
+      }
       setSelectedIds([]);
       setDeleteMode(false);
       setNotice(`Successfully deleted ${selectedIds.length} item(s).`);
       setIsNoticeVisible(true);
       await loadMasterList();
     } catch (err) {
-      console.error(err);
-      setNotice(err?.message || 'Failed to delete selected items.');
+      console.error('Failed to bulk delete master list items:', err);
+      setNotice(err?.response?.data?.message || err?.message || 'Failed to delete selected items.');
       setIsNoticeVisible(true);
     } finally {
       setDeleteLoading(false);
     }
   };
 
-  return (
-    <div className="w-full min-h-screen flex flex-col bg-app pb-12">
-      <div ref={headerRef} style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50, background: 'transparent' }}>
-      </div>
+  const typeOptions = [
+    { value: 'all', label: 'All Types' },
+    { value: 'Academic Program', label: 'Academic Programs' },
+    { value: 'Non-Academic Office', label: 'Non-Academic Offices' },
+  ];
 
+  const departmentOptions = [
+    { value: 'all', label: 'All Departments' },
+    ...departments.map((department) => ({
+      value: String(department.id),
+      label: department.name,
+    })),
+  ];
+
+  return (
+    <div className="w-full flex-1 flex flex-col min-w-0 bg-slate-50/50 overflow-hidden">
       <NotificationToast title="Notice" message={notice} visible={isNoticeVisible} onDismiss={() => setNotice('')} />
 
-      <div className="flex flex-col gap-0 px-4 pt-2 pb-0" style={{ marginTop: headerRef.current ? headerRef.current.offsetHeight : 0 }}>
-        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
-          <div ref={controlsRef}>
-            <h1 className="text-2xl font-bold text-gray-800 mb-1">Master List</h1>
-            <p className="text-xs text-gray-600">{deleteMode ? ' ' : 'Manage your reusable academic programs and non-academic offices.'}</p>
+      {/* Top Header Card */}
+      <div className="px-4 sm:px-6 pt-4 pb-3.5 shrink-0 border-b border-slate-200/70 bg-white shadow-2xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-600 to-blue-700 text-white shadow-md shadow-cyan-500/20 shrink-0">
+              <Layers className="w-5 h-5 sm:w-5.5 sm:h-5.5" />
+            </div>
+            <div>
+              <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">Master List</h1>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {deleteMode ? 'Select items to delete from master list.' : 'Manage your reusable academic programs and non-academic offices.'}
+              </p>
+            </div>
           </div>
+
           {isAdmin && (
-            <div className="flex items-center gap-1.5 pt-0.5 self-start sm:self-auto flex-wrap">
+            <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
               {deleteMode && (
                 <button
                   type="button"
                   onClick={handleBulkDelete}
                   disabled={selectedIds.length === 0 || deleteLoading}
-                  className="inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-red-400 bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+                  className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold shadow-xs transition-all ${
+                    selectedIds.length === 0 || deleteLoading
+                      ? 'border-red-200 bg-red-50/50 text-red-400 cursor-not-allowed'
+                      : 'border-red-600 bg-red-600 text-white hover:bg-red-700 active:scale-95 shadow-red-500/20 cursor-pointer'
+                  }`}
                 >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
                   {deleteLoading ? 'Deleting...' : `Delete Selected (${selectedIds.length})`}
                 </button>
               )}
@@ -285,260 +325,388 @@ export default function MasterList() {
                   setDeleteMode(true);
                   setSelectedIds([]);
                 }}
-                className={`inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-red-400 ${deleteMode
-                    ? 'border-red-300 bg-red-100 text-red-700 hover:bg-red-200'
-                    : 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100'
-                  }`}
+                className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition-all cursor-pointer ${
+                  deleteMode
+                    ? 'border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    : 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100 hover:border-red-300'
+                }`}
               >
-                {deleteMode ? 'Cancel Delete' : 'Delete'}
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={deleteMode ? "M6 18L18 6M6 6l12 12" : "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"} />
+                </svg>
+                {deleteMode ? 'Cancel' : 'Delete Mode'}
               </button>
               <button
                 type="button"
                 onClick={() => setShowAddModal(true)}
-                className="inline-flex h-8 items-center gap-1 rounded-lg bg-emerald-600 px-3 text-[11px] font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 text-xs font-semibold text-white shadow-xs transition-all hover:bg-emerald-700 active:scale-95 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer"
               >
-                <span className="text-sm leading-none">+</span>
-                Add
+                <Plus className="h-3.5 w-3.5" />
+                <span>Add Program / Office</span>
               </button>
             </div>
           )}
         </div>
 
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5 mt-2 flex-wrap">
-          <div className="relative w-full md:w-64 lg:w-72">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
-            >
-              <circle cx="11" cy="11" r="7" />
-              <path d="m20 20-3.5-3.5" />
-            </svg>
+        {/* Search, Filters & View Mode Toolbar */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mt-3 pt-3 border-t border-slate-100">
+          <div className="relative w-full sm:w-72 md:w-80">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               placeholder="Search master list..."
-              className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs text-slate-800 placeholder-slate-400 shadow-2xs transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              className="h-9 w-full rounded-xl border border-slate-200/90 bg-slate-50/60 pl-9.5 pr-8 text-xs text-slate-800 placeholder-slate-400 shadow-2xs transition-all focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-slate-300"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-md cursor-pointer flex items-center justify-center"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="relative inline-flex">
-              <select
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
-                className="h-8 min-w-[140px] appearance-none rounded-md border border-slate-200 bg-white px-4 text-center text-xs font-medium leading-4 text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                style={{ textAlignLast: 'center' }}
-              >
-                <option value="all">All Types</option>
-                <option value="Academic Program">Academic Program</option>
-                <option value="Non-Academic Office">Non-Academic Office</option>
-              </select>
-              <svg xmlns="http://www.w3.org/2000/svg" className="pointer-events-none absolute right-2.5 top-1/2 h-2.5 w-2.5 -translate-y-1/2 text-slate-500" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
-              </svg>
-            </div>
+          <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap">
+            <CustomDropdown
+              value={typeFilter}
+              onChange={setTypeFilter}
+              options={typeOptions}
+              minWidth="min-w-[145px]"
+              size="sm"
+            />
 
-            <div className="relative inline-flex">
-              <select
-                value={departmentFilter}
-                onChange={(e) => setDepartmentFilter(e.target.value)}
-                className="h-8 min-w-[140px] appearance-none rounded-md border border-slate-200 bg-white px-4 text-center text-xs font-medium leading-4 text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                style={{ textAlignLast: 'center' }}
-              >
-                <option value="all">All Departments</option>
-                {departments.map((department) => (
-                  <option key={department.id} value={String(department.id)}>
-                    {department.name}
-                  </option>
-                ))}
-              </select>
-              <svg xmlns="http://www.w3.org/2000/svg" className="pointer-events-none absolute right-2.5 top-1/2 h-2.5 w-2.5 -translate-y-1/2 text-slate-500" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
-              </svg>
-            </div>
+            <CustomDropdown
+              value={departmentFilter}
+              onChange={setDepartmentFilter}
+              options={departmentOptions}
+              minWidth="min-w-[160px]"
+              size="sm"
+            />
 
-            <div className="flex h-7 items-center gap-0.5 rounded-md border border-slate-200 bg-slate-100 p-0.5">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${viewMode === 'grid' ? 'bg-white text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
-                title="Grid View"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                </svg>
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${viewMode === 'list' ? 'bg-white text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
-                title="List View"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-              </button>
-            </div>
+            <ViewModeToggle viewMode={viewMode} onChange={handleSetViewMode} />
           </div>
         </div>
       </div>
 
-      <div className="w-full px-4 pt-2 pb-6" style={{ marginTop: 0 }}>
-        {loadingItems ? (
-          <MasterListSkeleton count={9} />
-        ) : viewMode === 'list' ? (
-          <div className="flex h-full flex-col">
-            <div className="px-0 overflow-x-auto">
-              <div className="hidden md:grid grid-cols-[minmax(140px,1fr)_180px_180px_120px] gap-6 px-6 py-3 mb-1 bg-white border border-slate-200 rounded-xl shadow-sm text-xs font-semibold text-gray-700 w-full min-w-[640px]">
-                <div className="flex items-center">Name</div>
-                <div className="flex items-center justify-center">Type</div>
+      <div className="flex-1 overflow-hidden px-4 sm:px-6 pt-3 pb-8 flex flex-col min-h-0">
+
+        {/* Content Area */}
+        <div className={`flex-1 min-h-0 ${viewMode === 'list' && !serverError && filteredItems.length > 0 ? 'overflow-y-auto pr-0.5' : 'flex flex-col h-full'}`}>
+          {loadingItems ? (
+            <MasterListSkeleton count={9} />
+          ) : serverError ? (
+            <ServerOfflineState
+              onRetry={() => loadMasterList(true)}
+              isRetrying={isRetrying}
+              title={serverError === 'Server Offline' ? 'Backend Server Unavailable' : 'Unable to Load Master List'}
+              message={serverError === 'Server Offline' 
+                ? 'The backend server is unreachable or offline. If you stopped the backend server, please start it and click Retry Connection.' 
+                : serverError}
+            />
+          ) : filteredItems.length === 0 ? (
+            <div className="flex-1 w-full min-h-[350px] flex flex-col items-center justify-center p-8 text-center bg-white/70 border border-dashed border-slate-200 rounded-2xl animate-fadeIn my-auto">
+              <div className="h-16 w-16 rounded-2xl bg-slate-100 border border-slate-200 text-slate-400 flex items-center justify-center mb-3">
+                <Building2 className="h-8 w-8 text-slate-400" />
+              </div>
+              <h3 className="text-base font-bold text-slate-800 mb-1">No Items Found</h3>
+              <p className="text-xs text-slate-500 max-w-sm mb-4">
+                {searchTerm || typeFilter !== 'all' || departmentFilter !== 'all'
+                  ? 'No master list items match your current filter or search criteria.'
+                  : 'No programs or offices have been added to the master list yet.'}
+              </p>
+              {searchTerm || typeFilter !== 'all' || departmentFilter !== 'all' ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setTypeFilter('all');
+                    setDepartmentFilter('all');
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200 transition cursor-pointer"
+                >
+                  Clear Filters
+                </button>
+              ) : isAdmin ? (
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(true)}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition shadow-sm cursor-pointer"
+                >
+                  <span>+ Add Program / Office</span>
+                </button>
+              ) : null}
+            </div>
+          ) : viewMode === 'list' ? (
+            <div className="flex flex-col min-w-[760px] pb-6">
+              {/* Sticky Header Row matching Programs & Offices */}
+              <div className="grid grid-cols-[minmax(220px,1fr)_160px_160px_120px_80px] gap-6 px-6 py-3 bg-white border border-slate-200 rounded-xl shadow-xs text-xs font-semibold text-slate-700 sticky top-0 z-20 mb-2">
+                <div className="flex items-center">Office Name</div>
+                <div className="flex items-center justify-center">Office Type</div>
                 <div className="flex items-center justify-center">Department</div>
                 <div className="flex items-center justify-center">Status</div>
+                <div className="flex items-center justify-end">Actions</div>
               </div>
-            </div>
 
-            <div className="w-full px-0 pb-6" style={{ marginTop: 0 }}>
-              <div className="relative z-10">
-                <div className="space-y-2">
-                  {filteredItems.length === 0 ? (
-                    <div className="rounded-2xl border border-slate-200 bg-white px-6 py-8 text-sm text-slate-500 shadow-sm">No items match your current filters.</div>
-                  ) : (
-                    paginatedItems.map((item) => (
-                      <div
-                        key={item.id}
-                        className="rounded-xl border border-slate-200 bg-white shadow-sm transition-all duration-200 hover:border-indigo-200 hover:shadow-md overflow-x-auto"
-                      >
-                        <div className="grid grid-cols-[minmax(140px,1fr)_180px_180px_120px] items-center gap-6 px-5 py-2 min-w-[640px]">
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-3">
-                              {renderItemIcon(item.type)}
-                              <div className="min-w-0">
-                                <div className="text-sm font-semibold text-slate-900 truncate">{item.name}</div>
-                              </div>
+              {/* Rows List */}
+              <div className="space-y-2">
+                {paginatedItems.map((item) => {
+                  const isSelected = selectedIds.includes(item.id);
+                  const isAcademic = item.type === 'Academic Program' || String(item.type).toLowerCase().includes('academic');
+
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => deleteMode && toggleSelect(item.id)}
+                      className={`rounded-xl bg-white shadow-2xs transition-all duration-200 ${
+                        isSelected
+                          ? 'border-2 border-rose-500 ring-2 ring-inset ring-rose-400/50 bg-rose-50/25 shadow-sm'
+                          : deleteMode
+                            ? 'border border-slate-200/90 hover:border-rose-300 cursor-pointer'
+                            : 'border border-slate-200/90 app-card-hover cursor-pointer'
+                      }`}
+                    >
+                      <div className="grid grid-cols-[minmax(220px,1fr)_160px_160px_120px_80px] items-center gap-6 px-6 py-3.5">
+                        {/* Office / Program Name & Detailed Metadata */}
+                        <div className="flex items-center gap-3 min-w-0">
+                          {deleteMode && (
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleSelect(item.id)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="h-4 w-4 rounded border-rose-300 text-rose-600 focus:ring-rose-500 cursor-pointer shrink-0"
+                            />
+                          )}
+                          {renderItemIcon(item.type)}
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-bold text-slate-900 truncate leading-snug hover:text-indigo-600 transition-colors">
+                              {item.name}
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-slate-400 font-medium truncate">
+                              <span className="font-semibold text-slate-500 uppercase">{item.department || 'INSTITUTION-WIDE'}</span>
+                              <span className="text-slate-300">•</span>
+                              <span><span className="font-semibold text-slate-400 uppercase">CREATED:</span> {formatDateTime(item.created_at)}</span>
+                              <span className="text-slate-300">•</span>
+                              <span><span className="font-semibold text-slate-400 uppercase">UPDATED:</span> {formatDateTime(item.updated_at || item.created_at)}</span>
                             </div>
                           </div>
-                          <div className="flex items-center justify-center">
-                            <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium ${item.type === 'Academic Program'
-                                ? 'bg-blue-50 text-blue-700 border-blue-200'
-                                : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                              }`}>
-                              {item.type}
+                        </div>
+
+                        {/* Office Type */}
+                        <div className="flex items-center justify-center">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                            isAcademic
+                              ? 'bg-blue-50 text-blue-700 border-blue-100'
+                              : 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                          }`}>
+                            {isAcademic ? 'Academic' : 'Non Academic'}
+                          </span>
+                        </div>
+
+                        {/* Department */}
+                        <div className="flex items-center justify-center text-xs font-bold text-slate-700">
+                          {item.department ? (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200/80">
+                              {item.department}
                             </span>
-                          </div>
-                          <div className="flex items-center justify-center text-sm text-slate-700">{item.department ?? '—'}</div>
+                          ) : (
+                            <span className="text-slate-400 font-normal">—</span>
+                          )}
+                        </div>
+
+                        {/* Status */}
+                        <div className="flex items-center justify-center">
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 border border-emerald-200/60">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            Active
+                          </span>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center justify-end relative">
+                          {!deleteMode && (
+                            <div className="relative masterlist-menu-container">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenMenuId(openMenuId === item.id ? null : item.id);
+                                }}
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200/90 bg-white text-slate-400 transition-all hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 shadow-2xs focus:outline-none cursor-pointer"
+                                aria-label="Options"
+                              >
+                                <MoreVertical className="h-3.5 w-3.5" />
+                              </button>
+
+                              {openMenuId === item.id && (
+                                <div
+                                  className="absolute right-0 top-9 z-30 w-36 rounded-xl border border-slate-200 bg-white p-1 shadow-lg animate-fadeIn"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditItem(item);
+                                      setOpenMenuId(null);
+                                    }}
+                                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+                                  >
+                                    <Edit2 className="h-3.5 w-3.5 text-indigo-500" />
+                                    <span>Edit Item</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setDeleteTarget(item);
+                                      setOpenMenuId(null);
+                                    }}
+                                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5 text-rose-500" />
+                                    <span>Delete</span>
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
-                    ))
-                  )}
-                </div>
-                <div className="h-6 md:h-12" aria-hidden="true" />
+                    </div>
+                  );
+                })}
               </div>
             </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 grid-rows-3 gap-2 sm:gap-2.5 lg:gap-3 flex-1 min-h-0 h-full p-1">
+              {paginatedItems.map((item) => {
+                const isSelected = selectedIds.includes(item.id);
+                const isAcademic = item.type === 'Academic Program' || String(item.type).toLowerCase().includes('academic');
 
-            <Pagination
-              currentPage={safePage}
-              totalPages={totalPages}
-              onPageChange={(page) => setCurrentPage(page)}
-              fixed={true}
-              showWhenSinglePage={true}
-            />
-          </div>
-        ) : (
-          <div className="w-full">
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {filteredItems.length === 0 ? (
-                <div className="col-span-full rounded-2xl border border-slate-200 bg-white px-5 py-6 text-sm text-slate-500 shadow-sm">No items match your current filters.</div>
-              ) : (
-                paginatedItems.map((item) => (
-                  <div key={item.id} className={`relative rounded-2xl border bg-white px-4 py-5 shadow-sm transition hover:shadow-md min-h-[175px] flex flex-col justify-between ${selectedIds.includes(item.id) ? 'border-red-400 bg-red-50/20' : 'border-slate-200'}`}>
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => deleteMode && toggleSelect(item.id)}
+                    className={`relative rounded-2xl bg-white p-3 sm:p-3.5 shadow-2xs h-full min-h-0 flex flex-col justify-between transition-all duration-200 ${
+                      isSelected
+                        ? 'border-2 border-rose-500 ring-2 ring-inset ring-rose-400/50 bg-rose-50/25 shadow-sm'
+                        : deleteMode
+                          ? 'border border-slate-200/90 hover:border-rose-300 cursor-pointer'
+                          : 'border border-slate-200/90 app-card-hover cursor-pointer'
+                    }`}
+                  >
                     {deleteMode && (
                       <input
                         type="checkbox"
-                        checked={selectedIds.includes(item.id)}
+                        checked={isSelected}
                         onChange={() => toggleSelect(item.id)}
-                        className="absolute top-3 left-3 h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500 z-10 cursor-pointer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute top-3 left-3 h-3.5 w-3.5 rounded border-rose-300 text-rose-600 focus:ring-rose-500 z-10 cursor-pointer"
                       />
                     )}
-                    {/* 3-dot button & options popup (Admin only) */}
-                    {isAdmin && (
-                      <>
-                        <button
-                          ref={(el) => { dotBtnRefs.current[item.id] = el; }}
-                          type="button"
-                          className="absolute top-3 right-3 inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-100 focus:outline-none"
-                          onClick={(e) => { e.stopPropagation(); setOpenMenuId((prev) => (prev === item.id ? null : item.id)); }}
-                          aria-label="More options"
-                        >
-                          <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24">
-                            <circle cx="12" cy="5" r="1.5" />
-                            <circle cx="12" cy="12" r="1.5" />
-                            <circle cx="12" cy="19" r="1.5" />
-                          </svg>
-                        </button>
 
-                        {openMenuId === item.id && (
-                          <div
-                            className="absolute right-3 top-11 z-50 w-48 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl animate-in fade-in zoom-in-95 duration-100"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <button
-                              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition whitespace-nowrap"
-                              onClick={() => { setEditItem(item); setOpenMenuId(null); }}
-                            >
-                              <svg className="h-4 w-4 text-blue-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                              </svg>
-                              <span>Edit Item</span>
-                            </button>
-                            <button
-                              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50 transition whitespace-nowrap"
-                              onClick={() => { setDeleteTarget(item); setOpenMenuId(null); }}
-                            >
-                              <svg className="h-4 w-4 text-rose-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
-                              </svg>
-                              <span>Delete Item</span>
-                            </button>
+                    {/* Header Row & 3-dot Menu */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-start gap-2.5 min-w-0 pr-2">
+                        {renderItemIcon(item.type)}
+                        <div className="min-w-0 flex-1">
+                          <h3 className="text-xs sm:text-[13px] font-bold text-slate-900 truncate leading-tight">
+                            {item.name}
+                          </h3>
+                          <div className="mt-0.5 text-[10px] text-slate-500 truncate font-semibold uppercase tracking-wider">
+                            {item.department || 'Institution-wide'}
                           </div>
-                        )}
-                      </>
-                    )}
+                        </div>
+                      </div>
 
-                    <div className="flex items-start gap-3 pr-8">
-                      {renderItemIcon(item.type)}
-                      <div className="min-w-0">
-                        <h3 className="text-sm font-semibold text-slate-800 truncate">{item.name}</h3>
-                        <p className="mt-1 text-[11px] text-slate-500 truncate">{item.department ?? 'Institution-wide'}</p>
+                      {!deleteMode && (
+                        <div className="relative masterlist-menu-container">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenMenuId(openMenuId === item.id ? null : item.id);
+                            }}
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200/90 bg-white text-slate-400 transition-all hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 shadow-2xs focus:outline-none cursor-pointer"
+                            aria-label="Options"
+                            title="Options"
+                          >
+                            <MoreVertical className="h-3.5 w-3.5" />
+                          </button>
+
+                          {openMenuId === item.id && (
+                            <div
+                              className="absolute right-0 top-6 z-30 w-32 rounded-xl border border-slate-200 bg-white p-1 shadow-lg animate-fadeIn"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditItem(item);
+                                  setOpenMenuId(null);
+                                }}
+                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+                              >
+                                <Edit2 className="h-3.5 w-3.5 text-indigo-500" />
+                                <span>Edit</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setDeleteTarget(item);
+                                  setOpenMenuId(null);
+                                }}
+                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors"
+                              >
+                                <Trash2 className="h-3.5 w-3.5 text-rose-500" />
+                                <span>Delete</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Metadata Dates */}
+                    <div className="my-2 border-t border-slate-100 pt-2 flex flex-col gap-1 text-[10px] text-slate-500">
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold text-slate-400 uppercase tracking-wider">Created</span>
+                        <span className="font-medium text-slate-600 truncate ml-2">{formatDateTime(item.created_at)}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold text-slate-400 uppercase tracking-wider">Updated</span>
+                        <span className="font-medium text-slate-600 truncate ml-2">{formatDateTime(item.updated_at || item.created_at)}</span>
                       </div>
                     </div>
-                    <div className="mt-4 grid grid-cols-2 gap-3 text-[11px] text-slate-500">
-                      <div>
-                        <span className="block font-semibold uppercase tracking-wide text-slate-400">Created</span>
-                        <span className="text-slate-700">{formatDateTime(item.created_at)}</span>
-                      </div>
-                      <div>
-                        <span className="block font-semibold uppercase tracking-wide text-slate-400">Updated</span>
-                        <span className="text-slate-700">{formatDateTime(item.updated_at || item.created_at)}</span>
-                      </div>
-                    </div>
-                    <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-2 text-[11px] text-slate-600">
-                      <span className={`rounded-full border px-2.5 py-1 font-medium ${item.type === 'Academic Program'
-                          ? 'bg-blue-50 text-blue-700 border-blue-200'
-                          : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                        }`}>
-                        {item.type}
+
+                    {/* Footer Badge */}
+                    <div className="flex items-center justify-between gap-1 pt-1.5 border-t border-slate-100">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                        isAcademic
+                          ? 'bg-blue-50 text-blue-700 border-blue-100'
+                          : 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                      }`}>
+                        {isAcademic ? 'Academic' : 'Non-Academic'}
                       </span>
-                      <span>{item.department ?? 'Institution-wide'}</span>
+                      <span className="text-[10px] text-slate-400 font-medium truncate max-w-[100px]">
+                        {item.code || ''}
+                      </span>
                     </div>
                   </div>
-                ))
-              )}
+                );
+              })}
             </div>
+          )}
+        </div>
+
+        {/* Bottom Pagination */}
+        {!loadingItems && !serverError && filteredItems.length > 0 && (
+          <div className="mt-1 shrink-0">
             <Pagination
-              currentPage={safePage}
+              currentPage={currentPage}
               totalPages={totalPages}
               onPageChange={(page) => setCurrentPage(page)}
               fixed={true}
@@ -565,18 +733,18 @@ export default function MasterList() {
 
       {/* Delete Confirmation Dialog */}
       {deleteTarget && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4">
-          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
-            <h3 className="text-lg font-bold text-slate-900">Confirm</h3>
-            <p className="mt-2 text-sm text-slate-600">
-              Delete <span className="font-semibold">&ldquo;{deleteTarget.name}&rdquo;</span>? This cannot be undone.
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 backdrop-blur-xs px-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-150">
+            <h3 className="text-base font-bold text-slate-900">Delete Item</h3>
+            <p className="mt-2 text-xs text-slate-600">
+              Are you sure you want to delete <span className="font-bold text-slate-800">&ldquo;{deleteTarget.name}&rdquo;</span> from the master list? This action cannot be undone.
             </p>
-            <div className="mt-6 flex justify-end gap-3">
+            <div className="mt-6 flex justify-end gap-2.5">
               <button
                 type="button"
                 onClick={() => setDeleteTarget(null)}
                 disabled={deleteLoading}
-                className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-100 disabled:opacity-50"
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 cursor-pointer disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -584,9 +752,9 @@ export default function MasterList() {
                 type="button"
                 onClick={handleDeleteItem}
                 disabled={deleteLoading}
-                className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-rose-700 cursor-pointer disabled:opacity-50 shadow-xs"
               >
-                {deleteLoading ? 'Deleting...' : 'OK'}
+                {deleteLoading ? 'Deleting...' : 'Delete'}
               </button>
             </div>
           </div>

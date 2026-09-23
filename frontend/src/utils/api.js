@@ -90,11 +90,19 @@ export const masterlistAPI = {
   updateItem: async (id, item) => (await api.put(`/api/masterlist/${id}`, item)).data,
   deleteItem: async (id) => (await api.delete(`/api/masterlist/${id}`)).data,
   deleteMultiple: async (ids) => (await api.post('/api/masterlist/delete-multiple', { ids })).data,
+  bulkDelete: async (ids) => (await api.post('/api/masterlist/delete-multiple', { ids })).data,
 };
 
 
 export const departmentsAPI = {
   getAll: async () => (await api.get('/api/departments')).data,
+};
+
+export const eventDepartmentsAPI = {
+  getByEvent: async (eventId) => (await api.get(`/api/event-departments/event/${eventId}`)).data,
+  assignDepartment: async (payload) => (await api.post('/api/event-departments', payload)).data,
+  updateLevel: async (id, accreditation_level) => (await api.put(`/api/event-departments/${id}/level`, { accreditation_level })).data,
+  deleteDepartment: async (id) => (await api.delete(`/api/event-departments/${id}`)).data,
 };
 
 // ========================
@@ -221,8 +229,15 @@ export const eventsAPI = {
       console.error('Download error:', error);
       // If error response has a blob (error message), try to extract it
       if (error.response && error.response.data instanceof Blob) {
-        const errorText = await error.response.data.text();
-        throw new Error(errorText || 'Download failed');
+        try {
+          const errorText = await error.response.data.text();
+          const parsed = JSON.parse(errorText);
+          throw new Error(parsed.message || errorText || 'Download failed');
+        } catch (e) {
+          if (e.message && !e.message.includes('JSON')) throw e;
+          const rawText = await error.response.data.text();
+          throw new Error(rawText || 'Download failed');
+        }
       }
       throw error;
     }

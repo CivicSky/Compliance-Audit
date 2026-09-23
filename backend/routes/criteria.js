@@ -6,10 +6,10 @@ const { recordLog } = require('../controllers/logsController');
 const { auth, restrictAuditor } = require('../middleware/auth');
 
 // GET all criteria
-router.get('/', CriteriaController.getAllCriteria);
+router.get('/', auth, CriteriaController.getAllCriteria);
 
 // GET criteria by event
-router.get('/event/:eventId', CriteriaController.getCriteriaByEvent);
+router.get('/event/:eventId', auth, CriteriaController.getCriteriaByEvent);
 
 // UPDATE criteria by ID
 router.put('/:id', auth, restrictAuditor, async (req, res) => {
@@ -107,7 +107,7 @@ router.put('/:id', auth, restrictAuditor, async (req, res) => {
 router.delete('/delete', auth, restrictAuditor, CriteriaController.deleteCriteria);
 
 // GET criteria by area
-router.get('/area/:areaId', async (req, res) => {
+router.get('/area/:areaId', auth, async (req, res) => {
     try {
         const { areaId } = req.params;
         

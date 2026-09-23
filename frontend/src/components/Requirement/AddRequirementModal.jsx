@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { X, Loader2 } from 'lucide-react';
 import { useModal } from "../UI/ModalProvider";
+import StructureLivePreview from '../ALLC/AddAreaPop/StructureLivePreview';
+import CustomSelect from '../UI/CustomSelect';
 
 export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
     const [formData, setFormData] = useState({
@@ -240,14 +243,14 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                 }
                 
                 onClose();
-                await showAlert('Requirement added successfully!');
+                await showAlert('Evidence added successfully!');
             } else {
-                await showAlert(response.message || 'Failed to add requirement');
+                await showAlert(response.message || 'Failed to add evidence');
             }
             
         } catch (error) {
             console.error('Error submitting form:', error);
-            await showAlert('An error occurred while adding the requirement. Please try again.');
+            await showAlert('An error occurred while adding the evidence. Please try again.');
         } finally {
             setIsSubmitting(false);
         }
@@ -272,159 +275,148 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out bg-black bg-opacity-50 flex items-center justify-center z-[50]">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl mx-4 my-8 min-h-[70vh] max-h-[85vh] overflow-y-auto">
+        <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-[50] p-4">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh]">
                 {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b sticky top-0 bg-white z-10">
-                    <h2 className="text-xl font-semibold text-gray-800">Add New Requirement</h2>
+                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-white z-10 shrink-0">
+                    <div>
+                        <h2 className="text-base font-bold text-slate-900">Add New Evidence</h2>
+                        <p className="text-xs text-slate-500 mt-0.5">Attach an evidence specification to a selected criteria</p>
+                    </div>
                     <button
+                        type="button"
                         onClick={handleClose}
                         disabled={isSubmitting}
-                        className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 hover:bg-slate-100 hover:text-slate-700 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
                     >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
+                        <X className="h-4 w-4" />
                     </button>
                 </div>
 
-                <div className="flex">
+                <div className="flex flex-1 overflow-y-auto min-h-0">
                     {/* Left Side - Form */}
-                    <div className="w-1/2 p-6 border-r">
+                    <div className="w-1/2 p-6 border-r border-slate-200 overflow-y-auto">
                         <form onSubmit={handleSubmit} className="space-y-4">
                     {/* Event Selection */}
-                    <div className="mb-4">
-                        <label htmlFor="EventID" className="block text-sm font-medium text-gray-700 mb-1">
-                            Event *
+                    <div>
+                        <label htmlFor="EventID" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                            Accreditation *
                         </label>
-                        <select
+                        <CustomSelect
                             id="EventID"
-                            name="EventID"
+                            size="md"
                             value={formData.EventID}
-                            onChange={handleInputChange}
-                            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                                errors.EventID ? 'border-red-500' : 'border-gray-300'
-                            }`}
+                            onChange={(val) => handleInputChange({ target: { name: 'EventID', value: val } })}
+                            options={eventsList.map((event) => ({
+                                 value: String(event.EventID),
+                                 label: `${event.EventCode} - ${event.EventName}`
+                            }))}
+                            placeholder="Select an accreditation"
                             disabled={isSubmitting}
-                        >
-                            <option value="">Select an event</option>
-                            {eventsList.map((event) => (
-                                <option key={event.EventID} value={event.EventID}>
-                                    {event.EventCode} - {event.EventName}
-                                </option>
-                            ))}
-                        </select>
+                            buttonClassName={errors.EventID ? '!border-red-400' : ''}
+                        />
                         {errors.EventID && (
-                            <p className="text-red-500 text-sm mt-1">{errors.EventID}</p>
+                            <p className="text-red-500 text-[11px] mt-1">{errors.EventID}</p>
                         )}
-                        <p className="text-xs text-gray-500 mt-1">Select the event to filter criteria</p>
+                        <p className="text-[11px] text-slate-400 mt-1">Select the accreditation to filter criteria</p>
                     </div>
 
                     {/* Criteria Dropdown */}
-                    <div className="mb-4">
-                        <label htmlFor="CriteriaID" className="block text-sm font-medium text-gray-700 mb-1">
+                    <div>
+                        <label htmlFor="CriteriaID" className="block text-xs font-semibold text-slate-700 mb-1.5">
                             Criteria *
                         </label>
-                        <select
+                        <CustomSelect
                             id="CriteriaID"
-                            name="CriteriaID"
+                            size="md"
                             value={formData.CriteriaID}
-                            onChange={handleInputChange}
-                            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                                errors.CriteriaID ? 'border-red-500' : 'border-gray-300'
-                            }`}
+                            onChange={(val) => handleInputChange({ target: { name: 'CriteriaID', value: val } })}
+                            options={topLevelCriteria.map((criteria) => ({
+                                value: String(criteria.CriteriaID),
+                                label: `${criteria.CriteriaCode} - ${criteria.CriteriaName}`
+                            }))}
+                            placeholder={!formData.EventID ? 'Select an accreditation first' : 'Select a criteria'}
                             disabled={isSubmitting || isLoading || !formData.EventID}
-                        >
-                            <option value="">
-                                {!formData.EventID ? 'Select an event first' : 'Select a criteria'}
-                            </option>
-                            {topLevelCriteria.map((criteria) => (
-                                <option key={criteria.CriteriaID} value={criteria.CriteriaID}>
-                                    {criteria.CriteriaCode} - {criteria.CriteriaName}
-                                </option>
-                            ))}
-                        </select>
+                            buttonClassName={errors.CriteriaID ? '!border-red-400' : ''}
+                        />
                         {errors.CriteriaID && (
-                            <p className="text-red-500 text-sm mt-1">{errors.CriteriaID}</p>
+                            <p className="text-red-500 text-[11px] mt-1">{errors.CriteriaID}</p>
                         )}
                         {isLoading && (
-                            <p className="text-gray-500 text-sm mt-1">Loading criteria...</p>
+                            <p className="text-slate-400 text-[11px] mt-1">Loading criteria...</p>
                         )}
                         {!isLoading && formData.EventID && topLevelCriteria.length === 0 && (
-                            <p className="text-yellow-600 text-sm mt-1">No top-level criteria found for this event.</p>
+                            <p className="text-amber-600 text-[11px] mt-1">No top-level criteria found for this accreditation.</p>
                         )}
                         {!isLoading && topLevelCriteria.length > 0 && (
-                            <p className="text-green-600 text-sm mt-1">Loaded {topLevelCriteria.length} top-level criteria for this event</p>
+                            <p className="text-emerald-600 text-[11px] mt-1">Loaded {topLevelCriteria.length} top-level criteria for this accreditation</p>
                         )}
                     </div>
 
                     {/* Parent Requirement Code */}
-                    <div className="mb-4">
-                        <label htmlFor="ParentRequirementCode" className="block text-sm font-medium text-gray-700 mb-1">
-                            Parent Requirement Code (Optional)
+                    <div>
+                        <label htmlFor="ParentRequirementCode" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                            Parent Evidence Code (Optional)
                         </label>
-                        <select
+                        <CustomSelect
                             id="ParentRequirementCode"
-                            name="ParentRequirementCode"
+                            size="md"
                             value={formData.ParentRequirementCode}
-                            onChange={handleInputChange}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            onChange={(val) => handleInputChange({ target: { name: 'ParentRequirementCode', value: val } })}
+                            options={[
+                                { value: '', label: !formData.CriteriaID ? 'Select a criteria first' : 'None (Top-level evidence)' },
+                                ...requirementsList.map((req) => ({
+                                    value: req.RequirementCode,
+                                    label: `${req.RequirementCode} - ${req.Description?.substring(0, 50) || ''}${req.Description?.length > 50 ? '...' : ''}`
+                                }))
+                            ]}
+                            placeholder={!formData.CriteriaID ? 'Select a criteria first' : 'None (Top-level evidence)'}
                             disabled={isSubmitting || !formData.CriteriaID}
-                        >
-                            <option value="">
-                                {!formData.CriteriaID ? 'Select a criteria first' : 'None (Top-level requirement)'}
-                            </option>
-                            {requirementsList.map((req) => (
-                                <option key={req.RequirementID} value={req.RequirementCode}>
-                                    {req.RequirementCode} - {req.Description?.substring(0, 50)}
-                                    {req.Description?.length > 50 ? '...' : ''}
-                                </option>
-                            ))}
-                        </select>
+                        />
                         {!formData.CriteriaID ? (
-                            <p className="text-gray-500 text-xs mt-1">
-                                Select a criteria to see available parent requirements
+                            <p className="text-slate-400 text-[11px] mt-1">
+                                Select a criteria to see available parent evidence
                             </p>
                         ) : requirementsList.length === 0 ? (
-                            <p className="text-yellow-600 text-xs mt-1">
-                                No existing requirements in this criteria. This will be a top-level requirement.
+                            <p className="text-amber-600 text-[11px] mt-1">
+                                No existing evidence in this criteria. This will be top-level evidence.
                             </p>
                         ) : (
-                            <p className="text-green-600 text-xs mt-1">
-                                Loaded {requirementsList.length} requirement{requirementsList.length !== 1 ? 's' : ''} for this criteria
+                            <p className="text-emerald-600 text-[11px] mt-1">
+                                Loaded {requirementsList.length} evidence item{requirementsList.length !== 1 ? 's' : ''} for this criteria
                             </p>
                         )}
                     </div>
 
                     {/* Child Criteria Dropdown (optional) */}
                     {childCriteriaOptions.length > 0 && (
-                        <div className="mb-4">
-                            <label htmlFor="ChildCriteriaID" className="block text-sm font-medium text-gray-700 mb-1">
+                        <div>
+                            <label htmlFor="ChildCriteriaID" className="block text-xs font-semibold text-slate-700 mb-1.5">
                                 Place under Child Criteria (Optional)
                             </label>
-                            <select
+                            <CustomSelect
                                 id="ChildCriteriaID"
-                                name="ChildCriteriaID"
+                                size="md"
                                 value={formData.ChildCriteriaID}
-                                onChange={handleInputChange}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                onChange={(val) => handleInputChange({ target: { name: 'ChildCriteriaID', value: val } })}
+                                options={[
+                                    { value: '', label: 'No child selected (use selected criteria)' },
+                                    ...childCriteriaOptions.map(cc => ({
+                                        value: String(cc.CriteriaID),
+                                        label: cc.CriteriaCode ? `${cc.CriteriaCode} - ${cc.CriteriaName}` : cc.CriteriaName
+                                    }))
+                                ]}
+                                placeholder="No child selected (use selected criteria)"
                                 disabled={isSubmitting || !formData.CriteriaID}
-                            >
-                                <option value="">No child selected (use selected criteria)</option>
-                                {childCriteriaOptions.map(cc => (
-                                    <option key={cc.CriteriaID} value={cc.CriteriaID}>
-                                        {cc.CriteriaCode ? `${cc.CriteriaCode} - ${cc.CriteriaName}` : cc.CriteriaName}
-                                    </option>
-                                ))}
-                            </select>
-                            <p className="text-xs text-gray-500 mt-1">Choose a child criteria to save this requirement under that child.</p>
+                            />
+                            <p className="text-[11px] text-slate-400 mt-1">Choose a child criteria to save this evidence under that child.</p>
                         </div>
                     )}
 
                     {/* Requirement Code */}
-                    <div className="mb-4">
-                        <label htmlFor="RequirementCode" className="block text-sm font-medium text-gray-700 mb-1">
-                            Requirement Code *
+                    <div>
+                        <label htmlFor="RequirementCode" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                            Evidence Code *
                         </label>
                         <input
                             type="text"
@@ -432,20 +424,20 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                             name="RequirementCode"
                             value={formData.RequirementCode}
                             onChange={handleInputChange}
-                            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                                errors.RequirementCode ? 'border-red-500' : 'border-gray-300'
+                            className={`w-full px-3 py-2 text-xs border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ${
+                                errors.RequirementCode ? 'border-red-400' : 'border-slate-200'
                             }`}
                             placeholder="e.g., A.1, B.2.1"
                             disabled={isSubmitting}
                         />
                         {errors.RequirementCode && (
-                            <p className="text-red-500 text-sm mt-1">{errors.RequirementCode}</p>
+                            <p className="text-red-500 text-[11px] mt-1">{errors.RequirementCode}</p>
                         )}
                     </div>
 
                     {/* Description */}
-                    <div className="mb-4">
-                        <label htmlFor="Description" className="block text-sm font-medium text-gray-700 mb-1">
+                    <div>
+                        <label htmlFor="Description" className="block text-xs font-semibold text-slate-700 mb-1.5">
                             Description *
                         </label>
                         <textarea
@@ -454,110 +446,64 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                             value={formData.Description}
                             onChange={handleInputChange}
                             rows="4"
-                            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none ${
-                                errors.Description ? 'border-red-500' : 'border-gray-300'
+                            className={`w-full px-3 py-2 text-xs border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 resize-none transition-colors ${
+                                errors.Description ? 'border-red-400' : 'border-slate-200'
                             }`}
-                            placeholder="Enter a detailed description of this requirement"
+                            placeholder="Enter a detailed description of this evidence"
                             disabled={isSubmitting}
                         />
                         {errors.Description && (
-                            <p className="text-red-500 text-sm mt-1">{errors.Description}</p>
+                            <p className="text-red-500 text-[11px] mt-1">{errors.Description}</p>
                         )}
                     </div>
 
                     {/* Form Actions */}
-                    <div className="flex justify-end space-x-3 pt-4 border-t">
-                            <button
-                                type="button"
-                                onClick={handleClose}
-                                disabled={isSubmitting}
-                                className="px-4 py-2 text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors disabled:opacity-50"
-                            >
+                    <div className="flex justify-end gap-2.5 pt-4 border-t border-slate-200">
+                        <button
+                            type="button"
+                            onClick={handleClose}
+                            disabled={isSubmitting}
+                            className="inline-flex h-9 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+                        >
                             Cancel
                         </button>
                         <button
                             type="submit"
                             disabled={isSubmitting || !formData.EventID || !formData.CriteriaID}
-                                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-4 text-xs font-semibold text-white shadow-2xs hover:bg-blue-700 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                         >
                             {isSubmitting && (
-                                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"></circle>
-                                    <path fill="currentColor" className="opacity-75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
                             )}
-                            {isSubmitting ? 'Adding...' : 'Add Requirement'}
+                            {isSubmitting ? 'Adding...' : 'Add Evidence'}
                         </button>
                     </div>
                         </form>
                     </div>
 
                     {/* Right Side - Preview */}
-                    <div className="w-1/2 p-6 bg-gray-50">
-                        <h3 className="text-lg font-semibold text-gray-800 mb-4">Preview Structure</h3>
-                        
-                        {/* Preview of selected hierarchy */}
-                        {formData.CriteriaID || formData.RequirementCode ? (
-                            <div className="space-y-4">
-                                {/* Criteria Preview */}
-                                {formData.CriteriaID && (
-                                    <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-3 rounded-lg shadow-md">
-                                        <h3 className="text-sm font-bold">
-                                            {criteriaList.find(c => c.CriteriaID == formData.CriteriaID)?.CriteriaCode || 'Criteria'}
-                                        </h3>
-                                        <p className="text-xs text-blue-100 mt-1">
-                                            {criteriaList.find(c => c.CriteriaID == formData.CriteriaID)?.CriteriaName || 'Select a criteria'}
-                                        </p>
-                                    </div>
-                                )}
+                    <div className="w-1/2 p-6 bg-slate-50 flex flex-col justify-start">
+                        {(() => {
+                            const selectedCrit = criteriaList.find(c => String(c.CriteriaID) === String(formData.ChildCriteriaID || formData.CriteriaID));
+                            const selectedArea = selectedCrit ? {
+                                AreaID: selectedCrit.AreaID,
+                                AreaName: selectedCrit.AreaName || selectedCrit.area_name,
+                                AreaCode: selectedCrit.AreaCode || selectedCrit.area_code
+                            } : null;
 
-                                {/* Requirement Preview */}
-                                {formData.RequirementCode && (
-                                    <div className="ml-4">
-                                        <div className="border-l-4 border-blue-200 bg-white p-4 rounded-r-lg shadow-sm">
-                                            <div className="flex items-start gap-3">
-                                                <div className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center mt-1">
-                                                    <svg className="w-3 h-3 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                                    </svg>
-                                                </div>
-                                                <div className="flex-1">
-                                                    <h4 className="font-bold text-sm text-gray-800">
-                                                        {(() => {
-                                                            const criteriaCode = criteriaList.find(c => c.CriteriaID == formData.CriteriaID)?.CriteriaCode || '';
-                                                            const parentCode = formData.ParentRequirementCode || '';
-                                                            const reqCode = formData.RequirementCode || '';
-                                                            
-                                                             if (reqCode) {
-                                                                if (parentCode) {
-                                                                    // Parent already includes criteria code
-                                                                    return `${parentCode}.${reqCode}`;
-                                                                } else if (criteriaCode) {
-                                                                    return `${criteriaCode}.${reqCode}`;
-                                                                }
-                                                                return reqCode;
-                                                            }
-                                                            return 'Enter requirement code...';
-                                                        })()}
-                                                    </h4>
-                                                    <p className="text-xs text-gray-600 mt-1">
-                                                        {formData.Description || 'Enter a description...'}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        ) : (
-                            <div className="text-center py-12">
-                                <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                </svg>
-                                <p className="text-gray-500 text-sm">Fill out the form to see preview</p>
-                                <p className="text-gray-400 text-xs mt-1">Criteria → Requirement</p>
-                            </div>
-                        )}
+                            return (
+                                <StructureLivePreview
+                                    mode="add-requirement"
+                                    areaData={selectedArea}
+                                    criteriaData={selectedCrit || null}
+                                    requirementData={{
+                                        RequirementCode: formData.RequirementCode,
+                                        Description: formData.Description
+                                    }}
+                                    event={eventsList.find(e => String(e.EventID) === String(formData.EventID)) || null}
+                                />
+                            );
+                        })()}
                     </div>
                 </div>
             </div>

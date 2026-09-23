@@ -148,10 +148,18 @@ class DataCache {
 
 export const dataCache = new DataCache(10 * 60 * 1000); // 10 minute default cache
 
+// Invalidate in-memory cache whenever live data mutations arrive from Socket.io
+if (typeof window !== 'undefined') {
+    window.addEventListener('app:data-sync', () => {
+        dataCache.clear();
+    });
+}
+
 // Convenience helpers
 export const CacheKeys = {
     officeReqs: (officeId) => `office_reqs_${officeId}`,
-    userFiles: (reqId, userId) => `user_files_${reqId}_${userId}`,
-    allUserFilesForReq: (reqId) => `user_files_${reqId}_`,
+    userFiles: (reqId, userId, officeId = 'all') => `user_files_${reqId}_${officeId || 'all'}_${userId}`,
+    allUserFilesForReq: (reqId, officeId = 'all') => `user_files_${reqId}_${officeId || 'all'}_`,
     officeSummary: (officeId) => `office_summary_${officeId}`,
 };
+

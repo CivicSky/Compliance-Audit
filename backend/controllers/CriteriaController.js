@@ -32,7 +32,26 @@ const deleteCriteria = async (req, res) => {
     );
 
     if (req.user && req.user.userId) {
-        try { recordLog(req.user.userId, 'Criteria deleted', { criteriaIds }); } catch (e) {}
+        // Capture criteria details before deletion for verbose logging
+        let deletedCriteria = [];
+        try {
+          const phol = criteriaIds.map(() => '?').join(',');
+          const [critRows] = await db.query(
+            `SELECT c.CriteriaID, c.CriteriaCode, c.CriteriaName, a.AreaName, e.EventName
+             FROM criteria c
+             LEFT JOIN areas a ON c.AreaID = a.AreaID
+             LEFT JOIN Events e ON c.EventID = e.EventID
+             WHERE c.CriteriaID IN (${phol})`,
+            criteriaIds
+          );
+          deletedCriteria = critRows.map(c => ({
+            CriteriaCode: c.CriteriaCode,
+            CriteriaName: c.CriteriaName,
+            AreaName: c.AreaName,
+            EventName: c.EventName,
+          }));
+        } catch (e) { console.warn('Could not fetch criteria details before deletion:', e.message); }
+        try { recordLog(req.user.userId, 'CriteriaDeleted', { criteriaIds, deletedCriteria, deletedCount: criteriaIds.length }); } catch (e) {}
     }
 
     res.json({

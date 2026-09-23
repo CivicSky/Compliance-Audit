@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
+import CustomSelect from "../UI/CustomSelect";
 
 export default function EditEventPopup({ open, event, onCancel, onConfirm }) {
     const [eventName, setEventName] = useState("");
     const [eventCode, setEventCode] = useState("");
-    const [description, setDescription] = useState("");
     const [status, setStatus] = useState("active");
     const [accreditationLevel, setAccreditationLevel] = useState("N/A");
 
@@ -12,7 +13,6 @@ export default function EditEventPopup({ open, event, onCancel, onConfirm }) {
         if (event) {
             setEventName(event.EventName || "");
             setEventCode(event.EventCode || "");
-            setDescription(event.Description || "");
             setStatus(event.status || "active");
             setAccreditationLevel(event.accreditation_level || "N/A");
         }
@@ -20,20 +20,15 @@ export default function EditEventPopup({ open, event, onCancel, onConfirm }) {
 
     if (!open) return null;
 
-    return (
-        <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out bg-black bg-opacity-40 flex items-center justify-center z-[50]">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
-                <div className="flex items-center justify-between px-6 py-5 border-b border-slate-200">
-                    <h2 className="text-lg font-bold text-gray-900">Edit Event</h2>
-                    <button onClick={onCancel} className="text-gray-400 hover:text-gray-600" aria-label="Close">
-                        <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
+    const modalContent = (
+        <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-[50]">
+            <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg mx-4 max-h-[95vh] overflow-hidden flex flex-col">
+                <div className="px-6 py-4 border-b border-slate-200">
+                    <h2 className="text-lg font-bold text-gray-800">Edit Accreditation</h2>
                 </div>
-                <div className="px-6 py-5 space-y-4">
+                <div className="p-6 space-y-4">
                     <div>
-                        <label className="block text-sm font-semibold text-gray-800 mb-1">Event Name</label>
+                        <label className="block text-sm font-semibold text-gray-800 mb-1">Accreditation Name</label>
                         <input
                             type="text"
                             className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
@@ -42,7 +37,7 @@ export default function EditEventPopup({ open, event, onCancel, onConfirm }) {
                         />
                     </div>
                     <div>
-                        <label className="block text-sm font-semibold text-gray-800 mb-1">Event Code</label>
+                        <label className="block text-sm font-semibold text-gray-800 mb-1">Accreditation Code</label>
                         <input
                             type="text"
                             className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
@@ -52,47 +47,30 @@ export default function EditEventPopup({ open, event, onCancel, onConfirm }) {
                     </div>
                     <div>
                         <label className="block text-sm font-semibold text-gray-800 mb-1">Accreditation Level</label>
-                        <div className="relative">
-                            <select
-                                className="h-10 w-full appearance-none rounded-md border border-slate-200 bg-white px-3 pr-9 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                                value={accreditationLevel}
-                                onChange={e => setAccreditationLevel(e.target.value)}
-                            >
-                                <option value="Level I">Level I</option>
-                                <option value="Level II">Level II</option>
-                                <option value="Level III">Level III</option>
-                                <option value="Level IV">Level IV</option>
-                                <option value="N/A">N/A</option>
-                            </select>
-                            <svg xmlns="http://www.w3.org/2000/svg" className="pointer-events-none absolute right-3 top-1/2 h-2.5 w-2.5 -translate-y-1/2 text-slate-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
-                            </svg>
-                        </div>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-semibold text-gray-800 mb-1">Description</label>
-                        <textarea
-                            className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                            rows={4}
-                            value={description}
-                            onChange={e => setDescription(e.target.value)}
+                        <CustomSelect
+                            value={accreditationLevel}
+                            onChange={(val) => setAccreditationLevel(val)}
+                            options={[
+                                { value: "Level I", label: "Level I" },
+                                { value: "Level II", label: "Level II" },
+                                { value: "Level III", label: "Level III" },
+                                { value: "Level IV", label: "Level IV" },
+                                { value: "N/A", label: "N/A" }
+                            ]}
+                            size="md"
                         />
                     </div>
                     <div>
                         <label className="block text-sm font-semibold text-gray-800 mb-1">Status</label>
-                        <div className="relative">
-                            <select
-                                className="h-10 w-full appearance-none rounded-md border border-slate-200 bg-white px-3 pr-9 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                                value={status}
-                                onChange={e => setStatus(e.target.value)}
-                            >
-                                <option value="active">Active</option>
-                                <option value="inactive">Inactive</option>
-                            </select>
-                            <svg xmlns="http://www.w3.org/2000/svg" className="pointer-events-none absolute right-3 top-1/2 h-2.5 w-2.5 -translate-y-1/2 text-slate-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
-                            </svg>
-                        </div>
+                        <CustomSelect
+                            value={status}
+                            onChange={(val) => setStatus(val)}
+                            options={[
+                                { value: "active", label: "Active" },
+                                { value: "inactive", label: "Inactive" }
+                            ]}
+                            size="md"
+                        />
                     </div>
                 </div>
                 <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-200 bg-white">
@@ -105,8 +83,8 @@ export default function EditEventPopup({ open, event, onCancel, onConfirm }) {
                     <button
                         className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-green-700"
                         onClick={() => {
-                            console.log('EditEventPopup onConfirm:', { EventName: eventName, EventCode: eventCode, Description: description, status, accreditation_level: accreditationLevel });
-                            onConfirm({ EventName: eventName, EventCode: eventCode, Description: description, status, accreditation_level: accreditationLevel });
+                            console.log('EditEventPopup onConfirm:', { EventName: eventName, EventCode: eventCode, Description: null, status, accreditation_level: accreditationLevel });
+                            onConfirm({ EventName: eventName, EventCode: eventCode, Description: null, status, accreditation_level: accreditationLevel });
                         }}
                     >
                         Save
@@ -115,5 +93,7 @@ export default function EditEventPopup({ open, event, onCancel, onConfirm }) {
             </div>
         </div>
     );
+
+    return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : null;
 }
 

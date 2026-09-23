@@ -26,13 +26,34 @@ export default function UserFileViewerModal({
     }, []);
 
     const isAuditor = currentUser?.RoleID === 4 || 
+                      Number(currentUser?.roleId) === 4 ||
                       String(currentUser?.RoleName || '').toLowerCase().includes('auditor') || 
-                      currentUser?.isExternalAuditor;
+                      String(currentUser?.role || '').toLowerCase().includes('auditor') ||
+                      String(currentUser?.Position || '').toLowerCase().includes('auditor') ||
+                      Boolean(currentUser?.isExternalAuditor);
+
+    useEffect(() => {
+        if (!show || !isAuditor) return;
+        const handleKeyDown = (e) => {
+            if ((e.ctrlKey || e.metaKey) && ['s', 'S', 'p', 'P'].includes(e.key)) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown, true);
+        return () => window.removeEventListener('keydown', handleKeyDown, true);
+    }, [show, isAuditor]);
 
     if (!show || !selectedUserFile) return null;
 
-    const url = String(selectedUserFile?.url || '');
-    const downloadName = String(selectedUserFile?.fileName || '').trim() || fileNameFromUrl(url);
+    const url = String(selectedUserFile?.url || selectedUserFile?.file_path || '');
+    const rawName = String(selectedUserFile?.displayName || selectedUserFile?.fileName || '').trim() || fileNameFromUrl(url);
+    const extMatch = (selectedUserFile?.fileName || url).match(/\.([a-zA-Z0-9]+)(?:\?|#|$)/);
+    const ext = extMatch ? extMatch[1] : '';
+    let downloadName = rawName;
+    if (ext && !downloadName.toLowerCase().endsWith(`.${ext.toLowerCase()}`)) {
+        downloadName = `${downloadName}.${ext}`;
+    }
 
     const handleDownload = async (e) => {
         e.stopPropagation();
@@ -56,11 +77,27 @@ export default function UserFileViewerModal({
 
     const modalContent = (
         <div
-            className="fixed inset-0 z-[10000] bg-black/75 flex items-center justify-center p-4 animate-in fade-in duration-150"
+            className="fixed inset-0 z-[10000] bg-black/75 flex items-center justify-center p-4 animate-in fade-in duration-150 select-none"
             onClick={onClose}
+            onContextMenu={(e) => {
+                if (isAuditor) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+            }}
             role="presentation"
         >
-            <div className="fixed top-4 right-4 z-[132] flex items-center gap-2">
+            {/* Auditor Watermark Overlay */}
+            {isAuditor && (
+                <div className="pointer-events-none fixed inset-0 z-[10001] flex items-center justify-center overflow-hidden opacity-15 select-none">
+                    <div className="rotate-[-25deg] text-center text-white text-sm sm:text-lg md:text-2xl font-black uppercase tracking-widest leading-loose">
+                        CONFIDENTIAL • AUDIT EVALUATION ONLY<br />
+                        {currentUser?.FirstName || ''} {currentUser?.LastName || 'Auditor'} • {new Date().toLocaleDateString()}
+                    </div>
+                </div>
+            )}
+
+            <div className="fixed top-4 right-4 z-[10002] flex items-center gap-2">
                 {!isAuditor && (
                     <button
                         type="button"
@@ -95,17 +132,66 @@ export default function UserFileViewerModal({
             <div className="w-full h-full flex items-center justify-center p-4" onClick={(e) => e.stopPropagation()}>
                 <div className="w-[94vw] max-w-[1600px] h-[94vh] max-h-[94vh]">
                     {isVideo ? (
-                        <div className="w-full h-full flex items-center justify-center bg-black/60 rounded-xl overflow-hidden p-2">
-                            <video controls autoPlay src={url} className="max-h-full max-w-full object-contain rounded-lg shadow-2xl" />
+                        <div 
+                            className="w-full h-full flex items-center justify-center bg-black/60 rounded-xl overflow-hidden p-2"
+                            onContextMenu={(e) => {
+                                if (isAuditor) {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                }
+                            }}
+                        >
+                            <video 
+                                controls 
+                                autoPlay 
+                                src={url} 
+                                controlsList={isAuditor ? "nodownload" : undefined}
+                                disablePictureInPicture={isAuditor}
+                                className="max-h-full max-w-full object-contain rounded-lg shadow-2xl" 
+                            />
                         </div>
                     ) : isImage ? (
-                        <div className="w-full h-full flex items-center justify-center">
-                            <img src={url} alt="Document Preview" className="max-h-full max-w-full object-contain" />
+                        <div 
+                            className="relative w-full h-full flex items-center justify-center select-none"
+                            onContextMenu={(e) => {
+                                if (isAuditor) {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                }
+                            }}
+                        >
+                            <img 
+                                src={url} 
+                                alt="Document Preview" 
+                                className={`max-h-full max-w-full object-contain ${isAuditor ? 'pointer-events-none select-none' : ''}`}
+                                draggable={!isAuditor}
+                                onContextMenu={(e) => {
+                                    if (isAuditor) {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                    }
+                                }}
+                            />
+                            {/* Shield overlay for auditors */}
+                            {isAuditor && (
+                                <div 
+                                    className="absolute inset-0 z-20 cursor-default select-none"
+                                    onContextMenu={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                    }}
+                                    onDragStart={(e) => e.preventDefault()}
+                                />
+                            )}
                         </div>
                     ) : (
                         <div className="w-full h-full overflow-hidden rounded-lg bg-transparent">
                             {isPdf ? (
-                                <iframe src={url} title="Document Preview" className="w-full h-full border-0 rounded-lg" />
+                                <iframe 
+                                    src={isAuditor ? `${url}#toolbar=0&navpanes=0` : url} 
+                                    title="Document Preview" 
+                                    className="w-full h-full border-0 rounded-lg" 
+                                />
                             ) : isExcel ? (
                                 <div className="w-full h-full flex flex-col">
                                     {excelHtml ? (

@@ -8,8 +8,8 @@ import { useModal } from "../components/UI/ModalProvider";
 import EditAreaModal from "../components/EditArea/EditArea";
 import RequirementsP from "../components/RequirementsProfile/RequirementsProfile";
 import UnifiedSetupWizard from "../components/UnifiedSetupWizard/UnifiedSetupWizard";
-import { Wand2 } from "lucide-react";
-import Header from "../components/Header/header";
+import CustomSelect from "../components/UI/CustomSelect";
+import { Wand2, Layers, Plus, Trash2, ChevronDown } from "lucide-react";
 
 export default function Area() {
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -59,7 +59,9 @@ export default function Area() {
                 if (allEvents && allEvents.success && Array.isArray(allEvents.data)) {
                     setEvents(allEvents.data);
                     if (allEvents.data.length > 0) {
-                        setSelectedEventId(allEvents.data[0].EventID);
+                        const savedId = localStorage.getItem('acc_selected_event_id') || localStorage.getItem('selected_audit_event_id');
+                        const valid = allEvents.data.find(e => String(e.EventID || e.id) === String(savedId));
+                        setSelectedEventId(valid ? (valid.EventID || valid.id) : allEvents.data[0].EventID);
                     }
                 } else {
                     setEvents([]);
@@ -106,17 +108,17 @@ export default function Area() {
             );
 
             if (response.success) {
-                console.log('Requirement updated successfully');
+                console.log('Evidence updated successfully');
                 if (requirementsPRef.current && requirementsPRef.current.refresh) {
                     requirementsPRef.current.refresh();
                 }
-                await showAlert('Requirement updated successfully!');
+                await showAlert('Evidence updated successfully!');
             } else {
-                await showAlert(response.message || 'Failed to update requirement');
+                await showAlert(response.message || 'Failed to update evidence');
             }
         } catch (error) {
-            console.error('Error updating requirement:', error);
-            await showAlert('An error occurred while updating the requirement');
+            console.error('Error updating evidence:', error);
+            await showAlert('An error occurred while updating the evidence');
         }
     };
 
@@ -130,9 +132,11 @@ export default function Area() {
 
     const handleDeleteModeToggle = (mode) => {
         setDeleteMode(mode);
-        if (!mode) {
-            setSelectedCount(0);
-            setSelectedIds([]);
+        setSelectedCount(0);
+        setSelectedIds([]);
+        // Also clear selection in RequirementsP child
+        if (requirementsPRef.current && requirementsPRef.current.clearSelection) {
+            requirementsPRef.current.clearSelection();
         }
     };
 
@@ -148,7 +152,7 @@ export default function Area() {
         if (selectedIds.length === 0 || !requirementsPRef.current) return;
         
         // Confirm deletion
-        const confirmed = await showConfirm(`Are you sure you want to delete ${selectedIds.length} requirement(s)? This action cannot be undone.`);
+        const confirmed = await showConfirm(`Are you sure you want to delete ${selectedIds.length} evidence item(s)? This action cannot be undone.`);
         if (!confirmed) return;
         
         try {
@@ -158,15 +162,17 @@ export default function Area() {
                 setSelectedCount(0);
                 setSelectedIds([]);
                 setDeleteMode(false);
-                console.log('Successfully deleted selected requirements');
-                await showAlert(`Successfully deleted ${selectedIds.length} requirement(s)`);
+                // Show success message
+                console.log('Successfully deleted selected evidence');
+                await showAlert(`Successfully deleted ${selectedIds.length} evidence item(s)`);
             } else {
-                console.error('Failed to delete requirements:', result.message);
-                await showAlert(result.message || 'Failed to delete requirements');
+                // Show error message
+                console.error('Failed to delete evidence:', result.message);
+                await showAlert(result.message || 'Failed to delete evidence');
             }
         } catch (error) {
-            console.error('Error deleting requirements:', error);
-            await showAlert('An error occurred while deleting requirements');
+            console.error('Error deleting evidence:', error);
+            await showAlert('An error occurred while deleting evidence');
         }
     };
 
@@ -230,53 +236,88 @@ export default function Area() {
     };
 
     return (
-        <div className="px-6 pb-6 pt-2 w-full">
-            {/* Event Type Dropdown at the very top */}
-            <div className="mb-4">
-                <div className="relative w-full">
-                    <select
-                        value={selectedEventId}
-                        onChange={(e) => setSelectedEventId(e.target.value)}
-                        className="w-full appearance-none px-5 py-3 border-2 border-purple-400 rounded-xl bg-white text-gray-800 font-semibold shadow focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all duration-200 hover:border-purple-600 hover:shadow-lg"
-                    >
-                        {events.map((event) => (
-                            <option key={event.EventID} value={event.EventID} className="text-base">
-                                {event.EventName || event.eventType}
-                            </option>
-                        ))}
-                    </select>
-                    <span className="pointer-events-none absolute right-4 top-1/2 transform -translate-y-1/2 text-purple-500">
-                        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                    </span>
+        <div className="w-full flex-1 flex flex-col min-w-0 bg-slate-50/50 overflow-hidden">
+            {/* Top Header Card */}
+            <div className="px-4 sm:px-6 pt-4 pb-3.5 shrink-0 border-b border-slate-200/70 bg-white shadow-2xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-700 text-white shadow-md shadow-indigo-500/20 shrink-0">
+                            <Layers className="w-5 h-5 sm:w-5.5 sm:h-5.5" />
+                        </div>
+                        <div>
+                            <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">Accreditation Areas</h1>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                                Manage and inspect assessment areas configured across accreditation events.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                        {/* Event Selector */}
+                        <div className="min-w-[200px] sm:min-w-[240px]">
+                            <CustomSelect
+                                size="md"
+                                value={selectedEventId}
+                                onChange={(val) => setSelectedEventId(val)}
+                                options={events.map((event) => ({
+                                    value: String(event.EventID),
+                                    label: event.EventName || event.eventType,
+                                }))}
+                            />
+                        </div>
+
+                        {isAdmin && (
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={handleAreaDeleteModeToggle}
+                                    className={`inline-flex h-9 items-center gap-1.5 rounded-xl border px-3.5 text-xs font-semibold shadow-2xs transition active:scale-95 cursor-pointer ${
+                                        areaSelectionMode
+                                            ? 'border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100'
+                                            : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                                    }`}
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                    <span>{areaSelectionMode ? 'Cancel Selection' : 'Delete Mode'}</span>
+                                </button>
+
+                                {areaSelectionMode && selectedAreaIds.length > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={handleDeleteSelectedAreas}
+                                        className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-rose-600 px-3.5 text-xs font-semibold text-white shadow-xs transition hover:bg-rose-700 active:scale-95 cursor-pointer"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                        <span>Delete Selected ({selectedAreaIds.length})</span>
+                                    </button>
+                                )}
+
+                                <button
+                                    type="button"
+                                    onClick={() => setIsModalOpen(true)}
+                                    className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 text-xs font-semibold text-white shadow-xs transition hover:bg-emerald-700 active:scale-95 cursor-pointer"
+                                >
+                                    <Plus className="h-4 w-4" />
+                                    <span>Add Area</span>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setShowWizard(true)}
+                                    className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50 active:scale-95 cursor-pointer"
+                                    title="Quick setup wizard"
+                                >
+                                    <Wand2 className="h-4 w-4 text-indigo-500" />
+                                    <span>Wizard</span>
+                                </button>
+                            </>
+                        )}
+                    </div>
                 </div>
             </div>
 
-            {/* Header */}
-            <div className="flex items-center justify-between mb-4">
-                <Header 
-                    pageTitle="Areas" 
-                    onAddClick={() => setIsModalOpen(true)}
-                    onSearchChange={handleSearchChange}
-                    searchValue={searchTerm}
-                    onFilterChange={handleFilterChange}
-                    filterOptions={filterOptions}
-                    onDeleteModeToggle={handleAreaDeleteModeToggle}
-                    deleteMode={areaSelectionMode}
-                    selectedCount={selectedAreaIds.length}
-                    onDeleteSelected={handleDeleteSelectedAreas}
-                    showRequirementsFilter={true}
-                    userRole={currentUser?.RoleID}
-                />
-                {isAdmin && (
-                    <button 
-                        onClick={() => setShowWizard(true)}
-                        className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition text-sm"
-                        title="Quick setup with wizard"
-                    >
-                        <Wand2 size={18} /> Wizard
-                    </button>
-                )}
-            </div>
+            {/* Main Content Body */}
+            <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 pt-4 pb-12">
 
             <UnifiedSetupWizard 
                 isOpen={showWizard} 
@@ -336,6 +377,7 @@ export default function Area() {
                 onSave={handleEditSave}
                 userRole={currentUser?.RoleID}
             />
+            </div>
         </div>
     );
 }

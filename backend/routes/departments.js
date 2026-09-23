@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const auth = require('../middleware/auth');
 
 // GET /api/departments
-router.get('/', async (req, res) => {
+router.get('/', auth, async (req, res) => {
   try {
     const [rows] = await db.query('SELECT id, name FROM departments ORDER BY name');
     res.json({ success: true, data: rows });
@@ -14,3 +15,4 @@ router.get('/', async (req, res) => {
 });
 
 module.exports = router;
+

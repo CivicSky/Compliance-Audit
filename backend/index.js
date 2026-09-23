@@ -15,8 +15,13 @@ if (fs.existsSync(envPath)) {
   });
 }
 
+const http = require('http');
 const express = require('express');
 const app = express();
+const server = http.createServer(app);
+const { initSocket, emitDataChange } = require('./socket');
+const io = initSocket(server);
+app.set('io', io);
 const port = 5000;
 const cors = require('cors');
 const userRoutes = require('./routes/users');
@@ -33,6 +38,7 @@ const logsRoutes = require('./routes/logs');
 const departmentsRoutes = require('./routes/departments');
 const programTypesRoutes = require('./routes/program_types');
 const masterlistRoutes = require('./routes/masterlist');
+const eventDepartmentsRoutes = require('./routes/eventDepartments');
 
 console.log('Backend started and logger active');
 
@@ -99,6 +105,45 @@ app.use((req, res, next) => {
         if (userId) {
           recordLog(userId, action, details);
         }
+
+        // Broadcast real-time change to all connected clients on successful mutation
+        if (res.statusCode >= 200 && res.statusCode < 400) {
+          const url = req.originalUrl.toLowerCase();
+          const matchedTypes = new Set();
+
+          if (url.includes('/events')) matchedTypes.add('events');
+          if (url.includes('/criteria')) matchedTypes.add('criteria');
+          if (url.includes('/areas')) matchedTypes.add('areas');
+          if (url.includes('/requirements')) matchedTypes.add('requirements');
+          if (url.includes('/compliancestatusoffices') || url.includes('/status')) {
+            matchedTypes.add('compliance');
+            matchedTypes.add('requirements');
+            matchedTypes.add('offices');
+          }
+          if (url.includes('/officedocuments') || url.includes('/file') || url.includes('/upload') || url.includes('/review')) {
+            matchedTypes.add('documents');
+            matchedTypes.add('requirements');
+          }
+          if (url.includes('/officeheads')) matchedTypes.add('officeheads');
+          if (url.includes('/offices')) matchedTypes.add('offices');
+          if (url.includes('/user')) matchedTypes.add('users');
+          if (url.includes('/notif')) matchedTypes.add('notifications');
+          if (url.includes('/departments')) matchedTypes.add('departments');
+          if (url.includes('/masterlist')) {
+            matchedTypes.add('masterlist');
+            matchedTypes.add('offices');
+            matchedTypes.add('departments');
+            matchedTypes.add('compliance');
+            matchedTypes.add('requirements');
+          }
+
+          if (matchedTypes.size === 0) matchedTypes.add('general');
+
+          for (const type of matchedTypes) {
+            emitDataChange(type, { method: req.method, url: req.originalUrl });
+          }
+          emitDataChange('logs');
+        }
       }
     } catch (err) {
       console.error('Audit log error:', err);
@@ -129,6 +174,7 @@ app.use('/api/logs', logsRoutes);
 app.use('/api/departments', departmentsRoutes);
 app.use('/api/program_types', programTypesRoutes);
 app.use('/api/masterlist', masterlistRoutes);
+app.use('/api/event-departments', eventDepartmentsRoutes);
 // Ensure basic roles exist on startup (Admin, User, Personnel)
 const db = require('./db');
 async function ensureRoles() {
@@ -175,6 +221,6 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.listen(port, () => {
-  console.log(`Example app listening at http://localhost:${port}`);
+server.listen(port, () => {
+  console.log(`Backend server with Socket.io listening at http://localhost:${port}`);
 });

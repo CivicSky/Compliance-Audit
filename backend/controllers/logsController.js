@@ -1,18 +1,45 @@
 const db = require('../db');
 
+const stripEmojis = (val) => {
+  if (val === null || val === undefined) return val;
+  if (typeof val === 'string') {
+    return val
+      .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]|[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FAFF}\u{FE00}-\u{FE0F}\u{1F000}-\u{1F02F}\u{1F0A0}-\u{1F0FF}\u{200D}])/gu, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+  }
+  if (Array.isArray(val)) {
+    return val.map(stripEmojis);
+  }
+  if (typeof val === 'object') {
+    const cleaned = {};
+    for (const [k, v] of Object.entries(val)) {
+      cleaned[k] = stripEmojis(v);
+    }
+    return cleaned;
+  }
+  return val;
+};
+
 async function recordLog(userId, action, details = null) {
   if (!action || !userId) return;
   try {
-    const detailsStr = details && typeof details === 'object' ? JSON.stringify(details) : details ? String(details) : null;
+    const cleanAction = stripEmojis(action).slice(0, 100);
+    const cleanDetails = stripEmojis(details);
+    const detailsStr = cleanDetails && typeof cleanDetails === 'object'
+      ? JSON.stringify(cleanDetails)
+      : cleanDetails ? String(cleanDetails) : null;
+
     await db.query(
       'INSERT INTO logs (UserID, Action, Details) VALUES (?, ?, ?)',
-      [userId, String(action).slice(0, 100), detailsStr ? String(detailsStr).slice(0, 5000) : null]
+      [userId, cleanAction, detailsStr ? String(detailsStr).slice(0, 5000) : null]
     );
   } catch (err) {
     console.error('recordLog insert failed:', err.message);
   }
 }
 
+exports.stripEmojis = stripEmojis;
 exports.recordLog = recordLog;
 
 exports.getLogs = async (req, res) => {
@@ -22,12 +49,58 @@ exports.getLogs = async (req, res) => {
     const offset = (page - 1) * limit;
     const includeHttp = String(req.query.includeHttp || '').trim() === '1';
 
-    let countSql = `SELECT COUNT(*) as total FROM logs l`;
+    let statsSql = `SELECT 
+        COUNT(*) as total,
+        SUM(CASE 
+          WHEN l.Action ILIKE '%create%' 
+            OR l.Action ILIKE '%add%' 
+            OR l.Action ILIKE '%insert%'
+            OR l.Action ILIKE '%register%'
+            OR l.Action ~* '^POST\\s+'
+          THEN 1 ELSE 0 
+        END) as created,
+        SUM(CASE 
+          WHEN l.Action ILIKE '%update%' 
+            OR l.Action ILIKE '%edit%' 
+            OR l.Action ILIKE '%modify%' 
+            OR l.Action ILIKE '%assign%'
+            OR l.Action ILIKE '%change%'
+            OR l.Action ~* '^(PUT|PATCH)\\s+'
+          THEN 1 ELSE 0 
+        END) as updated,
+        SUM(CASE 
+          WHEN l.Action ILIKE '%delete%' 
+            OR l.Action ILIKE '%remove%' 
+            OR l.Action ILIKE '%destroy%'
+            OR l.Action ~* '^DELETE\\s+'
+          THEN 1 ELSE 0 
+        END) as deleted,
+        SUM(CASE 
+          WHEN l.Action ILIKE '%login%' 
+            OR l.Action ILIKE '%logout%' 
+            OR l.Action ILIKE '%auth%'
+            OR l.Action ILIKE '%password%'
+          THEN 1 ELSE 0 
+        END) as auth
+      FROM logs l`;
     if (!includeHttp) {
-      countSql += ` WHERE l.Action !~ '^(GET|POST|PUT|PATCH|DELETE)\\s+'`;
+      statsSql += ` WHERE l.Action !~ '^(GET|POST|PUT|PATCH|DELETE)\\s+'`;
     }
-    const [countRows] = await db.query(countSql);
-    const totalCount = parseInt(countRows[0]?.total || 0, 10);
+    const [statsRows] = await db.query(statsSql);
+    const statsResult = statsRows[0] || {};
+    const totalCount = parseInt(statsResult.total || 0, 10);
+    const createdCount = parseInt(statsResult.created || 0, 10);
+    const updatedCount = parseInt(statsResult.updated || 0, 10);
+    const deletedCount = parseInt(statsResult.deleted || 0, 10);
+    const authCount = parseInt(statsResult.auth || 0, 10);
+    const stats = {
+      total: totalCount,
+      created: createdCount,
+      updated: updatedCount,
+      deleted: deletedCount,
+      auth: authCount,
+      deletedAndAuth: deletedCount + authCount
+    };
     const totalPages = Math.ceil(totalCount / limit) || 1;
 
     let sql = `SELECT
@@ -270,12 +343,33 @@ exports.getLogs = async (req, res) => {
           message = `Added office head${headNames ? `(s): ${headNames}` : ''}${position}.`.trim();
           break;
         }
+        case 'OfficeHeadUpdated': {
+          const headName = body?.HeadName || 'Office Personnel';
+          const changesText = formatChangesList(body?.changes);
+          message = changesText
+            ? `Updated ${headName}. ${changesText}`
+            : `Updated office personnel ${headName}`.trim();
+          break;
+        }
         case 'OfficeHeadDeleted': {
           const headNames = formatList(body?.HeadNames);
           if (headNames) {
             message = `Removed office head(s): ${headNames}.`;
           } else {
             message = `Removed ${body?.DeletedCount || 0} office head(s).`;
+          }
+          break;
+        }
+        case 'AuditorAssignedAreas': {
+          const auditorName = body?.AuditorName || (body?.AuditorUserID ? `Auditor #${body.AuditorUserID}` : 'External Auditor');
+          const count = body?.AssignedAreaCount ?? (Array.isArray(body?.Areas) ? body.Areas.length : 0);
+          const areaNames = Array.isArray(body?.Areas)
+            ? body.Areas.map(a => a.AreaCode ? (a.AreaName ? `${a.AreaCode} (${a.AreaName})` : a.AreaCode) : a.AreaName).filter(Boolean).join(', ')
+            : '';
+          if (count === 0) {
+            message = `Updated assignments for ${auditorName} (cleared assigned areas).`;
+          } else {
+            message = `Assigned external auditor ${auditorName} to ${count} area(s): ${areaNames}.`;
           }
           break;
         }
@@ -346,19 +440,19 @@ exports.getLogs = async (req, res) => {
       return {
         LogID: row.LogID,
         UserID: row.UserID,
-        Action: row.Action,
+        Action: stripEmojis(row.Action),
         Timestamp: row.Timestamp,
-        Details: row.Details,
-        DetailsSummary: detailsSummary,
-        DetailsParsed: detailsParsed,
-        Message: message,
-        displayName: displayName || `Deleted user #${row.UserID}`,
-        RoleName: row.RoleName || 'Deleted User',
-        actorKind: row.RoleName || 'Deleted User',
+        Details: stripEmojis(row.Details),
+        DetailsSummary: stripEmojis(detailsSummary),
+        DetailsParsed: stripEmojis(detailsParsed),
+        Message: stripEmojis(message),
+        displayName: stripEmojis(displayName) || `Deleted user #${row.UserID}`,
+        RoleName: stripEmojis(row.RoleName) || 'Deleted User',
+        actorKind: stripEmojis(row.RoleName) || 'Deleted User',
       };
     });
 
-    res.json({ success: true, logs, total: totalCount, totalPages, page, limit });
+    res.json({ success: true, logs, total: totalCount, totalPages, page, limit, stats });
   } catch (err) {
     console.error('getLogs:', err);
     res.status(500).json({ success: false, message: 'Failed to load activity logs' });

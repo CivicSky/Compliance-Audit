@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Check } from 'lucide-react';
 import StatusBadge from './StatusBadge';
 import StatusSlider from './StatusSlider';
 import { API_BASE_URL } from '../../utils/apiBase';
@@ -70,16 +71,18 @@ export default function RequirementsTree({
 
     useEffect(() => {
         if (!currentUser || !isAuditor) return;
+        const targetUserId = currentUser.UserID ?? currentUser.id ?? currentUser.user_id;
+        if (!targetUserId) return;
         let mounted = true;
         const fetchAssignments = async () => {
             try {
                 const token = localStorage.getItem('token');
-                const res = await fetch(`${API_BASE_URL}/api/areas/assignments/${currentUser.UserID}`, {
+                const res = await fetch(`${API_BASE_URL}/api/areas/assignments/${targetUserId}`, {
                     headers: token ? { 'Authorization': `Bearer ${token}` } : {}
                 });
                 const data = await res.json();
                 if (mounted && res.ok && data.success) {
-                    const ids = new Set((data.assignments || []).map(a => Number(a.area_id)));
+                    const ids = new Set((data.assignments || []).map(a => Number(a.area_id ?? a.AreaID)));
                     setAuditorAssignedAreaIds(ids);
                 }
             } catch (e) { }
@@ -89,8 +92,11 @@ export default function RequirementsTree({
     }, [currentUser, isAuditor]);
 
     const effectiveRequirements = isAuditor
-        ? (requirements || []).filter(req => auditorAssignedAreaIds.has(Number(req.AreaID)))
+        ? (requirements || []).filter(req => auditorAssignedAreaIds.has(Number(req.AreaID ?? req.area_id ?? req.areaId)))
         : (requirements || []);
+
+    const totalCount = (requirements || []).length;
+    const isAuditorFiltered = isAuditor && totalCount > 0;
 
     return (
         <div className="flex-1 overflow-y-auto bg-app px-4 py-4 sm:px-5">
@@ -143,8 +149,14 @@ export default function RequirementsTree({
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
                     </div>
-                    <p className="text-sm font-medium text-slate-700">No requirements assigned to your area</p>
-                    <p className="mt-1 text-xs text-slate-500">Requirements will appear here once added to your assigned area.</p>
+                    <p className="text-sm font-medium text-slate-700">
+                        {isAuditorFiltered ? 'No evidence in your assigned area(s)' : 'No evidence added yet'}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                        {isAuditorFiltered 
+                            ? 'Evidence exists in this office, but none match your assigned area(s).' 
+                            : 'Evidence will appear here once added to this office.'}
+                    </p>
                 </div>
             ) : (
                 <div className="space-y-5">
@@ -310,7 +322,7 @@ export default function RequirementsTree({
                                                                             className="h-full"
                                                                             onChange={(newStatusId) => handleStatusChange(req.RequirementID, newStatusId)}
                                                                             onDisabledClick={() => {
-                                                                                showAlert('Cannot change compliance status: No evidence or proof document has been uploaded for this requirement yet.');
+                                                                                showAlert('Cannot change compliance status: No proof document has been uploaded for this evidence yet.');
                                                                             }}
                                                                         />
                                                                     );
@@ -507,8 +519,8 @@ export default function RequirementsTree({
                                                                                         className={`h-7 w-7 cursor-pointer rounded-full border-2 object-cover shadow-sm ring-1 ring-slate-200/50 ${hasUploaded ? 'border-emerald-500' : 'border-white'}`}
                                                                                     />
                                                                                     {hasUploaded && (
-                                                                                        <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white bg-emerald-500 text-[10px] font-bold leading-none text-white">
-                                                                                            ✓
+                                                                                        <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white bg-emerald-500 leading-none text-white">
+                                                                                            <Check className="w-2.5 h-2.5" />
                                                                                         </span>
                                                                                     )}
                                                                                 </div>
@@ -572,7 +584,7 @@ export default function RequirementsTree({
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                         </svg>
                                     </div>
-                                    <p className="text-sm font-medium text-slate-700">No requirements found</p>
+                                    <p className="text-sm font-medium text-slate-700">No evidence found</p>
                                     <p className="mt-1 text-xs text-slate-500">Try adjusting your search or filter.</p>
                                 </div>
                             );

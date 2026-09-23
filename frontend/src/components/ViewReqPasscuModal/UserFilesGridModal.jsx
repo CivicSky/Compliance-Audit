@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { API_BASE_URL } from '../../utils/apiBase';
 import { dataCache, CacheKeys } from '../../utils/dataCache';
 import { useToast } from '../UI/Toast';
+import { useLiveRefresh } from '../../utils/liveSync';
 import RenameInline from './RenameInline';
 
 const getExtension = (fileNameOrUrl) => {
@@ -69,7 +70,8 @@ const FileCardItem = memo(({
     const reviewStatus = item.reviewStatus || 'pending';
     const isApproved = reviewStatus === 'approved';
     const isRejected = reviewStatus === 'rejected';
-    const canReview = isAdmin || isViewerAuditor;
+    const canApproveReject = Boolean(isAdmin);
+    const canComment = Boolean(isAdmin || isViewerAuditor);
 
     const handleSaveComment = (valToSave = localComment) => {
         const val = String(valToSave || '').trim();
@@ -120,46 +122,60 @@ const FileCardItem = memo(({
             onDrop={(e) => onDrop(e, idx)}
             onDragEnd={onDragEnd}
             onClick={() => onViewFile?.(item)}
-            className={`group cursor-pointer rounded-xl border bg-white p-4 shadow-2xs flex flex-col justify-between gap-3 transition-all [content-visibility:auto] [contain-intrinsic-size:220px] ${
+            onContextMenu={(e) => {
+                if (isViewerAuditor) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+            }}
+            className={`group cursor-pointer rounded-xl border-2 bg-white p-3 sm:p-3.5 shadow-2xs flex flex-col justify-between gap-2 transition-all [content-visibility:auto] [contain-intrinsic-size:200px] ${
                 isDragging ? 'opacity-40 scale-[0.98] border-dashed border-blue-400 bg-blue-50/20' :
                 isDragOver ? 'border-blue-500 ring-2 ring-blue-400/50 shadow-md scale-[1.01]' :
-                isRejected ? 'border-rose-300/90 bg-rose-50/20 hover:border-rose-400 hover:shadow-md' :
-                isApproved ? 'border-emerald-300/90 bg-emerald-50/20 hover:border-emerald-400 hover:shadow-md' :
-                'border-slate-200/90 hover:border-blue-400 hover:bg-blue-50/20 hover:shadow-md'
+                !isViewerAuditor && isRejected ? 'border-rose-400 bg-rose-50/25 hover:border-rose-500 hover:shadow-md' :
+                !isViewerAuditor && isApproved ? 'border-emerald-400 bg-emerald-50/25 hover:border-emerald-500 hover:shadow-md' :
+                'border-slate-200 hover:border-blue-400 hover:bg-blue-50/20 hover:shadow-md'
             }`}
         >
             {/* Top Review Status Badge */}
             <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5">
-                    {isApproved && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-2xs">
-                            <svg className="w-3 h-3 text-emerald-600 stroke-current" fill="none" viewBox="0 0 24 24" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                <polyline points="20 6 9 17 4 12" />
-                            </svg>
-                            Approved
+                {!isViewerAuditor ? (
+                    <div className="flex items-center gap-1.5">
+                        {isApproved && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
+                                <svg className="w-3 h-3 text-emerald-600 stroke-current" fill="none" viewBox="0 0 24 24" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="20 6 9 17 4 12" />
+                                </svg>
+                                Approved
+                            </span>
+                        )}
+                        {isRejected && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300 shadow-2xs">
+                                <svg className="w-3 h-3 text-rose-600 stroke-current" fill="none" viewBox="0 0 24 24" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                                Needs Revision
+                            </span>
+                        )}
+                        {!isApproved && !isRejected && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 shadow-2xs">
+                                <svg className="w-3 h-3 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                    <circle cx="12" cy="12" r="9"/>
+                                    <polyline points="12 7 12 12 15 14"/>
+                                </svg>
+                                Pending Review
+                            </span>
+                        )}
+                    </div>
+                ) : (
+                    <div className="flex items-center gap-1.5">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                            Evidence
                         </span>
-                    )}
-                    {isRejected && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-200 shadow-2xs">
-                            <svg className="w-3 h-3 text-rose-600 stroke-current" fill="none" viewBox="0 0 24 24" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                <line x1="18" y1="6" x2="6" y2="18"></line>
-                                <line x1="6" y1="6" x2="18" y2="18"></line>
-                            </svg>
-                            Needs Revision
-                        </span>
-                    )}
-                    {!isApproved && !isRejected && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200 shadow-2xs">
-                            <svg className="w-3 h-3 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                <circle cx="12" cy="12" r="9"/>
-                                <polyline points="12 7 12 12 15 14"/>
-                            </svg>
-                            Pending Review
-                        </span>
-                    )}
-                </div>
+                    </div>
+                )}
 
-                <span className="text-[10px] font-semibold text-slate-400">
+                <span className="text-[10px] font-bold text-slate-400">
                     File #{idx + 1}
                 </span>
             </div>
@@ -179,8 +195,8 @@ const FileCardItem = memo(({
                 )}
 
                 <div className={`h-11 w-11 shrink-0 rounded-lg border bg-slate-50 flex items-center justify-center overflow-hidden shadow-2xs group-hover:border-blue-300 ${
-                    isApproved ? 'border-emerald-200 bg-emerald-50/40' :
-                    isRejected ? 'border-rose-200 bg-rose-50/40' :
+                    !isViewerAuditor && isApproved ? 'border-emerald-200 bg-emerald-50/40' :
+                    !isViewerAuditor && isRejected ? 'border-rose-200 bg-rose-50/40' :
                     'border-slate-200'
                 }`}>
                     {isImageExt(ext) && fileUrl ? (
@@ -257,8 +273,8 @@ const FileCardItem = memo(({
                 </div>
             </div>
 
-            {/* Auditor Review Action Bar */}
-            {canReview && (
+            {/* Admin Review Action Bar (Approve / Reject only for Admin) */}
+            {canApproveReject && (
                 <div 
                     className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2"
                     onClick={(e) => e.stopPropagation()}
@@ -317,116 +333,118 @@ const FileCardItem = memo(({
                 </div>
             )}
 
-            {/* Per-File Comment & Rejection Reason Section */}
-            <div 
-                className="pt-2 border-t border-slate-100 flex flex-col gap-1.5"
-                onClick={(e) => e.stopPropagation()}
-            >
-                <div className="flex items-center justify-between text-xs font-semibold h-6 min-h-[24px]">
-                    {isRejected ? (
-                        <span className="text-rose-700 font-bold flex items-center gap-1 leading-none">
-                            <svg className="w-3.5 h-3.5 text-rose-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                            </svg>
-                            Rejection Reason / Revision Note:
-                        </span>
-                    ) : isApproved ? (
-                        <span className="text-emerald-700 font-bold flex items-center gap-1 leading-none">
-                            <svg className="w-3.5 h-3.5 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor">
-                                <polyline points="20 6 9 17 4 12" />
-                            </svg>
-                            Auditor Note:
-                        </span>
-                    ) : (
-                        <span className="text-slate-700 font-semibold leading-none">Auditor Note / Comment:</span>
-                    )}
+            {/* Per-File Comment & Rejection Reason Section (Hidden for Auditors) */}
+            {!isViewerAuditor && (
+                <div 
+                    className="pt-2 border-t border-slate-100 flex flex-col gap-1.5"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <div className="flex items-center justify-between text-xs font-semibold h-6 min-h-[24px]">
+                        {isRejected ? (
+                            <span className="text-rose-700 font-bold flex items-center gap-1 leading-none">
+                                <svg className="w-3.5 h-3.5 text-rose-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                                Rejection Reason / Revision Note:
+                            </span>
+                        ) : isApproved ? (
+                            <span className="text-emerald-700 font-bold flex items-center gap-1 leading-none">
+                                <svg className="w-3.5 h-3.5 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor">
+                                    <polyline points="20 6 9 17 4 12" />
+                                </svg>
+                                Auditor Note:
+                            </span>
+                        ) : (
+                            <span className="text-slate-700 font-semibold leading-none">Auditor Note / Comment:</span>
+                        )}
 
-                    {canReview && (
-                        <div className="h-6 flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                            {isSavedRecently && !isDirty && (
-                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 animate-in fade-in duration-200 leading-none">
-                                    <svg className="w-3 h-3 stroke-current" fill="none" viewBox="0 0 24 24" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                        <polyline points="20 6 9 17 4 12" />
-                                    </svg>
-                                    Saved
+                        {canComment && (
+                            <div className="h-6 flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                                {isSavedRecently && !isDirty && (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 animate-in fade-in duration-200 leading-none">
+                                        <svg className="w-3 h-3 stroke-current" fill="none" viewBox="0 0 24 24" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                            <polyline points="20 6 9 17 4 12" />
+                                        </svg>
+                                        Saved
+                                    </span>
+                                )}
+                                {isDirty && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleSaveComment(localComment)}
+                                        className="inline-flex items-center gap-1 px-2 h-5 rounded text-[10px] font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-2xs transition-all cursor-pointer animate-in zoom-in-90 duration-150 leading-none"
+                                        title="Save note (Ctrl+Enter)"
+                                    >
+                                        <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        Save
+                                    </button>
+                                )}
+                            </div>
+                        )}
+
+                        {isLongComment && !canComment && (
+                            <button
+                                type="button"
+                                onClick={onToggleExpand}
+                                className="text-[11px] font-medium text-blue-600 hover:underline leading-none"
+                            >
+                                {isExpanded ? 'Show less' : 'Show more'}
+                            </button>
+                        )}
+                    </div>
+
+                    {canComment ? (
+                        <textarea
+                            ref={textareaRef}
+                            rows={2}
+                            value={localComment}
+                            onChange={(e) => setLocalComment(e.target.value)}
+                            onBlur={handleBlurComment}
+                            onKeyDown={handleKeyDown}
+                            spellCheck={false}
+                            autoCorrect="off"
+                            autoCapitalize="off"
+                            placeholder={
+                                isRejected 
+                                    ? "Type rejection reason / revision note (Ctrl+Enter to save)..."
+                                    : "Add feedback or revision note (Ctrl+Enter to save)..."
+                            }
+                            className={`w-full rounded-lg border-2 py-1.5 px-2 text-[11px] font-medium shadow-2xs focus:bg-white focus:outline-none focus:ring-1 resize-none min-h-[44px] max-h-[58px] leading-tight ${
+                                isRejected
+                                    ? 'border-rose-400 bg-rose-50/40 text-rose-900 focus:border-rose-500 focus:ring-rose-400 placeholder:text-rose-400'
+                                    : isApproved
+                                    ? 'border-emerald-400 bg-emerald-50/20 text-emerald-900 focus:border-emerald-500 focus:ring-emerald-400 placeholder:text-emerald-400'
+                                    : 'border-slate-300 bg-slate-50/80 text-slate-800 focus:border-blue-400 focus:ring-blue-400 placeholder:text-slate-400'
+                            }`}
+                        />
+                    ) : (
+                        <div className={`w-full rounded-lg border-2 py-1.5 px-2 text-[11px] font-medium break-words break-all [overflow-wrap:anywhere] whitespace-pre-wrap leading-tight min-h-[38px] ${
+                            isRejected 
+                                ? 'border-rose-300 bg-rose-50/70 text-rose-900' 
+                                : isApproved
+                                ? 'border-emerald-300 bg-emerald-50/50 text-emerald-800'
+                                : 'border-slate-200 bg-slate-50/90 text-slate-700'
+                        }`}>
+                            {localComment ? (
+                                <span className={!isExpanded && isLongComment ? 'line-clamp-2' : ''}>
+                                    {localComment}
+                                </span>
+                            ) : (
+                                <span className="italic text-slate-400 font-normal">
+                                    {isRejected ? 'Needs revision (no comment provided)' : 'No comment from auditor'}
                                 </span>
                             )}
-                            {isDirty && (
-                                <button
-                                    type="button"
-                                    onClick={() => handleSaveComment(localComment)}
-                                    className="inline-flex items-center gap-1 px-2 h-5 rounded text-[10px] font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-2xs transition-all cursor-pointer animate-in zoom-in-90 duration-150 leading-none"
-                                    title="Save note (Ctrl+Enter)"
-                                >
-                                    <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                    </svg>
-                                    Save
-                                </button>
+                            {item.reviewerName && (
+                                <div className="mt-0.5 text-[9px] text-slate-400 font-normal">
+                                    Reviewed by: {item.reviewerName}
+                                </div>
                             )}
                         </div>
                     )}
-
-                    {isLongComment && !canReview && (
-                        <button
-                            type="button"
-                            onClick={onToggleExpand}
-                            className="text-[11px] font-medium text-blue-600 hover:underline leading-none"
-                        >
-                            {isExpanded ? 'Show less' : 'Show more'}
-                        </button>
-                    )}
                 </div>
-
-                {canReview ? (
-                    <textarea
-                        ref={textareaRef}
-                        rows={2}
-                        value={localComment}
-                        onChange={(e) => setLocalComment(e.target.value)}
-                        onBlur={handleBlurComment}
-                        onKeyDown={handleKeyDown}
-                        spellCheck={false}
-                        autoCorrect="off"
-                        autoCapitalize="off"
-                        placeholder={
-                            isRejected 
-                                ? "Type rejection reason / revision note (Ctrl+Enter to save)..."
-                                : "Add feedback or revision note (Ctrl+Enter to save)..."
-                        }
-                        className={`w-full rounded-lg border p-2 text-xs font-medium shadow-2xs focus:bg-white focus:outline-none focus:ring-1 resize-y min-h-[48px] ${
-                            isRejected
-                                ? 'border-rose-300 bg-rose-50/40 text-rose-900 focus:border-rose-500 focus:ring-rose-400 placeholder:text-rose-400'
-                                : isApproved
-                                ? 'border-emerald-200 bg-emerald-50/20 text-emerald-900 focus:border-emerald-500 focus:ring-emerald-400 placeholder:text-emerald-400'
-                                : 'border-slate-200 bg-slate-50/80 text-slate-800 focus:border-blue-400 focus:ring-blue-400 placeholder:text-slate-400'
-                        }`}
-                    />
-                ) : (
-                    <div className={`w-full rounded-lg border p-2 text-xs font-medium break-words break-all [overflow-wrap:anywhere] whitespace-pre-wrap leading-relaxed ${
-                        isRejected 
-                            ? 'border-rose-200 bg-rose-50/70 text-rose-900' 
-                            : isApproved
-                            ? 'border-emerald-100 bg-emerald-50/50 text-emerald-800'
-                            : 'border-slate-100 bg-slate-50/90 text-slate-700'
-                    }`}>
-                        {localComment ? (
-                            <span className={!isExpanded && isLongComment ? 'line-clamp-2' : ''}>
-                                {localComment}
-                            </span>
-                        ) : (
-                            <span className="italic text-slate-400 font-normal">
-                                {isRejected ? 'Needs revision (no comment provided)' : 'No comment from auditor'}
-                            </span>
-                        )}
-                        {item.reviewerName && (
-                            <div className="mt-1 text-[10px] text-slate-400 font-normal">
-                                Reviewed by: {item.reviewerName}
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
+            )}
         </div>
     );
 });
@@ -436,11 +454,12 @@ export default function UserFilesGridModal({
     user = null,
     requirement = null,
     files = [],
+    officeId = null,
     onClose,
     onViewFile,
     onUpdateComment,
     onReorderFiles,
-    isAdmin = true,
+    isAdmin = false,
     currentUser = null,
     onUpload = null,
     onUnsubmit = null,
@@ -450,7 +469,10 @@ export default function UserFilesGridModal({
     uploading = false
 }) {
     const isOwnFiles = !!(currentUser && user && Number(currentUser.UserID) === Number(user.UserID));
-    const isViewerAuditor = Number(viewerRoleId || currentUser?.RoleID || 0) === 4;
+    const isViewerAuditor = Number(viewerRoleId || currentUser?.RoleID || 0) === 4 ||
+        String(currentUser?.RoleName || '').toLowerCase().includes('auditor') ||
+        String(currentUser?.Position || '').toLowerCase().includes('auditor') ||
+        Boolean(currentUser?.isExternalAuditor);
     const { toast } = useToast();
     const [expandedComments, setExpandedComments] = useState({});
     const [visibleCount, setVisibleCount] = useState(9);
@@ -464,11 +486,36 @@ export default function UserFilesGridModal({
         setLocalFiles(files || []);
     }, [files]);
 
+    const pageSize = isViewerAuditor ? 15 : 9;
+
     useEffect(() => {
         if (show) {
-            setVisibleCount(9);
+            setVisibleCount(pageSize);
         }
-    }, [show, user?.UserID]);
+    }, [show, user?.UserID, pageSize]);
+
+    // Real-time live synchronization while modal is open
+    useLiveRefresh(async () => {
+        if (!show || !requirement?.RequirementID || !user?.UserID) return;
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(
+                `${API_BASE_URL}/api/requirements/${requirement.RequirementID}/user-file/${user.UserID}${officeId ? `?officeId=${officeId}` : ''}`,
+                { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
+            );
+            if (res.ok) {
+                const data = await res.json();
+                if (data?.success) {
+                    const fresh = Array.isArray(data.files) && data.files.length > 0 
+                        ? data.files 
+                        : (data.file ? [data.file] : []);
+                    setLocalFiles(fresh);
+                }
+            }
+        } catch (err) {
+            console.warn('Live refresh error in UserFilesGridModal:', err);
+        }
+    }, { entityTypes: ['requirements', 'compliance', 'documents', 'all'], deps: [show, requirement?.RequirementID, user?.UserID, officeId] });
 
     // Native IntersectionObserver for zero JS scroll overhead
     useEffect(() => {
@@ -477,7 +524,7 @@ export default function UserFilesGridModal({
         const observer = new IntersectionObserver(
             (entries) => {
                 if (entries[0].isIntersecting) {
-                    setVisibleCount((prev) => Math.min(prev + 9, localFiles.length));
+                    setVisibleCount((prev) => Math.min(prev + pageSize, localFiles.length));
                 }
             },
             { threshold: 0.1, rootMargin: '200px' }
@@ -493,7 +540,7 @@ export default function UserFilesGridModal({
                 observer.unobserve(currentSentinel);
             }
         };
-    }, [show, visibleCount, localFiles.length]);
+    }, [show, visibleCount, localFiles.length, pageSize]);
 
     if (!show || !user) return null;
 
@@ -513,6 +560,9 @@ export default function UserFilesGridModal({
                 const updated = prev.map(f => f.id === item.id ? { ...f, comment: val, rejectionReason: f.reviewStatus === 'rejected' ? val : f.rejectionReason } : f);
                 if (requirement?.RequirementID && user?.UserID) {
                     dataCache.set(CacheKeys.userFiles(requirement.RequirementID, user.UserID), updated);
+                    window.dispatchEvent(new CustomEvent('evidence-file-updated', {
+                        detail: { reqId: requirement.RequirementID, userId: user.UserID, files: updated }
+                    }));
                 }
                 return updated;
             });
@@ -533,6 +583,9 @@ export default function UserFilesGridModal({
                 const updated = prev.map(f => f.id === item.id ? { ...f, displayName: newTitle } : f);
                 if (requirement?.RequirementID && user?.UserID) {
                     dataCache.set(CacheKeys.userFiles(requirement.RequirementID, user.UserID), updated);
+                    window.dispatchEvent(new CustomEvent('evidence-file-updated', {
+                        detail: { reqId: requirement.RequirementID, userId: user.UserID, files: updated }
+                    }));
                 }
                 return updated;
             });
@@ -550,24 +603,60 @@ export default function UserFilesGridModal({
     const handleExecuteReview = async (item, status, reason = '') => {
         if (!requirement?.RequirementID || !item?.id) return;
         setIsSubmittingReview(true);
+
+        // Instant optimistic update
+        setLocalFiles(prev => {
+            const updated = prev.map(f => f.id === item.id ? {
+                ...f,
+                reviewStatus: status,
+                comment: reason || f.comment,
+                rejectionReason: status === 'rejected' ? reason : '',
+            } : f);
+            if (requirement?.RequirementID && user?.UserID) {
+                dataCache.set(CacheKeys.userFiles(requirement.RequirementID, user.UserID), updated);
+                window.dispatchEvent(new CustomEvent('evidence-file-reviewed', {
+                    detail: {
+                        reqId: requirement.RequirementID,
+                        fileId: item.id,
+                        status,
+                        userId: user.UserID,
+                        reason
+                    }
+                }));
+            }
+            return updated;
+        });
+
         try {
             if (onReviewFile) {
                 const resData = await onReviewFile(requirement.RequirementID, item.id, status, reason);
-                setLocalFiles(prev => {
-                    const updated = prev.map(f => f.id === item.id ? {
-                        ...f,
-                        reviewStatus: resData?.reviewStatus || status,
-                        comment: resData?.comment || reason || f.comment,
-                        rejectionReason: resData?.rejectionReason || reason,
-                        reviewedBy: resData?.reviewedBy,
-                        reviewedAt: resData?.reviewedAt,
-                        reviewerName: resData?.reviewerName || (currentUser ? `${currentUser.FirstName || ''} ${currentUser.LastName || ''}`.trim() : 'Auditor')
-                    } : f);
-                    if (requirement?.RequirementID && user?.UserID) {
-                        dataCache.set(CacheKeys.userFiles(requirement.RequirementID, user.UserID), updated);
-                    }
-                    return updated;
-                });
+                if (resData) {
+                    setLocalFiles(prev => {
+                        const updated = prev.map(f => f.id === item.id ? {
+                            ...f,
+                            reviewStatus: resData?.reviewStatus || status,
+                            comment: resData?.comment || reason || f.comment,
+                            rejectionReason: resData?.rejectionReason || reason,
+                            reviewedBy: resData?.reviewedBy,
+                            reviewedAt: resData?.reviewedAt,
+                            reviewerName: resData?.reviewerName || (currentUser ? `${currentUser.FirstName || ''} ${currentUser.LastName || ''}`.trim() : 'Auditor')
+                        } : f);
+                        if (requirement?.RequirementID && user?.UserID) {
+                            dataCache.set(CacheKeys.userFiles(requirement.RequirementID, user.UserID), updated);
+                            window.dispatchEvent(new CustomEvent('evidence-file-reviewed', {
+                                detail: {
+                                    reqId: requirement.RequirementID,
+                                    fileId: item.id,
+                                    status: resData?.reviewStatus || status,
+                                    userId: user.UserID,
+                                    reason: resData?.rejectionReason || reason,
+                                    resData
+                                }
+                            }));
+                        }
+                        return updated;
+                    });
+                }
             } else {
                 const res = await fetch(`${API_BASE_URL}/api/requirements/${requirement.RequirementID}/file/${item.id}/review`, {
                     method: 'PATCH',
@@ -591,6 +680,16 @@ export default function UserFilesGridModal({
                         } : f);
                         if (requirement?.RequirementID && user?.UserID) {
                             dataCache.set(CacheKeys.userFiles(requirement.RequirementID, user.UserID), updated);
+                            window.dispatchEvent(new CustomEvent('evidence-file-reviewed', {
+                                detail: {
+                                    reqId: requirement.RequirementID,
+                                    fileId: item.id,
+                                    status: data.reviewStatus || status,
+                                    userId: user.UserID,
+                                    reason: data.rejectionReason || reason,
+                                    resData: data
+                                }
+                            }));
                         }
                         return updated;
                     });
@@ -654,10 +753,18 @@ export default function UserFilesGridModal({
         const orderedIds = updated.map(f => f.id).filter(Boolean);
 
         if (targetReqId && targetUserId && orderedIds.length > 0) {
+            onReorderFiles?.(targetReqId, updated);
+            if (targetReqId && targetUserId) {
+                dataCache.set(CacheKeys.userFiles(targetReqId, targetUserId), updated);
+            }
             try {
+                const token = localStorage.getItem('token');
                 await fetch(`${API_BASE_URL}/api/requirements/${targetReqId}/user-file/${targetUserId}/reorder`, {
                     method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        ...(token ? { Authorization: `Bearer ${token}` } : {})
+                    },
                     body: JSON.stringify({ orderedIds })
                 });
                 toast?.({
@@ -666,7 +773,6 @@ export default function UserFilesGridModal({
                     variant: 'success',
                     duration: 2000
                 });
-                onReorderFiles?.(targetReqId, updated);
             } catch (err) {
                 console.error('Failed to persist file reorder:', err);
             }
@@ -683,15 +789,15 @@ export default function UserFilesGridModal({
 
     const modalContent = (
         <div 
-            className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 transition-opacity animate-in fade-in duration-150"
+            className="fixed inset-0 z-[9999] flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 transition-opacity animate-in fade-in duration-150"
             onClick={onClose}
         >
             <div 
-                className="relative w-full max-w-6xl max-h-[90vh] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-150"
+                className="relative w-full max-w-6xl max-h-[94vh] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-150"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header matching App Design System */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-white shrink-0">
+                <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 bg-white shrink-0">
                     <div className="flex items-center gap-3 min-w-0">
                         <div className="relative shrink-0">
                             <img 
@@ -700,17 +806,17 @@ export default function UserFilesGridModal({
                                 loading="lazy"
                                 decoding="async"
                                 onError={(e) => { e.target.src = '/src/assets/images/user.svg'; }}
-                                className="h-11 w-11 rounded-full object-cover border-2 border-emerald-500 shadow-2xs" 
+                                className="h-10 w-10 rounded-full object-cover border-2 border-emerald-500 shadow-2xs" 
                             />
-                            <span className="absolute -bottom-0.5 -right-0.5 flex h-[18px] w-[18px] min-w-[18px] min-h-[18px] shrink-0 items-center justify-center rounded-full border-2 border-white bg-emerald-500 text-white shadow-2xs">
-                                <svg className="w-2.5 h-2.5 stroke-white" fill="none" viewBox="0 0 24 24" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                            <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 min-w-[16px] min-h-[16px] shrink-0 items-center justify-center rounded-full border-2 border-white bg-emerald-500 text-white shadow-2xs">
+                                <svg className="w-2 h-2 stroke-white" fill="none" viewBox="0 0 24 24" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
                                     <polyline points="20 6 9 17 4 12" />
                                 </svg>
                             </span>
                         </div>
                         <div className="min-w-0">
                             <div className="flex items-center gap-2.5">
-                                <h2 className="text-base font-bold text-slate-900 truncate">{displayName}</h2>
+                                <h2 className="text-sm sm:text-base font-bold text-slate-900 truncate">{displayName}</h2>
                                 <span className="rounded-full bg-emerald-100/90 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
                                     Submitted ({localFiles.length} files)
                                 </span>
@@ -758,11 +864,11 @@ export default function UserFilesGridModal({
                     </div>
                 </div>
 
-                {/* Body: 3-Column 3x3 Grid with Drag & Drop Reordering */}
-                <div className="flex-1 overflow-y-auto p-6 bg-slate-50/70 [contain:content]">
+                {/* Body: 3-Column 3x2 Grid */}
+                <div className="flex-1 overflow-y-auto p-3.5 sm:p-4 bg-slate-50/70 [contain:content]">
                     {localFiles.length > 0 ? (
-                        <div className="flex flex-col gap-4">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                        <div className="flex flex-col gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                                 {visibleFiles.map((item, idx) => {
                                     const fileIdKey = item.id || item.fileName || idx;
                                     return (
@@ -801,7 +907,7 @@ export default function UserFilesGridModal({
                                 >
                                     <button
                                         type="button"
-                                        onClick={() => setVisibleCount((prev) => Math.min(prev + 9, localFiles.length))}
+                                        onClick={() => setVisibleCount((prev) => Math.min(prev + pageSize, localFiles.length))}
                                         className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-white px-5 py-2 text-xs font-bold text-blue-600 shadow-2xs hover:bg-blue-50 hover:border-blue-300 transition-all cursor-pointer"
                                     >
                                         <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

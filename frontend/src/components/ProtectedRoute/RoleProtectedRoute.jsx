@@ -5,26 +5,62 @@ import { DashboardSkeleton, CardListSkeleton } from "../UI/Skeleton";
 
 export default function RoleProtectedRoute({ allowedRoles = [], forbiddenRoles = [], children }) {
     const location = useLocation();
-    const [currentUser, setCurrentUser] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const token = typeof window !== 'undefined' ? localStorage.getItem("token") : null;
+    const [currentUser, setCurrentUser] = useState(() => {
+        try {
+            const stored = localStorage.getItem("user");
+            return stored ? JSON.parse(stored) : null;
+        } catch {
+            return null;
+        }
+    });
+    const [loading, setLoading] = useState(() => !currentUser && !!token);
+    const [authFailed, setAuthFailed] = useState(false);
 
     useEffect(() => {
+        if (!token) {
+            setAuthFailed(true);
+            setLoading(false);
+            return;
+        }
+
         let mounted = true;
         const fetchUser = async () => {
             try {
                 const res = await usersAPI.getLoggedInUser();
-                if (mounted && res?.success) {
+                if (mounted && res?.success && res.user) {
                     setCurrentUser(res.user);
+                    try {
+                        localStorage.setItem("user", JSON.stringify(res.user));
+                    } catch {}
+                } else if (mounted) {
+                    setAuthFailed(true);
                 }
             } catch (err) {
-                console.error("RoleProtectedRoute error:", err);
+                console.error("RoleProtectedRoute fetch error:", err);
+                if (mounted) {
+                    if (err.response?.status === 401 || err.response?.status === 403) {
+                        localStorage.removeItem("token");
+                        localStorage.removeItem("user");
+                        setAuthFailed(true);
+                    } else {
+                        const cached = localStorage.getItem("user");
+                        if (!cached) {
+                            setAuthFailed(true);
+                        }
+                    }
+                }
             } finally {
                 if (mounted) setLoading(false);
             }
         };
         fetchUser();
         return () => { mounted = false; };
-    }, []);
+    }, [token]);
+
+    if (!token || authFailed) {
+        return <Navigate to="/login" state={{ from: location }} replace />;
+    }
 
     if (loading) {
         const isDashboard = location.pathname === '/home' || location.pathname === '/home/';
@@ -35,13 +71,12 @@ export default function RoleProtectedRoute({ allowedRoles = [], forbiddenRoles =
         );
     }
 
-    const token = localStorage.getItem("token");
-    if (!token) {
-        return <Navigate to="/login" replace />;
+    if (!currentUser) {
+        return <Navigate to="/login" state={{ from: location }} replace />;
     }
 
     const userRoleId = Number(currentUser?.RoleID);
-    const userRoleName = String(currentUser?.RoleName || '').toLowerCase();
+    const userRoleName = String(currentUser?.RoleName || currentUser?.role_name || '').toLowerCase();
     const isAuditor = userRoleId === 4 || userRoleName.includes('auditor') || currentUser?.isExternalAuditor;
 
     // Check forbidden roles
@@ -54,7 +89,7 @@ export default function RoleProtectedRoute({ allowedRoles = [], forbiddenRoles =
         }
     }
 
-    // Check allowed roles if specified
+    // Check allowed roles
     if (allowedRoles.length > 0) {
         const isAllowed = allowedRoles.includes(userRoleId) || 
                           allowedRoles.some(r => typeof r === 'string' && r.toLowerCase() === userRoleName);
@@ -65,3 +100,4 @@ export default function RoleProtectedRoute({ allowedRoles = [], forbiddenRoles =
 
     return children;
 }
+

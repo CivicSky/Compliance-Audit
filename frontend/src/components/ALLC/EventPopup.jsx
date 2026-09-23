@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { ChevronDown, ChevronRight, Calendar } from 'lucide-react';
 import AreaSection from './AreaSection';
 import CriteriaSection from './CriteriaSection';
 import RequirementsSection from './RequirementsSection';
@@ -361,105 +362,137 @@ export default function EventPopup({
         }
     };
 
-    return (
-        <div className="fixed inset-y-0 right-0 left-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out bg-black bg-opacity-50 z-[50]">
+    const modalContent = (
+        <div className="fixed inset-0 lg:left-[var(--sidebar-width)] lg:transition-[left] lg:duration-200 lg:ease-in-out bg-black/50 backdrop-blur-xs z-[60] flex flex-col">
             <div className="bg-white w-full h-full overflow-hidden shadow-2xl flex flex-col">
-                <div className="px-6 py-5 border-b border-slate-200 bg-white">
-                    <div className="flex justify-between items-start gap-4">
-                        <div>
-                            <h2 className="text-4xl font-bold tracking-tight text-slate-900">{selectedEvent.EventCode || selectedEvent.EventName}</h2>
-                            <p className="text-slate-600 mt-1">{selectedEvent.EventName || selectedEvent.EventCode}</p>
-                            <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                                <span className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1">
-                                    Created: <span className="font-semibold text-slate-700">{formatDateTime(selectedEvent.CreatedAt)}</span>
-                                </span>
-                                <span className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1">
-                                    Updated: <span className="font-semibold text-slate-700">{formatDateTime(selectedEvent.UpdatedAt || selectedEvent.CreatedAt)}</span>
-                                </span>
-                                {selectedEvent.accreditation_level && selectedEvent.accreditation_level.toUpperCase() !== 'N/A' && (
-                                    <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 font-semibold text-emerald-700">
-                                        {selectedEvent.accreditation_level}
+                <div className="relative border-b border-slate-200/80 bg-white px-5 py-4 shadow-sm shrink-0">
+                    {/* Accent bar */}
+                    <div className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-indigo-500 via-violet-500 to-purple-500" />
+
+                    <div className="flex items-center justify-between gap-4">
+                        {/* Left: icon + name + meta */}
+                        <div className="flex min-w-0 items-center gap-3.5">
+                            {/* Icon */}
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-indigo-100 text-indigo-600 shadow-sm">
+                                <Calendar className="h-5 w-5" />
+                            </div>
+
+                            {/* Name + meta */}
+                            <div className="min-w-0">
+                                <h2 className="truncate text-lg font-bold tracking-tight text-slate-900 leading-snug">
+                                    {selectedEvent.EventCode || selectedEvent.EventName}
+                                </h2>
+                                <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                                    {selectedEvent.EventName && selectedEvent.EventName !== selectedEvent.EventCode && (
+                                        <span className="text-xs font-medium text-slate-500 truncate max-w-xs md:max-w-md">
+                                            {selectedEvent.EventName}
+                                        </span>
+                                    )}
+                                    {selectedEvent.EventName && selectedEvent.EventName !== selectedEvent.EventCode && (
+                                        <span className="text-slate-300">·</span>
+                                    )}
+                                    <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 border border-slate-200/80">
+                                        Created: {formatDateTime(selectedEvent.CreatedAt)}
                                     </span>
-                                )}
+                                    <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 border border-slate-200/80">
+                                        Updated: {formatDateTime(selectedEvent.UpdatedAt || selectedEvent.CreatedAt)}
+                                    </span>
+                                    {selectedEvent.accreditation_level && selectedEvent.accreditation_level.toUpperCase() !== 'N/A' && (
+                                        <span className="inline-flex items-center rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 border border-emerald-200/80">
+                                            {selectedEvent.accreditation_level}
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                         </div>
-                        <div className="relative flex items-center gap-2 ml-4">
+
+                        {/* Right: actions + close */}
+                        <div className="flex shrink-0 items-center gap-2">
                             {isAdmin && (
-                                <>
+                                <div className="relative">
                                     <button
+                                        type="button"
                                         onClick={() => setIsActionMenuOpen(prev => !prev)}
-                                        className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
+                                        className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-100 hover:text-slate-800 active:scale-95 cursor-pointer ${isActionMenuOpen ? 'bg-slate-100 text-slate-900 border-slate-300' : ''}`}
                                         title="More actions"
                                         aria-label="More actions"
                                     >
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                                            <circle cx="12" cy="5" r="1.5" fill="currentColor" stroke="none" />
-                                            <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
-                                            <circle cx="12" cy="19" r="1.5" fill="currentColor" stroke="none" />
+                                        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                            <circle cx="12" cy="5" r="2" />
+                                            <circle cx="12" cy="12" r="2" />
+                                            <circle cx="12" cy="19" r="2" />
                                         </svg>
                                     </button>
                                     {isActionMenuOpen && (
-                                        <div className="absolute right-12 top-11 z-50 bg-white border border-slate-200 rounded-xl shadow-lg min-w-[170px] py-1" onClick={(e) => e.stopPropagation()}>
-                                            <button
-                                                onClick={() => {
-                                                    onEditEvent?.(selectedEvent);
-                                                    setIsActionMenuOpen(false);
-                                                }}
-                                                className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-xs text-slate-700 transition hover:bg-slate-50 whitespace-nowrap"
-                                            >
-                                                <svg className="h-4 w-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                                </svg>
-                                                <span>Edit Event</span>
-                                            </button>
-                                            <button
-                                                onClick={() => {
-                                                    onCopyEvent?.(selectedEvent);
-                                                    setIsActionMenuOpen(false);
-                                                }}
-                                                className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-xs text-slate-700 transition hover:bg-slate-50 whitespace-nowrap"
-                                            >
-                                                <svg className="h-4 w-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                                </svg>
-                                                <span>Copy Event</span>
-                                            </button>
-                                            <button
-                                                onClick={() => {
-                                                    onPrepareStructureData?.();
-                                                    setIsActionOpen(true);
-                                                    setIsActionMenuOpen(false);
-                                                }}
-                                                className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-xs text-slate-700 transition hover:bg-blue-50 whitespace-nowrap"
-                                            >
-                                                <svg className="h-4 w-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4zM14 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2v-4z" />
-                                                </svg>
-                                                <span>Manage Structure</span>
-                                            </button>
-                                            <button
-                                                onClick={() => {
-                                                    enterDeleteMode();
-                                                    setIsActionMenuOpen(false);
-                                                }}
-                                                className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-xs text-red-600 transition hover:bg-red-50 whitespace-nowrap"
-                                            >
-                                                <svg className="h-4 w-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
-                                                </svg>
-                                                <span>Delete Items</span>
-                                            </button>
-                                        </div>
+                                        <>
+                                            <div className="fixed inset-0 z-40" onClick={() => setIsActionMenuOpen(false)} />
+                                            <div className="absolute right-0 top-10 z-50 w-48 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl animate-in fade-in zoom-in-95 duration-100" onClick={(e) => e.stopPropagation()}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        onEditEvent?.(selectedEvent);
+                                                        setIsActionMenuOpen(false);
+                                                    }}
+                                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition whitespace-nowrap cursor-pointer"
+                                                >
+                                                    <svg className="h-4 w-4 text-blue-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                    </svg>
+                                                    <span>Edit Accreditation</span>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        onCopyEvent?.(selectedEvent);
+                                                        setIsActionMenuOpen(false);
+                                                    }}
+                                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 transition whitespace-nowrap cursor-pointer"
+                                                >
+                                                    <svg className="h-4 w-4 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                                    </svg>
+                                                    <span>Copy Accreditation</span>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        onPrepareStructureData?.();
+                                                        setIsActionOpen(true);
+                                                        setIsActionMenuOpen(false);
+                                                    }}
+                                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 transition whitespace-nowrap cursor-pointer"
+                                                >
+                                                    <svg className="h-4 w-4 text-indigo-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4zM14 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2v-4z" />
+                                                    </svg>
+                                                    <span>Manage Structure</span>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        enterDeleteMode();
+                                                        setIsActionMenuOpen(false);
+                                                    }}
+                                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50 transition whitespace-nowrap cursor-pointer"
+                                                >
+                                                    <svg className="h-4 w-4 text-rose-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
+                                                    </svg>
+                                                    <span>Delete Items</span>
+                                                </button>
+                                            </div>
+                                        </>
                                     )}
-                                </>
+                                </div>
                             )}
                             <button
+                                type="button"
                                 onClick={onClose}
-                                className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 active:scale-95 cursor-pointer"
                                 aria-label="Close"
                             >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                             </button>
                         </div>
@@ -497,7 +530,139 @@ export default function EventPopup({
                 {/* Hierarchy + Offices sidebar inside modal */}
                 <div className="flex-1 min-h-0 overflow-hidden px-6 pb-6">
                     <div className="flex gap-6 h-full min-h-[300px]">
-                        <div className="w-3/4 border-r border-slate-200 pr-4 overflow-y-auto">
+                        {/* Left Side: Programs and Offices Panel */}
+                        <div className="w-1/3 border-r border-slate-200 pr-4 overflow-y-auto flex flex-col h-full min-h-0">
+                            <div className="py-2 flex-1 flex flex-col min-h-0">
+                                <div className="sticky top-0 z-10 bg-white pt-2 pb-3 shrink-0 flex flex-col gap-2">
+                                    <h4 className="text-sm font-bold text-slate-800">Programs and Offices</h4>
+                                    <input
+                                        type="text"
+                                        value={officeSearch}
+                                        onChange={(e) => setOfficeSearch(e.target.value)}
+                                        placeholder="Search programs and offices..."
+                                        className="h-9 w-full rounded-md border border-slate-200 px-3 text-xs text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-slate-100/50 focus:bg-white transition-all shadow-sm"
+                                    />
+                                    
+                                    {/* Programs & Offices Filtering Tabs */}
+                                    <div className="flex border-b border-slate-200 mt-1">
+                                        {["All", "Programs", "Offices"].map((tab) => {
+                                            const isSelected = activeOfficeTab === tab;
+                                            return (
+                                                <button
+                                                    key={tab}
+                                                    type="button"
+                                                    onClick={() => setActiveOfficeTab(tab)}
+                                                    className={`pb-1.5 px-3 text-[11px] font-semibold transition-all border-b-2 -mb-[1.5px] ${
+                                                        isSelected 
+                                                            ? 'border-blue-600 text-blue-600' 
+                                                            : 'border-transparent text-slate-500 hover:text-slate-800'
+                                                    }`}
+                                                >
+                                                    {tab}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                <div className="flex-1 overflow-y-auto space-y-3 pr-1 pt-1 min-h-0">
+                                    {loadingOffices ? (
+                                        <div className="text-xs text-slate-400 text-center py-4">Loading programs and offices...</div>
+                                    ) : filteredOffices.length === 0 ? (
+                                        <div className="text-xs text-slate-400 text-center py-4 border border-dashed border-slate-100 rounded-lg">
+                                            {officeSearch ? "No matching records found" : "No programs or offices assigned"}
+                                        </div>
+                                    ) : (
+                                        filteredOffices.map((office) => {
+                                            const isAcademic = office.entity_type_id === 1 || String(office.category_name || office.TypeName || "").toLowerCase().includes("academic program") || String(office.category_name || office.TypeName || "").toLowerCase().includes("program");
+                                            return (
+                                                <div
+                                                    key={office.id || office.OfficeID || office.office_id}
+                                                    className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm hover:shadow-md transition-shadow relative flex flex-col gap-2.5 animate-fadeIn"
+                                                >
+                                                    {/* Header with Icon, Name, and Actions */}
+                                                    <div className="flex items-start justify-between gap-2.5">
+                                                        <div className="flex items-center gap-2.5 min-w-0">
+                                                            {/* Icon */}
+                                                            {isAcademic ? (
+                                                                <div className="h-9 w-9 rounded-full bg-cyan-50 text-cyan-600 flex items-center justify-center shrink-0 border border-cyan-100">
+                                                                    <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.436 60.436 0 00-.491 6.347A48.62 48.62 0 0112 20.904a48.62 48.62 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.57 50.57 0 00-2.658-.813A59.905 59.905 0 0112 3.493a59.902 59.902 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0112 13.489a50.702 50.702 0 017.74-3.342M6.75 15a.75.75 0 100-1.5.75.75 0 000 1.5zm0 0v-3.675A57.778 57.778 0 0012 13.5" />
+                                                                    </svg>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="h-9 w-9 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
+                                                                    <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 16.5h1.5m3 0H15M9 21v-3a1 1 0 011-1h4a1 1 0 011 1v3" />
+                                                                    </svg>
+                                                                </div>
+                                                            )}
+                                                            
+                                                            {/* Name and Subtitle */}
+                                                            <div className="min-w-0">
+                                                                <h5 className="text-xs font-bold text-slate-800 truncate leading-snug">
+                                                                    {office.OfficeName || office.office_name}
+                                                                </h5>
+                                                                <p className="text-[10px] text-slate-500 truncate mt-0.5 leading-normal">
+                                                                    {office.department_name || 'Institution-wide'}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        {/* Static visual 3-dot dropdown for matching look */}
+                                                        {!isAuditor && (
+                                                            <div className="shrink-0">
+                                                                <button
+                                                                    type="button"
+                                                                    className="h-7 w-7 rounded-lg border border-slate-200/90 bg-white hover:bg-slate-50 hover:border-slate-300 shadow-2xs flex items-center justify-center text-slate-400 hover:text-slate-600 transition"
+                                                                    aria-label="Office options"
+                                                                >
+                                                                    <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24">
+                                                                        <circle cx="12" cy="5" r="2" />
+                                                                        <circle cx="12" cy="12" r="2" />
+                                                                        <circle cx="12" cy="19" r="2" />
+                                                                    </svg>
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Timestamps Grid */}
+                                                    <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-2.5 text-[9px] text-slate-400 font-semibold tracking-wider">
+                                                        <div>
+                                                            <p className="uppercase text-slate-400 font-bold mb-0.5">Created</p>
+                                                            <p className="text-slate-655 font-bold">{formatDateString(office.created_at)}</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="uppercase text-slate-400 font-bold mb-0.5">Updated</p>
+                                                            <p className="text-slate-655 font-bold">{formatDateString(office.updated_at)}</p>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Bottom Badges Row */}
+                                                    <div className="flex items-center justify-between mt-1 pt-1 border-t border-slate-50">
+                                                        <span className={`px-1.5 py-0.5 rounded-[4px] text-[9px] font-bold border ${
+                                                            isAcademic
+                                                                ? 'bg-blue-50 text-blue-700 border-blue-150'
+                                                                : 'bg-emerald-50 text-emerald-700 border-emerald-150'
+                                                        }`}>
+                                                            {isAcademic ? 'Academic Program' : 'Non-Academic Office'}
+                                                        </span>
+                                                        
+                                                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                                                            {office.department_name || 'Institution-wide'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Right Side: Areas & Hierarchy Tree */}
+                        <div className="w-2/3 flex-1 pl-2 overflow-y-auto min-w-0">
                             <div className="sticky top-0 z-10 bg-white pt-3 pb-2">
                                 <h4 className="text-sm font-semibold text-slate-700 mb-2">Areas</h4>
                                 <input
@@ -512,7 +677,7 @@ export default function EventPopup({
                                 {loadingAreas.has(selectedEvent.EventID) ? (
                                     <div className="text-center text-gray-500">Loading areas...</div>
                                 ) : allAreasForEvent.length === 0 ? (
-                                    <div className="text-center text-gray-500">No areas found for this event</div>
+                                    <div className="text-center text-gray-500">No areas found for this accreditation</div>
                                 ) : hasSearch && !hasAnyVisibleResults ? (
                                     <div className="text-center text-gray-500">No matching results</div>
                                 ) : (
@@ -604,7 +769,7 @@ export default function EventPopup({
 
                                         <div className="mt-6">
                                             <div
-                                                className="bg-slate-600 text-white p-4 rounded-lg flex items-center justify-between cursor-pointer hover:bg-slate-700 transition"
+                                                className="bg-slate-700 hover:bg-slate-800 text-white p-4 rounded-xl shadow-sm flex items-center justify-between cursor-pointer transition"
                                                 onClick={onToggleNoArea}
                                             >
                                                 <div>
@@ -689,133 +854,6 @@ export default function EventPopup({
                                         </div>
                                     </div>
                                 )}
-                            </div>
-                        </div>
-
-                        <div className="w-1/3 pl-4 overflow-y-auto flex flex-col h-full min-h-0">
-                            <div className="py-2 flex-1 flex flex-col min-h-0">
-                                <div className="sticky top-0 z-10 bg-white pt-2 pb-3 shrink-0 flex flex-col gap-2">
-                                    <h4 className="text-sm font-bold text-slate-800">Programs and Offices</h4>
-                                    <input
-                                        type="text"
-                                        value={officeSearch}
-                                        onChange={(e) => setOfficeSearch(e.target.value)}
-                                        placeholder="Search programs and offices..."
-                                        className="h-9 w-full rounded-md border border-slate-200 px-3 text-xs text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-slate-100/50 focus:bg-white transition-all shadow-sm"
-                                    />
-                                    
-                                    {/* Programs & Offices Filtering Tabs */}
-                                    <div className="flex border-b border-slate-200 mt-1">
-                                        {["All", "Programs", "Offices"].map((tab) => {
-                                            const isSelected = activeOfficeTab === tab;
-                                            return (
-                                                <button
-                                                    key={tab}
-                                                    type="button"
-                                                    onClick={() => setActiveOfficeTab(tab)}
-                                                    className={`pb-1.5 px-3 text-[11px] font-semibold transition-all border-b-2 -mb-[1.5px] ${
-                                                        isSelected 
-                                                            ? 'border-blue-600 text-blue-600' 
-                                                            : 'border-transparent text-slate-500 hover:text-slate-800'
-                                                    }`}
-                                                >
-                                                    {tab}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-
-                                <div className="flex-1 overflow-y-auto space-y-3 pr-1 pt-1 min-h-0">
-                                    {loadingOffices ? (
-                                        <div className="text-xs text-slate-400 text-center py-4">Loading programs and offices...</div>
-                                    ) : filteredOffices.length === 0 ? (
-                                        <div className="text-xs text-slate-400 text-center py-4 border border-dashed border-slate-100 rounded-lg">
-                                            {officeSearch ? "No matching records found" : "No programs or offices assigned"}
-                                        </div>
-                                    ) : (
-                                        filteredOffices.map((office) => {
-                                            const isAcademic = office.entity_type_id === 1 || String(office.category_name || office.TypeName || "").toLowerCase().includes("academic program") || String(office.category_name || office.TypeName || "").toLowerCase().includes("program");
-                                            return (
-                                                <div
-                                                    key={office.id || office.OfficeID || office.office_id}
-                                                    className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm hover:shadow-md transition-shadow relative flex flex-col gap-2.5 animate-fadeIn"
-                                                >
-                                                    {/* Header with Icon, Name, and Actions */}
-                                                    <div className="flex items-start justify-between gap-2.5">
-                                                        <div className="flex items-center gap-2.5 min-w-0">
-                                                            {/* Icon */}
-                                                            {isAcademic ? (
-                                                                <div className="h-9 w-9 rounded-full bg-cyan-50 text-cyan-600 flex items-center justify-center shrink-0 border border-cyan-100">
-                                                                    <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.436 60.436 0 00-.491 6.347A48.62 48.62 0 0112 20.904a48.62 48.62 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.57 50.57 0 00-2.658-.813A59.905 59.905 0 0112 3.493a59.902 59.902 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0112 13.489a50.702 50.702 0 017.74-3.342M6.75 15a.75.75 0 100-1.5.75.75 0 000 1.5zm0 0v-3.675A57.778 57.778 0 0012 13.5" />
-                                                                    </svg>
-                                                                </div>
-                                                            ) : (
-                                                                <div className="h-9 w-9 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
-                                                                    <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 16.5h1.5m3 0H15M9 21v-3a1 1 0 011-1h4a1 1 0 011 1v3" />
-                                                                    </svg>
-                                                                </div>
-                                                            )}
-                                                            
-                                                            {/* Name and Subtitle */}
-                                                            <div className="min-w-0">
-                                                                <h5 className="text-xs font-bold text-slate-800 truncate leading-snug">
-                                                                    {office.OfficeName || office.office_name}
-                                                                </h5>
-                                                                <p className="text-[10px] text-slate-500 truncate mt-0.5 leading-normal">
-                                                                    {office.department_name || 'Institution-wide'}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                        
-                                                        {/* Static visual 3-dot dropdown for matching look */}
-                                                        {!isAuditor && (
-                                                            <div className="shrink-0">
-                                                                <button
-                                                                    type="button"
-                                                                    className="h-6 w-6 rounded-md hover:bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-550 transition"
-                                                                >
-                                                                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 12.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 18.75a.75.75 0 110-1.5.75.75 0 010 1.5z" />
-                                                                    </svg>
-                                                                </button>
-                                                            </div>
-                                                        )}
-                                                    </div>
-
-                                                    {/* Timestamps Grid */}
-                                                    <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-2.5 text-[9px] text-slate-400 font-semibold tracking-wider">
-                                                        <div>
-                                                            <p className="uppercase text-slate-400 font-bold mb-0.5">Created</p>
-                                                            <p className="text-slate-655 font-bold">{formatDateString(office.created_at)}</p>
-                                                        </div>
-                                                        <div>
-                                                            <p className="uppercase text-slate-400 font-bold mb-0.5">Updated</p>
-                                                            <p className="text-slate-655 font-bold">{formatDateString(office.updated_at)}</p>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Bottom Badges Row */}
-                                                    <div className="flex items-center justify-between mt-1 pt-1 border-t border-slate-50">
-                                                        <span className={`px-1.5 py-0.5 rounded-[4px] text-[9px] font-bold border ${
-                                                            isAcademic
-                                                                ? 'bg-blue-50 text-blue-700 border-blue-150'
-                                                                : 'bg-emerald-50 text-emerald-700 border-emerald-150'
-                                                        }`}>
-                                                            {isAcademic ? 'Academic Program' : 'Non-Academic Office'}
-                                                        </span>
-                                                        
-                                                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
-                                                            {office.department_name || 'Institution-wide'}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })
-                                    )}
-                                </div>
                             </div>
                         </div>
                     </div>
@@ -903,4 +941,6 @@ export default function EventPopup({
             )}
         </div>
     );
+
+    return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : null;
 }

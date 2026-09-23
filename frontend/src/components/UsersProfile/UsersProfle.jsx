@@ -7,6 +7,7 @@ import Pagination from "../Pagination/Pagination";
 import { API_BASE_URL } from '../../utils/apiBase';
 import { CardListSkeleton } from "../UI/Skeleton";
 import { useLiveRefresh } from "../../utils/liveSync";
+import ServerOfflineState from "../UI/ServerOfflineState";
 
 const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = false, onSelectionChange, onUserClick, viewMode = 'list' }, ref) => {
     const [users, setUsers] = useState([]);
@@ -102,22 +103,32 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
         };
     }, [actionMenuUserId]);
 
-    const fetchUsers = useCallback(async () => {
+    const [isRetrying, setIsRetrying] = useState(false);
+
+    const fetchUsers = useCallback(async (isRetry = false) => {
         try {
-            setLoading(true);
+            if (isRetry) setIsRetrying(true);
+            else setLoading(true);
             setError(null);
             const response = await usersAPI.getAllUsers();
 
             if (response.success) {
-                setUsers(response.users);
+                setUsers(response.users || []);
+                setError(null);
             } else {
                 setError('Failed to fetch users');
             }
         } catch (error) {
             console.error('Error fetching users:', error);
-            setError('Error loading users. Please try again.');
+            setUsers([]);
+            if (!error.response || error.code === 'ERR_NETWORK' || error.message?.toLowerCase().includes('network error') || error.message?.toLowerCase().includes('failed to fetch')) {
+                setError('Server Offline');
+            } else {
+                setError(error.response?.data?.message || 'Failed to load users.');
+            }
         } finally {
             setLoading(false);
+            setIsRetrying(false);
         }
     }, []);
 
@@ -248,73 +259,65 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
 
     if (loading) {
         return (
-            <div className="mt-6 w-full">
-                <CardListSkeleton count={4} />
+            <div className="w-full py-4">
+                <CardListSkeleton count={6} />
             </div>
         );
     }
 
     if (error) {
         return (
-            <div className="mt-6 w-full">
-                <div className="bg-red-50 border border-red-200 rounded-md p-4">
-                    <div className="flex items-center">
-                        <svg className="w-5 h-5 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span className="text-red-700">{error}</span>
-                        <button
-                            onClick={fetchUsers}
-                            className="ml-4 px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
-                        >
-                            Retry
-                        </button>
-                    </div>
+            <ServerOfflineState
+                onRetry={() => fetchUsers(true)}
+                isRetrying={isRetrying}
+                title={error === 'Server Offline' ? 'Backend Server Unavailable' : 'Unable to Load Users'}
+                message={error === 'Server Offline' 
+                    ? 'The backend server is unreachable or offline. If you stopped the backend server, please start it and click Retry Connection.' 
+                    : error}
+            />
+        );
+    }
+
+    if (filteredUsers.length === 0) {
+        return (
+            <div className="flex-1 w-full min-h-[350px] flex flex-col items-center justify-center p-8 text-center bg-white/70 border border-dashed border-slate-200 rounded-2xl animate-fadeIn my-auto">
+                <div className="w-16 h-16 bg-slate-100 border border-slate-200 text-slate-400 rounded-2xl flex items-center justify-center mb-3">
+                    <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+                    </svg>
                 </div>
+                <h3 className="text-base font-bold text-slate-800 mb-1">
+                    {searchTerm.trim() ? 'No Users Found' : 'No Users Registered'}
+                </h3>
+                <p className="text-xs text-slate-500 max-w-sm">
+                    {searchTerm.trim()
+                        ? `No registered users match your search for "${searchTerm}".`
+                        : 'No users have registered or been created in the system yet.'}
+                </p>
             </div>
         );
     }
 
-    if (filteredUsers.length === 0 && !loading) {
-        if (searchTerm.trim()) {
-            return (
-                <div className="mt-6 w-full">
-                    <div className="bg-gray-50 border border-gray-200 rounded-md p-8 text-center">
-                        <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">No Results Found</h3>
-                        <p className="text-gray-600">No users match your search for "{searchTerm}".</p>
-                        <p className="text-gray-500 text-sm mt-2">Try adjusting your search terms or browse all users.</p>
-                    </div>
-                </div>
-            );
-        } else if (users.length === 0) {
-            return (
-                <div className="mt-6 w-full">
-                    <div className="bg-gray-50 border border-gray-200 rounded-md p-8 text-center">
-                        <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM9 9a2 2 0 11-4 0 2 2 0 014 0z" />
-                        </svg>
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">No Users Found</h3>
-                        <p className="text-gray-600">No users available in the system yet.</p>
-                    </div>
-                </div>
-            );
-        }
-    }
-
     return (
-        <div className="mt-1 w-full">
+        <div className="mt-1 w-full flex flex-col">
             {/* Search Results Counter */}
             {searchTerm.trim() && (
-                <div className="text-sm text-gray-600 mb-4">
+                <div className="text-xs text-gray-600 mb-2">
                     Showing {filteredUsers.length} of {users.length} users
                     {filteredUsers.length !== users.length && ` matching "${searchTerm}"`}
                 </div>
             )}
 
-            <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-20' : 'space-y-2'}>
+            {viewMode === 'list' && (
+                <div className="grid grid-cols-12 items-center gap-3 px-4 py-3 bg-white border border-slate-200 rounded-xl shadow-2xs text-xs font-semibold text-gray-700 sticky top-0 z-30 min-w-[720px] mb-2">
+                    <div className="col-span-5 flex items-center">Name</div>
+                    <div className="col-span-3 flex items-center justify-center">Role</div>
+                    <div className="col-span-3 flex items-center justify-center">Approval Status</div>
+                    <div className="col-span-1 flex items-center justify-end">Actions</div>
+                </div>
+            )}
+
+            <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pt-1.5 pb-20' : 'space-y-2 pt-1 pb-1'}>
                 {visibleUsers.map((person) => {
                     // Construct full name
                     const fullName = `${person.FirstName || ''}${person.MiddleInitial ? ' ' + person.MiddleInitial + '.' : ''} ${person.LastName || ''}`.trim() || 'User';
@@ -343,26 +346,25 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
                     } else if (person.ProfilePic) {
                         profilePicUrl = `${API_BASE_URL}/uploads/profile-pics/${person.ProfilePic}`;
                     }
-
                     if (viewMode === 'list') {
                         return (
                             <div
                                 key={person.UserID}
-                                onClick={() => !deleteMode && onUserClick && onUserClick(person)}
-                                className={`relative overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xs transition-all duration-200 ${selectedUsers.has(person.UserID) ? 'ring-2 ring-indigo-500 border-indigo-500' : ''
+                                onClick={() => deleteMode ? handleCheckboxChange(person.UserID, !selectedUsers.has(person.UserID)) : (onUserClick && onUserClick(person))}
+                                className={`relative rounded-xl border border-slate-200 bg-white shadow-2xs ${selectedUsers.has(person.UserID) ? 'ring-2 ring-rose-500 border-rose-500 bg-rose-50/20' : ''
                                     } ${currentUserID === person.UserID ? 'border-indigo-300 bg-indigo-50/30' : ''
-                                    } ${deleteMode ? 'cursor-pointer hover:border-gray-300' : 'cursor-pointer hover:border-indigo-200 hover:shadow-md'}`}
+                                    } ${deleteMode ? 'cursor-pointer hover:border-rose-300' : 'app-card-hover cursor-pointer'}`}
                             >
-                                <div className="grid grid-cols-8 items-center gap-2 px-3 py-2">
+                                <div className="grid grid-cols-12 items-center gap-3 px-4 py-2.5">
                                     {/* Name & Email */}
-                                    <div className="flex items-center gap-3 col-span-4 min-w-0">
+                                    <div className="flex items-center gap-3 col-span-5 min-w-0">
                                         {deleteMode && (
                                             <div className="flex-shrink-0">
                                                 <input
                                                     type="checkbox"
                                                     checked={selectedUsers.has(person.UserID)}
                                                     onChange={(e) => handleCheckboxChange(person.UserID, e.target.checked)}
-                                                    className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                                    className="h-4 w-4 rounded border-rose-300 text-rose-600 focus:ring-rose-500"
                                                     onClick={(e) => e.stopPropagation()}
                                                 />
                                             </div>
@@ -373,61 +375,69 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
                                                     src={profilePicUrl}
                                                     alt={fullName}
                                                     className="h-full w-full rounded-full object-cover ring-2 ring-slate-100"
-                                                    onError={e => {
-                                                        e.target.style.display = 'none';
-                                                        if (e.target.nextElementSibling) e.target.nextElementSibling.style.display = 'flex';
+                                                    onError={(e) => {
+                                                        e.target.onerror = null;
+                                                        e.target.src = user;
                                                     }}
                                                 />
-                                            ) : null}
-                                            <div className={`h-full w-full rounded-full flex items-center justify-center font-bold text-white text-xs ${avatarStyle.bg} ${profilePicUrl ? 'hidden' : 'flex'}`}>
-                                                {initials}
-                                            </div>
+                                            ) : (
+                                                <div className="h-full w-full rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs">
+                                                    {initials}
+                                                </div>
+                                            )}
                                         </div>
-                                        <div className="min-w-0">
-                                            <h3 className="truncate text-[13px] font-semibold text-gray-900">{fullName}</h3>
-                                            <div className="mt-0.5 flex items-center gap-2 text-[11px] text-gray-600">
-                                                <span className="truncate">{person.Email}</span>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="text-xs font-bold text-slate-800 truncate">
+                                                    {fullName}
+                                                </span>
+                                                {currentUserID === person.UserID && (
+                                                    <span className="text-[9px] bg-indigo-100 text-indigo-700 font-bold px-1.5 py-0.2 rounded shrink-0">
+                                                        You
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="text-[10px] text-slate-500 truncate flex items-center gap-1">
+                                                <span>{person.Email}</span>
                                             </div>
                                         </div>
                                     </div>
+
                                     {/* Role */}
-                                    <div className="flex items-center col-span-2 justify-center">
-                                        <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-semibold ${roleBadgeClass}`}>
+                                    <div className="col-span-3 flex items-center justify-center">
+                                        <span className={`inline-flex items-center rounded-md border px-2.5 py-0.5 text-[10px] font-semibold ${roleBadgeClass}`}>
                                             {roleLabel}
                                         </span>
                                     </div>
-                                    {/* Approval Status */}
-                                    <div className="flex items-center col-span-1 justify-center">
-                                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${approvalBadgeClass}`}>
+
+                                    {/* Status */}
+                                    <div className="col-span-3 flex items-center justify-center">
+                                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold tracking-wide border ${approvalBadgeClass}`}>
                                             {approvalLabel}
                                         </span>
                                     </div>
+
                                     {/* Actions */}
-                                    <div className="flex items-center col-span-1 justify-end">
-                                        {isAdmin && (
-                                            <div className="relative">
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        const rect = e.currentTarget.getBoundingClientRect();
-                                                        setActionMenuUserId((prev) => {
-                                                            const next = prev === person.UserID ? null : person.UserID;
-                                                            return next;
-                                                        });
-                                                        setActionMenuAnchorRect((prev) => {
-                                                            if (actionMenuUserId === person.UserID) return null;
-                                                            return rect;
-                                                        });
-                                                    }}
-                                                    className="user-actions-button inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-100"
-                                                    aria-label="User actions"
-                                                    title="User actions"
-                                                >
-                                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6h.01M12 12h.01M12 18h.01" />
-                                                    </svg>
-                                                </button>
-                                            </div>
+                                    <div className="col-span-1 flex items-center justify-end">
+                                        {!deleteMode && isAdmin && (
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    const rect = e.currentTarget.getBoundingClientRect();
+                                                    setActionMenuUserId((prev) => (prev === person.UserID ? null : person.UserID));
+                                                    setActionMenuAnchorRect((prev) => (actionMenuUserId === person.UserID ? null : rect));
+                                                }}
+                                                className="user-actions-button flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 shadow-2xs"
+                                                aria-label="User actions"
+                                                title="User actions"
+                                            >
+                                                <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                    <circle cx="12" cy="5" r="2" />
+                                                    <circle cx="12" cy="12" r="2" />
+                                                    <circle cx="12" cy="19" r="2" />
+                                                </svg>
+                                            </button>
                                         )}
                                     </div>
                                 </div>
@@ -438,28 +448,25 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
                     return (
                         <div
                             key={person.UserID}
-                            onClick={() => !deleteMode && onUserClick && onUserClick(person)}
-                            className={`group relative flex flex-col justify-between rounded-2xl border bg-white shadow-xs hover:shadow-xl transition-all duration-200 hover:-translate-y-1 overflow-hidden min-h-[200px] ${selectedUsers.has(person.UserID)
-                                    ? 'border-indigo-500 ring-2 ring-indigo-400/50 bg-indigo-50/15'
+                            onClick={() => deleteMode ? handleCheckboxChange(person.UserID, !selectedUsers.has(person.UserID)) : (onUserClick && onUserClick(person))}
+                            className={`group relative flex flex-col justify-between rounded-2xl border bg-white shadow-2xs app-card-hover min-h-[200px] ${selectedUsers.has(person.UserID)
+                                    ? 'border-rose-500 ring-2 ring-rose-400/50 bg-rose-50/15'
                                     : currentUserID === person.UserID
                                         ? 'border-indigo-300 bg-indigo-50/20'
-                                        : 'border-slate-200/90 hover:border-indigo-300/80'
-                                } ${deleteMode ? 'cursor-pointer hover:border-slate-300' : 'cursor-pointer'}`}
+                                        : 'border-slate-200/90'
+                                } ${deleteMode ? 'cursor-pointer hover:border-rose-300' : 'cursor-pointer'}`}
                         >
                             <div className="p-4 flex flex-col flex-1 justify-between gap-3">
                                 {/* Card Top: Approval Badge & Actions / Checkbox */}
                                 <div className="flex items-center justify-between gap-2">
                                     {deleteMode ? (
-                                        <label className="flex items-center gap-2 cursor-pointer select-none">
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedUsers.has(person.UserID)}
-                                                onChange={(e) => handleCheckboxChange(person.UserID, e.target.checked)}
-                                                className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                                                onClick={(e) => e.stopPropagation()}
-                                            />
-                                            <span className="text-[11px] font-semibold text-slate-600">Select</span>
-                                        </label>
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedUsers.has(person.UserID)}
+                                            onChange={(e) => handleCheckboxChange(person.UserID, e.target.checked)}
+                                            className="h-4 w-4 rounded border-rose-300 text-rose-600 focus:ring-rose-500 cursor-pointer"
+                                            onClick={(e) => e.stopPropagation()}
+                                        />
                                     ) : (
                                         <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold tracking-wide border ${approvalBadgeClass}`}>
                                             {approvalLabel}
@@ -483,8 +490,10 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
                                                 aria-label="User actions"
                                                 title="User actions"
                                             >
-                                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6h.01M12 12h.01M12 18h.01" />
+                                                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                    <circle cx="12" cy="5" r="2" />
+                                                    <circle cx="12" cy="12" r="2" />
+                                                    <circle cx="12" cy="19" r="2" />
                                                 </svg>
                                             </button>
                                         )}
@@ -542,15 +551,17 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
 
                 if (!menuPerson) return null;
 
-                const menuWidth = 220;
-                const viewportRight = window.innerWidth - 8;
-                const left = Math.min((actionMenuAnchorRect.right || 0) - menuWidth + window.scrollX, viewportRight - menuWidth);
-                const top = (actionMenuAnchorRect.bottom || 0) + window.scrollY + 8;
+                const zoom = parseFloat(getComputedStyle(document.body).zoom) || 1;
+                const menuWidth = 192;
+                const viewportRight = (window.innerWidth / zoom) - 8;
+                const desiredLeft = (actionMenuAnchorRect.right / zoom) - menuWidth;
+                const left = Math.min(desiredLeft, viewportRight - menuWidth);
+                const top = (actionMenuAnchorRect.bottom / zoom) + 4;
 
                 return createPortal(
                     <div
                         className="user-actions-menu"
-                        style={{ position: 'fixed', top, left: Math.max(8, left), width: menuWidth, zIndex: 9999 }}
+                        style={{ position: 'fixed', top, left: Math.max(8, left), zIndex: 9999 }}
                         onMouseDown={(e) => e.stopPropagation()}
                         onClick={(e) => e.stopPropagation()}
                     >

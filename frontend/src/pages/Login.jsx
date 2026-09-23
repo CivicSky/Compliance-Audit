@@ -89,13 +89,16 @@ export default function Login() {
         return () => clearTimeout(id);
     }, [formData.email]);
 
-    // 🔒 Redirect if already logged in
+    // Redirect if already logged in
     useEffect(() => {
         const token = localStorage.getItem("token");
         const user = localStorage.getItem("user");
         if (token && user) {
             const userData = JSON.parse(user);
-            const destination = userData.RoleID === 1 ? "/home" : "/home/organizations";
+            const roleId = Number(userData?.RoleID);
+            const roleName = String(userData?.RoleName || '').toLowerCase();
+            const isAdmin = roleId === 1 || roleName === 'admin';
+            const destination = isAdmin ? "/home" : "/home/acc-management";
             navigate(destination, { replace: true });
         }
     }, [navigate]);
@@ -134,7 +137,10 @@ export default function Login() {
                 axios.defaults.headers.common["Authorization"] =
                     `Bearer ${response.token}`;
 
-                const destination = response.user.RoleID === 1 ? "/home" : "/home/organizations";
+                const roleId = Number(response.user?.RoleID);
+                const roleName = String(response.user?.RoleName || '').toLowerCase();
+                const isAdmin = roleId === 1 || roleName === 'admin';
+                const destination = isAdmin ? "/home" : "/home/acc-management";
                 navigate(destination, { replace: true });
             } else {
                 if (response.approvalStatus === 'pending') {

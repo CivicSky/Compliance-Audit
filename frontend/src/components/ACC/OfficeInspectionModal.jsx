@@ -3,6 +3,7 @@ import { Search, GraduationCap, Building2, User, UserCheck, X, ChevronDown, Chev
 import StatusSlider from './StatusSlider';
 import { officesAPI, requirementsAPI } from '../../utils/api';
 import { useModal } from '../UI/ModalProvider';
+import CustomSelect from '../UI/CustomSelect';
 
 export default function OfficeInspectionModal({
   office,
@@ -254,7 +255,7 @@ export default function OfficeInspectionModal({
                 <div>
                   <span className="block text-[9px] font-extrabold uppercase tracking-wider text-slate-400">PERSONNEL</span>
                   <span className="font-bold text-slate-800">
-                    {office?.head_name || office?.HeadName || 'Lenuel'}
+                    {office?.head_name || office?.HeadName || (Array.isArray(office?.heads) && office.heads.length > 0 ? office.heads.map(h => h.full_name || `${h.FirstName || ''} ${h.LastName || ''}`.trim() || h.FirstName).filter(Boolean).join(', ') : 'Unassigned')}
                   </span>
                 </div>
               </div>
@@ -314,16 +315,20 @@ export default function OfficeInspectionModal({
 
           <div className="flex items-center gap-3">
             {/* Filter Dropdown */}
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-blue-500 shadow-2xs cursor-pointer"
-            >
-              <option value="all">All statuses</option>
-              <option value="complied">Complied</option>
-              <option value="partial">Partially Complied</option>
-              <option value="not">Not Complied</option>
-            </select>
+            <div className="w-48">
+              <CustomSelect
+                size="sm"
+                value={statusFilter}
+                onChange={(val) => setStatusFilter(val)}
+                options={[
+                  { value: 'all', label: 'All statuses' },
+                  { value: 'complied', label: 'Complied' },
+                  { value: 'partial', label: 'Partially Complied' },
+                  { value: 'not', label: 'Not Complied' }
+                ]}
+                placeholder="All statuses"
+              />
+            </div>
 
             {/* Search Box */}
             <div className="relative w-64">

@@ -400,7 +400,7 @@ export default function AssignUserModal({ isOpen, onClose, requirement, officeId
                                                         }`}
                                                         title={hasUploaded ? 'Click to mark as not uploaded' : 'Click to mark as uploaded'}
                                                     >
-                                                        {hasUploaded ? '✓ Uploaded' : 'Not Uploaded'}
+                                                        {hasUploaded ? 'Uploaded' : 'Not Uploaded'}
                                                     </button>
                                                 ) : (
                                                     <span className={`ml-2 px-2 py-1 text-xs font-medium rounded ${
@@ -408,7 +408,7 @@ export default function AssignUserModal({ isOpen, onClose, requirement, officeId
                                                             ? 'bg-green-100 text-green-700' 
                                                             : 'bg-gray-100 text-gray-600'
                                                     }`}>
-                                                        {hasUploaded ? '✓ Uploaded' : 'Not Uploaded'}
+                                                        {hasUploaded ? 'Uploaded' : 'Not Uploaded'}
                                                     </span>
                                                 )}
                                                 {isAdmin && (

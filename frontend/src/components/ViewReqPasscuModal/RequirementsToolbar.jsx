@@ -20,8 +20,8 @@ export default function RequirementsToolbar({
     return (
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/70 bg-white px-5 py-3">
             <div>
-                <h3 className="text-sm font-bold text-slate-800">Requirements</h3>
-                <p className="text-[11px] text-slate-400">Browse areas, criteria, and compliance items</p>
+                <h3 className="text-sm font-bold text-slate-800">Evidence</h3>
+                <p className="text-[11px] text-slate-400">Browse areas, criteria, and evidence items</p>
             </div>
 
             <div className="flex items-center gap-2">
@@ -70,7 +70,7 @@ export default function RequirementsToolbar({
                     </svg>
                     <input
                         type="search"
-                        placeholder="Search requirements..."
+                        placeholder="Search evidence..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-52 rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-xs text-slate-800 shadow-sm placeholder:text-slate-400 transition focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400/20"

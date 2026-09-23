@@ -85,13 +85,32 @@
     transform: none;
   }
 
-  /* ── Unified card ── */
+  /* ── Master Unified Card & List Hover Effect ── */
+  .app-card-hover {
+    transition: background-color 0.15s ease, 
+                border-color 0.15s ease, 
+                box-shadow 0.15s ease !important;
+  }
+  .app-card-hover:hover:not(.border-rose-500):not(.ring-rose-500):not([data-selected="true"]) {
+    background-color: #f1f5f9 !important; /* clean highlighted background without levitation */
+    border-color: #94a3b8 !important; /* refined highlighted border */
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.04) !important;
+    transform: none !important;
+  }
+
+
   .card {
     background-color: var(--app-surface);
     border: 1px solid var(--app-border);
     border-radius: 1rem;
     box-shadow: 0 1px 4px rgba(37, 99, 235, 0.06);
   }
+
+  .card-grid-container {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+
 
   /* ── Unified input ── */
   .input-base {
