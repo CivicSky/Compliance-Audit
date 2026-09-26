@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, ChevronRight, Calendar } from 'lucide-react';
+import { ChevronDown, ChevronRight, Calendar, Plus } from 'lucide-react';
 import AreaSection from './AreaSection';
 import CriteriaSection from './CriteriaSection';
 import RequirementsSection from './RequirementsSection';
@@ -106,13 +106,27 @@ export default function EventPopup({
     const [selectedOfficeIdsLocal, setSelectedOfficeIdsLocal] = useState(new Set());
     const [assignedAreaIds, setAssignedAreaIds] = useState(new Set());
 
-    const isAuditor = currentUser?.RoleID === 4 || 
-                      String(currentUser?.RoleName || '').toLowerCase().includes('auditor') || 
-                      currentUser?.isExternalAuditor;
+    const roleId = Number(currentUser?.RoleID);
+    const roleName = String(currentUser?.RoleName || '').toLowerCase();
 
-    const isAdmin = isAdminProp !== undefined 
-        ? isAdminProp 
-        : (currentUser?.RoleID === 1 || String(currentUser?.RoleName || '').toLowerCase() === 'admin');
+    const isAuditor = roleId === 4 || 
+                      roleName.includes('auditor') || 
+                      Boolean(currentUser?.isExternalAuditor);
+
+    const isPersonnel = roleId === 2 || 
+                        roleId === 3 || 
+                        roleName.includes('office') || 
+                        roleName === 'user' || 
+                        roleName === 'personnel' || 
+                        roleName === 'head';
+
+    const isAdmin = !isAuditor && !isPersonnel && (
+        isAdminProp !== undefined 
+            ? Boolean(isAdminProp) 
+            : (roleId === 1 || roleName === 'admin')
+    );
+
+    const canEdit = isAdmin;
 
     useEffect(() => {
         let mounted = true;
@@ -409,6 +423,21 @@ export default function EventPopup({
                         {/* Right: actions + close */}
                         <div className="flex shrink-0 items-center gap-2">
                             {isAdmin && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        onPrepareStructureData?.();
+                                        setIsActionOpen(true);
+                                    }}
+                                    className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 text-xs font-semibold text-white shadow-xs transition-all hover:bg-emerald-700 active:scale-95 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer"
+                                    title="Manage Accreditation"
+                                    aria-label="Manage Accreditation"
+                                >
+                                    <Plus className="w-3.5 h-3.5 shrink-0" strokeWidth={2.5} />
+                                    <span>Manage Accreditation</span>
+                                </button>
+                            )}
+                            {isAdmin && (
                                 <div className="relative">
                                     <button
                                         type="button"
@@ -609,8 +638,8 @@ export default function EventPopup({
                                                             </div>
                                                         </div>
                                                         
-                                                        {/* Static visual 3-dot dropdown for matching look */}
-                                                        {!isAuditor && (
+                                                        {/* Static visual 3-dot dropdown for matching look (Admin only) */}
+                                                        {canEdit && (
                                                             <div className="shrink-0">
                                                                 <button
                                                                     type="button"
@@ -641,13 +670,20 @@ export default function EventPopup({
 
                                                     {/* Bottom Badges Row */}
                                                     <div className="flex items-center justify-between mt-1 pt-1 border-t border-slate-50">
-                                                        <span className={`px-1.5 py-0.5 rounded-[4px] text-[9px] font-bold border ${
-                                                            isAcademic
-                                                                ? 'bg-blue-50 text-blue-700 border-blue-150'
-                                                                : 'bg-emerald-50 text-emerald-700 border-emerald-150'
-                                                        }`}>
-                                                            {isAcademic ? 'Academic Program' : 'Non-Academic Office'}
-                                                        </span>
+                                                        <div className="flex items-center gap-1">
+                                                            <span className={`px-1.5 py-0.5 rounded-[4px] text-[9px] font-bold border ${
+                                                                isAcademic
+                                                                    ? 'bg-blue-50 text-blue-700 border-blue-150'
+                                                                    : 'bg-emerald-50 text-emerald-700 border-emerald-150'
+                                                            }`}>
+                                                                {isAcademic ? 'Academic Program' : 'Non-Academic Office'}
+                                                            </span>
+                                                            {isAcademic && office.accreditation_level && office.accreditation_level !== 'None' && (
+                                                                <span className="px-1.5 py-0.5 rounded-[4px] text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                                    {office.accreditation_level}
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                         
                                                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
                                                             {office.department_name || 'Institution-wide'}
@@ -668,7 +704,7 @@ export default function EventPopup({
                                 <input
                                     type="text"
                                     className="h-9 w-full rounded-md border border-slate-200 px-2 text-sm text-slate-700 shadow-sm focus:outline-none"
-                                    placeholder="Search areas, criteria, or requirements..."
+                                    placeholder="Search areas, sub areas, or standards..."
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
                                 />
@@ -694,16 +730,16 @@ export default function EventPopup({
                                                     showCheckbox={deleteMode}
                                                     isChecked={selectedAreaIds.has(Number(area.AreaID))}
                                                     onToggleSelect={(checked) => toggleAreaSelect(area, checked)}
-                                                    onMenuClick={isAuditor ? undefined : (item) => { setEditAreaData(item); setIsEditAreaOpen(true); }}
-                                                    onDeleteClick={isAuditor ? undefined : (item) => handleSingleDelete({ areaIds: [Number(item.AreaID)] })}
+                                                    onMenuClick={!canEdit ? undefined : (item) => { setEditAreaData(item); setIsEditAreaOpen(true); }}
+                                                    onDeleteClick={!canEdit ? undefined : (item) => handleSingleDelete({ areaIds: [Number(item.AreaID)] })}
                                                     isAssigned={assignedAreaIds.has(Number(area.AreaID))}
                                                     isAuditor={isAuditor}
                                                 >
                                                     {loadingCriteria.has(area.AreaID) ? (
-                                                        <p className="text-xs text-gray-500 ml-4 mt-2">Loading criteria...</p>
+                                                        <p className="text-xs text-gray-500 ml-4 mt-2">Loading sub areas...</p>
                                                     ) : areaCriteria.length === 0 ? (
                                                         <p className="text-xs text-gray-500 ml-4 mt-2">
-                                                            {hasSearch ? 'No matching criteria' : 'No criteria'}
+                                                            {hasSearch ? 'No matching sub areas' : 'No sub areas'}
                                                         </p>
                                                     ) : (
                                                         <div className="relative mt-3 ml-6 pl-5">
@@ -740,8 +776,8 @@ export default function EventPopup({
                                                                             showCheckbox={deleteMode}
                                                                             isChecked={selectedCriteriaIds.has(Number(node.CriteriaID))}
                                                                             onToggleSelect={(checked) => toggleCriteriaSelect(node, checked)}
-                                                                            onMenuClick={isAuditor ? undefined : (c) => { setEditCriteriaData(c); setIsEditCriteriaOpen(true); }}
-                                                                            onDeleteClick={isAuditor ? undefined : (c) => handleSingleDelete({ criteriaIds: [Number(c.CriteriaID)] })}
+                                                                            onMenuClick={!canEdit ? undefined : (c) => { setEditCriteriaData(c); setIsEditCriteriaOpen(true); }}
+                                                                            onDeleteClick={!canEdit ? undefined : (c) => handleSingleDelete({ criteriaIds: [Number(c.CriteriaID)] })}
                                                                         >
                                                                             <div className="ml-6 space-y-2">
                                                                                 {node.children && node.children.map(child => renderNode(child, depth + 1))}
@@ -751,8 +787,8 @@ export default function EventPopup({
                                                                                     showCheckbox={deleteMode}
                                                                                     selectedRequirementIds={selectedRequirementIds}
                                                                                     onToggleRequirement={toggleRequirementSelect}
-                                                                                    onMenuClick={isAuditor ? undefined : (req) => { setEditRequirementData(req); setIsEditRequirementOpen(true); }}
-                                                                                    onDeleteClick={isAuditor ? undefined : (req) => handleSingleDelete({ requirementIds: [Number(req.RequirementID)] })}
+                                                                                    onMenuClick={!canEdit ? undefined : (req) => { setEditRequirementData(req); setIsEditRequirementOpen(true); }}
+                                                                                    onDeleteClick={!canEdit ? undefined : (req) => handleSingleDelete({ requirementIds: [Number(req.RequirementID)] })}
                                                                                 />
                                                                             </div>
                                                                         </CriteriaSection>
@@ -781,18 +817,18 @@ export default function EventPopup({
                                                         )}
                                                         <span>No Area Assigned</span>
                                                     </h3>
-                                                    <p className="text-xs text-slate-200 mt-1">Criteria without area assignment</p>
+                                                    <p className="text-xs text-slate-200 mt-1">Sub areas without area assignment</p>
                                                 </div>
                                                 <span className="text-xs px-2 py-1 rounded bg-slate-500 text-slate-100">
-                                                    {visibleNoAreaCriteria.length} criteria
+                                                    {visibleNoAreaCriteria.length} sub areas
                                                 </span>
                                             </div>
 
                                             {expandedNoArea.has(selectedEvent.EventID) && loadingNoAreaCriteria.has(selectedEvent.EventID) ? (
-                                                <p className="text-xs text-gray-500 ml-4 mt-2">Loading no-area criteria...</p>
+                                                <p className="text-xs text-gray-500 ml-4 mt-2">Loading sub areas without area...</p>
                                             ) : expandedNoArea.has(selectedEvent.EventID) && visibleNoAreaCriteria.length === 0 ? (
                                                 <p className="text-xs text-gray-500 ml-4 mt-2">
-                                                    {hasSearch ? 'No matching criteria without area' : 'No criteria without area'}
+                                                    {hasSearch ? 'No matching sub areas without area' : 'No sub areas without area'}
                                                 </p>
                                             ) : expandedNoArea.has(selectedEvent.EventID) ? (
                                                 <div className="relative mt-3 ml-6 pl-5">
@@ -828,8 +864,8 @@ export default function EventPopup({
                                                                     showCheckbox={deleteMode}
                                                                     isChecked={selectedCriteriaIds.has(Number(node.CriteriaID))}
                                                                     onToggleSelect={(checked) => toggleCriteriaSelect(node, checked)}
-                                                                    onMenuClick={(c) => { setEditCriteriaData(c); setIsEditCriteriaOpen(true); }}
-                                                                    onDeleteClick={(c) => handleSingleDelete({ criteriaIds: [Number(c.CriteriaID)] })}
+                                                                    onMenuClick={!canEdit ? undefined : (c) => { setEditCriteriaData(c); setIsEditCriteriaOpen(true); }}
+                                                                    onDeleteClick={!canEdit ? undefined : (c) => handleSingleDelete({ criteriaIds: [Number(c.CriteriaID)] })}
                                                                 >
                                                                     <div className="ml-6 space-y-2">
                                                                         {node.children && node.children.map(child => renderNode(child))}
@@ -839,8 +875,8 @@ export default function EventPopup({
                                                                             showCheckbox={deleteMode}
                                                                             selectedRequirementIds={selectedRequirementIds}
                                                                             onToggleRequirement={toggleRequirementSelect}
-                                                                            onMenuClick={(req) => { setEditRequirementData(req); setIsEditRequirementOpen(true); }}
-                                                                            onDeleteClick={(req) => handleSingleDelete({ requirementIds: [Number(req.RequirementID)] })}
+                                                                            onMenuClick={!canEdit ? undefined : (req) => { setEditRequirementData(req); setIsEditRequirementOpen(true); }}
+                                                                            onDeleteClick={!canEdit ? undefined : (req) => handleSingleDelete({ requirementIds: [Number(req.RequirementID)] })}
                                                                         />
                                                                     </div>
                                                                 </CriteriaSection>

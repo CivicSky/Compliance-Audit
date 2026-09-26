@@ -47,13 +47,13 @@ const EditCriteriaModal = ({ visible, onClose, event = {}, onSave, userRole = 'u
 
   const validateForm = () => {
     const newErrors = {};
-    if (!criteriaCode.trim() && !isChild) newErrors.CriteriaCode = 'Criteria code is required';
-    if (!criteriaName.trim()) newErrors.CriteriaName = 'Criteria name is required';
+    if (!criteriaCode.trim() && !isChild) newErrors.CriteriaCode = 'Sub area code is required';
+    if (!criteriaName.trim()) newErrors.CriteriaName = 'Sub area name is required';
     // ensure uniqueness of CriteriaCode within the same event (case-insensitive)
     const code = String(criteriaCode || '').trim().toLowerCase();
     if (code) {
       const duplicate = (criteriaList || []).find(c => String(c.CriteriaCode || '').trim().toLowerCase() === code && Number(c.CriteriaID) !== Number(event.CriteriaID));
-      if (duplicate) newErrors.CriteriaCode = 'A criteria with this code already exists for this event.';
+      if (duplicate) newErrors.CriteriaCode = 'A sub area with this code already exists for this event.';
     }
     // Description is optional/removed
     setErrors(newErrors);
@@ -86,7 +86,7 @@ const EditCriteriaModal = ({ visible, onClose, event = {}, onSave, userRole = 'u
         onClose();
       } catch (err) {
         console.log('Update criteria error (parent):', err);
-        let msg = 'Failed to update criteria.';
+        let msg = 'Failed to update sub area.';
         if (err?.message) msg += '\n' + err.message;
         await showAlert(msg);
       } finally {
@@ -99,8 +99,8 @@ const EditCriteriaModal = ({ visible, onClose, event = {}, onSave, userRole = 'u
       <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl mx-4 max-h-[95vh] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
           <div>
-            <h2 className="text-lg font-bold tracking-tight text-slate-800">{isAdmin ? 'Edit Criteria' : 'View Criteria'}</h2>
-            <p className="mt-0.5 text-xs text-slate-500">Configure accreditation criteria parameters and requirements.</p>
+            <h2 className="text-lg font-bold tracking-tight text-slate-800">{isAdmin ? 'Edit Sub Area' : 'View Sub Area'}</h2>
+            <p className="mt-0.5 text-xs text-slate-500">Configure accreditation sub area parameters and requirements.</p>
           </div>
           <button
             type="button"
@@ -119,7 +119,7 @@ const EditCriteriaModal = ({ visible, onClose, event = {}, onSave, userRole = 'u
           {/* Criteria Code */}
           <div className="mb-6">
             <label htmlFor="CriteriaCode" className="block text-sm font-semibold text-gray-800 mb-2">
-              Criteria Code *
+              Sub Area Code *
             </label>
             <input
               type="text"
@@ -138,7 +138,7 @@ const EditCriteriaModal = ({ visible, onClose, event = {}, onSave, userRole = 'u
           {/* Criteria Name */}
           <div className="mb-6">
             <label htmlFor="CriteriaName" className="block text-sm font-semibold text-gray-800 mb-2">
-              Criteria Name *
+              Sub Area Name *
             </label>
             <input
               type="text"
@@ -147,7 +147,7 @@ const EditCriteriaModal = ({ visible, onClose, event = {}, onSave, userRole = 'u
               value={criteriaName}
               onChange={handleInputChange}
               className={`w-full rounded-md bg-white px-4 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500 ${errors.CriteriaName ? 'border-red-500' : 'border border-slate-200'}`}
-              placeholder="Enter criteria name"
+              placeholder="Enter sub area name"
               disabled={isSubmitting || !isAdmin}
               required
             />
@@ -157,7 +157,7 @@ const EditCriteriaModal = ({ visible, onClose, event = {}, onSave, userRole = 'u
           {/* Parent Criteria Dropdown */}
           <div className="mb-6">
             <label htmlFor="ParentCriteriaID" className="block text-sm font-semibold text-gray-800 mb-2">
-              Parent Criteria (Optional)
+              Parent Sub Area (Optional)
             </label>
             <CustomSelect
               id="ParentCriteriaID"
@@ -165,7 +165,7 @@ const EditCriteriaModal = ({ visible, onClose, event = {}, onSave, userRole = 'u
               value={parentCriteriaId}
               onChange={(val) => handleInputChange({ target: { name: 'ParentCriteriaID', value: val } })}
               options={[
-                { value: '', label: 'None (Top-level criteria)' },
+                { value: '', label: 'None (Top-level sub area)' },
                 ...criteriaList
                   .filter(c => String(c.CriteriaID) !== String(event.CriteriaID))
                   .map(c => ({
@@ -173,7 +173,7 @@ const EditCriteriaModal = ({ visible, onClose, event = {}, onSave, userRole = 'u
                     label: `${c.CriteriaCode} - ${c.CriteriaName}`
                   }))
               ]}
-              placeholder="None (Top-level criteria)"
+              placeholder="None (Top-level sub area)"
               disabled={isSubmitting || !isAdmin || isChild}
             />
           </div>

@@ -191,13 +191,13 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
             newErrors.EventID = 'Event is required';
         }
         if (!formData.RequirementCode.trim()) {
-            newErrors.RequirementCode = 'Requirement code is required';
+            newErrors.RequirementCode = 'Standard code is required';
         }
         if (!formData.Description.trim()) {
             newErrors.Description = 'Description is required';
         }
         if (!formData.CriteriaID) {
-            newErrors.CriteriaID = 'Criteria is required';
+            newErrors.CriteriaID = 'Sub area is required';
         }
 
         setErrors(newErrors);
@@ -243,14 +243,14 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                 }
                 
                 onClose();
-                await showAlert('Evidence added successfully!');
+                await showAlert('Standard added successfully!');
             } else {
-                await showAlert(response.message || 'Failed to add evidence');
+                await showAlert(response.message || 'Failed to add standard');
             }
             
         } catch (error) {
             console.error('Error submitting form:', error);
-            await showAlert('An error occurred while adding the evidence. Please try again.');
+            await showAlert('An error occurred while adding the standard. Please try again.');
         } finally {
             setIsSubmitting(false);
         }
@@ -280,8 +280,8 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-white z-10 shrink-0">
                     <div>
-                        <h2 className="text-base font-bold text-slate-900">Add New Evidence</h2>
-                        <p className="text-xs text-slate-500 mt-0.5">Attach an evidence specification to a selected criteria</p>
+                        <h2 className="text-base font-bold text-slate-900">Add New Standard</h2>
+                        <p className="text-xs text-slate-500 mt-0.5">Attach a standard specification to a selected sub area</p>
                     </div>
                     <button
                         type="button"
@@ -318,13 +318,13 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                         {errors.EventID && (
                             <p className="text-red-500 text-[11px] mt-1">{errors.EventID}</p>
                         )}
-                        <p className="text-[11px] text-slate-400 mt-1">Select the accreditation to filter criteria</p>
+                        <p className="text-[11px] text-slate-400 mt-1">Select the accreditation to filter sub areas</p>
                     </div>
 
                     {/* Criteria Dropdown */}
                     <div>
                         <label htmlFor="CriteriaID" className="block text-xs font-semibold text-slate-700 mb-1.5">
-                            Criteria *
+                            Sub Area *
                         </label>
                         <CustomSelect
                             id="CriteriaID"
@@ -335,7 +335,7 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                                 value: String(criteria.CriteriaID),
                                 label: `${criteria.CriteriaCode} - ${criteria.CriteriaName}`
                             }))}
-                            placeholder={!formData.EventID ? 'Select an accreditation first' : 'Select a criteria'}
+                            placeholder={!formData.EventID ? 'Select an accreditation first' : 'Select a sub area'}
                             disabled={isSubmitting || isLoading || !formData.EventID}
                             buttonClassName={errors.CriteriaID ? '!border-red-400' : ''}
                         />
@@ -343,20 +343,20 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                             <p className="text-red-500 text-[11px] mt-1">{errors.CriteriaID}</p>
                         )}
                         {isLoading && (
-                            <p className="text-slate-400 text-[11px] mt-1">Loading criteria...</p>
+                            <p className="text-slate-400 text-[11px] mt-1">Loading sub areas...</p>
                         )}
                         {!isLoading && formData.EventID && topLevelCriteria.length === 0 && (
-                            <p className="text-amber-600 text-[11px] mt-1">No top-level criteria found for this accreditation.</p>
+                            <p className="text-amber-600 text-[11px] mt-1">No top-level sub areas found for this accreditation.</p>
                         )}
                         {!isLoading && topLevelCriteria.length > 0 && (
-                            <p className="text-emerald-600 text-[11px] mt-1">Loaded {topLevelCriteria.length} top-level criteria for this accreditation</p>
+                            <p className="text-emerald-600 text-[11px] mt-1">Loaded {topLevelCriteria.length} top-level sub areas for this accreditation</p>
                         )}
                     </div>
 
                     {/* Parent Requirement Code */}
                     <div>
                         <label htmlFor="ParentRequirementCode" className="block text-xs font-semibold text-slate-700 mb-1.5">
-                            Parent Evidence Code (Optional)
+                            Parent Standard Code (Optional)
                         </label>
                         <CustomSelect
                             id="ParentRequirementCode"
@@ -364,26 +364,26 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                             value={formData.ParentRequirementCode}
                             onChange={(val) => handleInputChange({ target: { name: 'ParentRequirementCode', value: val } })}
                             options={[
-                                { value: '', label: !formData.CriteriaID ? 'Select a criteria first' : 'None (Top-level evidence)' },
+                                { value: '', label: !formData.CriteriaID ? 'Select a sub area first' : 'None (Top-level standard)' },
                                 ...requirementsList.map((req) => ({
                                     value: req.RequirementCode,
                                     label: `${req.RequirementCode} - ${req.Description?.substring(0, 50) || ''}${req.Description?.length > 50 ? '...' : ''}`
                                 }))
                             ]}
-                            placeholder={!formData.CriteriaID ? 'Select a criteria first' : 'None (Top-level evidence)'}
+                            placeholder={!formData.CriteriaID ? 'Select a sub area first' : 'None (Top-level standard)'}
                             disabled={isSubmitting || !formData.CriteriaID}
                         />
                         {!formData.CriteriaID ? (
                             <p className="text-slate-400 text-[11px] mt-1">
-                                Select a criteria to see available parent evidence
+                                Select a sub area to see available parent standards
                             </p>
                         ) : requirementsList.length === 0 ? (
                             <p className="text-amber-600 text-[11px] mt-1">
-                                No existing evidence in this criteria. This will be top-level evidence.
+                                No existing standards in this sub area. This will be top-level standard.
                             </p>
                         ) : (
                             <p className="text-emerald-600 text-[11px] mt-1">
-                                Loaded {requirementsList.length} evidence item{requirementsList.length !== 1 ? 's' : ''} for this criteria
+                                Loaded {requirementsList.length} standard item{requirementsList.length !== 1 ? 's' : ''} for this sub area
                             </p>
                         )}
                     </div>
@@ -392,7 +392,7 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                     {childCriteriaOptions.length > 0 && (
                         <div>
                             <label htmlFor="ChildCriteriaID" className="block text-xs font-semibold text-slate-700 mb-1.5">
-                                Place under Child Criteria (Optional)
+                                Place under Child Sub Area (Optional)
                             </label>
                             <CustomSelect
                                 id="ChildCriteriaID"
@@ -400,23 +400,23 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                                 value={formData.ChildCriteriaID}
                                 onChange={(val) => handleInputChange({ target: { name: 'ChildCriteriaID', value: val } })}
                                 options={[
-                                    { value: '', label: 'No child selected (use selected criteria)' },
+                                    { value: '', label: 'No child selected (use selected sub area)' },
                                     ...childCriteriaOptions.map(cc => ({
                                         value: String(cc.CriteriaID),
                                         label: cc.CriteriaCode ? `${cc.CriteriaCode} - ${cc.CriteriaName}` : cc.CriteriaName
                                     }))
                                 ]}
-                                placeholder="No child selected (use selected criteria)"
+                                placeholder="No child selected (use selected sub area)"
                                 disabled={isSubmitting || !formData.CriteriaID}
                             />
-                            <p className="text-[11px] text-slate-400 mt-1">Choose a child criteria to save this evidence under that child.</p>
+                            <p className="text-[11px] text-slate-400 mt-1">Choose a child sub area to save this standard under that child.</p>
                         </div>
                     )}
 
                     {/* Requirement Code */}
                     <div>
                         <label htmlFor="RequirementCode" className="block text-xs font-semibold text-slate-700 mb-1.5">
-                            Evidence Code *
+                            Standard Code *
                         </label>
                         <input
                             type="text"
@@ -449,7 +449,7 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                             className={`w-full px-3 py-2 text-xs border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 resize-none transition-colors ${
                                 errors.Description ? 'border-red-400' : 'border-slate-200'
                             }`}
-                            placeholder="Enter a detailed description of this evidence"
+                            placeholder="Enter a detailed description of this standard"
                             disabled={isSubmitting}
                         />
                         {errors.Description && (
@@ -475,7 +475,7 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                             {isSubmitting && (
                                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                             )}
-                            {isSubmitting ? 'Adding...' : 'Add Evidence'}
+                            {isSubmitting ? 'Adding...' : 'Add Standard'}
                         </button>
                     </div>
                         </form>

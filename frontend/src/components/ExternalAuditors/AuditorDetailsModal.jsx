@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { API_BASE_URL } from '../../utils/apiBase';
+import SmartUserAvatar from '../UI/SmartUserAvatar';
 
 export default function AuditorDetailsModal({ isOpen, onClose, auditor, onAssignClick }) {
     const [assignments, setAssignments] = useState([]);
@@ -68,18 +69,13 @@ export default function AuditorDetailsModal({ isOpen, onClose, auditor, onAssign
                 {/* Header (100% Matching AssignAreaModal System Blueprint) */}
                 <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-5 text-white flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-3 min-w-0">
-                        {avatarSrc ? (
-                            <img
-                                src={avatarSrc}
-                                alt={fullName}
-                                onError={(e) => { e.target.style.display = 'none'; }}
-                                className="h-11 w-11 rounded-full object-cover border border-white/40 shrink-0 shadow-sm"
-                            />
-                        ) : (
-                            <div className="h-11 w-11 rounded-full bg-white/20 border border-white/30 text-white font-bold flex items-center justify-center text-lg shrink-0 shadow-inner">
-                                {initialLetter}
-                            </div>
-                        )}
+                        <SmartUserAvatar
+                            user={auditor}
+                            fullName={fullName}
+                            size="h-11 w-11"
+                            textSize="text-base font-bold"
+                            ring="border-2 border-white/60 shadow-sm"
+                        />
                         <div className="min-w-0">
                             <h3 className="font-bold text-base text-white leading-tight truncate">
                                 {fullName}

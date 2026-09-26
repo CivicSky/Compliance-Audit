@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { requirementsAPI } from '../../utils/api';
 import { useModal } from "../UI/ModalProvider";
 import { API_BASE_URL } from '../../utils/apiBase';
+import SmartUserAvatar from '../UI/SmartUserAvatar';
 
 export default function AssignUserModal({ isOpen, onClose, requirement, officeId, onSuccess, currentUserId, isAdmin = false }) {
     const [availableUsers, setAvailableUsers] = useState([]);
@@ -202,7 +203,7 @@ export default function AssignUserModal({ isOpen, onClose, requirement, officeId
                                         value={searchTerm}
                                         onChange={(e) => setSearchTerm(e.target.value)}
                                         placeholder="Search users..."
-                                        className="w-full px-3 py-2 pl-9 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm"
+                                        className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm"
                                     />
                                     <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -261,22 +262,13 @@ export default function AssignUserModal({ isOpen, onClose, requirement, officeId
                                                     />
                                                     <div className="ml-2.5 flex items-center flex-1">
                                                         <div className="flex-shrink-0">
-                                                            {user.ProfilePic ? (
-                                                                <img
-                                                                    src={`${API_BASE_URL}/uploads/profile-pics/${user.ProfilePic}`}
-                                                                    alt={fullName}
-                                                                    className="w-8 h-8 rounded-full object-cover border border-gray-200"
-                                                                    onError={(e) => {
-                                                                        e.target.style.display = 'none';
-                                                                        e.target.nextElementSibling.style.display = 'flex';
-                                                                    }}
-                                                                />
-                                                            ) : null}
-                                                            <div 
-                                                                className={`w-8 h-8 rounded-full bg-indigo-100 items-center justify-center text-indigo-600 text-xs font-semibold ${user.ProfilePic ? 'hidden' : 'flex'}`}
-                                                            >
-                                                                {user.FirstName[0]}{user.LastName[0]}
-                                                            </div>
+                                                            <SmartUserAvatar
+                                                                user={user}
+                                                                fullName={fullName}
+                                                                size="w-8 h-8"
+                                                                textSize="text-xs font-bold"
+                                                                ring="border border-gray-200"
+                                                            />
                                                         </div>
                                                         <div className="ml-2.5 flex-1 min-w-0">
                                                             <p className="text-sm font-medium text-gray-900 truncate">{fullName}</p>
@@ -360,22 +352,13 @@ export default function AssignUserModal({ isOpen, onClose, requirement, officeId
                                                 className={`flex items-center p-2.5 rounded-lg border bg-white ${hasUploaded ? 'border-green-300 bg-green-50' : 'border-gray-200'}`}
                                             >
                                                 <div className="flex-shrink-0 relative">
-                                                    {user.ProfilePic ? (
-                                                        <img
-                                                            src={`${API_BASE_URL}/uploads/profile-pics/${user.ProfilePic}`}
-                                                            alt={fullName}
-                                                            className={`w-8 h-8 rounded-full object-cover border-2 ${hasUploaded ? 'border-green-500' : 'border-gray-300'}`}
-                                                            onError={(e) => {
-                                                                e.target.style.display = 'none';
-                                                                e.target.nextElementSibling.style.display = 'flex';
-                                                            }}
-                                                        />
-                                                    ) : null}
-                                                    <div 
-                                                        className={`w-8 h-8 rounded-full bg-indigo-100 items-center justify-center text-indigo-600 text-xs font-semibold border-2 ${hasUploaded ? 'border-green-500' : 'border-gray-300'} ${user.ProfilePic ? 'hidden' : 'flex'}`}
-                                                    >
-                                                        {user.FirstName[0]}{user.LastName[0]}
-                                                    </div>
+                                                    <SmartUserAvatar
+                                                        user={user}
+                                                        fullName={fullName}
+                                                        size="w-8 h-8"
+                                                        textSize="text-xs font-bold"
+                                                        ring={`border-2 ${hasUploaded ? 'border-green-500' : 'border-gray-300'}`}
+                                                    />
                                                     {/* Upload status indicator */}
                                                     {hasUploaded && (
                                                         <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full flex items-center justify-center">

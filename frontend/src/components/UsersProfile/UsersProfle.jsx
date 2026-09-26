@@ -3,11 +3,13 @@ import { createPortal } from 'react-dom';
 import user from "../../assets/images/user.svg";
 import { usersAPI } from "../../utils/api";
 import { useModal } from "../UI/ModalProvider";
+import { useToast } from "../UI/Toast";
 import Pagination from "../Pagination/Pagination";
 import { API_BASE_URL } from '../../utils/apiBase';
 import { CardListSkeleton } from "../UI/Skeleton";
 import { useLiveRefresh } from "../../utils/liveSync";
 import ServerOfflineState from "../UI/ServerOfflineState";
+import SmartUserAvatar from "../UI/SmartUserAvatar";
 
 const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = false, onSelectionChange, onUserClick, viewMode = 'list' }, ref) => {
     const [users, setUsers] = useState([]);
@@ -22,13 +24,14 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
     const [actionMenuUserId, setActionMenuUserId] = useState(null);
     const [actionMenuAnchorRect, setActionMenuAnchorRect] = useState(null);
     const { showConfirm } = useModal();
+    const { toast } = useToast();
 
     const normalizeRoleKey = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
     const getRoleLabel = (person) => person.RoleName || (person.RoleID === 1 ? 'Admin' : 'User');
     const getRoleBadgeClass = (person) => {
-        if (person.RoleID === 1) return 'bg-purple-100 text-purple-800 border-purple-200';
-        if (person.RoleID === 2) return 'bg-blue-100 text-blue-800 border-blue-200';
-        if (person.RoleID === 3) return 'bg-green-100 text-green-800 border-green-200';
+        if (person.RoleID === 1) return 'bg-blue-100 text-blue-800 border-blue-200';
+        if (person.RoleID === 2) return 'bg-sky-100 text-sky-800 border-sky-200';
+        if (person.RoleID === 3) return 'bg-emerald-100 text-emerald-800 border-emerald-200';
         return 'bg-gray-100 text-gray-800 border-gray-200';
     };
     const getApprovalLabel = (person) => {
@@ -327,18 +330,6 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
                     const roleBadgeClass = getRoleBadgeClass(person);
                     const approvalBadgeClass = getApprovalBadgeClass(person);
 
-                    const avatarPalettes = [
-                        { bg: 'bg-gradient-to-br from-indigo-500 to-blue-600', ring: 'ring-indigo-100' },
-                        { bg: 'bg-gradient-to-br from-violet-500 to-purple-600', ring: 'ring-purple-100' },
-                        { bg: 'bg-gradient-to-br from-sky-500 to-cyan-600', ring: 'ring-sky-100' },
-                        { bg: 'bg-gradient-to-br from-emerald-500 to-teal-600', ring: 'ring-emerald-100' },
-                        { bg: 'bg-gradient-to-br from-amber-500 to-orange-600', ring: 'ring-amber-100' },
-                        { bg: 'bg-gradient-to-br from-rose-500 to-pink-600', ring: 'ring-rose-100' },
-                    ];
-                    let hash = 0;
-                    for (let i = 0; i < fullName.length; i++) hash = fullName.charCodeAt(i) + ((hash << 5) - hash);
-                    const avatarStyle = avatarPalettes[Math.abs(hash) % avatarPalettes.length];
-
                     // Profile photo logic: use preview if available, else use uploaded filename, else null
                     let profilePicUrl = null;
                     if (person.TempPreview) {
@@ -352,7 +343,7 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
                                 key={person.UserID}
                                 onClick={() => deleteMode ? handleCheckboxChange(person.UserID, !selectedUsers.has(person.UserID)) : (onUserClick && onUserClick(person))}
                                 className={`relative rounded-xl border border-slate-200 bg-white shadow-2xs ${selectedUsers.has(person.UserID) ? 'ring-2 ring-rose-500 border-rose-500 bg-rose-50/20' : ''
-                                    } ${currentUserID === person.UserID ? 'border-indigo-300 bg-indigo-50/30' : ''
+                                    } ${currentUserID === person.UserID ? 'border-blue-300 bg-blue-50/30' : ''
                                     } ${deleteMode ? 'cursor-pointer hover:border-rose-300' : 'app-card-hover cursor-pointer'}`}
                             >
                                 <div className="grid grid-cols-12 items-center gap-3 px-4 py-2.5">
@@ -369,30 +360,21 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
                                                 />
                                             </div>
                                         )}
-                                        <div className="h-9 w-9 flex-shrink-0 rounded-full overflow-hidden relative">
-                                            {profilePicUrl ? (
-                                                <img
-                                                    src={profilePicUrl}
-                                                    alt={fullName}
-                                                    className="h-full w-full rounded-full object-cover ring-2 ring-slate-100"
-                                                    onError={(e) => {
-                                                        e.target.onerror = null;
-                                                        e.target.src = user;
-                                                    }}
-                                                />
-                                            ) : (
-                                                <div className="h-full w-full rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs">
-                                                    {initials}
-                                                </div>
-                                            )}
-                                        </div>
+                                        <SmartUserAvatar
+                                            user={person}
+                                            src={profilePicUrl}
+                                            fullName={fullName}
+                                            size="h-9 w-9"
+                                            textSize="text-xs font-bold"
+                                            ring="ring-2 ring-slate-100"
+                                        />
                                         <div className="min-w-0 flex-1">
                                             <div className="flex items-center gap-1.5">
                                                 <span className="text-xs font-bold text-slate-800 truncate">
                                                     {fullName}
                                                 </span>
                                                 {currentUserID === person.UserID && (
-                                                    <span className="text-[9px] bg-indigo-100 text-indigo-700 font-bold px-1.5 py-0.2 rounded shrink-0">
+                                                    <span className="text-[9px] bg-blue-100 text-blue-700 font-bold px-1.5 py-0.2 rounded shrink-0">
                                                         You
                                                     </span>
                                                 )}
@@ -452,7 +434,7 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
                             className={`group relative flex flex-col justify-between rounded-2xl border bg-white shadow-2xs app-card-hover min-h-[200px] ${selectedUsers.has(person.UserID)
                                     ? 'border-rose-500 ring-2 ring-rose-400/50 bg-rose-50/15'
                                     : currentUserID === person.UserID
-                                        ? 'border-indigo-300 bg-indigo-50/20'
+                                        ? 'border-blue-300 bg-blue-50/20'
                                         : 'border-slate-200/90'
                                 } ${deleteMode ? 'cursor-pointer hover:border-rose-300' : 'cursor-pointer'}`}
                         >
@@ -502,29 +484,21 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
 
                                 {/* Profile Info */}
                                 <div className="flex items-center gap-3">
-                                    <div className="relative shrink-0">
-                                        {profilePicUrl ? (
-                                            <img
-                                                src={profilePicUrl}
-                                                alt={fullName}
-                                                className="h-12 w-12 rounded-full object-cover ring-2 ring-slate-100 shadow-xs"
-                                                onError={e => {
-                                                    e.target.style.display = 'none';
-                                                    if (e.target.nextElementSibling) e.target.nextElementSibling.style.display = 'flex';
-                                                }}
-                                            />
-                                        ) : null}
-                                        <div className={`h-12 w-12 rounded-full flex items-center justify-center font-bold text-white text-sm shadow-xs ring-2 ${avatarStyle.ring} ${avatarStyle.bg} ${profilePicUrl ? 'hidden' : 'flex'}`}>
-                                            {initials}
-                                        </div>
-                                    </div>
+                                    <SmartUserAvatar
+                                        user={person}
+                                        src={profilePicUrl}
+                                        fullName={fullName}
+                                        size="h-12 w-12"
+                                        textSize="text-sm font-bold"
+                                        ring="ring-2 ring-slate-100 shadow-xs"
+                                    />
 
                                     <div className="min-w-0 flex-1">
-                                        <h3 className="text-[14px] font-bold text-slate-900 truncate group-hover:text-indigo-600 transition-colors">
+                                        <h3 className="text-[14px] font-bold text-slate-900 truncate group-hover:text-blue-600 transition-colors">
                                             {fullName}
                                         </h3>
                                         {currentUserID === person.UserID && (
-                                            <span className="inline-block mt-0.5 text-[9px] font-bold text-indigo-600 uppercase tracking-wider">
+                                            <span className="inline-block mt-0.5 text-[9px] font-bold text-blue-600 uppercase tracking-wider">
                                                 (You)
                                             </span>
                                         )}
@@ -587,19 +561,39 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
                                     e.stopPropagation();
                                     setActionMenuUserId(null);
                                     setActionMenuAnchorRect(null);
-                                    const confirmed = await showConfirm(`Delete user ${menuPerson.FirstName} ${menuPerson.LastName}? This cannot be undone.`);
+                                    const userName = `${menuPerson.FirstName || ''} ${menuPerson.LastName || ''}`.trim() || 'this user';
+                                    const confirmed = await showConfirm(
+                                        `Delete user "${userName}"? This cannot be undone.`,
+                                        'Confirm Deletion'
+                                    );
                                     if (!confirmed) return;
                                     try {
                                         const result = await deleteSelectedUsers([menuPerson.UserID]);
                                         if (result?.success) {
                                             fetchUsers();
+                                            toast({
+                                                title: 'User Deleted',
+                                                description: `"${userName}" has been successfully deleted.`,
+                                                variant: 'success',
+                                                duration: 3000,
+                                            });
                                         } else {
                                             setUsers((prev) => prev.filter((u) => u.UserID !== menuPerson.UserID));
-                                            console.warn('Delete user API not available, removed locally');
+                                            toast({
+                                                title: 'Notice',
+                                                description: result?.message || `"${userName}" was removed.`,
+                                                variant: 'warning',
+                                                duration: 3000,
+                                            });
                                         }
                                     } catch (err) {
                                         console.error('Error deleting user:', err);
-                                        setUsers((prev) => prev.filter((u) => u.UserID !== menuPerson.UserID));
+                                        toast({
+                                            title: 'Error',
+                                            description: `An error occurred while deleting "${userName}".`,
+                                            variant: 'error',
+                                            duration: 4000,
+                                        });
                                     }
                                 }}
                                 className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50 transition whitespace-nowrap"

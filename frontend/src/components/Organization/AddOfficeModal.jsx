@@ -3,6 +3,7 @@ import { officesAPI, officeHeadsAPI, masterlistAPI, departmentsAPI, eventDepartm
 import { useModal } from "../UI/ModalProvider";
 import CustomSelect from "../UI/CustomSelect";
 import { API_BASE_URL } from '../../utils/apiBase';
+import SmartUserAvatar from '../UI/SmartUserAvatar';
 
 const MAX_HEADS = 4;
 const ACCREDITATION_LEVELS = ['None', 'Candidate', 'Level I', 'Level II', 'Level III', 'Level IV'];
@@ -23,6 +24,7 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
     const [selectedDeptFilter, setSelectedDeptFilter] = useState("All");
     const [existingEventDepartments, setExistingEventDepartments] = useState([]);
     const [deptAccreditationLevels, setDeptAccreditationLevels] = useState({});
+    const [programAccreditationLevels, setProgramAccreditationLevels] = useState({});
 
     const { showAlert } = useModal();
 
@@ -177,28 +179,10 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
         return masterListItems.filter(item => selectedMasterListIds.includes(String(item.id)));
     }, [masterListItems, selectedMasterListIds]);
 
-    // Compute academic departments involved in current selection
-    const involvedDepartments = useMemo(() => {
-        const map = new Map();
-        selectedMasterItems.forEach(item => {
-            const isAcademic = item.entityTypeId === 1 || item.type === 'Academic Program';
-            if (isAcademic && (item.departmentId || item.department)) {
-                const deptId = item.departmentId || item.department;
-                if (!map.has(deptId)) {
-                    const existingEd = existingEventDepartments.find(
-                        ed => Number(ed.department_id) === Number(item.departmentId)
-                    );
-                    map.set(deptId, {
-                        id: item.departmentId,
-                        name: item.department || (departments.find(d => String(d.id) === String(item.departmentId))?.name) || `Department #${item.departmentId}`,
-                        existingLevel: existingEd?.accreditation_level || null,
-                        isExisting: !!existingEd
-                    });
-                }
-            }
-        });
-        return Array.from(map.values());
-    }, [selectedMasterItems, existingEventDepartments, departments]);
+    // Compute academic programs involved in current selection
+    const selectedAcademicPrograms = useMemo(() => {
+        return selectedMasterItems.filter(item => item.entityTypeId === 1 || item.type === 'Academic Program');
+    }, [selectedMasterItems]);
 
     const getOfficeTypeIdForCategory = (item) => {
         if (!item || !Array.isArray(officeTypes) || officeTypes.length === 0) return null;
@@ -265,8 +249,8 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
             const creationPromises = selectedMasterItems.map(async (item) => {
                 const typeId = getOfficeTypeIdForCategory(item);
                 const isAcademic = item.entityTypeId === 1 || item.type === 'Academic Program';
-                const deptLevel = isAcademic && item.departmentId
-                    ? (deptAccreditationLevels[item.departmentId] || 'Level I')
+                const progLevel = isAcademic
+                    ? (programAccreditationLevels[item.id] || 'Level I')
                     : null;
 
                 const payload = {
@@ -275,7 +259,7 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
                     OfficeTypeID: parseInt(typeId),
                     HeadIDs: selectedHeadIDs.map(id => parseInt(id)),
                     EventID: parseInt(eventID),
-                    accreditation_level: deptLevel
+                    accreditation_level: progLevel
                 };
                 return officesAPI.createOffice(payload);
             });
@@ -561,8 +545,8 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
                                 </div>
                             </div>
 
-                            {/* Department Accreditation Level Configuration (when academic programs are selected) */}
-                            {involvedDepartments.length > 0 && (
+                            {/* Academic Program Accreditation Level Configuration (when academic programs are selected) */}
+                            {selectedAcademicPrograms.length > 0 && (
                                 <div className="rounded-xl border border-blue-250 bg-gradient-to-r from-blue-50/70 to-indigo-50/50 p-3.5 space-y-2 shadow-2xs">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
@@ -572,46 +556,39 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
                                                 </svg>
                                             </div>
                                             <span className="text-xs font-bold text-blue-900">
-                                                Department Accreditation Level for this Event
+                                                Academic Program Accreditation Level for this Event
                                             </span>
                                         </div>
                                         <span className="text-[10px] font-semibold text-blue-700 bg-blue-100/80 px-2 py-0.5 rounded-full">
-                                            {involvedDepartments.length} {involvedDepartments.length === 1 ? 'Dept' : 'Depts'}
+                                            {selectedAcademicPrograms.length} {selectedAcademicPrograms.length === 1 ? 'Program' : 'Programs'}
                                         </span>
                                     </div>
                                     <p className="text-[11px] text-slate-600">
-                                        Selected academic programs will belong to their department's accreditation level in this audit.
+                                        Set the accreditation level for each selected academic program in this audit event.
                                     </p>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                                        {involvedDepartments.map((dept) => {
-                                            const currentLevel = deptAccreditationLevels[dept.id] || dept.existingLevel || 'Level I';
+                                        {selectedAcademicPrograms.map((prog) => {
+                                            const currentLevel = programAccreditationLevels[prog.id] || 'Level I';
                                             return (
                                                 <div
-                                                    key={dept.id || dept.name}
+                                                    key={prog.id}
                                                     className="flex items-center justify-between gap-2 p-2 bg-white rounded-lg border border-blue-200/80 shadow-2xs"
                                                 >
                                                     <div className="min-w-0 flex-1">
                                                         <span className="text-xs font-bold text-slate-800 block truncate">
-                                                            {dept.name}
+                                                            {prog.name}
                                                         </span>
-                                                        {dept.isExisting ? (
-                                                            <span className="text-[10px] font-medium text-emerald-600 flex items-center gap-1">
-                                                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-                                                                Already in event ({dept.existingLevel})
-                                                            </span>
-                                                        ) : (
-                                                            <span className="text-[10px] text-slate-400">
-                                                                New department in event
-                                                            </span>
-                                                        )}
+                                                        <span className="text-[10px] text-slate-400">
+                                                            {prog.department || 'Academic Program'}
+                                                        </span>
                                                     </div>
                                                     <div className="w-32 shrink-0">
                                                         <CustomSelect
                                                             size="sm"
                                                             value={currentLevel}
-                                                            onChange={(val) => setDeptAccreditationLevels(prev => ({
+                                                            onChange={(val) => setProgramAccreditationLevels(prev => ({
                                                                 ...prev,
-                                                                [dept.id]: val
+                                                                [prog.id]: val
                                                             }))}
                                                             options={ACCREDITATION_LEVELS.map((lvl) => ({
                                                                 value: lvl,
@@ -680,19 +657,13 @@ export default function AddOfficeModal({ isOpen, onClose, onSuccess, officeTypes
                                                             onChange={() => toggleHeadSelection(head.HeadID)}
                                                             className="self-center accent-blue-600 h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                                         />
-                                                        {picUrl ? (
-                                                            <img
-                                                                src={picUrl}
-                                                                alt={fullName || `Head ${head.HeadID}`}
-                                                                className="h-7 w-7 rounded-full object-cover border border-slate-200"
-                                                            />
-                                                        ) : (
-                                                            <div className="h-7 w-7 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center border border-slate-200 shrink-0">
-                                                                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15.75 7.5a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.5 19.5a7.5 7.5 0 0 1 15 0" />
-                                                                </svg>
-                                                            </div>
-                                                        )}
+                                                        <SmartUserAvatar
+                                                            user={head}
+                                                            fullName={fullName}
+                                                            size="h-7 w-7"
+                                                            textSize="text-[10px] font-bold"
+                                                            ring="border border-slate-200 shrink-0"
+                                                        />
                                                         <span className="flex-1 min-w-0 self-center text-xs truncate">
                                                             <span className="font-semibold text-slate-800">{fullName || `Head #${head.HeadID}`}</span>
                                                             {head.Position && <span className="text-slate-500"> - {head.Position}</span>}

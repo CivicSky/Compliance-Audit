@@ -10,6 +10,7 @@ import { API_BASE_URL } from '../../utils/apiBase';
 import { OfficeCardSkeleton } from "../UI/Skeleton";
 import { useLiveRefresh } from "../../utils/liveSync";
 import ServerOfflineState from "../UI/ServerOfflineState";
+import SmartUserAvatar from "../UI/SmartUserAvatar";
 
 const STATIC_MOCK_PERSONNEL = [
     {
@@ -617,18 +618,6 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                     const isSelected = selectedHeads.has(person.HeadID);
                     const { email } = parseContactInfo(person);
 
-                    const avatarPalettes = [
-                        { bg: 'bg-gradient-to-br from-indigo-500 to-blue-600', ring: 'ring-indigo-100' },
-                        { bg: 'bg-gradient-to-br from-violet-500 to-purple-600', ring: 'ring-purple-100' },
-                        { bg: 'bg-gradient-to-br from-sky-500 to-cyan-600', ring: 'ring-sky-100' },
-                        { bg: 'bg-gradient-to-br from-emerald-500 to-teal-600', ring: 'ring-emerald-100' },
-                        { bg: 'bg-gradient-to-br from-amber-500 to-orange-600', ring: 'ring-amber-100' },
-                        { bg: 'bg-gradient-to-br from-rose-500 to-pink-600', ring: 'ring-rose-100' },
-                    ];
-                    let hash = 0;
-                    for (let i = 0; i < fullName.length; i++) hash = fullName.charCodeAt(i) + ((hash << 5) - hash);
-                    const avatarStyle = avatarPalettes[Math.abs(hash) % avatarPalettes.length];
-
                     if (viewMode === 'list') {
                         return (
                             <div
@@ -637,7 +626,7 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                                     if (deleteMode) toggleHeadSelection(person.HeadID);
                                     else openDetails(person, assignedOffices);
                                 }}
-                                className={`relative rounded-xl border border-slate-200 bg-white shadow-2xs ${selectedHeads.has(person.HeadID) ? 'ring-2 ring-indigo-500 border-indigo-500' : ''
+                                className={`relative rounded-xl border border-slate-200 bg-white shadow-2xs ${selectedHeads.has(person.HeadID) ? 'ring-2 ring-blue-500 border-blue-500' : ''
                                     } ${deleteMode ? 'cursor-pointer' : 'app-card-hover cursor-pointer'}`}
                             >
                                 <div className="grid grid-cols-8 items-center gap-2 px-4 py-3">
@@ -655,22 +644,14 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                                             </div>
                                         )}
 
-                                        <div className="h-10 w-10 flex-shrink-0 rounded-full overflow-hidden relative">
-                                            {profilePicUrl ? (
-                                                <img
-                                                    src={profilePicUrl}
-                                                    alt={fullName}
-                                                    className="h-full w-full rounded-full object-cover ring-2 ring-slate-100"
-                                                    onError={(e) => {
-                                                        e.target.style.display = 'none';
-                                                        if (e.target.nextElementSibling) e.target.nextElementSibling.style.display = 'flex';
-                                                    }}
-                                                />
-                                            ) : null}
-                                            <div className={`h-full w-full rounded-full flex items-center justify-center font-bold text-white text-xs ${avatarStyle.bg} ${profilePicUrl ? 'hidden' : 'flex'}`}>
-                                                {initials}
-                                            </div>
-                                        </div>
+                                        <SmartUserAvatar
+                                            user={person}
+                                            src={profilePicUrl}
+                                            fullName={fullName}
+                                            size="h-10 w-10"
+                                            textSize="text-xs font-bold"
+                                            ring="ring-2 ring-slate-100"
+                                        />
 
                                         <div className="min-w-0">
                                             <div className="flex items-center gap-2">
@@ -800,29 +781,18 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                                     title="Click to view details and assigned offices"
                                 >
                                     <div className="flex items-center gap-2 sm:gap-2.5">
-                                        {/* Smart Avatar */}
-                                        <div className="relative shrink-0">
-                                            {profilePicUrl ? (
-                                                <img
-                                                    src={profilePicUrl}
-                                                    alt={fullName}
-                                                    onError={(e) => {
-                                                        e.target.style.display = 'none';
-                                                        if (e.target.nextElementSibling) e.target.nextElementSibling.style.display = 'flex';
-                                                    }}
-                                                    className="h-8 w-8 sm:h-9 sm:w-9 rounded-full object-cover ring-2 ring-slate-100 shadow-xs"
-                                                />
-                                            ) : null}
-                                            <div
-                                                className={`h-8 w-8 sm:h-9 sm:w-9 rounded-full flex items-center justify-center font-bold text-white text-[11px] sm:text-xs shadow-xs ring-2 ${avatarStyle.ring} ${avatarStyle.bg} ${profilePicUrl ? 'hidden' : 'flex'}`}
-                                            >
-                                                {initials}
-                                            </div>
-                                        </div>
+                                        <SmartUserAvatar
+                                            user={person}
+                                            src={profilePicUrl}
+                                            fullName={fullName}
+                                            size="h-8 w-8 sm:h-9 sm:w-9"
+                                            textSize="text-[11px] sm:text-xs font-bold"
+                                            ring="ring-2 ring-slate-100 shadow-xs"
+                                        />
 
                                         {/* Name & Role */}
                                         <div className="min-w-0 flex-1">
-                                            <h3 className="text-xs sm:text-[13px] font-bold text-slate-900 truncate group-hover/content:text-indigo-600 transition-colors leading-tight">
+                                            <h3 className="text-xs sm:text-[13px] font-bold text-slate-900 truncate group-hover/content:text-blue-600 transition-colors leading-tight">
                                                 {fullName}
                                             </h3>
                                             <div className="mt-0.5">

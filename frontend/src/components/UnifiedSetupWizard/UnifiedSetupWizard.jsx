@@ -327,14 +327,14 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
 
             if (response.success) {
                 setCreatedIds(prev => ({ ...prev, criteriaId: response.data.id || response.data.CriteriaID }));
-                toast({ title: 'Success', description: 'Criteria created successfully', variant: 'success' });
-                setSuccessMessage('Criteria created');
+                toast({ title: 'Success', description: 'Sub area created successfully', variant: 'success' });
+                setSuccessMessage('Sub area created');
                 setTimeout(() => {
                     setSuccessMessage('');
                     setCurrentStep(4);
                 }, 1000);
             } else {
-                toast({ title: 'Error', description: response.message || 'Failed to add criteria', variant: 'error' });
+                toast({ title: 'Error', description: response.message || 'Failed to add sub area', variant: 'error' });
             }
         } catch (error) {
             console.error('Error:', error);
@@ -348,7 +348,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
         if (!validateRequirement()) return;
 
         if (!createdIds.criteriaId && !criteriaData.CriteriaID) {
-            toast({ title: 'Warning', description: 'Please select a criteria first', variant: 'warning' });
+            toast({ title: 'Warning', description: 'Please select a sub area first', variant: 'warning' });
             return;
         }
 
@@ -370,14 +370,14 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
 
             if (response.success) {
                 setCreatedIds(prev => ({ ...prev, requirementId: response.data.id || response.data.RequirementID }));
-                toast({ title: 'Success', description: 'Evidence created successfully', variant: 'success' });
-                setSuccessMessage('Evidence created');
+                toast({ title: 'Success', description: 'Standard created successfully', variant: 'success' });
+                setSuccessMessage('Standard created');
                 setTimeout(() => {
                     setSuccessMessage('');
                     setCurrentStep(5);
                 }, 1000);
             } else {
-                toast({ title: 'Error', description: response.message || 'Failed to add evidence', variant: 'error' });
+                toast({ title: 'Error', description: response.message || 'Failed to add standard', variant: 'error' });
             }
         } catch (error) {
             console.error('Error:', error);
@@ -415,7 +415,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                 handleAddCriteria();
             } else if (criteriaMode === 'select') {
                 if (!criteriaData.CriteriaCode) {
-                    toast({ title: 'Warning', description: 'Please select a criteria', variant: 'warning' });
+                    toast({ title: 'Warning', description: 'Please select a sub area', variant: 'warning' });
                     return;
                 }
                 setCreatedIds(prev => ({ ...prev, criteriaId: criteriaData.CriteriaID }));
@@ -451,8 +451,8 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
     const steps = [
         { number: 1, label: 'Accreditation' },
         { number: 2, label: 'Area' },
-        { number: 3, label: 'Criteria' },
-        { number: 4, label: 'Evidence' },
+        { number: 3, label: 'Sub Area' },
+        { number: 4, label: 'Standard' },
         { number: 5, label: 'Complete' }
     ];
 
@@ -835,13 +835,13 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                     {currentStep === 3 && (
                         <div className="space-y-5">
                             <div>
-                                <h3 className="text-base font-semibold text-gray-900">Choose Criteria</h3>
-                                <p className="text-sm text-gray-500 mt-1">Add evaluation criteria</p>
+                                <h3 className="text-base font-semibold text-gray-900">Choose Sub Area</h3>
+                                <p className="text-sm text-gray-500 mt-1">Add evaluation sub area</p>
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">
                                 {[
-                                    { mode: 'create', icon: Plus, label: 'Create New', desc: 'Add new criteria' },
+                                    { mode: 'create', icon: Plus, label: 'Create New', desc: 'Add new sub area' },
                                     { mode: 'select', icon: Wand2, label: 'Select', desc: 'Use existing' }
                                 ].map(({ mode, icon: Icon, label, desc }) => (
                                     <button
@@ -879,7 +879,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                             {criteriaMode === 'select' && (
                                 <div className="space-y-3">
                                     <label className="block text-sm font-medium text-gray-700">
-                                        Select Criteria
+                                        Select Sub Area
                                     </label>
                                     {criteriaData.AreaID ? (
                                         availableCriteria.filter(c => String(c.AreaID) === String(criteriaData.AreaID)).length > 0 ? (
@@ -904,12 +904,12 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                                         value: crit.CriteriaCode,
                                                         label: `${crit.CriteriaCode} - ${crit.CriteriaName}`
                                                     }))}
-                                                placeholder="Select a criteria"
+                                                placeholder="Select a sub area"
                                                 size="md"
                                             />
                                         ) : (
                                             <p className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">
-                                                No criteria available for this area.
+                                                No sub areas available for this area.
                                             </p>
                                         )
                                     ) : (
@@ -925,7 +925,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                     <div className="grid grid-cols-2 gap-3">
                                         <div>
                                             <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                                                Criteria Code <span className="text-rose-500">*</span>
+                                                Sub Area Code <span className="text-rose-500">*</span>
                                             </label>
                                             <input
                                                 type="text"
@@ -947,7 +947,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                         </div>
                                         <div>
                                             <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                                                Criteria Name <span className="text-rose-500">*</span>
+                                                Sub Area Name <span className="text-rose-500">*</span>
                                             </label>
                                             <input
                                                 type="text"
@@ -972,7 +972,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                     {criteriaData.AreaID && parentCriteria.length > 0 && (
                                         <div>
                                             <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                                                Parent Criteria <span className="text-gray-400">(optional)</span>
+                                                Parent Sub Area <span className="text-gray-400">(optional)</span>
                                             </label>
                                             <CustomSelect
                                                 value={criteriaData.ParentCriteriaID}
@@ -1000,7 +1000,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                             name="Description"
                                             value={criteriaData.Description}
                                             onChange={handleCriteriaChange}
-                                            placeholder="Add criteria details..."
+                                            placeholder="Add sub area details..."
                                             rows={2}
                                             className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                                         />
@@ -1014,13 +1014,13 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                     {currentStep === 4 && (
                         <div className="space-y-5">
                             <div>
-                                <h3 className="text-base font-semibold text-gray-900">Choose Evidence</h3>
-                                <p className="text-sm text-gray-500 mt-1">Add new evidence</p>
+                                <h3 className="text-base font-semibold text-gray-900">Choose Standard</h3>
+                                <p className="text-sm text-gray-500 mt-1">Add new standard</p>
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">
                                 {[
-                                    { mode: 'create', icon: Plus, label: 'Standalone', desc: 'New evidence' },
+                                    { mode: 'create', icon: Plus, label: 'Standalone', desc: 'New standard' },
                                     { mode: 'select', icon: Wand2, label: 'Child', desc: 'Link to parent' }
                                 ].map(({ mode, icon: Icon, label, desc }) => (
                                     <button
@@ -1053,7 +1053,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                     {requirementMode === 'select' && (
                                         <div>
                                             <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                                                Parent Evidence
+                                                Parent Standard
                                             </label>
                                             {(() => {
                                                 const criteriaRequirements = availableRequirements.filter(
@@ -1076,7 +1076,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                                     />
                                                 ) : (
                                                     <p className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">
-                                                        No evidence available
+                                                        No standards available
                                                     </p>
                                                 );
                                             })()}
@@ -1085,7 +1085,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
 
                                     <div>
                                         <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                                            Evidence Code <span className="text-rose-500">*</span>
+                                            Standard Code <span className="text-rose-500">*</span>
                                         </label>
                                         <input
                                             type="text"
@@ -1114,7 +1114,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                             name="Description"
                                             value={requirementData.Description}
                                             onChange={handleRequirementChange}
-                                            placeholder="Describe the evidence..."
+                                            placeholder="Describe the standard..."
                                             rows={2}
                                             className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                                         />
@@ -1148,12 +1148,12 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                 {criteriaData.CriteriaName && (
                                     <p className="flex items-center gap-2">
                                         <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                                        <strong>Criteria:</strong> {criteriaData.CriteriaName}
+                                        <strong>Sub Area:</strong> {criteriaData.CriteriaName}
                                     </p>
                                 )}
                                 <p className="flex items-center gap-2">
                                     <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-                                    <strong>Evidence:</strong> {requirementData.RequirementCode}
+                                    <strong>Standard:</strong> {requirementData.RequirementCode}
                                 </p>
                             </div>
                         </div>
@@ -1240,7 +1240,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                                         <div className="flex items-center gap-2">
                                                             <BarChart2 size={16} className="text-blue-200 shrink-0" />
                                                             <div className="flex-1 min-w-0">
-                                                                <p className="text-[10px] font-medium text-blue-100 uppercase">Criteria</p>
+                                                                <p className="text-[10px] font-medium text-blue-100 uppercase">Sub Area</p>
                                                                 <p className="text-sm font-semibold truncate">{criteriaData.CriteriaName}</p>
                                                             </div>
                                                             <Check size={14} className="text-blue-200 flex-shrink-0" />
@@ -1254,7 +1254,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                                         <div className="flex items-center gap-2 text-gray-400">
                                                             <BarChart2 size={16} className="text-gray-400 shrink-0" />
                                                             <div className="flex-1">
-                                                                <p className="text-[10px] font-medium uppercase">Criteria</p>
+                                                                <p className="text-[10px] font-medium uppercase">Sub Area</p>
                                                                 <p className="text-xs">Not selected</p>
                                                             </div>
                                                         </div>
@@ -1270,7 +1270,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                                                     <Check size={12} className="text-emerald-600" />
                                                                 </div>
                                                                 <div className="flex-1 min-w-0">
-                                                                    <p className="text-[10px] font-medium text-emerald-600 uppercase">Evidence</p>
+                                                                    <p className="text-[10px] font-medium text-emerald-600 uppercase">Standard</p>
                                                                     <p className="text-sm font-semibold text-gray-800 truncate">{requirementData.RequirementCode}</p>
                                                                 </div>
                                                             </div>
@@ -1283,7 +1283,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                                             <div className="flex items-center gap-2 text-gray-400">
                                                                 <FileCheck size={16} className="text-gray-400 shrink-0" />
                                                                 <div className="flex-1">
-                                                                    <p className="text-[10px] font-medium uppercase">Evidence</p>
+                                                                    <p className="text-[10px] font-medium uppercase">Standard</p>
                                                                     <p className="text-xs">Not created</p>
                                                                 </div>
                                                             </div>

@@ -322,8 +322,51 @@ export default function AddAreaPop({
 				});
 
 				setEventOffices(filteredOffices);
-				setAssignmentCriteriaByArea({});
-				setAssignmentRequirementsByCriteria({});
+
+				// Preload all criteria and requirements for this event in batch so searching (e.g. A.1) works immediately
+				let eventCriteria = [];
+				let eventRequirements = [];
+				try {
+					const [critRes, reqRes] = await Promise.all([
+						criteriaAPI.getByEvent(event.EventID).catch(() => []),
+						requirementsAPI.getAllRequirements({ eventId: event.EventID }).catch(() => ({ data: [] })),
+					]);
+					eventCriteria = Array.isArray(critRes) ? critRes : Array.isArray(critRes?.data) ? critRes.data : [];
+					eventRequirements = Array.isArray(reqRes) ? reqRes : Array.isArray(reqRes?.data) ? reqRes.data : [];
+				} catch (preErr) {
+					console.warn('Could not preload full criteria/requirements:', preErr);
+				}
+
+				// Organize criteria by area
+				const critByArea = {};
+				eventCriteria.forEach((c) => {
+					const aId = Number(c.AreaID || c.area_id);
+					if (aId) {
+						if (!critByArea[aId]) critByArea[aId] = [];
+						critByArea[aId].push(c);
+					}
+				});
+
+				// Organize requirements by criteria
+				const reqsByCrit = {};
+				eventRequirements.forEach((r) => {
+					const cId = Number(r.CriteriaID || r.criteria_id);
+					if (cId) {
+						if (!reqsByCrit[cId]) reqsByCrit[cId] = [];
+						reqsByCrit[cId].push(r);
+					}
+				});
+
+				// Ensure all criteria have a requirements entry so requirementsLoaded is true
+				eventCriteria.forEach((c) => {
+					const cId = Number(c.CriteriaID || c.id);
+					if (cId && !reqsByCrit[cId]) {
+						reqsByCrit[cId] = [];
+					}
+				});
+
+				setAssignmentCriteriaByArea(critByArea);
+				setAssignmentRequirementsByCriteria(reqsByCrit);
 				setLoadingAssignmentCriteria(new Set());
 				setLoadingAssignmentRequirements(new Set());
 				setSelectedOfficeIds([]);
@@ -439,11 +482,11 @@ export default function AddAreaPop({
 		setSuccess('');
 		// If a parent criteria is selected, child criteria do not require a CriteriaCode
 		if (!criteriaForm.CriteriaName.trim()) {
-			showError('Criteria name is required.');
+			showError('Sub area name is required.');
 			return;
 		}
 		if (!criteriaForm.ParentCriteriaID && !criteriaForm.CriteriaCode.trim()) {
-			showError('Criteria code is required for top-level criteria.');
+			showError('Sub area code is required for top-level sub areas.');
 			return;
 		}
 		try {
@@ -453,7 +496,7 @@ export default function AddAreaPop({
 			if (newCode) {
 				const duplicate = (criteriaOptions || []).find((c) => String(c.CriteriaCode || '').trim().toLowerCase() === newCode && Number(c.EventID) === Number(event.EventID));
 				if (duplicate) {
-					showError('A criteria with this code already exists for this event.');
+					showError('A sub area with this code already exists for this event.');
 					setSaving(false);
 					return;
 				}
@@ -471,9 +514,9 @@ export default function AddAreaPop({
 					});
 			// keep last chosen AreaID and ParentCriteriaID after saving; clear other fields
 			setCriteriaForm({ CriteriaCode: '', CriteriaName: '', Description: '', AreaID: selectedArea || '', ParentCriteriaID: selectedParent || '' });
-			setMessage('Criteria added successfully.');
+			setMessage('Sub area added successfully.');
 		} catch (err) {
-			showError(err?.message || 'Failed to add criteria.');
+			showError(err?.message || 'Failed to add sub area.');
 		} finally {
 			setSaving(false);
 		}
@@ -484,7 +527,7 @@ export default function AddAreaPop({
 		setError('');
 		setSuccess('');
 		if (!requirementForm.Description.trim() || !requirementForm.CriteriaID) {
-			showError('Requirement description and criteria are required.');
+			showError('Standard description and sub area are required.');
 			return;
 		}
 
@@ -716,7 +759,7 @@ export default function AddAreaPop({
 		}
 
 		if (normalizedRequirementIds.length === 0) {
-			showError('Select at least one requirement, criteria, or area.');
+			showError('Select at least one standard, sub area, or area.');
 			return;
 		}
 

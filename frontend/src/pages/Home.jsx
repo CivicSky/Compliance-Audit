@@ -10,6 +10,7 @@ import {
 } from "../utils/api";
 import api from "../utils/api";
 import { Link } from "react-router-dom";
+import { isAcademicEntity } from "../utils/entityHelpers";
 import UnifiedSetupWizard from "../components/UnifiedSetupWizard/UnifiedSetupWizard";
 import { DashboardSkeleton } from "../components/UI/Skeleton";
 import DeficiencyTracker from "../components/Home/DeficiencyTracker";
@@ -165,6 +166,7 @@ export default function Home() {
         compiledOffices,
         notCompiledOffices,
         partialOffices,
+        academicSummary,
         activeEventProgress,
         complianceSummary,
         completionRate,
@@ -194,12 +196,14 @@ export default function Home() {
         const byEvent = {};
         const officeNameMap = {};
         const eventNameMap = {};
+        const officeByIdMap = new Map();
 
         for (const office of offices) {
             const officeId = getOfficeId(office);
             if (officeId !== undefined && officeId !== null) {
-                officeNameMap[String(officeId)] =
-                    getOfficeName(office) || `Office ${officeId}`;
+                const idStr = String(officeId);
+                officeByIdMap.set(idStr, office);
+                officeNameMap[idStr] = getOfficeName(office) || `Office ${officeId}`;
             }
         }
 
@@ -246,17 +250,80 @@ export default function Home() {
             }
         }
 
-        let done = 0;
-        let notDone = 0;
-        let partial = 0;
+        // Helper to accurately classify any entity into: 'compiled' | 'partial' | 'notCompiled'
+        const classifyOffice = (office, statuses = []) => {
+            const statusStr = String(office?.overall_status || office?.OverallStatus || '').trim().toLowerCase();
+            const percent = Number(office?.compliance_percent ?? office?.CompliancePercent ?? -1);
 
-        Object.values(byOffice).forEach((statuses) => {
-            const allCompiled = statuses.every((s) => s === 5);
-            const allNotCompiled = statuses.every((s) => s === 3);
-            if (allCompiled) done += 1;
-            else if (allNotCompiled) notDone += 1;
-            else partial += 1;
-        });
+            if (statusStr === 'complied' || statusStr === 'fully complied' || percent >= 100) {
+                return 'compiled';
+            }
+            if (statusStr === 'partially complied' || statusStr === 'partial' || (percent > 0 && percent < 100)) {
+                return 'partial';
+            }
+            if (statusStr === 'not complied' || percent === 0) {
+                if (statuses.length > 0) {
+                    const allCompiled = statuses.every((s) => s === 5);
+                    const hasComplied = statuses.some((s) => s === 5);
+                    const hasPartial = statuses.some((s) => s === 4);
+                    if (allCompiled) return 'compiled';
+                    if (hasComplied || hasPartial) return 'partial';
+                }
+                return 'notCompiled';
+            }
+
+            if (statuses.length > 0) {
+                const allCompiled = statuses.every((s) => s === 5);
+                const hasComplied = statuses.some((s) => s === 5);
+                const hasPartial = statuses.some((s) => s === 4);
+                if (allCompiled) return 'compiled';
+                if (hasComplied || hasPartial) return 'partial';
+                return 'notCompiled';
+            }
+
+            return 'notCompiled';
+        };
+
+        // Classify all monitored entities (combining Academic Programs and Non-Academic Offices)
+        const allEvaluatedOffices = offices.length > 0
+            ? offices
+            : Object.keys(byOffice).map((id) => ({ OfficeID: id, id }));
+
+        let done = 0;
+        let partial = 0;
+        let notDone = 0;
+        let academicCount = 0;
+        let nonAcademicCount = 0;
+        let academicPartial = 0;
+        let nonAcademicPartial = 0;
+        let academicDone = 0;
+        let nonAcademicDone = 0;
+        let academicNotDone = 0;
+        let nonAcademicNotDone = 0;
+
+        for (const office of allEvaluatedOffices) {
+            const officeIdStr = String(getOfficeId(office));
+            const statuses = byOffice[officeIdStr] || [];
+            const bucket = classifyOffice(office, statuses);
+            const isAcademic = isAcademicEntity(office);
+
+            if (isAcademic) academicCount++;
+            else nonAcademicCount++;
+
+            if (bucket === 'compiled') {
+                done++;
+                if (isAcademic) academicDone++;
+                else nonAcademicDone++;
+            } else if (bucket === 'partial') {
+                partial++;
+                if (isAcademic) academicPartial++;
+                else nonAcademicPartial++;
+            } else {
+                notDone++;
+                if (isAcademic) academicNotDone++;
+                else nonAcademicNotDone++;
+            }
+        }
 
         const activeEvents = events.filter((event) => {
             const eventStatus = String(event?.status || event?.Status || 'active').toLowerCase().trim();
@@ -266,8 +333,11 @@ export default function Home() {
         const activeEventProgressList = activeEvents.map((event) => {
             const eventId = String(getEventId(event) ?? '');
 
-            const eventOfficeIds = offices
-                .filter((office) => String(getOfficeEventId(office) ?? '') === eventId)
+            const eventOffices = offices.filter(
+                (office) => String(getOfficeEventId(office) ?? '') === eventId
+            );
+
+            const eventOfficeIds = eventOffices
                 .map((office) => String(getOfficeId(office) ?? ''))
                 .filter(Boolean);
 
@@ -304,18 +374,13 @@ export default function Home() {
                 return eventRequirementSet.has(requirementId);
             });
 
-            const classifyStatusCollection = (statuses) => {
-                if (statuses.length === 0) return 'notCompiled';
-                const allCompiled = statuses.every((status) => status === 5);
-                const allNotCompiled = statuses.every((status) => status === 3);
-                if (allCompiled) return 'compiled';
-                if (allNotCompiled) return 'notCompiled';
-                return 'partial';
-            };
-
             let compiledOfficeCount = 0;
             let partialOfficeCount = 0;
             let notCompiledOfficeCount = 0;
+            let eventAcademicCount = 0;
+            let eventNonAcademicCount = 0;
+            let eventAcademicPartial = 0;
+            let eventNonAcademicPartial = 0;
 
             const officeStatusesMap = new Map();
             for (const officeId of eventOfficeIds) {
@@ -329,12 +394,24 @@ export default function Home() {
                 officeStatusesMap.get(officeId).push(Number.isFinite(status) ? status : 3);
             }
 
-            for (const officeId of eventOfficeIds) {
+            for (const office of eventOffices) {
+                const officeId = String(getOfficeId(office));
                 const statusesForOffice = officeStatusesMap.get(officeId) || [];
-                const officeBucket = classifyStatusCollection(statusesForOffice);
-                if (officeBucket === 'compiled') compiledOfficeCount += 1;
-                else if (officeBucket === 'partial') partialOfficeCount += 1;
-                else notCompiledOfficeCount += 1;
+                const officeBucket = classifyOffice(office, statusesForOffice);
+                const isAcademic = isAcademicEntity(office);
+
+                if (isAcademic) eventAcademicCount += 1;
+                else eventNonAcademicCount += 1;
+
+                if (officeBucket === 'compiled') {
+                    compiledOfficeCount += 1;
+                } else if (officeBucket === 'partial') {
+                    partialOfficeCount += 1;
+                    if (isAcademic) eventAcademicPartial += 1;
+                    else eventNonAcademicPartial += 1;
+                } else {
+                    notCompiledOfficeCount += 1;
+                }
             }
 
             let compiledRequirements = 0;
@@ -344,16 +421,20 @@ export default function Home() {
             for (const row of rowsForEvent) {
                 const status = Number(getComplianceStatus(row));
                 if (status === 5) compiledRequirements += 1;
-                else if (status === 3) notCompiledRequirements += 1;
-                else partialRequirements += 1;
+                else if (status === 4) partialRequirements += 1;
+                else notCompiledRequirements += 1;
             }
 
             const totalOfficesForEvent = eventOfficeIds.length;
             const totalRequirementRows = rowsForEvent.length;
-            const rawCompletionPercent = totalRequirementRows > 0
-                ? Math.round((compiledRequirements / totalRequirementRows) * 100)
+            const rawEventScore = totalRequirementRows > 0
+                ? ((compiledRequirements * 100) + (partialRequirements * 50)) / totalRequirementRows
                 : 0;
-            const completionPercent = Math.min(100, Math.max(0, rawCompletionPercent));
+            const completionPercent = rawEventScore === 0
+                ? 0
+                : rawEventScore < 1
+                ? Number(rawEventScore.toFixed(1))
+                : (rawEventScore % 1 === 0 ? Number(rawEventScore.toFixed(0)) : Number(rawEventScore.toFixed(1)));
 
             return {
                 id: eventId,
@@ -368,6 +449,10 @@ export default function Home() {
                     compiled: compiledOfficeCount,
                     partial: partialOfficeCount,
                     notCompiled: notCompiledOfficeCount,
+                    academicCount: eventAcademicCount,
+                    nonAcademicCount: eventNonAcademicCount,
+                    academicPartial: eventAcademicPartial,
+                    nonAcademicPartial: eventNonAcademicPartial,
                 },
                 requirementStatus: {
                     compiled: compiledRequirements,
@@ -379,23 +464,42 @@ export default function Home() {
 
         const totalRecords = complianceData.length;
         const compiledRecords = complianceData.filter((item) => Number(item?.Status) === 5).length;
+        const partialRecords = complianceData.filter((item) => Number(item?.Status) === 4).length;
         const notCompiledRecords = complianceData.filter((item) => Number(item?.Status) === 3).length;
-        const partialRecords = Math.max(totalRecords - compiledRecords - notCompiledRecords, 0);
-        const completion = totalRecords > 0 ? Math.round((compiledRecords / totalRecords) * 100) : 0;
+
+        const rawCompletion = totalRecords > 0
+            ? ((compiledRecords * 100) + (partialRecords * 50)) / totalRecords
+            : 0;
+
+        const completionRate = rawCompletion === 0
+            ? 0
+            : rawCompletion < 1
+            ? Number(rawCompletion.toFixed(1))
+            : (rawCompletion % 1 === 0 ? Number(rawCompletion.toFixed(0)) : Number(rawCompletion.toFixed(1)));
 
         return {
             officeMap: byOffice,
             compiledOffices: done,
             notCompiledOffices: notDone,
             partialOffices: partial,
+            academicSummary: {
+                totalAcademic: academicCount,
+                totalNonAcademic: nonAcademicCount,
+                academicPartial,
+                nonAcademicPartial,
+                academicDone,
+                nonAcademicDone,
+                academicNotDone,
+                nonAcademicNotDone,
+            },
             activeEventProgress: activeEventProgressList,
             complianceSummary: {
                 totalRecords,
                 compiledRecords,
-                notCompiledRecords,
                 partialRecords,
+                notCompiledRecords,
             },
-            completionRate: completion,
+            completionRate,
         };
     }, [complianceData, offices, events, criteria, requirements]);
 
@@ -532,11 +636,11 @@ export default function Home() {
                         <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
                             <div
                                 className="h-full rounded-full bg-emerald-500 transition-all duration-500"
-                                style={{ width: `${completionRate}%` }}
+                                style={{ width: `${completionRate > 0 ? Math.max(completionRate, 2) : 0}%` }}
                             />
                         </div>
                         <div className="mt-1.5 flex justify-between text-[11px] text-slate-500">
-                            <span>{complianceSummary.compiledRecords} compliant</span>
+                            <span>{complianceSummary.compiledRecords} compliant{complianceSummary.partialRecords > 0 ? ` (${complianceSummary.partialRecords} partial)` : ''}</span>
                             <span>{complianceSummary.totalRecords} total</span>
                         </div>
                     </div>
@@ -551,14 +655,20 @@ export default function Home() {
                                 <span className="text-3xl font-extrabold tracking-tight text-slate-900">{officesCount}</span>
                                 <span className="text-xs font-medium text-slate-500">units</span>
                             </div>
+                            <p className="text-[10px] text-slate-400 mt-0.5">
+                                {academicSummary?.totalAcademic || 0} Academic · {academicSummary?.totalNonAcademic || 0} Non-Academic
+                            </p>
                         </div>
                         <div className="rounded-lg bg-slate-100 p-2 text-slate-600">
                             <Building2 size={20} />
                         </div>
                     </div>
-                    <div className="mt-3.5 flex items-center gap-2 text-xs">
+                    <div className="mt-3.5 flex flex-wrap items-center gap-1.5 text-xs">
                         <span className="inline-flex items-center gap-1 font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200/60">
-                            {compiledOffices} Fully Compiled
+                            {compiledOffices} Done
+                        </span>
+                        <span className="inline-flex items-center gap-1 font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200/60" title={`${academicSummary?.academicPartial || 0} Academic, ${academicSummary?.nonAcademicPartial || 0} Non-Academic`}>
+                            {partialOffices} Partial
                         </span>
                         <span className="inline-flex items-center gap-1 font-medium text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200/60">
                             {notCompiledOffices} Deficient
@@ -581,7 +691,7 @@ export default function Home() {
                         </div>
                     </div>
                     <div className="mt-3.5 flex items-center justify-between text-xs text-slate-500 border-t border-slate-100 pt-2">
-                        <span>{criteria.length} defined criteria</span>
+                        <span>{criteria.length} defined sub areas</span>
                         <Link to="/home/events" className="inline-flex items-center gap-0.5 font-medium text-blue-600 hover:text-blue-700">
                             View <ArrowUpRight size={12} />
                         </Link>
@@ -619,7 +729,9 @@ export default function Home() {
                         <div className="flex items-center justify-between mb-4">
                             <div>
                                 <h2 className="text-base font-bold text-slate-900">Institutional Compliance Ratio</h2>
-                                <p className="text-xs text-slate-500">Distribution across all monitored offices</p>
+                                <p className="text-xs text-slate-500">
+                                    Distribution across {academicSummary?.totalAcademic || 0} academic & {academicSummary?.totalNonAcademic || 0} non-academic units
+                                </p>
                             </div>
                             <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded-md">
                                 {officesCount} Offices
@@ -675,7 +787,9 @@ export default function Home() {
 
                     <div className="mt-4 rounded-lg bg-slate-50 p-3 text-xs text-slate-600 border border-slate-100 flex items-center justify-between">
                         <span>Total evaluated requirements: <strong>{complianceSummary.totalRecords}</strong></span>
-                        <span className="text-emerald-700 font-semibold">{complianceSummary.compiledRecords} Verified</span>
+                        <span className="text-emerald-700 font-semibold">
+                            {complianceSummary.compiledRecords} Verified{complianceSummary.partialRecords > 0 ? ` · ${complianceSummary.partialRecords} Partial` : ''}
+                        </span>
                     </div>
                 </div>
 
@@ -782,7 +896,7 @@ export default function Home() {
                                     <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
                                         <div
                                             className="h-full rounded-full bg-emerald-500 transition-all duration-300"
-                                            style={{ width: `${eventItem.completionPercent}%` }}
+                                            style={{ width: `${eventItem.completionPercent > 0 ? Math.max(eventItem.completionPercent, 2) : 0}%` }}
                                         />
                                     </div>
 
@@ -791,14 +905,19 @@ export default function Home() {
                                         <div className="rounded-lg border border-slate-200/70 bg-white py-2 px-1">
                                             <span className="block text-[11px] text-slate-400">Offices</span>
                                             <span className="font-bold text-slate-800 text-sm">{eventItem.totalOffices}</span>
+                                            <span className="block text-[9px] text-slate-400 truncate">
+                                                {eventItem.officeStatus.academicCount || 0} Acad · {eventItem.officeStatus.nonAcademicCount || 0} Non
+                                            </span>
                                         </div>
                                         <div className="rounded-lg border border-slate-200/70 bg-white py-2 px-1">
-                                            <span className="block text-[11px] text-slate-400">Criteria</span>
+                                            <span className="block text-[11px] text-slate-400">Sub Areas</span>
                                             <span className="font-bold text-slate-800 text-sm">{eventItem.totalCriteria}</span>
+                                            <span className="block text-[9px] text-slate-400">Categories</span>
                                         </div>
                                         <div className="rounded-lg border border-slate-200/70 bg-white py-2 px-1">
                                             <span className="block text-[11px] text-slate-400">Requirements</span>
                                             <span className="font-bold text-slate-800 text-sm">{eventItem.totalRequirements}</span>
+                                            <span className="block text-[9px] text-slate-400">Standards</span>
                                         </div>
                                     </div>
                                 </div>
@@ -809,7 +928,10 @@ export default function Home() {
                                         <span className="h-2 w-2 rounded-full bg-emerald-500" />
                                         <span>{eventItem.officeStatus.compiled} Done</span>
                                     </div>
-                                    <div className="flex items-center gap-1.5">
+                                    <div 
+                                        className="flex items-center gap-1.5 cursor-help"
+                                        title={`${eventItem.officeStatus.academicPartial || 0} Academic Program, ${eventItem.officeStatus.nonAcademicPartial || 0} Non-Academic Office`}
+                                    >
                                         <span className="h-2 w-2 rounded-full bg-amber-500" />
                                         <span>{eventItem.officeStatus.partial} Partial</span>
                                     </div>

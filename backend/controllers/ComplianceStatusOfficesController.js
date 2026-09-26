@@ -3,6 +3,9 @@ const db = require('../db');
 // Fetch all compliance status offices
 exports.getAllComplianceStatusOffices = async (req, res) => {
 	try {
+		const roleId = Number(req.user?.roleId || 0);
+		const userId = Number(req.user?.userId || 0);
+
 		const [results] = await db.query('SELECT * FROM compliancestatusoffices');
 		res.json(results);
 	} catch (err) {

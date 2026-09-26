@@ -71,14 +71,26 @@ const deleteCriteria = async (req, res) => {
 // Get all criteria
 const getAllCriteria = async (req, res) => {
   try {
+    const roleId = Number(req.user?.roleId || 0);
+    const userId = Number(req.user?.userId || 0);
+
+    let auditorFilter = '';
+    const params = [];
+
+    if (roleId === 4) {
+      auditorFilter = ' WHERE c.AreaID IN (SELECT area_id FROM auditor_area_assignments WHERE auditor_user_id = ?)';
+      params.push(userId);
+    }
+
     const [criteria] = await db.query(`
       SELECT c.*, e.EventName, e.EventCode, a.AreaID, a.AreaCode, a.AreaName, parent.CriteriaCode AS ParentCriteriaCode
       FROM criteria c
       LEFT JOIN Events e ON c.EventID = e.EventID
       LEFT JOIN areas a ON c.AreaID = a.AreaID
       LEFT JOIN criteria parent ON c.ParentCriteriaID = parent.CriteriaID
+      ${auditorFilter}
       ORDER BY c.CriteriaCode ASC
-    `);
+    `, params);
     res.json({
       success: true,
       data: criteria
@@ -96,15 +108,26 @@ const getAllCriteria = async (req, res) => {
 const getCriteriaByEvent = async (req, res) => {
   try {
     const { eventId } = req.params;
+    const roleId = Number(req.user?.roleId || 0);
+    const userId = Number(req.user?.userId || 0);
+
+    let auditorFilter = '';
+    const params = [eventId];
+
+    if (roleId === 4) {
+      auditorFilter = ' AND c.AreaID IN (SELECT area_id FROM auditor_area_assignments WHERE auditor_user_id = ?)';
+      params.push(userId);
+    }
+
     const [criteria] = await db.query(`
       SELECT c.*, e.EventName, e.EventCode, a.AreaID, a.AreaCode, a.AreaName, parent.CriteriaCode AS ParentCriteriaCode
       FROM criteria c
       LEFT JOIN Events e ON c.EventID = e.EventID
       LEFT JOIN areas a ON c.AreaID = a.AreaID
       LEFT JOIN criteria parent ON c.ParentCriteriaID = parent.CriteriaID
-      WHERE c.EventID = ?
+      WHERE c.EventID = ? ${auditorFilter}
       ORDER BY c.CriteriaCode ASC
-    `, [eventId]);
+    `, params);
     res.json({
       success: true,
       data: criteria

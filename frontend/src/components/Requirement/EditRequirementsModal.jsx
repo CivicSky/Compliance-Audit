@@ -128,7 +128,7 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, use
   const validateForm = () => {
     const newErrors = {};
     if (!formData.RequirementCode.trim()) {
-      newErrors.RequirementCode = 'Evidence code is required';
+      newErrors.RequirementCode = 'Standard code is required';
     }
     if (!formData.Description.trim()) {
       newErrors.Description = 'Description is required';
@@ -173,8 +173,8 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, use
       <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl mx-4 max-h-[95vh] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-white">
           <div>
-            <h2 className="text-lg font-bold tracking-tight text-slate-800">{isAdmin ? 'Edit Evidence' : 'View Evidence'}</h2>
-            <p className="mt-0.5 text-xs text-slate-500">Configure accreditation evidence parameters.</p>
+            <h2 className="text-lg font-bold tracking-tight text-slate-800">{isAdmin ? 'Edit Standard' : 'View Standard'}</h2>
+            <p className="mt-0.5 text-xs text-slate-500">Configure accreditation standard parameters.</p>
           </div>
           <button
             type="button"
@@ -196,7 +196,7 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, use
             {/* Parent Requirement Dropdown */}
             <div className="mb-4">
               <label htmlFor="ParentRequirementCode" className="block text-sm font-semibold text-gray-800 mb-1">
-                Parent Evidence (Optional)
+                Parent Standard (Optional)
               </label>
               <CustomSelect
                 id="ParentRequirementCode"
@@ -204,26 +204,26 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, use
                 value={formData.ParentRequirementCode}
                 onChange={(val) => handleInputChange({ target: { name: 'ParentRequirementCode', value: val } })}
                 options={[
-                  { value: '', label: !formData.CriteriaID ? 'Select a criteria first' : 'None (Top-level evidence)' },
+                  { value: '', label: !formData.CriteriaID ? 'Select a sub area first' : 'None (Top-level standard)' },
                   ...requirementsList.map((req) => ({
                     value: req.RequirementCode,
                     label: `${req.RequirementCode} - ${req.Description?.substring(0, 50) || ''}${req.Description?.length > 50 ? '...' : ''}`
                   }))
                 ]}
-                placeholder={!formData.CriteriaID ? 'Select a criteria first' : 'None (Top-level evidence)'}
+                placeholder={!formData.CriteriaID ? 'Select a sub area first' : 'None (Top-level standard)'}
                 disabled={isSubmitting || !formData.CriteriaID || !isAdmin}
               />
               {!formData.CriteriaID ? (
                 <p className="text-gray-500 text-xs mt-1">
-                  Select a criteria to see available parent evidence
+                  Select a sub area to see available parent standards
                 </p>
               ) : requirementsList.length === 0 ? (
                 <p className="text-yellow-600 text-xs mt-1">
-                  No other evidence in this criteria
+                  No other standards in this sub area
                 </p>
               ) : (
                 <p className="text-green-600 text-xs mt-1">
-                  Loaded {requirementsList.length} evidence item{requirementsList.length !== 1 ? 's' : ''} for this criteria
+                  Loaded {requirementsList.length} standard item{requirementsList.length !== 1 ? 's' : ''} for this sub area
                 </p>
               )}
             </div>
@@ -231,7 +231,7 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, use
             {/* Requirement Code */}
             <div className="mb-4">
               <label htmlFor="RequirementCode" className="block text-sm font-semibold text-gray-800 mb-1">
-                Evidence Code *
+                Standard Code *
               </label>
               <input
                 type="text"
@@ -269,7 +269,7 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, use
                 className={`w-full rounded-md bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none ${
                   errors.Description ? 'border-red-500' : 'border border-slate-200'
                 }`}
-                placeholder="Enter a detailed description of this evidence"
+                placeholder="Enter a detailed description of this standard"
                 disabled={isSubmitting || !isAdmin}
               />
               {errors.Description && (

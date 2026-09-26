@@ -1,8 +1,8 @@
 export default function ModalHeader({ event, onClose, mainMode }) {
 	const subtitle =
 		mainMode === 'assign'
-			? 'Assign evidence from your accreditation structure to one or more offices.'
-			: 'Create and organize areas, criteria, and evidence.';
+			? 'Assign standards from your accreditation structure to one or more offices.'
+			: 'Create and organize areas, sub areas, and standards.';
 
 	return (
 		<header className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200/60 bg-white px-6 py-5">

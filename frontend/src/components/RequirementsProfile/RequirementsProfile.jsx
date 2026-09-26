@@ -213,8 +213,8 @@ const RequirementsP = forwardRef(
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
               <h3 className="text-lg font-medium text-gray-900 mb-2">No Results Found</h3>
-              <p className="text-gray-600">No evidence matches your search for "{searchTerm}".</p>
-              <p className="text-gray-500 text-sm mt-2">Try adjusting your search terms or browse all evidence.</p>
+              <p className="text-gray-600">No standards match your search for "{searchTerm}".</p>
+              <p className="text-gray-500 text-sm mt-2">Try adjusting your search terms or browse all standards.</p>
             </div>
           </div>
         );
@@ -225,8 +225,8 @@ const RequirementsP = forwardRef(
               <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No Evidence Found</h3>
-              <p className="text-gray-600">No evidence available yet.</p>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No Standards Found</h3>
+              <p className="text-gray-600">No standards available yet.</p>
             </div>
           </div>
         );
@@ -239,7 +239,7 @@ const RequirementsP = forwardRef(
         {/* Search Results Counter */}
         {searchTerm.trim() && (
           <div className="text-sm text-gray-600 mb-4">
-            Showing {filteredRequirements.length} of {requirements.length} evidence items
+            Showing {filteredRequirements.length} of {requirements.length} standard items
             {filteredRequirements.length !== requirements.length && ` matching "${searchTerm}"`}
           </div>
         )}
@@ -270,10 +270,10 @@ const RequirementsP = forwardRef(
                   {/* Group by Criteria */}
                   {(() => {
                   const criteriaGroups = areaData.requirements.reduce((acc, req) => {
-                    const criteriaCode = req.CriteriaCode || "No Criteria";
+                    const criteriaCode = req.CriteriaCode || "No Sub Area";
                     if (!acc[criteriaCode]) {
                       acc[criteriaCode] = {
-                        criteriaName: req.CriteriaName || "Unknown Criteria",
+                        criteriaName: req.CriteriaName || "Unknown Sub Area",
                         requirements: []
                       };
                     }

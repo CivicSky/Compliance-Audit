@@ -52,7 +52,7 @@ export default function AddCriteriaForm({
 			</div>
 
 			<div>
-				<label className="mb-1 block text-xs font-semibold text-stone-600">Parent criteria (optional)</label>
+				<label className="mb-1 block text-xs font-semibold text-stone-600">Parent sub area (optional)</label>
 				<CustomSelect
 					size="md"
 					value={criteriaForm.ParentCriteriaID}
@@ -69,7 +69,7 @@ export default function AddCriteriaForm({
 				/>
 				<div className="mt-2">
 					<LongSelectPreview
-						label="Selected parent criteria"
+						label="Selected parent sub area"
 						title={
 							selectedParent
 								? selectedParent.CriteriaCode
@@ -78,16 +78,16 @@ export default function AddCriteriaForm({
 								: null
 						}
 						body={selectedParent?.Description || null}
-						emptyHint={criteriaForm.AreaID ? 'No parent selected — this will be a top-level criteria.' : null}
+						emptyHint={criteriaForm.AreaID ? 'No parent selected — this will be a top-level sub area.' : null}
 					/>
 				</div>
 			</div>
 
 			<div>
-				<label className="mb-1 block text-xs font-semibold text-stone-600">Criteria code</label>
+				<label className="mb-1 block text-xs font-semibold text-stone-600">Sub area code</label>
 				<input
 					className={fieldClass}
-					placeholder={criteriaForm.ParentCriteriaID ? 'No code required for child criteria' : 'Criteria code'}
+					placeholder={criteriaForm.ParentCriteriaID ? 'No code required for child sub area' : 'Sub area code'}
 					value={criteriaForm.CriteriaCode}
 					onChange={(e) => setCriteriaForm((prev) => ({ ...prev, CriteriaCode: (e.target.value || '').toUpperCase() }))}
 					disabled={!!criteriaForm.ParentCriteriaID}
@@ -95,10 +95,10 @@ export default function AddCriteriaForm({
 			</div>
 
 			<div>
-				<label className="mb-1 block text-xs font-semibold text-stone-600">Criteria name</label>
+				<label className="mb-1 block text-xs font-semibold text-stone-600">Sub area name</label>
 				<input
 					className={fieldClass}
-					placeholder="Criteria name"
+					placeholder="Sub area name"
 					value={criteriaForm.CriteriaName}
 					onChange={(e) => setCriteriaForm((prev) => ({ ...prev, CriteriaName: e.target.value }))}
 				/>
@@ -106,7 +106,7 @@ export default function AddCriteriaForm({
 
 			<div className={formFooterClass}>
 				<button type="submit" disabled={saving} className={saveButtonClass}>
-					{saving ? 'Saving…' : 'Save criteria'}
+					{saving ? 'Saving…' : 'Save sub area'}
 				</button>
 			</div>
 		</form>

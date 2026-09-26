@@ -29,8 +29,8 @@ export default function AuditLogs() {
     const entityAliases = {
         events: "Event",
         areas: "Area",
-        criteria: "Criteria",
-        requirements: "Requirement",
+        criteria: "Sub Area",
+        requirements: "Standard",
         offices: "Office",
         officeheads: "Office Personnel",
         users: "User",
@@ -252,17 +252,17 @@ export default function AuditLogs() {
         }
 
         if (/^CriteriaAdded$/i.test(rawAction)) {
-            const criteriaLabel = getCriteriaLabel(details) || "Criteria";
+            const criteriaLabel = getCriteriaLabel(details) || "Sub Area";
             const eventLabel = getEventLabel(details);
-            return `Created Criteria ${criteriaLabel}${eventLabel ? ` under ${eventLabel}` : ""}`;
+            return `Created Sub Area ${criteriaLabel}${eventLabel ? ` under ${eventLabel}` : ""}`;
         }
 
         if (/^RequirementAdded$/i.test(rawAction)) {
-            const requirementLabel = details?.RequirementCode || details?.RequirementID || "Requirement";
+            const requirementLabel = details?.RequirementCode || details?.RequirementID || "Standard";
             const eventLabel = getEventLabel(details);
             const criteriaLabel = getCriteriaLabel(details);
             const underLabel = [eventLabel, criteriaLabel].filter(Boolean).join(" / ");
-            return `Created Requirement ${requirementLabel}${underLabel ? ` under ${underLabel}` : ""}`;
+            return `Created Standard ${requirementLabel}${underLabel ? ` under ${underLabel}` : ""}`;
         }
 
         if (httpMatch) {

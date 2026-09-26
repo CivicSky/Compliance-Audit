@@ -3,6 +3,7 @@ import { X, Loader2, Search, Users } from 'lucide-react';
 import { officeHeadsAPI, usersAPI } from '../../utils/api';
 import { useModal } from "../UI/ModalProvider";
 import { API_BASE_URL } from '../../utils/apiBase';
+import SmartUserAvatar from '../UI/SmartUserAvatar';
 
 export default function AddOfficeHeadModal({ isOpen, onClose, onSuccess }) {
     const [availableUsers, setAvailableUsers] = useState([]);
@@ -171,7 +172,7 @@ export default function AddOfficeHeadModal({ isOpen, onClose, onSuccess }) {
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 placeholder="Search users by name, email, or department..."
-                                className="w-full px-3 py-2 pl-9 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
+                                className="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
                             />
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
                         </div>
@@ -226,22 +227,13 @@ export default function AddOfficeHeadModal({ isOpen, onClose, onSuccess }) {
                                             />
                                             <div className="ml-3 flex items-center flex-1 min-w-0">
                                                 <div className="shrink-0">
-                                                    {user.ProfilePic ? (
-                                                        <img
-                                                            src={`${API_BASE_URL}/uploads/profile-pics/${user.ProfilePic}`}
-                                                            alt={fullName}
-                                                            className="w-8 h-8 rounded-full object-cover border border-slate-200"
-                                                            onError={(e) => {
-                                                                e.target.style.display = 'none';
-                                                                e.target.nextElementSibling.style.display = 'flex';
-                                                            }}
-                                                        />
-                                                    ) : null}
-                                                    <div 
-                                                        className={`w-8 h-8 rounded-full bg-blue-100 items-center justify-center text-blue-600 text-xs font-bold ${user.ProfilePic ? 'hidden' : 'flex'}`}
-                                                    >
-                                                        {user.FirstName[0]}{user.LastName[0]}
-                                                    </div>
+                                                    <SmartUserAvatar
+                                                        user={user}
+                                                        fullName={fullName}
+                                                        size="w-8 h-8"
+                                                        textSize="text-xs font-bold"
+                                                        ring="border border-slate-200"
+                                                    />
                                                 </div>
                                                 <div className="ml-2.5 flex-1 min-w-0">
                                                     <div className="text-xs font-bold text-slate-800 truncate">{fullName}</div>

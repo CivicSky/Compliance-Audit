@@ -62,7 +62,7 @@ export default function Events() {
                         <div>
                             <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">Accreditation Archives & Downloads</h1>
                             <p className="text-xs text-slate-500 mt-0.5">
-                                Download complete zipped evidence packages, master trees, and office folders by event.
+                                Download complete zipped standard packages, master trees, and office folders by event.
                             </p>
                         </div>
                     </div>
@@ -85,7 +85,7 @@ export default function Events() {
                         <input
                             type="text"
                             placeholder="Search event packages, code..."
-                            className="h-9 w-full rounded-xl border border-slate-200/90 bg-slate-50/60 pl-9.5 pr-8 text-xs text-slate-800 placeholder-slate-400 shadow-2xs transition-all focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-slate-300"
+                            className="h-9 w-full rounded-xl border border-slate-200/90 bg-slate-50/60 pl-10 pr-8 text-xs text-slate-800 placeholder-slate-400 shadow-2xs transition-all focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-slate-300"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />

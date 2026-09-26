@@ -121,6 +121,33 @@ const OfficesController = {
   // ================================
   getAll: async (req, res) => {
     try {
+      const roleId = Number(req.user?.roleId || 0);
+      const userId = Number(req.user?.userId || 0);
+      const isAuditor = roleId === 4;
+
+      // If auditor, check if they have any area assignments
+      if (isAuditor) {
+        const [assignments] = await db.query(
+          'SELECT area_id FROM auditor_area_assignments WHERE auditor_user_id = ?',
+          [userId]
+        );
+        if (!assignments || assignments.length === 0) {
+          return res.json({ success: true, data: [] });
+        }
+      }
+
+      const officeWhere = isAuditor
+        ? `WHERE o.OfficeID IN (
+            SELECT DISTINCT cso.OfficeID
+            FROM compliancestatusoffices cso
+            JOIN requirements r ON cso.RequirementID = r.RequirementID
+            JOIN criteria c ON r.CriteriaID = c.CriteriaID
+            JOIN auditor_area_assignments aaa ON c.AreaID = aaa.area_id
+            WHERE aaa.auditor_user_id = ${Number(userId)}
+          )`
+        : '';
+
+
       // First get all offices with basic info
       const [officeRows] = await db.query(`
         SELECT 
@@ -130,15 +157,17 @@ const OfficesController = {
           o.OfficeTypeID,
           o.EventID,
           o.event_department_id,
-          ed.accreditation_level,
-          m.entity_type_id,
+          COALESCE(o.accreditation_level, 'None') AS accreditation_level,
+          COALESCE(m.entity_type_id, CASE WHEN ot.TypeName ILIKE '%non%' THEN 2 WHEN ot.TypeName ILIKE '%academic%' THEN 1 ELSE NULL END) AS entity_type_id,
           m.department_id,
           COALESCE(o.created_at, m.created_at) AS created_at,
           COALESCE(o.updated_at, m.updated_at, o.created_at, m.created_at) AS updated_at,
           COALESCE(d.name, NULL) AS department_name,
-          CASE m.entity_type_id
-            WHEN 1 THEN 'Academic Program'
-            WHEN 2 THEN 'Non-Academic Office'
+          CASE 
+            WHEN m.entity_type_id = 1 THEN 'Academic Program'
+            WHEN m.entity_type_id = 2 THEN 'Non-Academic Office'
+            WHEN ot.TypeName ILIKE '%non%' THEN 'Non-Academic Office'
+            WHEN ot.TypeName ILIKE '%academic%' THEN 'Academic Program'
             ELSE 'Unknown'
           END AS category_name,
           e.EventName,
@@ -160,27 +189,28 @@ const OfficesController = {
           SELECT
             cso.OfficeID,
             COUNT(*) AS TotalRequirements,
-            SUM(CASE WHEN cso.Status = 5 THEN 1 ELSE 0 END) AS CompliedCount,
-            SUM(CASE WHEN cso.Status = 4 THEN 1 ELSE 0 END) AS PartiallyCompliedCount,
-            SUM(CASE WHEN cso.Status = 3 THEN 1 ELSE 0 END) AS NotCompliedCount,
+            SUM(CASE WHEN cso.Status::text = '5' THEN 1 ELSE 0 END) AS CompliedCount,
+            SUM(CASE WHEN cso.Status::text = '4' THEN 1 ELSE 0 END) AS PartiallyCompliedCount,
+            SUM(CASE WHEN cso.Status::text = '3' THEN 1 ELSE 0 END) AS NotCompliedCount,
             CASE
               WHEN COUNT(*) = 0 THEN 0
               ELSE ROUND(
-                ((SUM(CASE WHEN cso.Status = 5 THEN 1 ELSE 0 END) * 100) +
-                (SUM(CASE WHEN cso.Status = 4 THEN 1 ELSE 0 END) * 50)) /
-                COUNT(*),
+                (((SUM(CASE WHEN cso.Status::text = '5' THEN 1.0 ELSE 0.0 END) * 100.0) +
+                (SUM(CASE WHEN cso.Status::text = '4' THEN 1.0 ELSE 0.0 END) * 50.0)) /
+                NULLIF(COUNT(*), 0))::numeric,
                 2
               )
             END AS CompliancePercent,
             CASE
               WHEN COUNT(*) = 0 THEN 'Not Complied'
-              WHEN SUM(CASE WHEN cso.Status = 5 THEN 1 ELSE 0 END) = COUNT(*) THEN 'Complied'
-              WHEN SUM(CASE WHEN cso.Status = 3 THEN 1 ELSE 0 END) = COUNT(*) THEN 'Not Complied'
+              WHEN SUM(CASE WHEN cso.Status::text = '5' THEN 1 ELSE 0 END) = COUNT(*) THEN 'Complied'
+              WHEN SUM(CASE WHEN cso.Status::text = '3' THEN 1 ELSE 0 END) = COUNT(*) THEN 'Not Complied'
               ELSE 'Partially Complied'
             END AS OverallStatus
           FROM compliancestatusoffices cso
           GROUP BY cso.OfficeID
         ) os ON o.OfficeID = os.OfficeID
+        ${officeWhere}
       `);
 
       // Get all heads assigned to offices via assignment junction table
@@ -232,7 +262,7 @@ const OfficesController = {
       try {
         const [auds] = await db.query(`
           SELECT DISTINCT 
-            o.OfficeID,
+            cso.OfficeID,
             u.UserID,
             u.FirstName,
             u.MiddleInitial,
@@ -243,7 +273,9 @@ const OfficesController = {
           FROM auditor_area_assignments aaa
           JOIN users u ON aaa.auditor_user_id = u.UserID
           JOIN areas ar ON aaa.area_id = ar.AreaID
-          JOIN offices o ON o.EventID = ar.EventID
+          JOIN criteria c ON ar.AreaID = c.AreaID
+          JOIN requirements r ON c.CriteriaID = r.CriteriaID
+          JOIN compliancestatusoffices cso ON r.RequirementID = cso.RequirementID
         `);
         auditorRows = auds;
       } catch (audErr) {
@@ -330,8 +362,31 @@ const OfficesController = {
   // ================================
   getById: async (req, res) => {
     const id = req.params.id;
+    const roleId = Number(req.user?.roleId || 0);
+    const userId = Number(req.user?.userId || 0);
+    const isAuditor = roleId === 4;
 
     try {
+      if (isAuditor) {
+        const [accessCheck] = await db.query(`
+          SELECT 1
+          FROM compliancestatusoffices cso
+          JOIN requirements r ON cso.RequirementID = r.RequirementID
+          JOIN criteria c ON r.CriteriaID = c.CriteriaID
+          JOIN auditor_area_assignments aaa ON c.AreaID = aaa.area_id
+          WHERE cso.OfficeID = ? AND aaa.auditor_user_id = ?
+          LIMIT 1
+        `, [id, userId]);
+
+        if (!accessCheck || accessCheck.length === 0) {
+          return res.status(403).json({
+            success: false,
+            message: "Forbidden: You are not assigned to any areas for this office or program."
+          });
+        }
+      }
+
+
       const [rows] = await db.query(`
         SELECT 
           o.OfficeID,
@@ -339,14 +394,17 @@ const OfficesController = {
           o.master_list_id,
           o.OfficeTypeID,
           o.EventID,
-          m.entity_type_id,
+          COALESCE(o.accreditation_level, 'None') AS accreditation_level,
+          COALESCE(m.entity_type_id, CASE WHEN t.TypeName ILIKE '%non%' THEN 2 WHEN t.TypeName ILIKE '%academic%' THEN 1 ELSE NULL END) AS entity_type_id,
           m.department_id,
           COALESCE(o.created_at, m.created_at) AS created_at,
           COALESCE(o.updated_at, m.updated_at, o.created_at, m.created_at) AS updated_at,
           COALESCE(d.name, NULL) AS department_name,
-          CASE m.entity_type_id
-            WHEN 1 THEN 'Academic Program'
-            WHEN 2 THEN 'Non-Academic Office'
+          CASE 
+            WHEN m.entity_type_id = 1 THEN 'Academic Program'
+            WHEN m.entity_type_id = 2 THEN 'Non-Academic Office'
+            WHEN t.TypeName ILIKE '%non%' THEN 'Non-Academic Office'
+            WHEN t.TypeName ILIKE '%academic%' THEN 'Academic Program'
             ELSE 'Unknown'
           END AS category_name,
           t.TypeName,
@@ -363,22 +421,22 @@ const OfficesController = {
           SELECT
             cso.OfficeID,
             COUNT(*) AS TotalRequirements,
-            SUM(CASE WHEN cso.Status = 5 THEN 1 ELSE 0 END) AS CompliedCount,
-            SUM(CASE WHEN cso.Status = 4 THEN 1 ELSE 0 END) AS PartiallyCompliedCount,
-            SUM(CASE WHEN cso.Status = 3 THEN 1 ELSE 0 END) AS NotCompliedCount,
+            SUM(CASE WHEN cso.Status::text = '5' THEN 1 ELSE 0 END) AS CompliedCount,
+            SUM(CASE WHEN cso.Status::text = '4' THEN 1 ELSE 0 END) AS PartiallyCompliedCount,
+            SUM(CASE WHEN cso.Status::text = '3' THEN 1 ELSE 0 END) AS NotCompliedCount,
             CASE
               WHEN COUNT(*) = 0 THEN 0
               ELSE ROUND(
-                ((SUM(CASE WHEN cso.Status = 5 THEN 1 ELSE 0 END) * 100) +
-                (SUM(CASE WHEN cso.Status = 4 THEN 1 ELSE 0 END) * 50)) /
-                COUNT(*),
+                (((SUM(CASE WHEN cso.Status::text = '5' THEN 1.0 ELSE 0.0 END) * 100.0) +
+                (SUM(CASE WHEN cso.Status::text = '4' THEN 1.0 ELSE 0.0 END) * 50.0)) /
+                NULLIF(COUNT(*), 0))::numeric,
                 2
               )
             END AS CompliancePercent,
             CASE
               WHEN COUNT(*) = 0 THEN 'Not Complied'
-              WHEN SUM(CASE WHEN cso.Status = 5 THEN 1 ELSE 0 END) = COUNT(*) THEN 'Complied'
-              WHEN SUM(CASE WHEN cso.Status = 3 THEN 1 ELSE 0 END) = COUNT(*) THEN 'Not Complied'
+              WHEN SUM(CASE WHEN cso.Status::text = '5' THEN 1 ELSE 0 END) = COUNT(*) THEN 'Complied'
+              WHEN SUM(CASE WHEN cso.Status::text = '3' THEN 1 ELSE 0 END) = COUNT(*) THEN 'Not Complied'
               ELSE 'Partially Complied'
             END AS OverallStatus
           FROM compliancestatusoffices cso
@@ -444,6 +502,7 @@ const OfficesController = {
         HeadIDs: officeHeads.map((head) => head.HeadID),
         Heads: officeHeads,
         HeadName: officeHeads.length > 0 ? officeHeads.map((head) => head.full_name).join(', ') : "Unknown Head",
+        accreditation_level: r.accreditation_level || 'None',
         EventID: r.EventID,
         EventName: r.EventName || null,
         EventCode: r.EventCode || null,
@@ -494,20 +553,16 @@ const OfficesController = {
         // Link academic program to event_departments
         if (mlRows[0].entity_type_id === 1 && mlRows[0].department_id && EventID) {
           if (!eventDeptId) {
-            const reqLevel = req.body.accreditation_level || 'Level I';
             const [existingEd] = await db.query(
               'SELECT id FROM event_departments WHERE event_id = ? AND department_id = ? LIMIT 1',
               [EventID, mlRows[0].department_id]
             );
             if (existingEd.length > 0) {
               eventDeptId = existingEd[0].id;
-              if (req.body.accreditation_level) {
-                await db.query('UPDATE event_departments SET accreditation_level = ? WHERE id = ?', [req.body.accreditation_level, eventDeptId]);
-              }
             } else {
               const [newEd] = await db.query(
-                'INSERT INTO event_departments (event_id, department_id, accreditation_level) VALUES (?, ?, ?) RETURNING id',
-                [EventID, mlRows[0].department_id, reqLevel]
+                'INSERT INTO event_departments (event_id, department_id) VALUES (?, ?) RETURNING id',
+                [EventID, mlRows[0].department_id]
               );
               eventDeptId = newEd[0]?.id || newEd.insertId;
             }
@@ -520,14 +575,15 @@ const OfficesController = {
 
     try {
       const [result] = await db.query(
-        `INSERT INTO offices (OfficeName, master_list_id, OfficeTypeID, EventID, event_department_id)
-         VALUES (?, ?, ?, ?, ?)`,
+        `INSERT INTO offices (OfficeName, master_list_id, OfficeTypeID, EventID, event_department_id, accreditation_level)
+         VALUES (?, ?, ?, ?, ?, ?)`,
         [
           nameToSave || '',
           master_list_id ? Number(master_list_id) : null,
           typeIdToSave || null,
           EventID || null,
-          eventDeptId || null
+          eventDeptId || null,
+          req.body.accreditation_level || 'None'
         ]
       );
 
@@ -649,17 +705,27 @@ const OfficesController = {
         await db.query('UPDATE master_list SET entity_name = ? WHERE id = ?', [nameToSave, master_list_id]);
       }
 
+      const hasLevel = req.body.accreditation_level !== undefined;
       const [result] = await db.query(
         `UPDATE offices 
-         SET OfficeName = ?, master_list_id = ?, OfficeTypeID = ?, EventID = ?
+         SET OfficeName = ?, master_list_id = ?, OfficeTypeID = ?, EventID = ?${hasLevel ? ', accreditation_level = ?' : ''}
          WHERE OfficeID = ?`,
-        [
-          nameToSave || previousOffice.OfficeName || '',
-          master_list_id ? Number(master_list_id) : null,
-          OfficeTypeID,
-          EventID,
-          id
-        ]
+        hasLevel
+          ? [
+              nameToSave || previousOffice.OfficeName || '',
+              master_list_id ? Number(master_list_id) : null,
+              OfficeTypeID,
+              EventID,
+              req.body.accreditation_level,
+              id
+            ]
+          : [
+              nameToSave || previousOffice.OfficeName || '',
+              master_list_id ? Number(master_list_id) : null,
+              OfficeTypeID,
+              EventID,
+              id
+            ]
       );
 
 
@@ -781,6 +847,29 @@ const OfficesController = {
     } catch (err) {
       console.error("Error updating office:", err);
       res.status(500).json({ success: false, error: "Database error" });
+    }
+  },
+
+  // ================================
+  // UPDATE PROGRAM ACCREDITATION LEVEL
+  // ================================
+  updateLevel: async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { accreditation_level } = req.body;
+      if (!accreditation_level) {
+        return res.status(400).json({ success: false, message: 'accreditation_level is required' });
+      }
+      await db.query(
+        `UPDATE offices 
+         SET accreditation_level = ?, updated_at = CURRENT_TIMESTAMP 
+         WHERE OfficeID = ?`,
+        [accreditation_level, Number(id)]
+      );
+      res.json({ success: true, message: 'Program accreditation level updated successfully', newLevel: accreditation_level });
+    } catch (err) {
+      console.error('Error updating program level:', err);
+      res.status(500).json({ success: false, message: 'Failed to update program accreditation level' });
     }
   },
 
@@ -969,6 +1058,8 @@ const OfficesController = {
   getOfficeRequirements: async (req, res) => {
     try {
         const { id } = req.params;
+        const roleId = Number(req.user?.roleId || 0);
+        const userId = Number(req.user?.userId || 0);
 
         const query = `
         SELECT 
@@ -1927,17 +2018,17 @@ async function updateOverallOfficeStatus(officeId) {
     const [counts] = await db.query(`
       SELECT 
         COUNT(*) as TotalRequirements,
-        SUM(CASE WHEN Status = 5 THEN 1 ELSE 0 END) as CompliedCount,
-        SUM(CASE WHEN Status = 4 THEN 1 ELSE 0 END) as PartiallyCompliedCount,
-        SUM(CASE WHEN Status = 3 THEN 1 ELSE 0 END) as NotCompliedCount
+        SUM(CASE WHEN Status::text = '5' THEN 1 ELSE 0 END) as CompliedCount,
+        SUM(CASE WHEN Status::text = '4' THEN 1 ELSE 0 END) as PartiallyCompliedCount,
+        SUM(CASE WHEN Status::text = '3' THEN 1 ELSE 0 END) as NotCompliedCount
       FROM compliancestatusoffices
       WHERE OfficeID = ?
     `, [officeId]);
 
-    const total = counts[0].TotalRequirements || 0;
-    const complied = counts[0].CompliedCount || 0;
-    const partially = counts[0].PartiallyCompliedCount || 0;
-    const notComplied = counts[0].NotCompliedCount || 0;
+    const total = Number(counts[0]?.TotalRequirements || 0);
+    const complied = Number(counts[0]?.CompliedCount || 0);
+    const partially = Number(counts[0]?.PartiallyCompliedCount || 0);
+    const notComplied = Number(counts[0]?.NotCompliedCount || 0);
 
     // Calculate percentage: Complied = 100%, Partially = 50%, Not Complied = 0%
     let compliancePercent = 0;

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { X, Loader2, Mail, UserCheck } from 'lucide-react';
 import { API_BASE_URL } from '../../utils/apiBase';
+import SmartUserAvatar from '../UI/SmartUserAvatar';
 
 const EditOfficeHeadModal = ({ visible, onClose, head = {}, onSave }) => {
   const [position, setPosition] = useState('');
@@ -76,17 +77,13 @@ const EditOfficeHeadModal = ({ visible, onClose, head = {}, onSave }) => {
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {/* Read-Only Personnel Summary Card */}
           <div className="flex items-center gap-3.5 p-3 rounded-xl bg-slate-50 border border-slate-200/80">
-            {avatarUrl ? (
-              <img
-                src={avatarUrl}
-                alt={fullName}
-                className="w-11 h-11 rounded-full object-cover border border-slate-200 shrink-0"
-              />
-            ) : (
-              <div className="w-11 h-11 rounded-full bg-blue-100 text-blue-700 font-bold text-sm flex items-center justify-center border border-blue-200 shrink-0">
-                {initials}
-              </div>
-            )}
+            <SmartUserAvatar
+              user={head}
+              fullName={fullName}
+              size="w-11 h-11"
+              textSize="text-sm font-bold"
+              ring="border border-slate-200 shrink-0"
+            />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
                 <p className="text-xs font-bold text-slate-900 truncate">{fullName}</p>

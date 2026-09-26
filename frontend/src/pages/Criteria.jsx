@@ -182,7 +182,7 @@ export default function Criteria() {
     // Delete selected criteria
     const handleDeleteSelected = async () => {
         if (selectedIds.length === 0) return;
-        const ok = await showConfirm(`Delete ${selectedIds.length} criteria?`);
+        const ok = await showConfirm(`Delete ${selectedIds.length} sub area(s)?`);
         if (!ok) return;
         try {
             await criteriaAPI.deleteCriteria(selectedIds);
@@ -212,9 +212,9 @@ export default function Criteria() {
                             <CheckSquare className="w-5 h-5 sm:w-5.5 sm:h-5.5" />
                         </div>
                         <div>
-                            <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">Criteria Management</h1>
+                            <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">Sub Area Management</h1>
                             <p className="text-xs text-slate-500 mt-0.5">
-                                Define assessment criteria, evidence, and compliance metrics.
+                                Define assessment sub areas, standards, and compliance metrics.
                             </p>
                         </div>
                     </div>
@@ -269,7 +269,7 @@ export default function Criteria() {
                                     className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 text-xs font-semibold text-white shadow-xs transition hover:bg-emerald-700 active:scale-95 cursor-pointer"
                                 >
                                     <Plus className="h-4 w-4" />
-                                    <span>Add Criteria</span>
+                                    <span>Add Sub Area</span>
                                 </button>
 
                                 <button

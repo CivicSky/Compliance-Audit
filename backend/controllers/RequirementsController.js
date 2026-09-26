@@ -60,6 +60,8 @@ const resolveParentRequirement = async (parentValue) => {
 const getAllRequirements = async (req, res) => {
   try {
     const { eventId } = req.query;
+    const roleId = Number(req.user?.roleId || 0);
+    const userId = Number(req.user?.userId || 0);
     
     let query = `
       SELECT 
@@ -85,11 +87,21 @@ const getAllRequirements = async (req, res) => {
     `;
     
     const params = [];
+    const whereConditions = [];
     
     // Filter by event if eventId is provided
     if (eventId) {
-      query += ` WHERE (c.EventID = ? OR pc.EventID = ?)`;
+      whereConditions.push(`(c.EventID = ? OR pc.EventID = ?)`);
       params.push(eventId, eventId);
+    }
+
+    if (roleId === 4) {
+      whereConditions.push(`COALESCE(c.AreaID, pc.AreaID) IN (SELECT area_id FROM auditor_area_assignments WHERE auditor_user_id = ?)`);
+      params.push(userId);
+    }
+
+    if (whereConditions.length > 0) {
+      query += ` WHERE ` + whereConditions.join(' AND ');
     }
     
     query += ` ORDER BY a.SortOrder ASC, c.CriteriaCode ASC, r.RequirementCode ASC`;
@@ -325,6 +337,16 @@ const addRequirement = async (req, res) => {
 const getRequirementsByEvent = async (req, res) => {
   try {
     const { eventId } = req.params;
+    const roleId = Number(req.user?.roleId || 0);
+    const userId = Number(req.user?.userId || 0);
+
+    let auditorFilter = '';
+    const params = [eventId];
+
+    if (roleId === 4) {
+      auditorFilter = ' AND c.AreaID IN (SELECT area_id FROM auditor_area_assignments WHERE auditor_user_id = ?)';
+      params.push(userId);
+    }
     
     const [requirements] = await db.query(`
       SELECT 
@@ -336,9 +358,9 @@ const getRequirementsByEvent = async (req, res) => {
       FROM requirements r
       LEFT JOIN criteria c ON r.CriteriaID = c.CriteriaID
       LEFT JOIN Events e ON c.EventID = e.EventID
-      WHERE c.EventID = ?
+      WHERE c.EventID = ? ${auditorFilter}
       ORDER BY r.RequirementCode ASC
-    `, [eventId]);
+    `, params);
     
     res.json({
       success: true,
@@ -357,6 +379,16 @@ const getRequirementsByEvent = async (req, res) => {
 const getRequirementsByCriteria = async (req, res) => {
   try {
     const { criteriaId } = req.params;
+    const roleId = Number(req.user?.roleId || 0);
+    const userId = Number(req.user?.userId || 0);
+
+    let auditorFilter = '';
+    const params = [criteriaId];
+
+    if (roleId === 4) {
+      auditorFilter = ' AND c.AreaID IN (SELECT area_id FROM auditor_area_assignments WHERE auditor_user_id = ?)';
+      params.push(userId);
+    }
 
     const [requirements] = await db.query(`
       SELECT 
@@ -369,9 +401,9 @@ const getRequirementsByCriteria = async (req, res) => {
       FROM requirements r
       LEFT JOIN criteria c ON r.CriteriaID = c.CriteriaID
       LEFT JOIN Events e ON c.EventID = e.EventID
-      WHERE r.CriteriaID = ?
+      WHERE r.CriteriaID = ? ${auditorFilter}
       ORDER BY r.RequirementCode ASC
-    `, [criteriaId]);
+    `, params);
 
     res.json({
       success: true,
@@ -944,7 +976,7 @@ const getAssignedUsers = async (req, res) => {
         rua.UserID,
         MIN(rua.AssignedAt) AS AssignedAt,
         MAX(rua.AssignedBy) AS AssignedBy,
-        COALESCE(bool_or(rua.HasUploaded), false) AS HasUploaded,
+        CASE WHEN COUNT(opd.id) > 0 THEN TRUE ELSE FALSE END AS HasUploaded,
         u.FirstName,
         u.MiddleInitial,
         u.LastName,
@@ -968,17 +1000,16 @@ const getAssignedUsers = async (req, res) => {
         WHERE requirement_id = ? ${numOfficeId ? 'AND office_id = ?' : ''}
       ) rua
       JOIN users u ON rua.UserID = u.UserID
+      LEFT JOIN office_proof_documents opd 
+        ON opd.requirement_id = rua.RequirementID 
+        AND opd.uploaded_by = rua.UserID
+        ${numOfficeId ? 'AND opd.office_id = ?' : ''}
+      GROUP BY rua.UserID, rua.RequirementID, rua.OfficeID, u.FirstName, u.MiddleInitial, u.LastName, u.Email, u.ProfilePic
+      ORDER BY AssignedAt DESC
     `;
     const params = numOfficeId 
-      ? [requirementId, numOfficeId, requirementId, numOfficeId] 
+      ? [requirementId, numOfficeId, requirementId, numOfficeId, numOfficeId] 
       : [requirementId, requirementId];
-
-    if (numOfficeId) {
-      query += ' WHERE rua.OfficeID = ?';
-      params.push(numOfficeId);
-    }
-    query += ' GROUP BY rua.UserID, rua.RequirementID, rua.OfficeID, u.FirstName, u.MiddleInitial, u.LastName, u.Email, u.ProfilePic';
-    query += ' ORDER BY AssignedAt DESC';
 
     const [assignments] = await db.query(query, params);
 

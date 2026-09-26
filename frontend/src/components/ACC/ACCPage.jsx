@@ -66,16 +66,33 @@ export default function ACCPage() {
         allCriteria = [];
       }
 
-      // 3. Fetch requirements for each criteria
+      // 3. Batch-fetch all requirements for the event in one fast request
+      let allEventReqs = [];
+      try {
+        const reqRes = await axios.get(`${API_BASE_URL}/api/requirements/all?eventId=${eventId}`, { headers });
+        allEventReqs = reqRes.data?.data || reqRes.data || [];
+      } catch (rErr) {
+        console.warn('Batch requirements fetch notice:', rErr.message);
+      }
+
+      const reqsByCriteria = {};
+      allEventReqs.forEach((r) => {
+        const cId = String(r.CriteriaID || r.criteria_id);
+        if (!reqsByCriteria[cId]) reqsByCriteria[cId] = [];
+        reqsByCriteria[cId].push(r);
+      });
+
       const criteriaWithReqs = await Promise.all(
         allCriteria.map(async (crit) => {
-          const critId = crit.CriteriaID || crit.id;
-          let reqs = [];
-          try {
-            const res = await axios.get(`${API_BASE_URL}/api/requirements/criteria/${critId}`, { headers });
-            reqs = res.data?.data || res.data || [];
-          } catch {
-            reqs = [];
+          const critId = String(crit.CriteriaID || crit.id);
+          let reqs = reqsByCriteria[critId] || [];
+          if (reqs.length === 0 && allEventReqs.length === 0) {
+            try {
+              const res = await axios.get(`${API_BASE_URL}/api/requirements/criteria/${critId}`, { headers });
+              reqs = res.data?.data || res.data || [];
+            } catch {
+              reqs = [];
+            }
           }
           return {
             ...crit,

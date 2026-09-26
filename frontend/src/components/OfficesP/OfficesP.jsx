@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { officesAPI, requirementsAPI, usersAPI, eventDepartmentsAPI } from "../../utils/api";
 import { useModal } from "../UI/ModalProvider";
 import userIcon from "../../assets/images/user.svg";
+import SmartUserAvatar from "../UI/SmartUserAvatar";
 import Pagination from "../Pagination/Pagination";
 import { API_BASE_URL } from '../../utils/apiBase';
 import { formatDateTime } from '../../utils/formatDateTime';
@@ -10,9 +11,10 @@ import { OfficeCardSkeleton } from "../UI/Skeleton";
 import { useLiveRefresh } from "../../utils/liveSync";
 import ServerOfflineState from "../UI/ServerOfflineState";
 import { GraduationCap, Building2, ChevronDown, Award, Layers } from "lucide-react";
+import { isAcademicEntity } from "../../utils/entityHelpers";
 
 const renderOfficeIcon = (office, deleteMode = false) => {
-    const isAcademic = office.entity_type_id === 1 || String(office.category_name || office.TypeName || office.office_type_name || office.office_type || "").toLowerCase().includes("academic program") || String(office.category_name || office.TypeName || office.office_type_name || office.office_type || "").toLowerCase().includes("program");
+    const isAcademic = isAcademicEntity(office);
 
     const transformStyle = {
         transform: deleteMode ? 'translateX(1.75rem)' : 'translateX(0)',
@@ -64,6 +66,7 @@ const OfficesP = forwardRef(
 
         const roleId = Number(currentUser?.RoleID);
         const roleName = String(currentUser?.RoleName || currentUser?.role_name || '').toLowerCase();
+        const isAuditor = roleId === 4 || roleName.includes('auditor') || Boolean(currentUser?.isExternalAuditor);
         const isPersonnel = (roleId === 2 || roleId === 3 || roleName.includes('personnel') || roleName.includes('office') || roleName === 'user' || roleName === 'head') && !roleName.includes('auditor') && roleId !== 4 && roleId !== 1 && roleName !== 'admin';
         const isAdmin = (roleId === 1 || roleName === 'admin') && !isPersonnel;
 
@@ -116,7 +119,7 @@ const OfficesP = forwardRef(
         };
 
         const [eventDepartments, setEventDepartments] = useState([]);
-        const [loadingDeptLevel, setLoadingDeptLevel] = useState(null);
+        const [loadingProgramLevel, setLoadingProgramLevel] = useState(null);
 
         const fetchEventDepartments = useCallback(async () => {
             if (!eventType || eventType === 'all') {
@@ -136,30 +139,21 @@ const OfficesP = forwardRef(
             fetchEventDepartments();
         }, [fetchEventDepartments]);
 
-        const handleUpdateDepartmentLevel = async (eventDeptId, deptId, newLevel) => {
+        const handleUpdateProgramLevel = async (officeId, newLevel) => {
             try {
-                setLoadingDeptLevel(deptId);
-                if (eventDeptId) {
-                    await eventDepartmentsAPI.updateLevel(eventDeptId, newLevel);
-                } else if (eventType && deptId) {
-                    await eventDepartmentsAPI.assignDepartment({
-                        event_id: Number(eventType),
-                        department_id: Number(deptId),
-                        accreditation_level: newLevel,
-                    });
-                }
-                await fetchEventDepartments();
+                setLoadingProgramLevel(officeId);
+                await officesAPI.updateLevel(officeId, newLevel);
                 await fetchOffices({ silent: true });
                 if (showAlert) {
                     showAlert(`Updated accreditation level to ${newLevel}`, 'success');
                 }
             } catch (err) {
-                console.error("Failed to update accreditation level:", err);
+                console.error("Failed to update program accreditation level:", err);
                 if (showAlert) {
                     showAlert("Failed to update accreditation level", 'error');
                 }
             } finally {
-                setLoadingDeptLevel(null);
+                setLoadingProgramLevel(null);
             }
         };
 
@@ -469,7 +463,7 @@ const OfficesP = forwardRef(
         ];
 
         const isAcademicOffice = (o) => {
-            return o.entity_type_id === 1 || isAcademicLabel(o.office_type_name || o.office_type || o.TypeName || o.category_name || '');
+            return isAcademicEntity(o);
         };
 
         const academicOffices = useMemo(() => {
@@ -489,7 +483,6 @@ const OfficesP = forwardRef(
                     deptId: ed.department_id,
                     deptName: ed.department_name,
                     eventDeptId: ed.id,
-                    level: ed.accreditation_level || 'Level I',
                     programs: [],
                 });
             }
@@ -504,7 +497,6 @@ const OfficesP = forwardRef(
                         deptId: office.department_id || null,
                         deptName,
                         eventDeptId: office.event_department_id || null,
-                        level: office.accreditation_level || 'Level I',
                         programs: [],
                     });
                 }
@@ -513,9 +505,6 @@ const OfficesP = forwardRef(
                 entry.programs.push(office);
                 if (office.event_department_id && !entry.eventDeptId) {
                     entry.eventDeptId = office.event_department_id;
-                }
-                if (office.accreditation_level && (!entry.level || entry.level === 'Level I')) {
-                    entry.level = office.accreditation_level;
                 }
             }
 
@@ -559,14 +548,18 @@ const OfficesP = forwardRef(
         if (filtered.length === 0) {
             return (
                 <div className="flex-1 w-full min-h-[350px] flex flex-col items-center justify-center p-8 text-center bg-white/70 border border-dashed border-slate-200 rounded-2xl animate-fadeIn my-auto">
-                    <div className="w-16 h-16 bg-slate-100 border border-slate-200 text-slate-400 rounded-2xl flex items-center justify-center mb-3">
-                        <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                    <div className="w-16 h-16 bg-blue-50 border border-blue-100 text-blue-500 rounded-2xl flex items-center justify-center mb-3">
+                        <svg className="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                         </svg>
                     </div>
-                    <h3 className="text-base font-bold text-slate-800 mb-1">No Matching Offices</h3>
+                    <h3 className="text-base font-bold text-slate-800 mb-1">
+                        {isAuditor ? 'No Assigned Programs or Offices' : 'No Matching Offices'}
+                    </h3>
                     <p className="text-xs text-slate-500 max-w-sm">
-                        {searchTerm ? 'No programs or offices match your current search or filter.' : 'No offices or programs are assigned to the selected event yet.'}
+                        {isAuditor 
+                            ? 'You are not assigned to any audit areas yet. Once an administrator assigns you to an audit area, the corresponding programs and offices will appear here.'
+                            : searchTerm ? 'No programs or offices match your current search or filter.' : 'No offices or programs are assigned to the selected event yet.'}
                     </p>
                 </div>
             );
@@ -660,6 +653,12 @@ const OfficesP = forwardRef(
                                 </div>
                             </div>
                             <div className="flex items-start gap-1 shrink-0">
+                                {isAcademicOffice(office) && office.accreditation_level && office.accreditation_level !== 'None' && (
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md shadow-2xs">
+                                        <Award className="h-3 w-3 text-emerald-600" />
+                                        {office.accreditation_level}
+                                    </span>
+                                )}
                                 <span className="px-1.5 py-0.5 text-[10px] font-medium bg-indigo-50 text-indigo-700 rounded-md border border-indigo-100 overflow-hidden max-w-[7.5rem] truncate">
                                     {office.office_type_name}
                                 </span>
@@ -717,7 +716,7 @@ const OfficesP = forwardRef(
                             <div className="mt-1">
                                 <div className="flex items-center justify-between text-[10px] text-slate-500 mb-0.5">
                                     <span>Compliance</span>
-                                    <span className="font-bold text-slate-700">{compliancePercent.toFixed(0)}%</span>
+                                    <span className="font-bold text-slate-700">{compliancePercent % 1 === 0 ? compliancePercent.toFixed(0) : compliancePercent.toFixed(1)}%</span>
                                 </div>
                                 <div className="h-1 rounded-full bg-slate-200 overflow-hidden">
                                     <div
@@ -761,17 +760,14 @@ const OfficesP = forwardRef(
                                         </div>
                                     ) : (
                                         officeHeads.map((head) => {
-                                            const headPicUrl = head.ProfilePic
-                                                ? `${API_BASE_URL}/uploads/profile-pics/${head.ProfilePic}`
-                                                : userIcon;
                                             const firstName = (head.full_name || head.FirstName || 'Personnel').split(' ')[0];
                                             return (
                                                 <div key={head.HeadID} className="group relative flex flex-col items-center max-w-[54px]">
-                                                    <img
-                                                        src={headPicUrl}
-                                                        alt={head.full_name}
-                                                        className="h-6 w-6 rounded-full object-cover border border-white shadow-2xs"
-                                                        onError={(e) => { e.target.src = userIcon; }}
+                                                    <SmartUserAvatar
+                                                        user={head}
+                                                        size="h-6 w-6"
+                                                        textSize="text-[9px] font-bold"
+                                                        ring="border border-white shadow-2xs"
                                                     />
                                                     <span 
                                                         className="text-[9px] text-slate-600 text-center truncate w-full mt-0.5 font-medium leading-tight" 
@@ -802,17 +798,14 @@ const OfficesP = forwardRef(
                                         </div>
                                     ) : (
                                         officeAuditors.map((aud) => {
-                                            const audPicUrl = aud.ProfilePic
-                                                ? `${API_BASE_URL}/uploads/profile-pics/${aud.ProfilePic}`
-                                                : userIcon;
                                             const firstName = (aud.full_name || aud.FirstName || 'Auditor').split(' ')[0];
                                             return (
                                                 <div key={aud.UserID} className="group relative flex flex-col items-center max-w-[54px]">
-                                                    <img
-                                                        src={audPicUrl}
-                                                        alt={aud.full_name}
-                                                        className="h-6 w-6 rounded-full object-cover border-2 border-sky-300 shadow-2xs ring-1 ring-sky-100"
-                                                        onError={(e) => { e.target.src = userIcon; }}
+                                                    <SmartUserAvatar
+                                                        user={aud}
+                                                        size="h-6 w-6"
+                                                        textSize="text-[9px] font-bold"
+                                                        ring="border-2 border-sky-300 shadow-2xs ring-1 ring-sky-100"
                                                     />
                                                     <span 
                                                         className="text-[9px] text-sky-700 text-center truncate w-full mt-0.5 font-semibold leading-tight" 
@@ -900,8 +893,14 @@ const OfficesP = forwardRef(
                             </div>
                         </div>
 
-                        {/* Office Type */}
-                        <div className="flex items-center justify-center text-sm text-slate-700">
+                        {/* Office Type & Accreditation Level */}
+                        <div className="flex items-center justify-center gap-1.5 text-sm text-slate-700 flex-wrap">
+                            {isAcademicOffice(office) && office.accreditation_level && office.accreditation_level !== 'None' && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-bold text-emerald-700 bg-emerald-50 rounded-full border border-emerald-200 shadow-2xs">
+                                    <Award className="h-3 w-3 text-emerald-600" />
+                                    {office.accreditation_level}
+                                </span>
+                            )}
                             <div className="inline-block px-2 py-0.5 text-xs font-medium bg-indigo-50 text-indigo-700 rounded-full border">{office.office_type_name}</div>
                         </div>
 
@@ -922,12 +921,12 @@ const OfficesP = forwardRef(
                         <div className="flex items-center justify-start">
                             <div className="flex items-center space-x-3">
                                 {officeHeads.slice(0, 4).map((head, idx) => (
-                                    <img
+                                    <SmartUserAvatar
                                         key={head.HeadID || idx}
-                                        src={head.ProfilePic ? `${API_BASE_URL}/uploads/profile-pics/${head.ProfilePic}` : userIcon}
-                                        alt={head.full_name}
-                                        className="w-8 h-8 rounded-full object-cover border-2 border-white shadow-sm"
-                                        onError={(e) => { e.target.src = userIcon; }}
+                                        user={head}
+                                        size="w-8 h-8"
+                                        textSize="text-xs font-semibold"
+                                        ring="border-2 border-white shadow-sm"
                                     />
                                 ))}
                                 {officeHeads.length > 4 && (
@@ -1012,15 +1011,6 @@ const OfficesP = forwardRef(
                                             </div>
                                             <p className="text-[10px] text-slate-400">Department</p>
                                         </div>
-                                    </div>
-
-                                    {/* Level Badge - Fixed to department's accreditation level in green */}
-                                    <div className="flex items-center gap-2 self-start sm:self-auto">
-                                        <span className="text-xs font-semibold text-slate-500">Accreditation Level:</span>
-                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg shadow-2xs">
-                                            <Award className="h-3.5 w-3.5 text-emerald-600" />
-                                            {deptGroup.level || 'Level I'}
-                                        </span>
                                     </div>
                                 </div>
 
@@ -1144,14 +1134,36 @@ const OfficesP = forwardRef(
                                     <button
                                         type="button"
                                         onClick={async (e) => { e.stopPropagation(); setOpenMenuOfficeId(null); setOpenMenuAnchorRect(null); await handleExportOffice(menuOffice); }}
-                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 transition whitespace-nowrap"
+                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition whitespace-nowrap"
                                     >
-                                        <svg className="h-4 w-4 text-indigo-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <svg className="h-4 w-4 text-blue-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 16V6m0 0l-4 4m4-4 4 4" />
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21H3" />
                                         </svg>
                                         <span>Export Excel</span>
                                     </button>
+                                    {isAcademicOffice(menuOffice) && (
+                                        <div className="border-t border-slate-100 my-1 pt-1.5 px-2.5">
+                                            <label className="text-[10px] font-semibold text-slate-400 block mb-1">
+                                                Accreditation Level
+                                            </label>
+                                            <select
+                                                value={menuOffice.accreditation_level || 'Candidate'}
+                                                onChange={async (e) => {
+                                                    const val = e.target.value;
+                                                    setOpenMenuOfficeId(null);
+                                                    setOpenMenuAnchorRect(null);
+                                                    await handleUpdateProgramLevel(menuOffice.id, val);
+                                                }}
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="w-full text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg py-1 px-2 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
+                                            >
+                                                {ACCREDITATION_LEVELS.map((lvl) => (
+                                                    <option key={lvl} value={lvl}>{lvl}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
                                     <button
                                         type="button"
                                         onClick={async (e) => { e.stopPropagation(); setOpenMenuOfficeId(null); setOpenMenuAnchorRect(null); await onDeleteOffice?.(menuOffice); }}

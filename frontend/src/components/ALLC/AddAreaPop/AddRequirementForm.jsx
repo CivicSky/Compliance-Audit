@@ -37,7 +37,7 @@ export default function AddRequirementForm({
 	);
 
 	const selectedArea = useMemo(() => {
-		if (requirementForm.AreaFilter === '__no_area__') return { label: 'No Area (criteria without area)' };
+		if (requirementForm.AreaFilter === '__no_area__') return { label: 'No Area (sub areas without area)' };
 		return (areas || []).find((a) => String(a.AreaID) === String(requirementForm.AreaFilter));
 	}, [areas, requirementForm.AreaFilter]);
 
@@ -51,7 +51,7 @@ export default function AddRequirementForm({
 					onChange={(val) => setRequirementForm((prev) => ({ ...prev, AreaFilter: val, CriteriaID: '' }))}
 					options={[
 						{ value: '', label: 'Select area' },
-						{ value: '__no_area__', label: 'No Area (criteria without area)' },
+						{ value: '__no_area__', label: 'No Area (sub areas without area)' },
 						...(areas || []).map((area) => ({
 							value: String(area.AreaID),
 							label: optionLabel(area.AreaCode, area.AreaName)
@@ -74,14 +74,14 @@ export default function AddRequirementForm({
 			</div>
 
 			<div>
-				<label className="mb-1 block text-xs font-semibold text-stone-600">Criteria</label>
+				<label className="mb-1 block text-xs font-semibold text-stone-600">Sub Area</label>
 				<CustomSelect
 					size="md"
 					value={requirementForm.CriteriaID}
 					onChange={(val) => handleRequirementCriteriaChange(val, false, requirementForm.AreaFilter)}
 					disabled={!requirementForm.AreaFilter}
 					options={[
-						{ value: '', label: 'Select criteria' },
+						{ value: '', label: 'Select sub area' },
 						...filteredCriteriaOptions.map((crit) => ({
 							value: String(crit.CriteriaID),
 							label: optionLabel(
@@ -91,18 +91,18 @@ export default function AddRequirementForm({
 							)
 						}))
 					]}
-					placeholder="Select criteria"
+					placeholder="Select sub area"
 				/>
 				{requirementForm.AreaFilter && filteredCriteriaOptions.length === 0 && (
-					<p className="mt-1 text-xs text-stone-500">No criteria found for the selected area filter.</p>
+					<p className="mt-1 text-xs text-stone-500">No sub areas found for the selected area filter.</p>
 				)}
 				{!requirementForm.AreaFilter && (
-					<p className="mt-1 text-xs text-stone-500">Select an area first to load criteria.</p>
+					<p className="mt-1 text-xs text-stone-500">Select an area first to load sub areas.</p>
 				)}
 				{selectedCriteria && (
 					<div className="mt-2">
 						<LongSelectPreview
-							label="Selected criteria"
+							label="Selected sub area"
 							title={optionLabel(selectedCriteria.CriteriaCode, selectedCriteria.CriteriaName)}
 							body={selectedCriteria.Description || null}
 						/>
@@ -112,7 +112,7 @@ export default function AddRequirementForm({
 
 			{childCriteriaOptions.length > 0 && (
 				<div>
-					<label className="mb-1 block text-xs font-semibold text-stone-600">Child criteria (optional)</label>
+					<label className="mb-1 block text-xs font-semibold text-stone-600">Child sub area (optional)</label>
 					<CustomSelect
 						size="md"
 						value={requirementForm.ChildCriteriaID}
@@ -122,39 +122,39 @@ export default function AddRequirementForm({
 						}}
 						disabled={!requirementForm.CriteriaID}
 						options={[
-							{ value: '', label: 'No child selected (use selected criteria)' },
+							{ value: '', label: 'No child selected (use selected sub area)' },
 							...childCriteriaOptions.map((cc) => ({
 								value: String(cc.CriteriaID),
 								label: optionLabel(cc.CriteriaCode, cc.CriteriaName)
 							}))
 						]}
-						placeholder="No child selected (use selected criteria)"
+						placeholder="No child selected (use selected sub area)"
 					/>
 				</div>
 			)}
 
 			<div>
-				<label className="mb-1 block text-xs font-semibold text-stone-600">Parent evidence (optional)</label>
+				<label className="mb-1 block text-xs font-semibold text-stone-600">Parent standard (optional)</label>
 				<CustomSelect
 					size="md"
 					value={requirementForm.ParentRequirementCode}
 					onChange={(val) => handleParentRequirementChange(val)}
 					disabled={!requirementForm.CriteriaID || loadingParents}
 					options={[
-						{ value: '', label: 'No parent evidence (optional)' },
+						{ value: '', label: 'No parent standard (optional)' },
 						...parentRequirementOptions.map((req) => ({
 							value: req.RequirementCode,
 							label: optionLabel(req.RequirementCode, req.Description)
 						}))
 					]}
-					placeholder="No parent evidence (optional)"
+					placeholder="No parent standard (optional)"
 				/>
 				{requirementForm.CriteriaID && loadingParents && (
-					<p className="mt-1 text-xs text-stone-500">Loading parent evidence options…</p>
+					<p className="mt-1 text-xs text-stone-500">Loading parent standard options…</p>
 				)}
 				<div className="mt-2">
 					<LongSelectPreview
-						label="Selected parent evidence"
+						label="Selected parent standard"
 						title={
 							selectedParent
 								? selectedParent.RequirementCode
@@ -165,7 +165,7 @@ export default function AddRequirementForm({
 						body={selectedParent?.Description}
 						emptyHint={
 							requirementForm.CriteriaID && !loadingParents
-								? 'No parent selected — this will be top-level evidence under the criteria.'
+								? 'No parent selected — this will be top-level standard under the sub area.'
 								: null
 						}
 					/>
@@ -173,7 +173,7 @@ export default function AddRequirementForm({
 			</div>
 
 			<div>
-				<label className="mb-1 block text-xs font-semibold text-stone-600">Evidence code (editable)</label>
+				<label className="mb-1 block text-xs font-semibold text-stone-600">Standard code (editable)</label>
 				<input
 					className={fieldClass}
 					value={requirementForm.RequirementCode || ''}
@@ -184,10 +184,10 @@ export default function AddRequirementForm({
 			</div>
 
 			<div>
-				<label className="mb-1 block text-xs font-semibold text-stone-600">Evidence description</label>
+				<label className="mb-1 block text-xs font-semibold text-stone-600">Standard description</label>
 				<textarea
 					className={`${fieldClass} min-h-[120px] resize-y`}
-					placeholder="Evidence description"
+					placeholder="Standard description"
 					value={requirementForm.Description}
 					onChange={(e) => setRequirementForm((prev) => ({ ...prev, Description: e.target.value }))}
 					disabled={!requirementForm.CriteriaID}
@@ -196,7 +196,7 @@ export default function AddRequirementForm({
 
 			<div className={formFooterClass}>
 				<button type="submit" disabled={saving || !requirementForm.CriteriaID} className={saveButtonClass}>
-					{saving ? 'Saving…' : 'Save evidence'}
+					{saving ? 'Saving…' : 'Save standard'}
 				</button>
 			</div>
 		</form>

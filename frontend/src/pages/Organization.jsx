@@ -18,6 +18,7 @@ import { Building2, Plus, Search, LayoutGrid, List } from "lucide-react";
 import { useModal } from "../components/UI/ModalProvider";
 import { useLiveRefresh } from "../utils/liveSync";
 import ViewModeToggle from "../components/UI/ViewModeToggle";
+import { isAcademicEntity } from "../utils/entityHelpers";
 
 const normalizeOfficeRecord = (office) => {
     if (!office) return null;
@@ -29,6 +30,7 @@ const normalizeOfficeRecord = (office) => {
         OfficeName: office.OfficeName ?? office.office_name,
         event_id: office.event_id ?? office.EventID,
         EventID: office.EventID ?? office.event_id,
+        accreditation_level: office.accreditation_level ?? office.AccreditationLevel,
     };
 };
 
@@ -275,19 +277,39 @@ export default function Organization({ selectedEventIdProp, onEventSelect }) {
     }, []);
 
     useEffect(() => {
+        if (searchParams.get('fromNotif') !== '1') {
+            notifDeepLinkHandled.current = false;
+            return;
+        }
         if (notifDeepLinkHandled.current) return;
-        if (searchParams.get('fromNotif') !== '1') return;
 
-        const officeId = searchParams.get('officeId');
-        if (!officeId) return;
+        let officeId = searchParams.get('officeId');
+        const areaId = searchParams.get('areaId');
 
         const deepLink = {
             requirementId: searchParams.get('requirementId') || null,
             openSubmission: searchParams.get('openSubmission') === '1',
             viewUserId: searchParams.get('viewUserId') || null,
+            areaId: areaId || null,
         };
 
         const run = async () => {
+            if (!officeId && areaId) {
+                // The notification meta should already include officeId from the backend.
+                // Fallback: fetch all offices and pick the first one linked to this area.
+                try {
+                    const allOffices = await officesAPI.getAll();
+                    const list = Array.isArray(allOffices?.data) ? allOffices.data : (Array.isArray(allOffices) ? allOffices : []);
+                    if (list.length > 0) {
+                        officeId = list[0].id || list[0].OfficeID;
+                    }
+                } catch (e) {
+                    console.warn('Could not resolve office for areaId notification:', e);
+                }
+            }
+
+            if (!officeId) return;
+
             const opened = await openOfficeFromNotification(officeId, deepLink);
             if (opened) {
                 notifDeepLinkHandled.current = true;
@@ -361,6 +383,7 @@ export default function Organization({ selectedEventIdProp, onEventSelect }) {
                             office_name: updated.OfficeName,
                             office_type_id: updated.OfficeTypeID,
                             office_type_name: updated.TypeName || updated.office_type_name || '',
+                            accreditation_level: updated.accreditation_level || updatedOffice.accreditation_level || 'Candidate',
                             head_ids: updated.HeadIDs || [],
                             heads: updated.Heads || [],
                             head_name: updated.HeadName || (updated.Heads ? (updated.Heads.map(h=> h.full_name).join(', ')) : ''),
@@ -464,9 +487,9 @@ export default function Organization({ selectedEventIdProp, onEventSelect }) {
         let items = masterListItems;
 
         if (activeCategoryTab === "Programs") {
-            items = items.filter(item => item.entityTypeId === 1 || item.type === 'Academic Program');
+            items = items.filter(item => isAcademicEntity(item));
         } else if (activeCategoryTab === "Offices") {
-            items = items.filter(item => item.entityTypeId !== 1 && item.type !== 'Academic Program');
+            items = items.filter(item => !isAcademicEntity(item));
         }
 
         const query = categorySearchTerm.trim().toLowerCase();
@@ -483,7 +506,7 @@ export default function Organization({ selectedEventIdProp, onEventSelect }) {
     const handleInstantAddCategory = async (item) => {
         if (!selectedEventType) return;
         try {
-            const isAcademic = item.entityTypeId === 1 || item.type === 'Academic Program';
+            const isAcademic = isAcademicEntity(item);
             const matchedType = officeTypes.find(t => {
                 const name = String(t.TypeName || t.name || '').toLowerCase();
                 if (isAcademic) {
@@ -621,7 +644,7 @@ export default function Organization({ selectedEventIdProp, onEventSelect }) {
                         <input
                             type="text"
                             placeholder="Search offices..."
-                            className="h-9 w-full rounded-xl border border-slate-200/90 bg-slate-50/60 pl-9.5 pr-8 text-xs text-slate-800 placeholder-slate-400 shadow-2xs transition-all focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-slate-300"
+                            className="h-9 w-full rounded-xl border border-slate-200/90 bg-slate-50/60 pl-10 pr-8 text-xs text-slate-800 placeholder-slate-400 shadow-2xs transition-all focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-slate-300"
                             value={searchTerm}
                             onChange={e => setSearchTerm(e.target.value)}
                         />

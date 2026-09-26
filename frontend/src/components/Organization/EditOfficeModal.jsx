@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { officeHeadsAPI } from "../../utils/api";
 import { useModal } from "../UI/ModalProvider";
 import CustomSelect from "../UI/CustomSelect";
+import SmartUserAvatar from "../UI/SmartUserAvatar";
 
 export default function EditOfficeModal({ visible, onClose, office, onSave, officeTypes, userRole = 'user' }) {
     const [officeName, setOfficeName] = useState("");
@@ -14,6 +15,7 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
     const [programTypes, setProgramTypes] = useState([]);
     const [selectedDepartmentID, setSelectedDepartmentID] = useState("");
     const [selectedProgramTypeID, setSelectedProgramTypeID] = useState("");
+    const [accreditationLevel, setAccreditationLevel] = useState("Candidate");
     const [loadingHeads, setLoadingHeads] = useState(false);
     const [showHeadDropdown, setShowHeadDropdown] = useState(false);
     const isAdmin = userRole === 'admin' || userRole === 1;
@@ -54,7 +56,7 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
 
     const isAcademicType = (officeTypeId) => {
         const t = getOfficeTypeById(officeTypeId);
-        const name = String(t?.TypeName || t?.name || '').toLowerCase();
+        const name = String(t?.TypeName || t?.name || office?.office_type_name || office?.TypeName || '').toLowerCase();
         if (!name) return false;
         if (/\bnon\b|non-?academic|not\s+academic/.test(name)) return false;
         return /\bacademic\b/.test(name);
@@ -72,6 +74,7 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
         setOfficeTypeID(office.office_type || office.office_type_id || office.OfficeTypeID || "");
         setSelectedDepartmentID(office.department_id || office.DepartmentID || office.departmentID || "");
         setSelectedProgramTypeID(office.program_type_id || office.ProgramTypeID || office.programTypeID || "");
+        setAccreditationLevel(office.accreditation_level || office.AccreditationLevel || "Candidate");
 
         let headIds = [];
         if (Array.isArray(office.head_ids) && office.head_ids.length > 0) {
@@ -231,6 +234,7 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
             master_list_id: office.master_list_id || null,
             OfficeName: officeName,
             OfficeTypeID: officeTypeID,
+            accreditation_level: isAcademicType(officeTypeID) ? accreditationLevel : null,
             HeadIDs: selectedHeadIDs.map(id => parseInt(id, 10)).filter(id => !isNaN(id)),
             EventID: office.event_id || office.EventID || null,
         };
@@ -345,6 +349,23 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
                                     />
                                 </div>
                             )}
+
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Accreditation Level</label>
+                                <CustomSelect
+                                    value={accreditationLevel}
+                                    onChange={(val) => setAccreditationLevel(val)}
+                                    disabled={!isAdmin}
+                                    placeholder="Select Accreditation Level"
+                                    options={[
+                                        { value: "Candidate", label: "Candidate" },
+                                        { value: "Level I", label: "Level I" },
+                                        { value: "Level II", label: "Level II" },
+                                        { value: "Level III", label: "Level III" },
+                                        { value: "Level IV", label: "Level IV" },
+                                    ]}
+                                />
+                            </div>
                         </>
                     )}
 
@@ -405,19 +426,13 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
                                                     disabled={!isSelected && isHeadLimitReached}
                                                     className="rounded text-blue-600 focus:ring-blue-500"
                                                 />
-                                                {picUrl ? (
-                                                    <img
-                                                        src={picUrl}
-                                                        alt={fullName || 'Head'}
-                                                        className="h-10 w-10 rounded-full object-cover border border-gray-200"
-                                                    />
-                                                ) : (
-                                                    <div className="h-10 w-10 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center border border-gray-200">
-                                                        <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15.75 7.5a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.5 19.5a7.5 7.5 0 0 1 15 0" />
-                                                        </svg>
-                                                    </div>
-                                                )}
+                                                <SmartUserAvatar
+                                                    user={head}
+                                                    fullName={fullName}
+                                                    size="h-10 w-10"
+                                                    textSize="text-xs font-bold"
+                                                    ring="border border-gray-200"
+                                                />
                                                 <span className="flex-1 self-center text-sm leading-snug">
                                                     <span className="font-medium text-gray-800">{fullName || `Head #${head.HeadID}`}</span>
                                                 </span>

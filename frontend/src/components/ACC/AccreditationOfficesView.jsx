@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Search, GraduationCap, Building2, User, MoreVertical, LayoutGrid, List, Plus, Trash2, GripVertical } from 'lucide-react';
+import { isAcademicEntity } from '../../utils/entityHelpers';
 import Pagination from '../Pagination/Pagination';
 import CustomDropdown from '../UI/CustomDropdown';
 import { formatDateTime } from '../../utils/formatDateTime';
@@ -128,9 +129,9 @@ export default function AccreditationOfficesView({
     // Filter by Office Type
     if (officeTypeFilter !== 'all') {
       if (officeTypeFilter === 'academic') {
-        list = list.filter(o => o.entity_type_id === 1 || String(o.category_name || o.TypeName || o.office_type || '').toLowerCase().includes('academic'));
+        list = list.filter(o => isAcademicEntity(o));
       } else if (officeTypeFilter === 'non-academic') {
-        list = list.filter(o => o.entity_type_id === 2 || String(o.category_name || o.TypeName || o.office_type || '').toLowerCase().includes('non-academic'));
+        list = list.filter(o => !isAcademicEntity(o));
       }
     }
 
@@ -142,10 +143,11 @@ export default function AccreditationOfficesView({
     // Filter by Status
     if (statusFilter !== 'all') {
       list = list.filter(o => {
-        const pct = Math.round(o.compliance_percentage || o.compliancePercentage || 0);
-        if (statusFilter === 'complied') return pct >= 100;
-        if (statusFilter === 'partial') return pct > 0 && pct < 100;
-        if (statusFilter === 'not') return pct === 0;
+        const rawPct = Number(o.compliance_percent ?? o.CompliancePercent ?? o.compliance_percentage ?? o.compliancePercentage ?? 0);
+        const pct = isNaN(rawPct) ? 0 : rawPct;
+        if (statusFilter === 'complied') return pct >= 100 || o.overall_status === 'Complied' || o.OverallStatus === 'Complied';
+        if (statusFilter === 'partial') return (pct > 0 && pct < 100) || o.overall_status === 'Partially Complied' || o.OverallStatus === 'Partially Complied';
+        if (statusFilter === 'not') return pct === 0 && (o.overall_status === 'Not Complied' || o.OverallStatus === 'Not Complied' || !o.overall_status);
         return true;
       });
     }
@@ -256,7 +258,7 @@ export default function AccreditationOfficesView({
             placeholder="Search offices..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="h-9 w-full pl-9 pr-4 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all outline-none shadow-2xs"
+            className="h-9 w-full pl-10 pr-4 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all outline-none shadow-2xs"
           />
         </div>
 
@@ -300,16 +302,15 @@ export default function AccreditationOfficesView({
           <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 grid-rows-3 gap-2 sm:gap-2.5 lg:gap-3 flex-1 min-h-0 h-full p-1' : 'space-y-3 pt-1 pb-1 overflow-y-auto flex-1'}>
             {paginatedOffices.map((office, idx) => {
               const officeId = office.OfficeID || office.id;
-              const isAcademic = office.entity_type_id === 1 || 
-                String(office.category_name || office.TypeName || office.office_type || '').toLowerCase().includes('academic') ||
-                String(office.category_name || office.TypeName || office.office_type || '').toLowerCase().includes('program');
+              const isAcademic = isAcademicEntity(office);
 
               const reqCount = office.total_requirements || office.requirementCount || 66;
-              const compliancePct = Math.round(office.compliance_percentage || office.compliancePercentage || 0);
-              const statusLabel = compliancePct >= 100 ? 'Compiled' : compliancePct > 0 ? 'Partially Complied' : 'Not Complied';
-              const statusBadgeClass = compliancePct >= 100 
+              const rawPct = Number(office.compliance_percent ?? office.CompliancePercent ?? office.compliance_percentage ?? office.compliancePercentage ?? 0);
+              const compliancePct = isNaN(rawPct) ? 0 : rawPct;
+              const statusLabel = office.overall_status || (compliancePct >= 100 ? 'Complied' : compliancePct > 0 ? 'Partially Complied' : 'Not Complied');
+              const statusBadgeClass = (compliancePct >= 100 || statusLabel === 'Complied')
                 ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                : compliancePct > 0
+                : (compliancePct > 0 || statusLabel === 'Partially Complied')
                 ? 'bg-amber-50 text-amber-700 border-amber-200'
                 : 'bg-rose-50 text-rose-700 border-rose-200';
 
@@ -358,7 +359,7 @@ export default function AccreditationOfficesView({
                         </span>
                         <span className="text-slate-300 shrink-0">•</span>
                         <span className="text-[10px] font-bold text-slate-500 uppercase shrink-0">
-                          {office.department_name || office.DepartmentCode || 'SSLATE'}
+                          {office.department_name || office.DepartmentCode || (isAcademic ? 'Academic' : 'Institution-wide')}
                         </span>
                       </div>
                     </div>
@@ -366,7 +367,11 @@ export default function AccreditationOfficesView({
 
                   {/* Type Badge */}
                   <div className="mt-1 shrink-0">
-                    <span className="inline-flex items-center px-2 py-0.2 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                    <span className={`inline-flex items-center px-2 py-0.2 rounded-md text-[10px] font-bold border ${
+                      isAcademic
+                        ? 'bg-blue-50 text-blue-700 border-blue-100'
+                        : 'bg-indigo-50 text-indigo-700 border border-indigo-100'
+                    }`}>
                       {isAcademic ? 'Academic' : 'Non-Academic'}
                     </span>
                   </div>
@@ -407,8 +412,8 @@ export default function AccreditationOfficesView({
                           style={{ width: `${compliancePct}%` }}
                         />
                       </div>
-                      <span className="text-[10px] font-extrabold text-slate-700 font-mono w-7 text-right">
-                        {compliancePct}%
+                      <span className="text-[10px] font-extrabold text-slate-700 font-mono w-8 text-right">
+                        {compliancePct % 1 === 0 ? compliancePct.toFixed(0) : compliancePct.toFixed(1)}%
                       </span>
                     </div>
                   </div>

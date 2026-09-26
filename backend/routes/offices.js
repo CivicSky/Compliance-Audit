@@ -10,6 +10,7 @@ router.get("/:id/export", auth, restrictAuditorDownloads, OfficesController.expo
 router.get("/:id", auth, OfficesController.getById);
 router.post("/", auth, restrictAuditor, OfficesController.create);
 router.put("/:id", auth, restrictAuditor, OfficesController.update);
+router.put("/:id/level", auth, restrictAuditor, OfficesController.updateLevel);
 router.post("/delete-multiple", auth, restrictAuditor, OfficesController.deleteMultiple);
 router.delete("/delete-multiple", auth, restrictAuditor, OfficesController.deleteMultiple);
 router.delete("/", auth, restrictAuditor, OfficesController.deleteMultiple);

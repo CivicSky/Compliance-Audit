@@ -31,10 +31,10 @@ const CriteriaP = forwardRef(function CriteriaP({ searchTerm = "", eventId = nul
       if (response.success) {
         setCriteria(response.data);
       } else {
-        setError("Failed to fetch criteria");
+        setError("Failed to fetch sub areas");
       }
     } catch (err) {
-      setError("Error loading criteria");
+      setError("Error loading sub areas");
     } finally {
       setLoading(false);
     }
@@ -87,13 +87,13 @@ const CriteriaP = forwardRef(function CriteriaP({ searchTerm = "", eventId = nul
   };
 
   if (loading) {
-    return <div className="p-6">Loading criteria...</div>;
+    return <div className="p-6">Loading sub areas...</div>;
   }
   if (error) {
     return <div className="p-6 text-red-600">{error}</div>;
   }
   if (filtered.length === 0) {
-    return <div className="p-6 text-gray-600">No criteria found.</div>;
+    return <div className="p-6 text-gray-600">No sub areas found.</div>;
   }
 
 

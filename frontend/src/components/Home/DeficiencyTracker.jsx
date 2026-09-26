@@ -19,6 +19,7 @@ import {
 import CustomDropdown from "../UI/CustomDropdown";
 import { API_BASE_URL } from "../../utils/apiBase";
 import userIcon from "../../assets/images/user.svg";
+import SmartUserAvatar from "../UI/SmartUserAvatar";
 
 export default function DeficiencyTracker({
     offices = [],
@@ -140,9 +141,9 @@ export default function DeficiencyTracker({
 
             let percent = 0;
             if (office?.compliance_percent !== undefined && office?.compliance_percent !== null) {
-                percent = Math.min(100, Math.max(0, Math.round(Number(office.compliance_percent))));
+                percent = Math.min(100, Math.max(0, Number(office.compliance_percent)));
             } else if (totalRequirements > 0) {
-                percent = Math.min(100, Math.max(0, Math.round(((compliedCount * 100) + (partiallyCompliedCount * 50)) / totalRequirements)));
+                percent = Math.min(100, Math.max(0, ((compliedCount * 100) + (partiallyCompliedCount * 50)) / totalRequirements));
             }
 
             const deficienciesCount = notCompliedCount + partiallyCompliedCount;
@@ -210,7 +211,10 @@ export default function DeficiencyTracker({
         let nonAcademicDeficientCount = 0;
 
         for (const unit of eventFilteredOffices) {
-            if (unit.percent === 100 && unit.totalRequirements > 0) {
+            if (unit.totalRequirements === 0) {
+                continue;
+            }
+            if (unit.percent === 100) {
                 compliantCount += 1;
             } else {
                 if (unit.percent < 50) criticalCount += 1;
@@ -313,40 +317,18 @@ export default function DeficiencyTracker({
     // Helper to render personnel avatar with photo and tooltip
     const renderPersonnelAvatar = (head, size = "md") => {
         const name = head?.full_name || `${head?.FirstName || ""} ${head?.LastName || ""}`.trim() || "Head";
-        const initials = name
-            .split(" ")
-            .map((n) => n[0])
-            .filter(Boolean)
-            .slice(0, 2)
-            .join("")
-            .toUpperCase() || "U";
-
-        const picUrl = head?.ProfilePic
-            ? head.ProfilePic.startsWith("http")
-                ? head.ProfilePic
-                : `${API_BASE_URL}/uploads/profile-pics/${head.ProfilePic}`
-            : null;
-
-        const dimClass = size === "sm" ? "h-6 w-6 text-[10px]" : "h-7 w-7 text-xs";
+        const dimClass = size === "sm" ? "h-6 w-6" : "h-7 w-7";
+        const textClass = size === "sm" ? "text-[10px] font-bold" : "text-xs font-bold";
 
         return (
             <div key={head.HeadID || head.UserID || name} className="group relative inline-block shrink-0">
-                {picUrl ? (
-                    <img
-                        src={picUrl}
-                        alt={name}
-                        className={`${dimClass} rounded-full object-cover border-2 border-white shadow-xs bg-slate-100`}
-                        onError={(e) => {
-                            e.target.src = userIcon;
-                        }}
-                    />
-                ) : (
-                    <div
-                        className={`${dimClass} rounded-full bg-indigo-100 text-indigo-700 font-semibold border-2 border-white shadow-xs flex items-center justify-center`}
-                    >
-                        {initials}
-                    </div>
-                )}
+                <SmartUserAvatar
+                    user={head}
+                    fullName={name}
+                    size={dimClass}
+                    textSize={textClass}
+                    ring="border-2 border-white shadow-xs"
+                />
                 {/* Tooltip */}
                 <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-medium text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100">
                     <p className="font-semibold">{name}</p>
@@ -381,7 +363,7 @@ export default function DeficiencyTracker({
                                 )}
                             </div>
                             <p className="text-xs text-slate-500 mt-0.5">
-                                Monitor academic programs and non-academic offices with pending or incomplete evidence under each accreditation.
+                                Monitor academic programs and non-academic offices with pending or incomplete standards under each accreditation.
                             </p>
                         </div>
                     </div>
@@ -552,7 +534,7 @@ export default function DeficiencyTracker({
                         placeholder="Search offices..."
                         value={searchTerm}
                         onChange={handleSearchChange}
-                        className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-8 text-xs text-slate-800 placeholder-slate-400 shadow-2xs transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                        className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-8 text-xs text-slate-800 placeholder-slate-400 shadow-2xs transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                     />
                     {searchTerm && (
                         <button
@@ -624,7 +606,7 @@ export default function DeficiencyTracker({
                                 </div>
                                 <h3 className="mt-3 text-base font-bold text-slate-800">All Units are 100% Compliant</h3>
                                 <p className="mt-1 max-w-sm text-xs text-slate-500">
-                                    Every academic program and non-academic office has fulfilled their compliance evidence for this accreditation.
+                                    Every academic program and non-academic office has fulfilled their compliance standards for this accreditation.
                                 </p>
                             </>
                         ) : (
@@ -652,8 +634,9 @@ export default function DeficiencyTracker({
                     /* Cards Grid View */
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 pt-1.5 pb-1.5">
                         {paginatedOffices.map((office) => {
-                            const isCompliant = office.percent === 100 && office.totalRequirements > 0;
-                            const isCritical = office.percent < 50;
+                            const hasNoReqs = office.totalRequirements === 0;
+                            const isCompliant = !hasNoReqs && office.percent === 100;
+                            const isCritical = !hasNoReqs && office.percent < 50;
 
                             return (
                                 <div
@@ -677,7 +660,11 @@ export default function DeficiencyTracker({
                                             </div>
 
                                             {/* Severity status chip */}
-                                            {isCompliant ? (
+                                            {hasNoReqs ? (
+                                                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500 border border-slate-200">
+                                                    No Requirements
+                                                </span>
+                                            ) : isCompliant ? (
                                                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 border border-emerald-200">
                                                     <CheckCircle2 size={11} /> 100% Complied
                                                 </span>
@@ -820,7 +807,7 @@ export default function DeficiencyTracker({
                                             onClick={() => onInspectOffice && onInspectOffice(office)}
                                             className="w-full flex items-center justify-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50/70 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100 hover:border-blue-300 transition cursor-pointer"
                                         >
-                                            <Eye size={13} /> Inspect Evidence
+                                            <Eye size={13} /> Inspect Standards
                                         </button>
                                     </div>
                                 </div>
@@ -844,8 +831,9 @@ export default function DeficiencyTracker({
                             </thead>
                             <tbody className="divide-y divide-slate-100 bg-white">
                                 {paginatedOffices.map((office) => {
-                                    const isCompliant = office.percent === 100 && office.totalRequirements > 0;
-                                    const isCritical = office.percent < 50;
+                                    const hasNoReqs = office.totalRequirements === 0;
+                                    const isCompliant = !hasNoReqs && office.percent === 100;
+                                    const isCritical = !hasNoReqs && office.percent < 50;
 
                                     return (
                                         <tr key={office.officeId || office.OfficeID} className="hover:bg-slate-50/80 transition">

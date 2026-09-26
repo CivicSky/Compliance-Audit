@@ -5,6 +5,7 @@ import { dataCache, CacheKeys } from '../../utils/dataCache';
 import { useToast } from '../UI/Toast';
 import { useLiveRefresh } from '../../utils/liveSync';
 import RenameInline from './RenameInline';
+import SmartUserAvatar from './SmartUserAvatar';
 
 const getExtension = (fileNameOrUrl) => {
     const s = String(fileNameOrUrl || '');
@@ -50,7 +51,7 @@ const FileCardItem = memo(({
     const [editingTitle, setEditingTitle] = React.useState(false);
     const fileUrl = item.url || item.file_path || '';
     const ext = getExtension(item.fileName || fileUrl);
-    const displayTitle = item.displayName || item.fileName || `Evidence ${idx + 1}`;
+    const displayTitle = item.displayName || item.fileName || `Standard ${idx + 1}`;
     const commentText = String(item.comment || item.rejectionReason || '');
     const [localComment, setLocalComment] = React.useState(commentText);
     const [savedComment, setSavedComment] = React.useState(commentText);
@@ -170,7 +171,7 @@ const FileCardItem = memo(({
                 ) : (
                     <div className="flex items-center gap-1.5">
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
-                            Evidence
+                            Standard
                         </span>
                     </div>
                 )}
@@ -290,7 +291,7 @@ const FileCardItem = memo(({
                                     ? 'bg-emerald-600 text-white shadow-2xs ring-1 ring-emerald-700' 
                                     : 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
                             }`}
-                            title="Approve evidence"
+                            title="Approve standard file"
                         >
                             <svg className="w-3 h-3 stroke-current" fill="none" viewBox="0 0 24 24" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                                 <polyline points="20 6 9 17 4 12" />
@@ -307,7 +308,7 @@ const FileCardItem = memo(({
                                     ? 'bg-rose-600 text-white shadow-2xs ring-1 ring-rose-700' 
                                     : 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100'
                             }`}
-                            title="Reject evidence and set comment as rejection reason"
+                            title="Reject standard file and set comment as rejection reason"
                         >
                             <svg className="w-3 h-3 stroke-current" fill="none" viewBox="0 0 24 24" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                                 <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -545,9 +546,6 @@ export default function UserFilesGridModal({
     if (!show || !user) return null;
 
     const displayName = `${user?.FirstName || ''}${user?.LastName ? ' ' + user.LastName : ''}`.trim() || user?.Username || 'Personnel';
-    const avatarSrc = user?.ProfilePic
-        ? `${API_BASE_URL}/uploads/profile-pics/${user.ProfilePic}`
-        : '/src/assets/images/user.svg';
 
     const reqCode = requirement?.RequirementCode || 'Requirement';
     const reqDesc = requirement?.Description || '';
@@ -698,13 +696,13 @@ export default function UserFilesGridModal({
 
             const label = status === 'approved' ? 'Approved' : status === 'rejected' ? 'Needs Revision' : 'Reset to Pending';
             toast?.({
-                title: `Evidence ${label}`,
+                title: `Standard ${label}`,
                 description: status === 'rejected' ? 'Rejection note saved to comment' : `File marked as ${status}`,
                 variant: status === 'approved' ? 'success' : status === 'rejected' ? 'warning' : 'info',
                 duration: 2500
             });
         } catch (err) {
-            console.error('Failed to review evidence:', err);
+            console.error('Failed to review standard:', err);
             toast?.({
                 title: 'Review Failed',
                 description: err?.response?.data?.message || err.message || 'Could not update status',
@@ -798,35 +796,99 @@ export default function UserFilesGridModal({
             >
                 {/* Header matching App Design System */}
                 <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 bg-white shrink-0">
-                    <div className="flex items-center gap-3 min-w-0">
-                        <div className="relative shrink-0">
-                            <img 
-                                src={avatarSrc} 
-                                alt={displayName} 
-                                loading="lazy"
-                                decoding="async"
-                                onError={(e) => { e.target.src = '/src/assets/images/user.svg'; }}
-                                className="h-10 w-10 rounded-full object-cover border-2 border-emerald-500 shadow-2xs" 
-                            />
-                            <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 min-w-[16px] min-h-[16px] shrink-0 items-center justify-center rounded-full border-2 border-white bg-emerald-500 text-white shadow-2xs">
+                    {(() => {
+                        const approvedCount = localFiles.filter(f => f.reviewStatus === 'approved').length;
+                        const rejectedCount = localFiles.filter(f => f.reviewStatus === 'rejected').length;
+                        const isAllApproved = approvedCount === localFiles.length && localFiles.length > 0;
+                        const isPartialApproved = approvedCount > 0 && !isAllApproved;
+                        const hasRejected = rejectedCount > 0;
+
+                        let borderColor = 'border-amber-400';
+                        let badgeBg = 'bg-amber-500';
+                        let badgeIcon = (
+                            <svg className="w-2 h-2 stroke-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                                <circle cx="12" cy="12" r="9"/>
+                                <polyline points="12 7 12 12 15 14"/>
+                            </svg>
+                        );
+                        let statusPill = (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-800 border border-amber-200 shadow-2xs">
+                                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                                Pending Review ({localFiles.length} files)
+                            </span>
+                        );
+
+                        if (hasRejected) {
+                            borderColor = 'border-rose-400';
+                            badgeBg = 'bg-rose-500';
+                            badgeIcon = (
+                                <svg className="w-2 h-2 stroke-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                                </svg>
+                            );
+                            statusPill = (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-bold text-rose-700 border border-rose-200 shadow-2xs">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-rose-500"></span>
+                                    Needs Revision ({rejectedCount})
+                                </span>
+                            );
+                        } else if (isAllApproved) {
+                            borderColor = 'border-emerald-500';
+                            badgeBg = 'bg-emerald-500';
+                            badgeIcon = (
                                 <svg className="w-2 h-2 stroke-white" fill="none" viewBox="0 0 24 24" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
                                     <polyline points="20 6 9 17 4 12" />
                                 </svg>
-                            </span>
-                        </div>
-                        <div className="min-w-0">
-                            <div className="flex items-center gap-2.5">
-                                <h2 className="text-sm sm:text-base font-bold text-slate-900 truncate">{displayName}</h2>
-                                <span className="rounded-full bg-emerald-100/90 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
-                                    Submitted ({localFiles.length} files)
+                            );
+                            statusPill = (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100/90 px-2.5 py-0.5 text-xs font-bold text-emerald-700 border border-emerald-200 shadow-2xs">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                                    All Approved ({localFiles.length} files)
                                 </span>
+                            );
+                        } else if (isPartialApproved) {
+                            borderColor = 'border-blue-400';
+                            badgeBg = 'bg-blue-500';
+                            badgeIcon = (
+                                <svg className="w-2 h-2 stroke-white" fill="none" viewBox="0 0 24 24" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="20 6 9 17 4 12" />
+                                </svg>
+                            );
+                            statusPill = (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-bold text-blue-700 border border-blue-200 shadow-2xs">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-blue-500"></span>
+                                    {approvedCount}/{localFiles.length} Approved
+                                </span>
+                            );
+                        }
+
+                        return (
+                            <div className="flex items-center gap-3 min-w-0">
+                                <div className="relative shrink-0">
+                                    <SmartUserAvatar
+                                        user={user}
+                                        size="h-10 w-10"
+                                        textSize="text-xs"
+                                        ring={`border-2 ${borderColor} shadow-2xs`}
+                                    />
+                                    <span className={`absolute -bottom-0.5 -right-0.5 flex h-4 w-4 min-w-[16px] min-h-[16px] shrink-0 items-center justify-center rounded-full border-2 border-white ${badgeBg} text-white shadow-2xs`}>
+                                        {badgeIcon}
+                                    </span>
+                                </div>
+                                <div className="min-w-0">
+                                    <div className="flex items-center gap-2.5">
+                                        <h2 className="text-sm sm:text-base font-bold text-slate-900 truncate">{displayName}</h2>
+                                        {statusPill}
+                                    </div>
+                                    <p className="text-xs text-slate-500 truncate mt-0.5">
+                                        <span className="font-semibold text-slate-700">{reqCode}</span>
+                                        {reqDesc ? ` — ${reqDesc}` : ''}
+                                    </p>
+                                </div>
                             </div>
-                            <p className="text-xs text-slate-500 truncate mt-0.5">
-                                <span className="font-semibold text-slate-700">{reqCode}</span>
-                                {reqDesc ? ` — ${reqDesc}` : ''}
-                            </p>
-                        </div>
-                    </div>
+                        );
+                    })()}
                     
                     <div className="flex items-center gap-3 shrink-0">
                         {isOwnFiles && (
@@ -923,7 +985,7 @@ export default function UserFilesGridModal({
                         </div>
                     ) : (
                         <div className="rounded-xl border border-dashed border-slate-300/80 bg-white py-12 text-center text-sm font-medium text-slate-500">
-                            No evidence files submitted by this user.
+                            No standard files submitted by this user.
                         </div>
                     )}
                 </div>

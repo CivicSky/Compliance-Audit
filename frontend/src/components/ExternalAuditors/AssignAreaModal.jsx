@@ -6,7 +6,7 @@ import CustomSelect from "../UI/CustomSelect";
 
 export default function AssignAreaModal({ show, auditor, onClose, onSaveSuccess }) {
     const [events, setEvents] = useState([]);
-    const [selectedEventId, setSelectedEventId] = useState("all");
+    const [selectedEventId, setSelectedEventId] = useState("");
     const [areas, setAreas] = useState([]);
     const [loadingAreas, setLoadingAreas] = useState(false);
     const [selectedAreaIds, setSelectedAreaIds] = useState(new Set());
@@ -51,6 +51,7 @@ export default function AssignAreaModal({ show, auditor, onClose, onSaveSuccess 
 
                 // 3. Fetch current auditor's assigned areas
                 const targetUserId = auditor.UserID ?? auditor.id ?? auditor.user_id;
+                let preferredEventId = '';
                 if (targetUserId) {
                     const assignRes = await fetch(`${API_BASE_URL}/api/areas/assignments/${targetUserId}`, { headers });
                     if (assignRes.ok) {
@@ -58,7 +59,18 @@ export default function AssignAreaModal({ show, auditor, onClose, onSaveSuccess 
                         const existingAssigned = assignData.assignments || [];
                         const assignedIds = new Set(existingAssigned.map(a => Number(a.area_id ?? a.AreaID)));
                         if (mounted) setSelectedAreaIds(assignedIds);
+
+                        // If auditor is already assigned in one of the active events, pick that as default
+                        const match = existingAssigned.find(a => a.EventID && activeEvents.some(e => String(e.EventID) === String(a.EventID)));
+                        if (match) {
+                            preferredEventId = String(match.EventID);
+                        }
                     }
+                }
+
+                if (mounted) {
+                    const defaultId = preferredEventId || (activeEvents[0] ? String(activeEvents[0].EventID) : '');
+                    setSelectedEventId(prev => (prev && activeEvents.some(e => String(e.EventID) === String(prev))) ? prev : defaultId);
                 }
             } catch (err) {
                 console.error("Error loading areas/events for assignment:", err);
@@ -74,7 +86,7 @@ export default function AssignAreaModal({ show, auditor, onClose, onSaveSuccess 
     if (!show || !auditor) return null;
 
     const filteredAreas = areas.filter(area => {
-        const matchesEvent = selectedEventId === "all" || String(area.EventID) === String(selectedEventId);
+        const matchesEvent = String(area.EventID) === String(selectedEventId);
         const code = String(area.AreaCode || '').toLowerCase();
         const name = String(area.AreaName || '').toLowerCase();
         const search = searchTerm.toLowerCase().trim();
@@ -181,19 +193,17 @@ export default function AssignAreaModal({ show, auditor, onClose, onSaveSuccess 
 
                 {/* Filter Toolbar */}
                 <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between shrink-0">
-                    {/* Event Filter */}
+                    {/* Accreditation Dropdown */}
                     <div className="flex-1 min-w-[200px]">
-                        <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block mb-1">Filter Event</label>
+                        <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block mb-1">Accreditation</label>
                         <CustomSelect
                             value={selectedEventId}
                             onChange={(val) => setSelectedEventId(val)}
-                            options={[
-                                { value: "all", label: `All Accreditation Events (${events.length})` },
-                                ...events.map(ev => ({
-                                    value: String(ev.EventID),
-                                    label: `${ev.EventCode ? `${ev.EventCode}: ` : ''}${ev.EventName}`
-                                }))
-                            ]}
+                            options={events.map(ev => ({
+                                value: String(ev.EventID),
+                                label: `${ev.EventCode ? `${ev.EventCode}: ` : ''}${ev.EventName}`
+                            }))}
+                            placeholder={events.length === 0 ? "No active accreditations" : "Select Accreditation"}
                             size="sm"
                         />
                     </div>
@@ -207,9 +217,9 @@ export default function AssignAreaModal({ show, auditor, onClose, onSaveSuccess 
                                 placeholder="Search code or area name..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full h-9 rounded-lg border border-slate-200 bg-white pl-8 pr-3 text-xs text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-xs"
+                                className="w-full h-9 rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-xs text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-xs"
                             />
-                            <svg className="w-4 h-4 text-slate-400 absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                             </svg>
                         </div>
@@ -219,7 +229,7 @@ export default function AssignAreaModal({ show, auditor, onClose, onSaveSuccess 
                 {/* Selection Count Bar */}
                 <div className="px-5 py-2.5 bg-blue-50 border-b border-blue-100 flex items-center justify-between shrink-0 text-xs">
                     <span className="font-semibold text-blue-800">
-                        {selectedAreaIds.size} Area(s) Selected
+                        {filteredAreas.filter(a => selectedAreaIds.has(Number(a.AreaID))).length} of {filteredAreas.length} Area(s) Selected
                     </span>
                     <div className="flex items-center gap-3 text-xs">
                         <button
@@ -250,11 +260,14 @@ export default function AssignAreaModal({ show, auditor, onClose, onSaveSuccess 
                     ) : filteredAreas.length === 0 ? (
                         <div className="text-center py-12 border border-dashed border-slate-200 rounded-xl bg-slate-50">
                             <p className="text-xs font-semibold text-slate-600">No matching areas found</p>
-                            <p className="text-[11px] text-slate-400 mt-1">Try selecting a different event or clearing your search term.</p>
+                            <p className="text-[11px] text-slate-400 mt-1">Try selecting a different accreditation or clearing your search term.</p>
                         </div>
                     ) : (
                         filteredAreas.map(area => {
                             const isChecked = selectedAreaIds.has(Number(area.AreaID));
+                            const targetUserId = auditor.UserID ?? auditor.id ?? auditor.user_id;
+                            const isAssignedToOther = area.AuditorUserID && Number(area.AuditorUserID) !== Number(targetUserId);
+
                             return (
                                 <label
                                     key={area.AreaID}
@@ -271,13 +284,20 @@ export default function AssignAreaModal({ show, auditor, onClose, onSaveSuccess 
                                         className="h-4 w-4 mt-0.5 accent-blue-600 rounded border-slate-300"
                                     />
                                     <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2">
-                                            <span className="inline-block px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-blue-100 text-blue-700 shrink-0">
-                                                {area.AreaCode || 'AREA'}
-                                            </span>
-                                            <span className="font-semibold text-xs text-slate-800 truncate">
-                                                {area.AreaName}
-                                            </span>
+                                        <div className="flex items-center justify-between gap-2">
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <span className="inline-block px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-blue-100 text-blue-700 shrink-0">
+                                                    {area.AreaCode || 'AREA'}
+                                                </span>
+                                                <span className="font-semibold text-xs text-slate-800 truncate">
+                                                    {area.AreaName}
+                                                </span>
+                                            </div>
+                                            {isAssignedToOther && (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full bg-amber-50 text-amber-700 border border-amber-200/80 shrink-0">
+                                                    Currently: {area.AuditorName || `Auditor #${area.AuditorUserID}`}
+                                                </span>
+                                            )}
                                         </div>
                                         {area.Description && (
                                             <p className="text-[11px] text-slate-500 line-clamp-1 mt-1">

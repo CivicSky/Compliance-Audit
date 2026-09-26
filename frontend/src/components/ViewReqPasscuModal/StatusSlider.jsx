@@ -104,7 +104,7 @@ export default function StatusSlider({
             className={`w-48 select-none flex flex-col justify-between rounded-xl border border-slate-300/50 bg-slate-200/50 p-2.5 shadow-xs transition-opacity ${
                 disabled ? 'opacity-60 cursor-not-allowed' : ''
             } ${className}`}
-            title={disabled ? 'Upload evidence or proof document before selecting compliance status' : ''}
+            title={disabled ? 'Upload standard proof document before selecting compliance status' : ''}
             onClick={(e) => {
                 e.stopPropagation();
                 if (disabled) onDisabledClick?.();

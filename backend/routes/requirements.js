@@ -537,25 +537,25 @@ router.delete('/:requirementId/file/:userId', auth, async (req, res) => {
 
         // Check remaining uploaded files count for this user & requirement & office
         let countQ = 'SELECT COUNT(*) as cnt FROM office_proof_documents WHERE requirement_id = ? AND uploaded_by = ?';
-        let countP = [requirementId, userId];
+        let countP = [Number(requirementId), Number(userId)];
         if (resolvedFileOfficeId) {
             countQ += ' AND office_id = ?';
-            countP.push(resolvedFileOfficeId);
+            countP.push(Number(resolvedFileOfficeId));
         }
         const [remaining] = await db.query(countQ, countP);
 
-        const remainingCount = remaining[0]?.cnt || 0;
+        const remainingCount = Number(remaining[0]?.cnt ?? 0);
         if (remainingCount === 0) {
             try {
                 if (resolvedFileOfficeId) {
                     await db.query(
-                        'UPDATE requirement_user_assignments SET HasUploaded = FALSE WHERE RequirementID = ? AND UserID = ? AND OfficeID = ?',
-                        [requirementId, userId, resolvedFileOfficeId]
+                        'UPDATE requirement_user_assignments SET HasUploaded = FALSE WHERE RequirementID = ? AND UserID = ? AND (OfficeID = ? OR OfficeID IS NULL)',
+                        [Number(requirementId), Number(userId), Number(resolvedFileOfficeId)]
                     );
                 } else {
                     await db.query(
                         'UPDATE requirement_user_assignments SET HasUploaded = FALSE WHERE RequirementID = ? AND UserID = ?',
-                        [requirementId, userId]
+                        [Number(requirementId), Number(userId)]
                     );
                 }
             } catch (uErr) {
@@ -667,6 +667,92 @@ router.post('/user-upload', auth, userReqUpload.single('file'), async (req, res)
         const EventCode = reqRow.EventCode || reqRow.eventcode || EventName || 'Event';
         const OfficeID = reqRow.OfficeID || reqRow.officeid || null;
         const finalResolvedOfficeId = resolvedOfficeId || (OfficeID ? Number(OfficeID) : null);
+
+        // Authorization check: Only assigned personnel and assigned auditors can upload evidence
+        const actorUserId = Number(req.user?.userId || req.user?.UserID || req.user?.id);
+        const actorRoleId = Number(req.user?.roleId || req.user?.RoleID || 0);
+        const isAdmin = actorRoleId === 1;
+
+        if (!isAdmin) {
+            if (Number(userId) !== actorUserId) {
+                if (req.file && req.file.path && fs.existsSync(req.file.path)) {
+                    try { fs.unlinkSync(req.file.path); } catch (e) {}
+                }
+                return res.status(403).json({
+                    success: false,
+                    message: 'Forbidden: You can only upload files for your own account.'
+                });
+            }
+
+            let isHeadAssigned = false;
+            if (finalResolvedOfficeId) {
+                try {
+                    const [headRows] = await db.query(
+                        `SELECT 1 FROM office_head_assignments oha 
+                         JOIN headofoffice h ON oha.HeadID = h.HeadID 
+                         WHERE oha.OfficeID = ? AND h.UserID = ?`,
+                        [finalResolvedOfficeId, actorUserId]
+                    );
+                    if (headRows && headRows.length > 0) isHeadAssigned = true;
+                } catch (hErr) {
+                    console.warn('Head assignment check error:', hErr.message);
+                }
+            }
+
+            let isReqAssigned = false;
+            try {
+                const [reqAssignRows] = await db.query(
+                    `SELECT 1 FROM requirement_user_assignments 
+                     WHERE RequirementID = ? AND UserID = ? ${finalResolvedOfficeId ? 'AND (OfficeID = ? OR OfficeID IS NULL)' : ''}`,
+                    finalResolvedOfficeId ? [requirementId, actorUserId, finalResolvedOfficeId] : [requirementId, actorUserId]
+                );
+                if (reqAssignRows && reqAssignRows.length > 0) isReqAssigned = true;
+            } catch (rErr) {
+                console.warn('Requirement user assignment check error:', rErr.message);
+            }
+
+            let isAuditorAssigned = false;
+            if (actorRoleId === 4) {
+                const reqAreaId = Number(reqRow.AreaID || reqRow.areaid || 0);
+                if (reqAreaId) {
+                    try {
+                        const [auditorAreaRows] = await db.query(
+                            `SELECT 1 FROM auditor_area_assignments 
+                             WHERE area_id = ? AND auditor_user_id = ?`,
+                            [reqAreaId, actorUserId]
+                        );
+                        if (auditorAreaRows && auditorAreaRows.length > 0) isAuditorAssigned = true;
+                    } catch (aaErr) {
+                        console.warn('Auditor area check error:', aaErr.message);
+                    }
+                }
+                if (!isAuditorAssigned && finalResolvedOfficeId) {
+                    try {
+                        const [auditorOfficeRows] = await db.query(
+                            `SELECT 1 FROM auditor_area_assignments aaa
+                             JOIN offices o ON o.OfficeID = ?
+                             JOIN criteria c ON c.EventID = o.EventID
+                             WHERE aaa.area_id = c.AreaID AND aaa.auditor_user_id = ?`,
+                            [finalResolvedOfficeId, actorUserId]
+                        );
+                        if (auditorOfficeRows && auditorOfficeRows.length > 0) isAuditorAssigned = true;
+                    } catch (aoErr) {
+                        console.warn('Auditor office check error:', aoErr.message);
+                    }
+                }
+            }
+
+            if (!isHeadAssigned && !isReqAssigned && !isAuditorAssigned) {
+                if (req.file && req.file.path && fs.existsSync(req.file.path)) {
+                    try { fs.unlinkSync(req.file.path); } catch (e) {}
+                }
+                return res.status(403).json({
+                    success: false,
+                    message: 'Forbidden: Only assigned personnel and assigned auditors can upload evidence for this office.'
+                });
+            }
+        }
+
         const Description = reqRow.Description || reqRow.description || '';
         const CriteriaName = reqRow.CriteriaName || reqRow.criterianame || '';
         const CriteriaCode = reqRow.CriteriaCode || reqRow.criteriacode || CriteriaName || '';

@@ -251,7 +251,7 @@ export const eventsAPI = {
 // Requirements API
 // ========================
 export const requirementsAPI = {
-  getAllRequirements: async () => (await api.get('/api/requirements/all')).data,
+  getAllRequirements: async (params) => (await api.get('/api/requirements/all', { params })).data,
   getRequirementsByEvent: async (eventId) => (await api.get(`/api/requirements/event/${eventId}`)).data,
   getRequirementsByCriteria: async (criteriaId) => (await api.get(`/api/requirements/criteria/${criteriaId}`)).data,
   addRequirement: async (data) => (await api.post('/api/requirements/add', data)).data,
@@ -291,6 +291,7 @@ export const officesAPI = {
   },
   createOffice: async (data) => (await api.post('/api/offices', data)).data,
   updateOffice: async (id, data) => (await api.put(`/api/offices/${id}`, data)).data,
+  updateLevel: async (id, accreditation_level) => (await api.put(`/api/offices/${id}/level`, { accreditation_level })).data,
   deleteOffice: async (id) => (await api.delete(`/api/offices/${id}`)).data,
   deleteMultipleOffices: async (ids) => (await api.post('/api/offices/delete-multiple', { ids })).data,
   getById: async (id) => (await api.get(`/api/offices/${id}`)).data,

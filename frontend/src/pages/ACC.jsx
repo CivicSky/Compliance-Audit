@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { officesAPI, eventsAPI, areasAPI, requirementsAPI, usersAPI } from '../utils/api';
 import AccreditationOfficesView from '../components/ACC/AccreditationOfficesView';
 import AccreditationMasterList from '../components/ACC/AccreditationMasterList';
@@ -19,8 +20,15 @@ import { dataCache } from '../utils/dataCache';
 
 export default function ACCPage() {
   const { showAlert } = useModal();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [activeTab, setActiveTab] = useState('categories'); // 'categories' (Programs & Offices), 'departments', or 'master-list'
+  const [activeTab, setActiveTab] = useState(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam && ['categories', 'master-list', 'departments', 'assign-offices'].includes(tabParam)) {
+      return tabParam;
+    }
+    return 'categories';
+  });
   const [offices, setOffices] = useState([]);
   const [events, setEvents] = useState([]);
   const [areasData, setAreasData] = useState([]);
@@ -44,6 +52,21 @@ export default function ACCPage() {
   const isAuditor = roleId === 4 || roleName.includes('auditor') || Boolean(currentUser?.isExternalAuditor);
   const isOfficer = roleId === 2 || roleId === 3 || roleName.includes('office') || roleName === 'user' || roleName === 'personnel' || roleName === 'head';
   const isAdmin = (roleId === 1 || roleName === 'admin') && !isAuditor && !isOfficer;
+
+  useEffect(() => {
+    if ((isAuditor || isOfficer) && activeTab === 'departments') {
+      setActiveTab('categories');
+    }
+  }, [isAuditor, isOfficer, activeTab]);
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam && ['categories', 'master-list', 'departments', 'assign-offices'].includes(tabParam)) {
+      setActiveTab(tabParam);
+    } else if (searchParams.get('fromNotif') === '1') {
+      setActiveTab('categories');
+    }
+  }, [searchParams]);
 
   // Helper to load full hierarchy for selected event
   const loadEventStructure = useCallback(async (eventId) => {
@@ -70,16 +93,33 @@ export default function ACCPage() {
         allCriteria = [];
       }
 
-      // 3. Fetch requirements for each criteria
+      // 3. Batch-fetch all requirements for the event in one fast request
+      let allEventReqs = [];
+      try {
+        const reqRes = await axios.get(`${API_BASE_URL}/api/requirements/all?eventId=${eventId}`, { headers });
+        allEventReqs = reqRes.data?.data || reqRes.data || [];
+      } catch (rErr) {
+        console.warn('Batch requirements fetch notice:', rErr.message);
+      }
+
+      const reqsByCriteria = {};
+      allEventReqs.forEach((r) => {
+        const cId = String(r.CriteriaID || r.criteria_id);
+        if (!reqsByCriteria[cId]) reqsByCriteria[cId] = [];
+        reqsByCriteria[cId].push(r);
+      });
+
       const criteriaWithReqs = await Promise.all(
         allCriteria.map(async (crit) => {
-          const critId = crit.CriteriaID || crit.id;
-          let reqs = [];
-          try {
-            const res = await axios.get(`${API_BASE_URL}/api/requirements/criteria/${critId}`, { headers });
-            reqs = res.data?.data || res.data || [];
-          } catch {
-            reqs = [];
+          const critId = String(crit.CriteriaID || crit.id);
+          let reqs = reqsByCriteria[critId] || [];
+          if (reqs.length === 0 && allEventReqs.length === 0) {
+            try {
+              const res = await axios.get(`${API_BASE_URL}/api/requirements/criteria/${critId}`, { headers });
+              reqs = res.data?.data || res.data || [];
+            } catch {
+              reqs = [];
+            }
           }
           return {
             ...crit,
@@ -232,7 +272,7 @@ export default function ACCPage() {
 
       if (showAlert) {
         showAlert(
-          `Successfully assigned ${requirementIds.length} evidence item(s) to ${officeIds.length} office(s).`,
+          `Successfully assigned ${requirementIds.length} standard item(s) to ${officeIds.length} office(s).`,
           'success'
         );
       }
@@ -257,7 +297,7 @@ export default function ACCPage() {
       console.error('Failed to assign requirements to offices:', err);
       if (showAlert) {
         showAlert(
-          err.response?.data?.message || err.message || 'Error assigning evidence',
+          err.response?.data?.message || err.message || 'Error assigning standards',
           'error'
         );
       }
@@ -277,6 +317,10 @@ export default function ACCPage() {
       });
     }
   };
+
+  const activeAccreditation = selectedEvent && !['inactive', 'archived', '0', 'false'].includes(
+    String(selectedEvent.Status ?? selectedEvent.status ?? '').toLowerCase()
+  ) ? selectedEvent : null;
 
   return (
     <div className="fixed top-14 bottom-0 left-0 lg:left-[var(--sidebar-width)] right-0 bg-slate-100 font-sans overflow-hidden flex transition-[left] duration-200">
@@ -320,38 +364,40 @@ export default function ACCPage() {
                   className={`text-[10px] truncate ${activeTab === 'master-list' ? 'text-blue-100' : 'text-slate-400'
                     }`}
                 >
-                  Areas, Criteria & Evidence
+                  Areas, Sub Areas & Standards
                 </div>
               </div>
             </button>
 
-            {/* Dedicated Departments Navigation Item */}
-            <button
-              type="button"
-              onClick={() => setActiveTab('departments')}
-              className={`w-full text-left px-3.5 py-3 rounded-xl text-xs font-bold transition-all flex items-center gap-3 cursor-pointer group ${activeTab === 'departments'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                }`}
-            >
-              <div
-                className={`p-2 rounded-lg transition-colors ${activeTab === 'departments'
-                  ? 'bg-white/20 text-white'
-                  : 'bg-slate-100 text-slate-500 group-hover:text-slate-800 group-hover:bg-slate-200'
+            {/* Dedicated Departments Navigation Item - Admin Only */}
+            {!isAuditor && !isOfficer && (
+              <button
+                type="button"
+                onClick={() => setActiveTab('departments')}
+                className={`w-full text-left px-3.5 py-3 rounded-xl text-xs font-bold transition-all flex items-center gap-3 cursor-pointer group ${activeTab === 'departments'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                   }`}
               >
-                <GraduationCap className="h-4 w-4" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="truncate font-bold">Departments</div>
                 <div
-                  className={`text-[10px] truncate ${activeTab === 'departments' ? 'text-blue-100' : 'text-slate-400'
+                  className={`p-2 rounded-lg transition-colors ${activeTab === 'departments'
+                    ? 'bg-white/20 text-white'
+                    : 'bg-slate-100 text-slate-500 group-hover:text-slate-800 group-hover:bg-slate-200'
                     }`}
                 >
-                  Programs & Levels
+                  <GraduationCap className="h-4 w-4" />
                 </div>
-              </div>
-            </button>
+                <div className="flex-1 min-w-0">
+                  <div className="truncate font-bold">Departments</div>
+                  <div
+                    className={`text-[10px] truncate ${activeTab === 'departments' ? 'text-blue-100' : 'text-slate-400'
+                      }`}
+                  >
+                    Programs & Levels
+                  </div>
+                </div>
+              </button>
+            )}
 
             <button
               type="button"
@@ -410,7 +456,7 @@ export default function ACCPage() {
                     </div>
                     <div className={`text-[10px] truncate font-medium ${activeTab === 'assign-offices' ? 'text-blue-100' : 'text-blue-600/90'
                       }`}>
-                      Bulk evidence setup
+                      Bulk standard setup
                     </div>
                   </div>
                 </div>
@@ -424,8 +470,8 @@ export default function ACCPage() {
           <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-2.5 text-[11px] text-slate-500 flex items-center gap-2">
             <Calendar className="h-3.5 w-3.5 text-blue-500 shrink-0" />
             <div className="truncate min-w-0">
-              <span className="font-semibold text-slate-700">Accreditations:</span>{' '}
-              {events.length} active
+              <span className="font-semibold text-slate-700">Accreditation:</span>{' '}
+              {activeAccreditation?.EventCode || activeAccreditation?.EventName || 'None assigned'}
             </div>
           </div>
         </div>
@@ -451,7 +497,7 @@ export default function ACCPage() {
               saving={assignSaving}
             />
           </div>
-        ) : activeTab === 'departments' ? (
+        ) : (activeTab === 'departments' && !isAuditor && !isOfficer) ? (
           /* Dedicated Departments Cards & Programs View */
           <DepartmentsView
             events={events}
@@ -461,6 +507,7 @@ export default function ACCPage() {
             onSelectOffice={handleSelectOffice}
             currentUser={currentUser}
             onRefresh={fetchData}
+            loading={initialLoading}
           />
         ) : activeTab === 'categories' ? (
           /* Category Management View - Organization Component */

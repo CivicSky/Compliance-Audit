@@ -6,6 +6,7 @@ import { usersAPI } from "../../utils/api";
 import { useNavigate } from "react-router-dom";
 import { API_BASE_URL } from '../../utils/apiBase';
 import { Activity, Building2, Layers } from "lucide-react";
+import SmartUserAvatar from "../UI/SmartUserAvatar";
 
 let toggleMobileNavbarHandler = null;
 
@@ -19,17 +20,37 @@ export function toggleMobileNavbar() {
 }
 
 export default function Navbar({ isMobileMenuOpen: propIsMobileMenuOpen, setIsMobileMenuOpen: propSetIsMobileMenuOpen }) {
+    const [currentUser, setCurrentUser] = useState(() => {
+        try {
+            const stored = localStorage.getItem("user");
+            return stored ? JSON.parse(stored) : null;
+        } catch {
+            return null;
+        }
+    });
+
+    const isAdmin = Boolean(
+        currentUser && (
+            Number(currentUser.RoleID) === 1 ||
+            String(currentUser.RoleName || '').toLowerCase() === 'admin' ||
+            String(currentUser.role_name || '').toLowerCase() === 'admin' ||
+            String(currentUser.RoleName || '').toLowerCase() === 'administrator'
+        )
+    );
+
     const getInitialSidebarExpanded = () => {
         if (typeof window === 'undefined') return false;
         const stored = window.localStorage.getItem('sidebarExpanded');
         const expanded = stored === null ? false : stored === 'true';
-        // Keep layout offset at collapsed width so hover/expand overlays content.
-        document.documentElement.style.setProperty('--sidebar-width', 'calc(4rem / 0.9)');
+        if (isAdmin) {
+            document.documentElement.style.setProperty('--sidebar-width', 'calc(4rem / 0.9)');
+        } else {
+            document.documentElement.style.setProperty('--sidebar-width', '0px');
+        }
         return expanded;
     };
 
     const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-    const [currentUser, setCurrentUser] = useState(null);
     const [internalIsMobileMenuOpen, setInternalIsMobileMenuOpen] = useState(false);
     const isMobileMenuOpen = propIsMobileMenuOpen !== undefined ? propIsMobileMenuOpen : internalIsMobileMenuOpen;
     const setIsMobileMenuOpen = propSetIsMobileMenuOpen || setInternalIsMobileMenuOpen;
@@ -43,10 +64,6 @@ export default function Navbar({ isMobileMenuOpen: propIsMobileMenuOpen, setIsMo
     const profileMenuRef = useRef(null);
     const mobileMenuRef = useRef(null);
     const navigate = useNavigate();
-
-    const isAdmin = Boolean(
-        currentUser && (Number(currentUser.RoleID) === 1 || currentUser.RoleName === 'admin' || currentUser.role_name === 'admin')
-    );
 
     // Persist expand on hover preference
     useEffect(() => {
@@ -222,6 +239,10 @@ export default function Navbar({ isMobileMenuOpen: propIsMobileMenuOpen, setIsMo
         }`;
 
     const mobileSectionClass = "flex items-center gap-2 px-3 pt-3 pb-1";
+
+    if (!isAdmin) {
+        return null;
+    }
 
     return (
         <>
@@ -406,20 +427,12 @@ export default function Navbar({ isMobileMenuOpen: propIsMobileMenuOpen, setIsMo
                 <div className="relative border-t border-slate-800/80 pt-2.5" ref={profileMenuRef}>
                     <div className={`flex items-center p-1.5 hover:bg-white/5 rounded-xl transition-colors duration-200 ${effectiveExpanded ? 'justify-between' : 'justify-center'}`}>
                         <NavLink to="/home/Profile" className={`flex items-center ${effectiveExpanded ? 'gap-2.5 flex-1 min-w-0' : 'justify-center'}`}>
-                            <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center overflow-hidden shrink-0 border border-slate-700/60 shadow-sm">
-                                {currentUser && currentUser.ProfilePic ? (
-                                    <img
-                                        src={`${API_BASE_URL}/uploads/profile-pics/${currentUser.ProfilePic}`}
-                                        alt="Profile"
-                                        className="w-8 h-8 object-cover rounded-full"
-                                        onError={e => { e.target.onerror = null; e.target.src = '/default-avatar.png'; }}
-                                    />
-                                ) : (
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                    </svg>
-                                )}
-                            </div>
+                            <SmartUserAvatar
+                                user={currentUser}
+                                size="w-8 h-8"
+                                textSize="text-xs font-bold"
+                                ring="border border-slate-700/60 shadow-sm"
+                            />
                             <div
                                 className={`flex flex-col whitespace-nowrap overflow-hidden transition-[max-width,opacity,transform] duration-200 ${
                                     effectiveExpanded ? 'opacity-100 translate-x-0 delay-150' : 'opacity-0 -translate-x-2 delay-0'
@@ -628,20 +641,12 @@ export default function Navbar({ isMobileMenuOpen: propIsMobileMenuOpen, setIsMo
                                 onClick={() => setIsMobileMenuOpen(false)}
                                 className="flex items-center gap-2.5 flex-1 min-w-0 pr-2 hover:opacity-90 transition-opacity"
                             >
-                                <div className="w-9 h-9 bg-blue-600 rounded-full flex items-center justify-center overflow-hidden shrink-0 ring-1 ring-blue-400/40 shadow-sm">
-                                    {currentUser && currentUser.ProfilePic ? (
-                                        <img
-                                            src={`${API_BASE_URL}/uploads/profile-pics/${currentUser.ProfilePic}`}
-                                            alt="Profile"
-                                            className="w-9 h-9 object-cover rounded-full"
-                                            onError={e => { e.target.onerror = null; e.target.src = '/default-avatar.png'; }}
-                                        />
-                                    ) : (
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                        </svg>
-                                    )}
-                                </div>
+                                <SmartUserAvatar
+                                    user={currentUser}
+                                    size="w-9 h-9"
+                                    textSize="text-xs font-bold"
+                                    ring="ring-1 ring-blue-400/40 shadow-sm"
+                                />
                                 <div className="flex flex-col min-w-0">
                                     <span className="text-xs font-semibold text-white truncate">
                                         {currentUser

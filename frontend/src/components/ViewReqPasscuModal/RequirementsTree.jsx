@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Check } from 'lucide-react';
 import StatusBadge from './StatusBadge';
 import StatusSlider from './StatusSlider';
+import SmartUserAvatar from './SmartUserAvatar';
 import { API_BASE_URL } from '../../utils/apiBase';
 import { useModal } from '../UI/ModalProvider';
 
@@ -16,6 +17,8 @@ export default function RequirementsTree({
     expandedReqs,
     toggleExpandReq,
     isUserAssignedToRequirement,
+    isUserAssignedToCurrentOffice = false,
+    canUserUploadEvidence = null,
     editingCommentId,
     commentInput,
     savingComment,
@@ -150,12 +153,12 @@ export default function RequirementsTree({
                         </svg>
                     </div>
                     <p className="text-sm font-medium text-slate-700">
-                        {isAuditorFiltered ? 'No evidence in your assigned area(s)' : 'No evidence added yet'}
+                        {isAuditorFiltered ? 'No standards in your assigned area(s)' : 'No standards added yet'}
                     </p>
                     <p className="mt-1 text-xs text-slate-500">
                         {isAuditorFiltered 
-                            ? 'Evidence exists in this office, but none match your assigned area(s).' 
-                            : 'Evidence will appear here once added to this office.'}
+                            ? 'Standards exist in this office, but none match your assigned area(s).' 
+                            : 'Standards will appear here once added to this office.'}
                     </p>
                 </div>
             ) : (
@@ -284,22 +287,45 @@ export default function RequirementsTree({
                                             const isAssignedToMe = isUserAssignedToRequirement(req.RequirementID);
                                             const isOfficePersonnel = currentUser?.RoleID === 2;
                                             const hasUploadedFile = hasUserUploadedForRequirement(req.RequirementID);
-                                            const canOpenSubmission = !!((isAdmin && onViewSubmission) || (isOfficeHead && onViewMySubmission) || (isAuditor && onViewSubmission));
+                                            const canUploadThisReq = canUserUploadEvidence ? canUserUploadEvidence(req) : false;
+                                            const canOpenSubmission = !!((isAdmin && onViewSubmission) || (isOfficeHead && (onViewMySubmission || onViewSubmission)) || (isAuditor && onViewSubmission) || (isAssignedToMe && onViewMySubmission));
                                             return (
                                                 <div
                                                     key={req.RequirementID}
                                                     className={`p-4 transition-colors ${isAssignedToMe ? 'bg-cyan-100/50 ring-1 ring-inset ring-cyan-300/50' : 'hover:bg-slate-200/40'} ${canOpenSubmission ? 'cursor-pointer hover:shadow-sm' : ''}`}
                                                     onClick={() => {
                                                         if (!canOpenSubmission) return;
-                                                        if (isAdmin || isAuditor) onViewSubmission?.(req);
-                                                        else if (isOfficeHead) onViewMySubmission?.(req);
+                                                        if (isAdmin || isAuditor) {
+                                                            onViewSubmission?.(req);
+                                                        } else if (isOfficeHead) {
+                                                            if (canUploadThisReq || isAssignedToMe || isUserAssignedToCurrentOffice) {
+                                                                onViewMySubmission?.(req);
+                                                            } else {
+                                                                onViewSubmission?.(req);
+                                                            }
+                                                        } else if (isAssignedToMe) {
+                                                            onViewMySubmission?.(req);
+                                                        } else {
+                                                            onViewSubmission?.(req);
+                                                        }
                                                     }}
                                                     onKeyDown={(e) => {
                                                         if (!canOpenSubmission) return;
                                                         if (e.key === 'Enter' || e.key === ' ') {
                                                             e.preventDefault();
-                                                            if (isAdmin || isAuditor) onViewSubmission?.(req);
-                                                            else if (isOfficeHead) onViewMySubmission?.(req);
+                                                            if (isAdmin || isAuditor) {
+                                                                onViewSubmission?.(req);
+                                                            } else if (isOfficeHead) {
+                                                                if (canUploadThisReq || isAssignedToMe || isUserAssignedToCurrentOffice) {
+                                                                    onViewMySubmission?.(req);
+                                                                } else {
+                                                                    onViewSubmission?.(req);
+                                                                }
+                                                            } else if (isAssignedToMe) {
+                                                                onViewMySubmission?.(req);
+                                                            } else {
+                                                                onViewSubmission?.(req);
+                                                            }
                                                         }
                                                     }}
                                                     role={canOpenSubmission ? 'button' : undefined}
@@ -322,7 +348,7 @@ export default function RequirementsTree({
                                                                             className="h-full"
                                                                             onChange={(newStatusId) => handleStatusChange(req.RequirementID, newStatusId)}
                                                                             onDisabledClick={() => {
-                                                                                showAlert('Cannot change compliance status: No proof document has been uploaded for this evidence yet.');
+                                                                                showAlert('Cannot change compliance status: No proof document has been uploaded for this standard yet.');
                                                                             }}
                                                                         />
                                                                     );
@@ -498,25 +524,21 @@ export default function RequirementsTree({
                                                                 <div className="flex flex-col items-end gap-1">
                                                                     <div className="flex items-center space-x-1">
                                                                         {assignedUsersMap[req.RequirementID].slice(0, 4).map((user) => {
-                                                                            const avatarSrc = user.ProfilePic
-                                                                                ? `${API_BASE_URL}/uploads/profile-pics/${user.ProfilePic}`
-                                                                                : '/src/assets/images/user.svg';
                                                                             const displayName = `${user.FirstName || ''}${user.LastName ? ' ' + user.LastName : ''}`.trim() || user.Username || '';
                                                                             const hasUploaded = user.HasUploaded === 1 || user.HasUploaded === true;
                                                                             return (
                                                                                 <div key={user.UserID} className="relative">
-                                                                                    <img
-                                                                                        src={avatarSrc}
-                                                                                        alt={displayName}
+                                                                                    <SmartUserAvatar
+                                                                                        user={user}
+                                                                                        size="h-7 w-7"
+                                                                                        textSize="text-[10px]"
                                                                                         title={`${displayName}${displayName ? ' • ' : ''}${hasUploaded ? 'Uploaded' : 'Not uploaded'}`}
-                                                                                        onError={(e) => {
-                                                                                            e.target.src = '/src/assets/images/user.svg';
-                                                                                        }}
                                                                                         onClick={(e) => {
                                                                                             e.stopPropagation();
                                                                                             handleUserAvatarClick(e, user, req.RequirementID);
                                                                                         }}
-                                                                                        className={`h-7 w-7 cursor-pointer rounded-full border-2 object-cover shadow-sm ring-1 ring-slate-200/50 ${hasUploaded ? 'border-emerald-500' : 'border-white'}`}
+                                                                                        ring={`border-2 ring-1 ring-slate-200/50 ${hasUploaded ? 'border-emerald-500' : 'border-white'}`}
+                                                                                        className="cursor-pointer"
                                                                                     />
                                                                                     {hasUploaded && (
                                                                                         <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white bg-emerald-500 leading-none text-white">
@@ -584,7 +606,7 @@ export default function RequirementsTree({
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                         </svg>
                                     </div>
-                                    <p className="text-sm font-medium text-slate-700">No evidence found</p>
+                                    <p className="text-sm font-medium text-slate-700">No standards found</p>
                                     <p className="mt-1 text-xs text-slate-500">Try adjusting your search or filter.</p>
                                 </div>
                             );
@@ -642,7 +664,7 @@ export default function RequirementsTree({
                                             <button
                                                 type="button"
                                                 onClick={() => toggleArea(areaKey)}
-                                                className="w-full text-left rounded-xl bg-gradient-to-r from-violet-600 via-purple-600 to-violet-700 px-4 py-3 shadow-md shadow-purple-500/15 hover:brightness-105 active:scale-[0.998] transition-all flex items-center justify-between gap-3 cursor-pointer group"
+                                                className="w-full text-left rounded-xl bg-gradient-to-r from-blue-600 via-blue-700 to-sky-700 px-4 py-3 shadow-md shadow-blue-500/15 hover:brightness-105 active:scale-[0.998] transition-all flex items-center justify-between gap-3 cursor-pointer group"
                                             >
                                                 <div className="min-w-0 flex-1">
                                                     <div className="flex items-center gap-2">

@@ -149,7 +149,7 @@ export default function Requirements() {
         if (selectedIds.length === 0 || !requirementsPRef.current) return;
         
         // Confirm deletion
-        const confirmed = await showConfirm(`Are you sure you want to delete ${selectedIds.length} evidence item(s)? This action cannot be undone.`);
+        const confirmed = await showConfirm(`Are you sure you want to delete ${selectedIds.length} standard item(s)? This action cannot be undone.`);
         if (!confirmed) return;
         
         try {
@@ -160,16 +160,16 @@ export default function Requirements() {
                 setSelectedIds([]);
                 setDeleteMode(false);
                 // Show success message
-                console.log('Successfully deleted selected evidence');
-                await showAlert(`Successfully deleted ${selectedIds.length} evidence item(s)`);
+                console.log('Successfully deleted selected standard(s)');
+                await showAlert(`Successfully deleted ${selectedIds.length} standard item(s)`);
             } else {
                 // Show error message
-                console.error('Failed to delete evidence:', result.message);
-                await showAlert(result.message || 'Failed to delete evidence');
+                console.error('Failed to delete standard:', result.message);
+                await showAlert(result.message || 'Failed to delete standard');
             }
         } catch (error) {
-            console.error('Error deleting evidence:', error);
-            await showAlert('An error occurred while deleting evidence');
+            console.error('Error deleting standard:', error);
+            await showAlert('An error occurred while deleting standard');
         }
     };
 
@@ -183,9 +183,9 @@ export default function Requirements() {
                             <ClipboardList className="w-5 h-5 sm:w-5.5 sm:h-5.5" />
                         </div>
                         <div>
-                            <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">Evidence Management</h1>
+                            <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">Standard Management</h1>
                             <p className="text-xs text-slate-500 mt-0.5">
-                                Track evidence compliance, documents, and assigned criteria.
+                                Track standard compliance, documents, and assigned sub areas.
                             </p>
                         </div>
                     </div>
@@ -236,7 +236,7 @@ export default function Requirements() {
                                     className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 text-xs font-semibold text-white shadow-xs transition hover:bg-emerald-700 active:scale-95 cursor-pointer"
                                 >
                                     <Plus className="h-4 w-4" />
-                                    <span>Add Evidence</span>
+                                    <span>Add Standard</span>
                                 </button>
 
                                 <button

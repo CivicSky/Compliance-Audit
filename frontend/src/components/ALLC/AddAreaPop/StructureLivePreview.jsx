@@ -24,10 +24,10 @@ export default function StructureLivePreview({
 
 	// Format Criteria title
 	const formatCriteriaTitle = (data) => {
-		if (!data) return 'Criteria (Select Criteria)';
+		if (!data) return 'Sub Area (Select Sub Area)';
 		const code = (data.CriteriaCode || '').trim().replace(/\.$/, '');
 		const name = (data.CriteriaName || '').trim();
-		if (!code && !name) return 'Untitled Criteria';
+		if (!code && !name) return 'Untitled Sub Area';
 		if (code && name) return `${code}. ${name}`;
 		return code ? `${code}.` : name;
 	};
@@ -42,7 +42,7 @@ export default function StructureLivePreview({
 					</span>
 				</div>
 				<span className="text-[11px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
-					{mode === 'add-area' ? 'New Area' : mode === 'add-criteria' ? 'New Criteria' : 'New Evidence'}
+					{mode === 'add-area' ? 'New Area' : mode === 'add-criteria' ? 'New Sub Area' : 'New Standard'}
 				</span>
 			</div>
 
@@ -75,8 +75,8 @@ export default function StructureLivePreview({
 							<div className="relative">
 								<span className="absolute -left-6 top-4 w-5 h-1 bg-blue-300/60 rounded-r-full" />
 								<div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/80 p-3 text-center">
-									<p className="text-xs text-slate-500 font-medium">No criteria or evidence yet</p>
-									<p className="text-[11px] text-slate-400 mt-0.5">This area will be created as an empty section ready for criteria.</p>
+									<p className="text-xs text-slate-500 font-medium">No sub areas or standards yet</p>
+									<p className="text-[11px] text-slate-400 mt-0.5">This area will be created as an empty section ready for sub areas.</p>
 								</div>
 							</div>
 						</div>
@@ -107,7 +107,7 @@ export default function StructureLivePreview({
 						) : (
 							<div className="rounded-xl border border-dashed border-blue-200 bg-blue-50/40 p-2.5 text-xs text-blue-600 font-medium flex items-center gap-1.5">
 								<AlertCircle className="w-3.5 h-3.5 shrink-0 text-amber-500" />
-								<span>No parent area selected (Top-level / Global Criteria)</span>
+								<span>No parent area selected (Top-level / Global Sub Area)</span>
 							</div>
 						)}
 
@@ -149,8 +149,8 @@ export default function StructureLivePreview({
 									<div className="relative">
 										<span className="absolute -left-5 top-4 w-4 h-1 bg-blue-300/50 rounded-r-full" />
 										<div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/70 p-2.5 text-center">
-											<p className="text-xs text-slate-500 font-medium">No evidence yet</p>
-											<p className="text-[11px] text-slate-400 mt-0.5">Evidence can be assigned under this criteria once created.</p>
+											<p className="text-xs text-slate-500 font-medium">No standards yet</p>
+											<p className="text-[11px] text-slate-400 mt-0.5">Standards can be assigned under this sub area once created.</p>
 										</div>
 									</div>
 								</div>
@@ -183,7 +183,7 @@ export default function StructureLivePreview({
 						) : (
 							<div className="rounded-xl border border-dashed border-blue-200 bg-blue-50/40 p-2.5 text-xs text-blue-600 font-medium flex items-center gap-1.5">
 								<AlertCircle className="w-3.5 h-3.5 shrink-0 text-amber-500" />
-								<span>Select an Area to attach this evidence</span>
+								<span>Select an Area to attach this standard</span>
 							</div>
 						)}
 
@@ -212,7 +212,7 @@ export default function StructureLivePreview({
 								) : (
 									<div className="rounded-lg border border-dashed border-blue-200 bg-blue-50/50 p-2 text-xs text-blue-600 font-medium flex items-center gap-1.5">
 										<AlertCircle className="w-3.5 h-3.5 shrink-0 text-amber-500" />
-										<span>Select a Criteria to place this evidence</span>
+										<span>Select a Sub Area to place this standard</span>
 									</div>
 								)}
 
@@ -227,7 +227,7 @@ export default function StructureLivePreview({
 													{requirementData?.RequirementCode?.trim() || 'A.1 (Code)'}
 												</p>
 												<p className="text-xs text-slate-600 mt-1 leading-relaxed whitespace-pre-wrap">
-													{requirementData?.Description?.trim() || 'Evidence description text will appear here...'}
+													{requirementData?.Description?.trim() || 'Standard description text will appear here...'}
 												</p>
 												<div className="mt-2 flex flex-wrap gap-2 text-[10px] text-slate-500">
 													<span>Created: {formatDateTime(currentDate)}</span>

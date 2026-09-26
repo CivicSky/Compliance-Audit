@@ -4,6 +4,7 @@ import StatusSlider from './StatusSlider';
 import { officesAPI, requirementsAPI } from '../../utils/api';
 import { useModal } from '../UI/ModalProvider';
 import CustomSelect from '../UI/CustomSelect';
+import { isAcademicEntity } from '../../utils/entityHelpers';
 
 export default function OfficeInspectionModal({
   office,
@@ -24,6 +25,11 @@ export default function OfficeInspectionModal({
   const [updatingReqId, setUpdatingReqId] = useState(null);
   const [proofDocument, setProofDocument] = useState(null);
   const [uploadingProof, setUploadingProof] = useState(false);
+  const [currentLevel, setCurrentLevel] = useState(office?.accreditation_level || 'Candidate');
+
+  useEffect(() => {
+    setCurrentLevel(office?.accreditation_level || 'Candidate');
+  }, [office?.accreditation_level]);
 
   // Fetch requirement compliance hierarchy for this office
   const fetchRequirements = async () => {
@@ -213,9 +219,7 @@ export default function OfficeInspectionModal({
     }
   };
 
-  const isAcademic = office?.entity_type_id === 1 || 
-    String(office?.category_name || office?.TypeName || office?.office_type || '').toLowerCase().includes('academic') ||
-    String(office?.category_name || office?.TypeName || office?.office_type || '').toLowerCase().includes('program');
+  const isAcademic = isAcademicEntity(office);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs font-sans">
@@ -234,12 +238,45 @@ export default function OfficeInspectionModal({
                 <h1 className="text-xl font-black text-slate-900 tracking-tight">
                   {office?.OfficeName || office?.office_name || 'BSIT'}
                 </h1>
-                <span className="px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
-                  {isAcademic ? 'Academic' : 'Office'}
+                <span className={`px-2.5 py-0.5 rounded-md text-[11px] font-bold border ${
+                  isAcademic 
+                    ? 'bg-blue-50 text-blue-700 border-blue-100' 
+                    : 'bg-indigo-50 text-indigo-700 border border-indigo-100'
+                }`}>
+                  {isAcademic ? 'Academic' : 'Non-Academic'}
                 </span>
                 <span className="px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200 uppercase">
                   Event: {office?.event_name || office?.EventName || 'PAASCU-COPY'}
                 </span>
+                {isAcademic && (
+                  isAdmin ? (
+                    <div className="inline-flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                      <span className="text-[11px] font-semibold text-slate-500">Accreditation:</span>
+                      <select
+                        value={currentLevel}
+                        onChange={async (e) => {
+                          const val = e.target.value;
+                          setCurrentLevel(val);
+                          try {
+                            await officesAPI.updateLevel(officeId, val);
+                            if (onUpdateOffice) onUpdateOffice({ ...office, accreditation_level: val });
+                          } catch (err) {
+                            console.error(err);
+                          }
+                        }}
+                        className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md py-0.5 px-2 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer shadow-2xs"
+                      >
+                        {['Candidate', 'Level I', 'Level II', 'Level III', 'Level IV'].map((lvl) => (
+                          <option key={lvl} value={lvl}>{lvl}</option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 border border-emerald-200">
+                      {currentLevel || 'Candidate'}
+                    </span>
+                  )
+                )}
               </div>
             </div>
           </div>
@@ -310,7 +347,7 @@ export default function OfficeInspectionModal({
         <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-4">
           <div>
             <h2 className="text-sm font-extrabold text-slate-900 uppercase tracking-wide">Requirements</h2>
-            <p className="text-xs text-slate-500">Browse areas, criteria, and compliance items.</p>
+            <p className="text-xs text-slate-500">Browse areas, sub areas, and compliance items.</p>
           </div>
 
           <div className="flex items-center gap-3">
@@ -332,7 +369,7 @@ export default function OfficeInspectionModal({
 
             {/* Search Box */}
             <div className="relative w-64">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
               <input
                 type="text"
                 placeholder="Search requirements..."

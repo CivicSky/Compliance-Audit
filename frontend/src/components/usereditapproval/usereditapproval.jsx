@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { usersAPI } from "../../utils/api";
-import { useModal } from "../UI/ModalProvider";
+import { useToast } from "../UI/Toast";
 import CustomSelect from "../UI/CustomSelect";
 
 export default function UserEditApproval({ selectedUser, onClose, onSuccess }) {
-    const { showAlert } = useModal();
+    const { toast } = useToast();
     const [newApprovalStatus, setNewApprovalStatus] = useState(selectedUser?.approval_status || 'pending');
     const [newRoleID, setNewRoleID] = useState(selectedUser?.RoleID || 2);
     const [updating, setUpdating] = useState(false);
@@ -20,7 +20,12 @@ export default function UserEditApproval({ selectedUser, onClose, onSuccess }) {
             
             // If backend deleted the user (denied), it may return deletedRows; handle that first
             if (approvalResponse.deletedRows && approvalResponse.deletedRows > 0) {
-                await showAlert(approvalResponse.message || 'User denied and deleted');
+                toast({
+                    title: 'User Denied',
+                    description: approvalResponse.message || 'User application was denied and removed.',
+                    variant: 'info',
+                    duration: 3500,
+                });
                 onClose();
                 if (onSuccess) onSuccess();
                 return;
@@ -39,24 +44,39 @@ export default function UserEditApproval({ selectedUser, onClose, onSuccess }) {
                 
                 let message = 'User updated successfully';
                 if (statusChanged && roleChanged) {
-                    message = `User approval status updated to ${newApprovalStatus} and role changed to ${newRoleID === 1 ? 'Admin' : 'User'}`;
+                    message = `User approval status set to ${newApprovalStatus} and role changed to ${newRoleID === 1 ? 'Admin' : 'User'}`;
                 } else if (statusChanged) {
-                    message = `User approval status updated to ${newApprovalStatus}`;
+                    message = `User approval status set to ${newApprovalStatus}`;
                 } else if (roleChanged) {
                     message = `User role changed to ${newRoleID === 1 ? 'Admin' : 'User'}`;
                 }
 
-                await showAlert(message);
+                toast({
+                    title: 'Updated',
+                    description: message,
+                    variant: 'success',
+                    duration: 3000,
+                });
                 onClose();
                 if (onSuccess) {
                     onSuccess();
                 }
             } else {
-                await showAlert(approvalResponse.message || 'Failed to update user');
+                toast({
+                    title: 'Update Failed',
+                    description: approvalResponse.message || 'Failed to update user.',
+                    variant: 'error',
+                    duration: 4000,
+                });
             }
         } catch (error) {
             console.error('Error updating user:', error);
-            await showAlert('Error updating user');
+            toast({
+                title: 'Error',
+                description: 'An unexpected error occurred while updating user.',
+                variant: 'error',
+                duration: 4000,
+            });
         } finally {
             setUpdating(false);
         }

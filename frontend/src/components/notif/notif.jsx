@@ -155,7 +155,7 @@ export default function NotificationPopup({ onClose }) {
 		if (table.includes('auditor') || table.includes('area') || table.includes('criteria')) {
 			return { 
 				label: 'Audit', 
-				bg: 'bg-purple-50 text-purple-700 border-purple-200/80', 
+				bg: 'bg-blue-50 text-blue-700 border-blue-200/80', 
 				icon: (
 					<svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
 						<path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -240,7 +240,7 @@ export default function NotificationPopup({ onClose }) {
 					<div className="flex items-center gap-2">
 						<h3 className="text-sm font-bold text-slate-800">Notifications</h3>
 						{notificationCounts.unread > 0 && (
-							<span className="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-600 border border-indigo-100 animate-pulse">
+							<span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-600 border border-blue-100 animate-pulse">
 								{notificationCounts.unread} new
 							</span>
 						)}
@@ -249,7 +249,7 @@ export default function NotificationPopup({ onClose }) {
 						<button
 							type="button"
 							onClick={markAllAsRead}
-							className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 hover:text-indigo-700 transition cursor-pointer"
+							className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-700 transition cursor-pointer"
 						>
 							<svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
 								<path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -370,7 +370,7 @@ export default function NotificationPopup({ onClose }) {
 													{formatTimestamp(notification.CreatedAt)}
 												</span>
 												{isUnread && (
-													<span className="h-2 w-2 rounded-full bg-indigo-600 ring-2 ring-indigo-200" title="Unread" />
+													<span className="h-2 w-2 rounded-full bg-blue-600 ring-2 ring-blue-200" title="Unread" />
 												)}
 											</div>
 										</div>
@@ -390,7 +390,7 @@ export default function NotificationPopup({ onClose }) {
 										{/* Action Link Footer */}
 										{hasLink && (
 											<div className="flex items-center justify-end">
-												<span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-600 group-hover:text-indigo-700 transition group-hover:translate-x-0.5">
+												<span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 group-hover:text-blue-700 transition group-hover:translate-x-0.5">
 													View Details
 													<svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
 														<path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />

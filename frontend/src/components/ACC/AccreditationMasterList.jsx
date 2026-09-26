@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { ChevronRight, ChevronDown, Search, MoreVertical, X, Building2, GraduationCap, Plus, Edit2, Copy, Trash2, SlidersHorizontal } from 'lucide-react';
+import { isAcademicEntity } from '../../utils/entityHelpers';
 
 export default function AccreditationMasterList({
   event,
@@ -63,17 +64,9 @@ export default function AccreditationMasterList({
   const filteredOffices = useMemo(() => {
     let list = offices || [];
     if (activeOfficeTab === 'Programs') {
-      list = list.filter(o =>
-        o.entity_type_id === 1 ||
-        String(o.category_name || o.TypeName || '').toLowerCase().includes('program') ||
-        String(o.office_type_name || o.office_type || '').toLowerCase().includes('academic')
-      );
+      list = list.filter(o => isAcademicEntity(o));
     } else if (activeOfficeTab === 'Offices') {
-      list = list.filter(o =>
-        o.entity_type_id === 2 ||
-        String(o.category_name || o.TypeName || '').toLowerCase().includes('office') ||
-        String(o.office_type_name || o.office_type || '').toLowerCase().includes('non-academic')
-      );
+      list = list.filter(o => !isAcademicEntity(o));
     }
 
     const q = officeSearch.trim().toLowerCase();
@@ -147,58 +140,60 @@ export default function AccreditationMasterList({
 
         {/* Top Actions */}
         <div className="flex items-center gap-1.5 shrink-0">
-          {/* Action Menu */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setIsHeaderMenuOpen(!isHeaderMenuOpen)}
-              className="h-8 w-8 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 flex items-center justify-center transition-colors shadow-2xs"
-              title="Options"
-            >
-              <MoreVertical className="h-3.5 w-3.5" />
-            </button>
+          {/* Action Menu (Admin Only) */}
+          {isAdmin && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsHeaderMenuOpen(!isHeaderMenuOpen)}
+                className="h-8 w-8 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 flex items-center justify-center transition-colors shadow-2xs"
+                title="Options"
+              >
+                <MoreVertical className="h-3.5 w-3.5" />
+              </button>
 
-            {isHeaderMenuOpen && (
-              <div className="absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-1 font-medium text-xs text-slate-700">
-                {onEditEvent && (
-                  <button
-                    onClick={() => { setIsHeaderMenuOpen(false); onEditEvent(event); }}
-                    className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700"
-                  >
-                    <Edit2 className="h-3.5 w-3.5 text-slate-400" />
-                    Edit Event Details
-                  </button>
-                )}
-                {onCopyEvent && (
-                  <button
-                    onClick={() => { setIsHeaderMenuOpen(false); onCopyEvent(event); }}
-                    className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700"
-                  >
-                    <Copy className="h-3.5 w-3.5 text-slate-400" />
-                    Copy Event
-                  </button>
-                )}
-                {onAddArea && (
-                  <button
-                    onClick={() => { setIsHeaderMenuOpen(false); onAddArea(); }}
-                    className="w-full text-left px-3.5 py-2 hover:bg-blue-50 text-blue-700 flex items-center gap-2"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    Add Area
-                  </button>
-                )}
-                {isAdmin && onDeleteEvent && (
-                  <button
-                    onClick={() => { setIsHeaderMenuOpen(false); onDeleteEvent(event); }}
-                    className="w-full text-left px-3.5 py-2 hover:bg-rose-50 text-rose-600 flex items-center gap-2 border-t border-slate-100"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    Delete Event
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
+              {isHeaderMenuOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-1 font-medium text-xs text-slate-700">
+                  {onEditEvent && (
+                    <button
+                      onClick={() => { setIsHeaderMenuOpen(false); onEditEvent(event); }}
+                      className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700"
+                    >
+                      <Edit2 className="h-3.5 w-3.5 text-slate-400" />
+                      Edit Event Details
+                    </button>
+                  )}
+                  {onCopyEvent && (
+                    <button
+                      onClick={() => { setIsHeaderMenuOpen(false); onCopyEvent(event); }}
+                      className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700"
+                    >
+                      <Copy className="h-3.5 w-3.5 text-slate-400" />
+                      Copy Event
+                    </button>
+                  )}
+                  {onAddArea && (
+                    <button
+                      onClick={() => { setIsHeaderMenuOpen(false); onAddArea(); }}
+                      className="w-full text-left px-3.5 py-2 hover:bg-blue-50 text-blue-700 flex items-center gap-2"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Add Area
+                    </button>
+                  )}
+                  {isAdmin && onDeleteEvent && (
+                    <button
+                      onClick={() => { setIsHeaderMenuOpen(false); onDeleteEvent(event); }}
+                      className="w-full text-left px-3.5 py-2 hover:bg-rose-50 text-rose-600 flex items-center gap-2 border-t border-slate-100"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Delete Event
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Close Button */}
           {onClose && (
@@ -223,7 +218,7 @@ export default function AccreditationMasterList({
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search areas, criteria, or requirements..."
+                placeholder="Search areas, sub areas, or standards..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
@@ -266,7 +261,7 @@ export default function AccreditationMasterList({
 
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] font-bold px-2 py-0.5 bg-white/20 text-white rounded-md backdrop-blur-xs">
-                        {criteriaList.length} criteria
+                        {criteriaList.length} sub areas
                       </span>
                     </div>
                   </div>
@@ -275,14 +270,14 @@ export default function AccreditationMasterList({
                   {isExpanded && (
                     <div className="p-3 bg-slate-50/50 space-y-2 border-t border-blue-100">
                       {criteriaList.length === 0 ? (
-                        <p className="text-xs text-slate-400 italic px-3 py-2">No criteria defined in this area yet.</p>
+                        <p className="text-xs text-slate-400 italic px-3 py-2">No sub areas defined in this area yet.</p>
                       ) : (
                         criteriaList.map((crit) => {
                           const critId = crit.id || crit.CriteriaID;
                           const isCritExpanded = expandedCriteria.has(critId);
                           const reqs = crit.requirements || [];
                           const critCode = crit.CriteriaCode || crit.code || '';
-                          const critName = crit.CriteriaName || crit.name || crit.title || 'Criteria';
+                          const critName = crit.CriteriaName || crit.name || crit.title || 'Sub Area';
 
                           return (
                             <div key={critId} className="rounded-lg border border-slate-200 bg-white overflow-hidden shadow-2xs">
@@ -346,7 +341,7 @@ export default function AccreditationMasterList({
                                         const isSubCritExpanded = expandedCriteria.has(subCritId);
                                         const subReqs = subCrit.requirements || [];
                                         const subCritCode = subCrit.CriteriaCode || subCrit.code || '';
-                                        const subCritName = subCrit.CriteriaName || subCrit.name || subCrit.title || 'Sub-Criteria';
+                                        const subCritName = subCrit.CriteriaName || subCrit.name || subCrit.title || 'Sub Area';
 
                                         return (
                                           <div key={subCritId} className="rounded-lg border border-blue-200 bg-white overflow-hidden shadow-2xs ml-2">
@@ -361,7 +356,7 @@ export default function AccreditationMasterList({
                                                   <ChevronRight className="h-3.5 w-3.5 text-blue-600 shrink-0" />
                                                 )}
                                                 <span className="px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wide uppercase bg-blue-600 text-white shrink-0 shadow-2xs">
-                                                  SUBCRITERIA
+                                                  SUB AREA
                                                 </span>
                                                 <span className="text-xs font-bold text-slate-800 truncate">
                                                   {subCritCode ? `${subCritCode}. ${subCritName}` : subCritName}
@@ -433,11 +428,11 @@ export default function AccreditationMasterList({
                     <ChevronRight className="h-4 w-4 text-slate-400" />
                     <div>
                       <h3 className="text-xs font-bold uppercase tracking-wider text-white">No Area Assigned</h3>
-                      <p className="text-[11px] text-slate-400">Criteria without area assignment</p>
+                      <p className="text-[11px] text-slate-400">Sub areas without area assignment</p>
                     </div>
                   </div>
                   <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-700 text-slate-300 rounded">
-                    {noAreaCriteriaData.length} criteria
+                    {noAreaCriteriaData.length} sub areas
                   </span>
                 </div>
               </div>
@@ -459,7 +454,7 @@ export default function AccreditationMasterList({
                 placeholder="Search programs and offices..."
                 value={officeSearch}
                 onChange={(e) => setOfficeSearch(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
+                className="w-full pl-10 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
               />
             </div>
 
@@ -492,9 +487,7 @@ export default function AccreditationMasterList({
               </div>
             ) : (
               filteredOffices.map((office) => {
-                const isAcademic = office.entity_type_id === 1 ||
-                  String(office.category_name || office.TypeName || office.office_type || '').toLowerCase().includes('academic') ||
-                  String(office.category_name || office.TypeName || office.office_type || '').toLowerCase().includes('program');
+                const isAcademic = isAcademicEntity(office);
 
                 return (
                   <div
@@ -518,19 +511,21 @@ export default function AccreditationMasterList({
                             {office.OfficeName || office.office_name}
                           </h4>
                           <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                            {office.department_name || office.DepartmentCode || 'SSLATE'}
+                            {office.department_name || office.DepartmentCode || (isAcademic ? 'Academic' : 'Institution-wide')}
                           </p>
                         </div>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); }}
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200/90 bg-white text-slate-400 hover:text-slate-700 hover:border-slate-300 shadow-2xs transition-all"
-                        aria-label="Options"
-                      >
-                        <MoreVertical className="h-3.5 w-3.5" />
-                      </button>
+                      {isAdmin && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); }}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200/90 bg-white text-slate-400 hover:text-slate-700 hover:border-slate-300 shadow-2xs transition-all"
+                          aria-label="Options"
+                        >
+                          <MoreVertical className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                     </div>
 
                     {/* Metadata Dates */}
@@ -547,11 +542,15 @@ export default function AccreditationMasterList({
 
                     {/* Tags Footer */}
                     <div className="flex items-center justify-between mt-2.5">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-100">
-                        {isAcademic ? 'Academic Program' : 'Office'}
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold border ${
+                        isAcademic
+                          ? 'bg-blue-50 text-blue-700 border border-blue-100'
+                          : 'bg-indigo-50 text-indigo-700 border border-indigo-100'
+                      }`}>
+                        {isAcademic ? 'Academic Program' : 'Non Academic'}
                       </span>
                       <span className="text-[10px] font-bold text-slate-400 uppercase">
-                        {office.department_name || office.DepartmentCode || 'SSLATE'}
+                        {office.department_name || office.DepartmentCode || (isAcademic ? 'Academic' : 'Institution-wide')}
                       </span>
                     </div>
                   </div>

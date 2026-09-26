@@ -1,6 +1,15 @@
 import React from 'react';
 import { officesAPI } from '../../utils/api';
 import { useModal } from '../UI/ModalProvider';
+import { Award } from 'lucide-react';
+
+const ACCREDITATION_LEVELS = [
+    'Candidate',
+    'Level I',
+    'Level II',
+    'Level III',
+    'Level IV',
+];
 
 export default function ModalHeader({
     officeData,
@@ -12,8 +21,29 @@ export default function ModalHeader({
     onDeleteOffice,
     onClose,
     office,
+    onUpdateLevel,
 }) {
     const { showAlert } = useModal();
+    const currentLevel = officeData?.accreditation_level || office?.accreditation_level || 'Candidate';
+    const [localLevel, setLocalLevel] = React.useState(currentLevel);
+    const [updatingLevel, setUpdatingLevel] = React.useState(false);
+
+    React.useEffect(() => {
+        const lvl = officeData?.accreditation_level || office?.accreditation_level || 'Candidate';
+        setLocalLevel(lvl);
+    }, [officeData?.accreditation_level, office?.accreditation_level]);
+
+    const handleLevelSelect = async (newLevel) => {
+        setLocalLevel(newLevel);
+        if (onUpdateLevel) {
+            setUpdatingLevel(true);
+            try {
+                await onUpdateLevel(newLevel);
+            } finally {
+                setUpdatingLevel(false);
+            }
+        }
+    };
     const isAcademicProgram = (() => {
         const typeId = Number(officeData?.entity_type_id || officeData?.OfficeTypeID || officeData?.type_id);
         if (typeId === 1) return true;
@@ -29,7 +59,7 @@ export default function ModalHeader({
     return (
         <div className="relative border-b border-slate-200/80 bg-white px-5 py-4 shadow-sm">
             {/* Accent bar */}
-            <div className="absolute inset-x-0 top-0 h-[3px] rounded-t-xl bg-gradient-to-r from-indigo-500 via-violet-500 to-purple-500" />
+            <div className="absolute inset-x-0 top-0 h-[3px] rounded-t-xl bg-gradient-to-r from-blue-500 via-sky-500 to-blue-600" />
 
             <div className="flex items-center justify-between gap-4">
                 {/* Left: icon + name */}
@@ -37,7 +67,7 @@ export default function ModalHeader({
                     {/* Icon */}
                     <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border shadow-sm ${
                         isAcademicProgram
-                            ? 'border-indigo-200 bg-gradient-to-br from-indigo-50 to-indigo-100 text-indigo-600'
+                            ? 'border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100 text-blue-600'
                             : 'border-emerald-200 bg-gradient-to-br from-emerald-50 to-emerald-100 text-emerald-600'
                     }`}>
                         {isAcademicProgram ? (
@@ -74,6 +104,34 @@ export default function ModalHeader({
                                 <>
                                     <span className="text-slate-300">·</span>
                                     <span className="text-[11px] text-slate-400">{officeData.DepartmentName || officeData.department_name}</span>
+                                </>
+                            )}
+                            {isAcademicProgram && (
+                                <>
+                                    <span className="text-slate-300">·</span>
+                                    {isAdmin ? (
+                                        <div className="inline-flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                                            <span className="text-[11px] font-semibold text-slate-500">Accreditation:</span>
+                                            <div className="relative inline-flex items-center">
+                                                <select
+                                                    value={localLevel}
+                                                    disabled={updatingLevel}
+                                                    onChange={(e) => handleLevelSelect(e.target.value)}
+                                                    className="inline-flex items-center text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md py-0.5 pl-2 pr-6 hover:bg-emerald-100/70 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer shadow-2xs transition appearance-none disabled:opacity-50"
+                                                >
+                                                    {ACCREDITATION_LEVELS.map((lvl) => (
+                                                        <option key={lvl} value={lvl}>{lvl}</option>
+                                                    ))}
+                                                </select>
+                                                <Award className="h-3 w-3 text-emerald-600 absolute right-1.5 pointer-events-none" />
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 border border-emerald-200 shadow-2xs">
+                                            <Award className="h-3 w-3 text-emerald-600" />
+                                            {localLevel}
+                                        </span>
+                                    )}
                                 </>
                             )}
                         </div>
@@ -119,7 +177,7 @@ export default function ModalHeader({
                                             <svg className="h-4 w-4 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                                             </svg>
-                                            <span>Add Evidence</span>
+                                            <span>Add Standard</span>
                                         </button>
                                         <button
                                             type="button"

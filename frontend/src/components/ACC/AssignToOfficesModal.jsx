@@ -4,6 +4,7 @@ import { officesAPI, areasAPI } from '../../utils/api';
 import axios from 'axios';
 import { API_BASE_URL } from '../../utils/apiBase';
 import CustomSelect from '../UI/CustomSelect';
+import { isAcademicEntity } from '../../utils/entityHelpers';
 
 export default function AssignToOfficesModal({
   offices = [],
@@ -22,7 +23,7 @@ export default function AssignToOfficesModal({
   const [activeOfficeTab, setActiveOfficeTab] = useState('All');
   const [selectedOfficeIds, setSelectedOfficeIds] = useState(new Set());
   const [selectedRequirementIds, setSelectedRequirementIds] = useState(new Set());
-  const [expandedAreas, setExpandedAreas] = useState(new Set([1, 2]));
+  const [expandedAreas, setExpandedAreas] = useState(new Set(['1', '2']));
   const [expandedCriteria, setExpandedCriteria] = useState(new Set());
 
   const [localOffices, setLocalOffices] = useState(offices || []);
@@ -38,7 +39,11 @@ export default function AssignToOfficesModal({
 
   useEffect(() => {
     if (Array.isArray(areasData) && areasData.length > 0) {
-      setLocalAreasData(areasData);
+      const propHasReqs = areasData.some(a => (a.criteria || []).some(c => (c.requirements || []).length > 0));
+      const localHasReqs = localAreasData.some(a => (a.criteria || []).some(c => (c.requirements || []).length > 0));
+      if (propHasReqs || !localHasReqs) {
+        setLocalAreasData(areasData);
+      }
     }
   }, [areasData]);
 
@@ -50,13 +55,17 @@ export default function AssignToOfficesModal({
       const list = Array.isArray(res) ? res : (res?.data || []);
       setLocalOffices(list);
 
-      if (eventId && eventId !== 'all') {
+      const targetEventId = eventId && eventId !== 'all'
+        ? eventId
+        : localStorage.getItem('acc_selected_event_id') || localStorage.getItem('selected_audit_event_id') || (events && events[0]?.EventID);
+
+      if (targetEventId && targetEventId !== 'all') {
         const token = localStorage.getItem('token');
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
         let areas = [];
         try {
-          const aRes = await axios.get(`${API_BASE_URL}/api/areas/event/${eventId}`, { headers });
+          const aRes = await axios.get(`${API_BASE_URL}/api/areas/event/${targetEventId}`, { headers });
           areas = aRes.data?.data || aRes.data || [];
         } catch {
           areas = await areasAPI.getAll().catch(() => []);
@@ -64,21 +73,41 @@ export default function AssignToOfficesModal({
 
         let allCriteria = [];
         try {
-          const cRes = await axios.get(`${API_BASE_URL}/api/criteria/event/${eventId}`, { headers });
+          const cRes = await axios.get(`${API_BASE_URL}/api/criteria/event/${targetEventId}`, { headers });
           allCriteria = cRes.data?.data || cRes.data || [];
         } catch {
           allCriteria = [];
         }
 
+        // Fast batch-fetch all requirements for this event
+        let allEventReqs = [];
+        try {
+          const reqRes = await axios.get(`${API_BASE_URL}/api/requirements/all?eventId=${targetEventId}`, { headers });
+          allEventReqs = reqRes.data?.data || reqRes.data || [];
+        } catch (rErr) {
+          console.warn('Batch requirements fetch notice:', rErr.message);
+        }
+
+        // Group requirements by CriteriaID
+        const reqsByCriteria = {};
+        allEventReqs.forEach((r) => {
+          const cId = String(r.CriteriaID || r.criteria_id);
+          if (!reqsByCriteria[cId]) reqsByCriteria[cId] = [];
+          reqsByCriteria[cId].push(r);
+        });
+
+        // Ensure requirements are attached to all criteria (with fallback if batch returned empty)
         const criteriaWithReqs = await Promise.all(
           allCriteria.map(async (crit) => {
-            const critId = crit.CriteriaID || crit.id;
-            let reqs = [];
-            try {
-              const rRes = await axios.get(`${API_BASE_URL}/api/requirements/criteria/${critId}`, { headers });
-              reqs = rRes.data?.data || rRes.data || [];
-            } catch {
-              reqs = [];
+            const critId = String(crit.CriteriaID || crit.id);
+            let reqs = reqsByCriteria[critId] || [];
+            if (reqs.length === 0 && allEventReqs.length === 0) {
+              try {
+                const rRes = await axios.get(`${API_BASE_URL}/api/requirements/criteria/${critId}`, { headers });
+                reqs = rRes.data?.data || rRes.data || [];
+              } catch {
+                reqs = [];
+              }
             }
             return { ...crit, requirements: reqs, children: [] };
           })
@@ -117,11 +146,14 @@ export default function AssignToOfficesModal({
     } finally {
       setLoadingData(false);
     }
-  }, []);
+  }, [events]);
 
   useEffect(() => {
-    fetchFreshData(selectedEventId);
-  }, [selectedEventId, fetchFreshData]);
+    const effectiveEventId = selectedEventId || localStorage.getItem('acc_selected_event_id') || localStorage.getItem('selected_audit_event_id') || (events && events[0]?.EventID);
+    if (effectiveEventId) {
+      fetchFreshData(effectiveEventId);
+    }
+  }, [selectedEventId, events, fetchFreshData]);
 
   const formatDateString = (dateStr) => {
     if (!dateStr) return 'Aug 24, 2026';
@@ -151,17 +183,9 @@ export default function AssignToOfficesModal({
     }
 
     if (activeOfficeTab === 'Programs') {
-      list = list.filter(o =>
-        o.entity_type_id === 1 ||
-        String(o.category_name || o.TypeName || '').toLowerCase().includes('program') ||
-        String(o.office_type_name || o.office_type || '').toLowerCase().includes('academic')
-      );
+      list = list.filter(o => isAcademicEntity(o));
     } else if (activeOfficeTab === 'Offices') {
-      list = list.filter(o =>
-        o.entity_type_id === 2 ||
-        String(o.category_name || o.TypeName || '').toLowerCase().includes('office') ||
-        String(o.office_type_name || o.office_type || '').toLowerCase().includes('non-academic')
-      );
+      list = list.filter(o => !isAcademicEntity(o));
     }
 
     const q = officeSearch.trim().toLowerCase();
@@ -172,7 +196,91 @@ export default function AssignToOfficesModal({
       const dept = String(o.department_name || o.DepartmentCode || '').toLowerCase();
       return name.includes(q) || dept.includes(q);
     });
-  }, [offices, selectedEventId, activeOfficeTab, officeSearch]);
+  }, [localOffices, selectedEventId, activeOfficeTab, officeSearch]);
+
+  // If user enters a search query and requirements are not loaded yet, ensure fresh data is fetched
+  useEffect(() => {
+    if (requirementSearch.trim() && localAreasData.length > 0) {
+      const hasAnyReqs = localAreasData.some(a => (a.criteria || []).some(c => (c.requirements || []).length > 0));
+      if (!hasAnyReqs && !loadingData) {
+        fetchFreshData(selectedEventId);
+      }
+    }
+  }, [requirementSearch, localAreasData, loadingData, selectedEventId, fetchFreshData]);
+
+  // Filter evidence hierarchy by search term (searches requirement code/description, criteria code/name, area code/name)
+  const filteredAreasData = useMemo(() => {
+    const q = requirementSearch.trim().toLowerCase();
+    if (!q) return localAreasData;
+
+    const matchesReq = (r) => {
+      const code = String(r.RequirementCode || r.code || r.req_code || '').toLowerCase();
+      const title = String(r.RequirementTitle || r.Title || r.title || r.RequirementName || r.description || r.Description || '').toLowerCase();
+      return code.includes(q) || title.includes(q);
+    };
+
+    const filterCriteria = (crit) => {
+      const critCode = String(crit.CriteriaCode || crit.code || '').toLowerCase();
+      const critName = String(crit.CriteriaName || crit.name || crit.title || '').toLowerCase();
+      const critSelfMatches = critCode.includes(q) || critName.includes(q);
+
+      const matchingReqs = (crit.requirements || []).filter(r => matchesReq(r) || critSelfMatches);
+      const matchingChildren = (crit.children || []).map(child => filterCriteria(child)).filter(Boolean);
+
+      if (critSelfMatches || matchingReqs.length > 0 || matchingChildren.length > 0) {
+        return {
+          ...crit,
+          requirements: critSelfMatches ? (crit.requirements || []) : matchingReqs,
+          children: matchingChildren
+        };
+      }
+      return null;
+    };
+
+    return (localAreasData || []).map((area) => {
+      const areaCode = String(area.AreaCode || area.code || '').toLowerCase();
+      const areaName = String(area.AreaName || area.name || area.title || '').toLowerCase();
+      const areaSelfMatches = areaCode.includes(q) || areaName.includes(q);
+
+      const filteredCriteria = (area.criteria || []).map(c => {
+        if (areaSelfMatches) return c;
+        return filterCriteria(c);
+      }).filter(Boolean);
+
+      if (areaSelfMatches || filteredCriteria.length > 0) {
+        return {
+          ...area,
+          criteria: filteredCriteria
+        };
+      }
+      return null;
+    }).filter(Boolean);
+  }, [localAreasData, requirementSearch]);
+
+  // Automatically expand matching areas and criteria when searching so user sees results immediately
+  useEffect(() => {
+    const q = requirementSearch.trim().toLowerCase();
+    if (!q) return;
+
+    const matchedAreaIds = new Set();
+    const matchedCritIds = new Set();
+
+    filteredAreasData.forEach((area) => {
+      const areaId = String(area.id || area.AreaID);
+      matchedAreaIds.add(areaId);
+
+      const markCrit = (crit) => {
+        const critId = String(crit.id || crit.CriteriaID);
+        matchedCritIds.add(critId);
+        (crit.children || []).forEach(markCrit);
+      };
+
+      (area.criteria || []).forEach(markCrit);
+    });
+
+    setExpandedAreas(matchedAreaIds);
+    setExpandedCriteria(matchedCritIds);
+  }, [requirementSearch, filteredAreasData]);
 
   // Office Selection Handlers
   const toggleOffice = (officeId) => {
@@ -253,19 +361,21 @@ export default function AssignToOfficesModal({
   };
 
   const toggleExpandArea = (areaId) => {
+    const normId = String(areaId);
     setExpandedAreas(prev => {
       const next = new Set(prev);
-      if (next.has(areaId)) next.delete(areaId);
-      else next.add(areaId);
+      if (next.has(normId)) next.delete(normId);
+      else next.add(normId);
       return next;
     });
   };
 
   const toggleExpandCriteria = (critId) => {
+    const normId = String(critId);
     setExpandedCriteria(prev => {
       const next = new Set(prev);
-      if (next.has(critId)) next.delete(critId);
-      else next.add(critId);
+      if (next.has(normId)) next.delete(normId);
+      else next.add(normId);
       return next;
     });
   };
@@ -287,7 +397,7 @@ export default function AssignToOfficesModal({
           </div>
           <div>
             <div className="flex items-center gap-3">
-              <h2 className="text-lg font-extrabold text-slate-900 tracking-tight uppercase">Assign Evidence to Offices</h2>
+              <h2 className="text-lg font-extrabold text-slate-900 tracking-tight uppercase">Assign Standards to Offices</h2>
               {events && events.length > 0 && (
                 <div className="flex items-center gap-1.5 min-w-[200px]">
                   <CustomSelect
@@ -309,7 +419,7 @@ export default function AssignToOfficesModal({
                 </div>
               )}
             </div>
-            <p className="text-xs text-slate-500 font-medium">Select programs or offices on the left and assign evidence items on the right.</p>
+            <p className="text-xs text-slate-500 font-medium">Select programs or offices on the left and assign standards on the right.</p>
           </div>
         </div>
 
@@ -337,7 +447,7 @@ export default function AssignToOfficesModal({
                 placeholder="Search programs and offices..."
                 value={officeSearch}
                 onChange={(e) => setOfficeSearch(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
+                className="w-full pl-10 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
               />
             </div>
 
@@ -385,9 +495,7 @@ export default function AssignToOfficesModal({
               filteredOffices.map((office) => {
                 const officeId = Number(office.OfficeID || office.id);
                 const isSelected = selectedOfficeIds.has(officeId);
-                const isAcademic = office.entity_type_id === 1 ||
-                  String(office.category_name || office.TypeName || office.office_type || '').toLowerCase().includes('academic') ||
-                  String(office.category_name || office.TypeName || office.office_type || '').toLowerCase().includes('program');
+                const isAcademic = isAcademicEntity(office);
 
                 return (
                   <div
@@ -410,9 +518,9 @@ export default function AssignToOfficesModal({
                     {/* Content */}
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <div className={`h-6 w-6 rounded-md flex items-center justify-center shrink-0 border ${isAcademic ? 'bg-cyan-50 text-cyan-600 border-cyan-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                        <div className={`h-7 w-7 rounded-lg flex items-center justify-center shrink-0 border shadow-2xs ${isAcademic ? 'bg-cyan-50 text-cyan-600 border-cyan-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'
                           }`}>
-                          {isAcademic ? <GraduationCap className="h-3.5 w-3.5" /> : <Building2 className="h-3.5 w-3.5" />}
+                          {isAcademic ? <GraduationCap className="h-4 w-4" /> : <Building2 className="h-4 w-4" />}
                         </div>
                         <h4 className="text-xs font-bold text-slate-900 truncate">
                           {office.OfficeName || office.office_name}
@@ -431,11 +539,15 @@ export default function AssignToOfficesModal({
                       </div>
 
                       <div className="flex items-center justify-between mt-2">
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold bg-blue-50 text-blue-700">
-                          {isAcademic ? 'Academic Program' : 'Office'}
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold border ${
+                          isAcademic
+                            ? 'bg-blue-50 text-blue-700 border-blue-100'
+                            : 'bg-indigo-50 text-indigo-700 border border-indigo-100'
+                        }`}>
+                          {isAcademic ? 'Academic Program' : 'Non Academic'}
                         </span>
                         <span className="text-[9px] font-bold text-slate-400 uppercase">
-                          {office.department_name || office.DepartmentCode || 'SSLATE'}
+                          {office.department_name || office.DepartmentCode || (isAcademic ? 'Academic' : 'Institution-wide')}
                         </span>
                       </div>
                     </div>
@@ -453,29 +565,50 @@ export default function AssignToOfficesModal({
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search loaded hierarchy..."
+                placeholder="Search areas, sub areas, or standards (e.g. A.1)..."
                 value={requirementSearch}
                 onChange={(e) => setRequirementSearch(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
+                className="w-full pl-10 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
               />
+              {requirementSearch && (
+                <button
+                  type="button"
+                  onClick={() => setRequirementSearch('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors"
+                  title="Clear search"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
             </div>
           </div>
 
           <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-slate-50/30">
-            {localAreasData.length === 0 ? (
+            {loadingData && localAreasData.length === 0 ? (
               <div className="flex h-48 flex-col items-center justify-center text-slate-400 text-xs gap-2">
-                {loadingData ? (
+                <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+                <span>Loading standards structure...</span>
+              </div>
+            ) : filteredAreasData.length === 0 ? (
+              <div className="flex h-48 flex-col items-center justify-center text-slate-400 text-xs gap-2">
+                {requirementSearch ? (
                   <>
-                    <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
-                    <span>Loading evidence structure...</span>
+                    <span>No standards match "{requirementSearch}".</span>
+                    <button
+                      type="button"
+                      onClick={() => setRequirementSearch('')}
+                      className="text-blue-600 font-semibold hover:underline mt-1 cursor-pointer"
+                    >
+                      Clear search
+                    </button>
                   </>
                 ) : (
-                  <span>No evidence hierarchy found for this accreditation.</span>
+                  <span>No standards hierarchy found for this accreditation.</span>
                 )}
               </div>
             ) : (
-              localAreasData.map((area) => {
-                const areaId = area.id || area.AreaID;
+              filteredAreasData.map((area) => {
+                const areaId = String(area.id || area.AreaID);
                 const isExpanded = expandedAreas.has(areaId);
                 const criteriaList = area.criteria || [];
                 const areaCode = area.AreaCode || area.code || '';
@@ -519,11 +652,11 @@ export default function AssignToOfficesModal({
                     {isExpanded && (
                       <div className="p-3 space-y-2 bg-slate-50 border-t border-blue-100">
                         {criteriaList.map((crit) => {
-                          const critId = crit.id || crit.CriteriaID;
+                          const critId = String(crit.id || crit.CriteriaID);
                           const isCritExpanded = expandedCriteria.has(critId);
                           const reqs = crit.requirements || [];
                           const critCode = crit.CriteriaCode || crit.code || '';
-                          const critName = crit.CriteriaName || crit.name || crit.title || 'Criteria';
+                          const critName = crit.CriteriaName || crit.name || crit.title || 'Sub Area';
 
                           const critChildren = crit.children || [];
                           const allCritReqIds = getAllReqIdsForCriteria(crit);
@@ -608,11 +741,11 @@ export default function AssignToOfficesModal({
                                   {critChildren.length > 0 && (
                                     <div className="space-y-2 pt-1">
                                       {critChildren.map((subCrit) => {
-                                        const subCritId = subCrit.id || subCrit.CriteriaID;
+                                        const subCritId = String(subCrit.id || subCrit.CriteriaID);
                                         const isSubCritExpanded = expandedCriteria.has(subCritId);
                                         const subReqs = subCrit.requirements || [];
                                         const subCritCode = subCrit.CriteriaCode || subCrit.code || '';
-                                        const subCritName = subCrit.CriteriaName || subCrit.name || subCrit.title || 'Sub-Criteria';
+                                        const subCritName = subCrit.CriteriaName || subCrit.name || subCrit.title || 'Sub Area';
                                         const subReqIds = subReqs.map(r => Number(r.id || r.RequirementID));
                                         const isSubAllSelected = subReqIds.length > 0 && subReqIds.every(id => selectedRequirementIds.has(id));
 
@@ -628,7 +761,7 @@ export default function AssignToOfficesModal({
                                                   className="h-3.5 w-3.5 rounded border-blue-400 text-blue-600 focus:ring-blue-500/30 cursor-pointer"
                                                 />
                                                 <span className="px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wide uppercase bg-blue-600 text-white shrink-0 shadow-2xs">
-                                                  SUBCRITERIA
+                                                  SUB AREA
                                                 </span>
                                                 <span
                                                   onClick={() => toggleExpandCriteria(subCritId)}
@@ -651,7 +784,7 @@ export default function AssignToOfficesModal({
                                             {isSubCritExpanded && (
                                               <div className="p-2 space-y-1.5 bg-slate-50/40">
                                                 {subReqs.length === 0 ? (
-                                                  <p className="text-[11px] text-slate-400 italic px-2 py-1">No evidence in this subcriterion.</p>
+                                                  <p className="text-[11px] text-slate-400 italic px-2 py-1">No standards in this sub area.</p>
                                                 ) : (
                                                   subReqs.map((req) => {
                                                     const reqId = Number(req.id || req.RequirementID);
@@ -698,7 +831,7 @@ export default function AssignToOfficesModal({
                                   )}
 
                                   {reqs.length === 0 && critChildren.length === 0 && (
-                                    <p className="text-[11px] text-slate-400 italic px-2 py-1">No evidence or sub-criteria added yet.</p>
+                                    <p className="text-[11px] text-slate-400 italic px-2 py-1">No standards or sub areas added yet.</p>
                                   )}
                                 </div>
                               )}
@@ -717,7 +850,7 @@ export default function AssignToOfficesModal({
       {/* Fixed Bottom Footer Action Bar */}
       <div className="shrink-0 bg-white border-t border-slate-200 px-6 py-3.5 flex items-center justify-between shadow-lg z-10">
         <p className="text-xs font-semibold text-slate-500">
-          Pick offices on the left, then evidence on the right.
+          Pick offices on the left, then standards on the right.
         </p>
 
         <div className="flex items-center gap-3">
@@ -727,7 +860,7 @@ export default function AssignToOfficesModal({
               OFFICES <strong className="ml-1 text-slate-900">{selectedOfficeIds.size}</strong>
             </span>
             <span className="px-3 py-1 bg-slate-100 text-slate-700 text-xs font-bold rounded-lg border border-slate-200">
-              EVIDENCE <strong className="ml-1 text-slate-900">{selectedRequirementIds.size}</strong>
+              STANDARDS <strong className="ml-1 text-slate-900">{selectedRequirementIds.size}</strong>
             </span>
           </div>
 

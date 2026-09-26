@@ -21,7 +21,6 @@ const eventDepartmentsController = {
             d.code AS department_code,
             NULL::integer AS id,
             NULL::integer AS event_id,
-            'None'::text AS accreditation_level,
             NULL::timestamp AS created_at,
             NULL::timestamp AS updated_at,
             COUNT(DISTINCT o."OfficeID") AS program_count
@@ -40,14 +39,13 @@ const eventDepartmentsController = {
             d.code AS department_code,
             ed.id AS id,
             COALESCE(ed.event_id, ?) AS event_id,
-            COALESCE(ed.accreditation_level, 'None') AS accreditation_level,
             ed.created_at,
             ed.updated_at,
             COUNT(DISTINCT o."OfficeID") AS program_count
           FROM departments d
           LEFT JOIN event_departments ed ON ed.department_id = d.id AND ed.event_id = ?
           LEFT JOIN offices o ON o."EventID" = ? AND o.master_list_id IN (SELECT id FROM master_list WHERE department_id = d.id)
-          GROUP BY d.id, d.name, d.code, ed.id, ed.event_id, ed.accreditation_level, ed.created_at, ed.updated_at
+          GROUP BY d.id, d.name, d.code, ed.id, ed.event_id, ed.created_at, ed.updated_at
           ORDER BY d.id ASC
         `;
         params = [numericEventId, numericEventId, numericEventId];
@@ -61,10 +59,10 @@ const eventDepartmentsController = {
     }
   },
 
-  // Assign a department to an event with an accreditation level
+  // Assign a department to an event
   assignDepartment: async (req, res) => {
     try {
-      const { event_id, department_id, accreditation_level = 'Level I' } = req.body;
+      const { event_id, department_id } = req.body;
 
       if (!event_id || !department_id) {
         return res.status(400).json({ success: false, message: 'Event ID and Department ID are required.' });
@@ -79,18 +77,18 @@ const eventDepartmentsController = {
       if (existing.length > 0) {
         const [updated] = await db.query(
           `UPDATE event_departments 
-           SET accreditation_level = ?, updated_at = CURRENT_TIMESTAMP 
+           SET updated_at = CURRENT_TIMESTAMP 
            WHERE id = ? 
            RETURNING *`,
-          [accreditation_level, existing[0].id]
+          [existing[0].id]
         );
         record = updated[0];
       } else {
         const [inserted] = await db.query(
-          `INSERT INTO event_departments (event_id, department_id, accreditation_level)
-           VALUES (?, ?, ?)
+          `INSERT INTO event_departments (event_id, department_id)
+           VALUES (?, ?)
            RETURNING *`,
-          [Number(event_id), Number(department_id), accreditation_level]
+          [Number(event_id), Number(department_id)]
         );
         record = inserted[0];
       }
@@ -137,7 +135,7 @@ const eventDepartmentsController = {
     }
   },
 
-  // Update accreditation level of a department in an event
+  // Update accreditation level for academic programs under an event department
   updateLevel: async (req, res) => {
     try {
       const { id } = req.params;
@@ -147,38 +145,16 @@ const eventDepartmentsController = {
         return res.status(400).json({ success: false, message: 'Accreditation level is required.' });
       }
 
-      const [updated] = await db.query(
-        `UPDATE event_departments 
-         SET accreditation_level = ?, updated_at = CURRENT_TIMESTAMP 
-         WHERE id = ? 
-         RETURNING *`,
+      // Update academic programs under this event department
+      await db.query(
+        `UPDATE offices SET accreditation_level = ? WHERE event_department_id = ?`,
         [accreditation_level, Number(id)]
       );
 
-      if (updated.length === 0) {
-        return res.status(404).json({ success: false, message: 'Event department record not found.' });
-      }
-
-      const record = updated[0];
-
-      // Audit log
-      if (req.user?.userId) {
-        try {
-          const [deptRows] = await db.query('SELECT name FROM departments WHERE id = ?', [record.department_id]);
-          await recordLog(req.user.userId, 'AccreditationLevelUpdated', {
-            eventDepartmentId: id,
-            department: deptRows[0]?.name,
-            newLevel: accreditation_level,
-          });
-        } catch (logErr) {
-          console.error('Failed to log level update:', logErr);
-        }
-      }
-
       res.json({
         success: true,
-        message: 'Accreditation level updated successfully',
-        data: record,
+        message: 'Accreditation level updated for programs successfully',
+        data: { id: Number(id), accreditation_level },
       });
     } catch (err) {
       console.error('Error updating accreditation level:', err);

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import { X } from "lucide-react";
 import CustomDropdown from "../components/UI/CustomDropdown";
 import { useModal } from "../components/UI/ModalProvider";
+import { useToast } from "../components/UI/Toast";
 import UsersP from "../components/UsersProfile/UsersProfle";
 import UserEditApproval from "../components/usereditapproval/usereditapproval";
 
@@ -38,7 +39,8 @@ export default function Users() {
     const [deleteMode, setDeleteMode] = useState(false);
     const [selectedCount, setSelectedCount] = useState(0);
     const [selectedIds, setSelectedIds] = useState([]);
-    const { showAlert, showConfirm } = useModal();
+    const { showConfirm } = useModal();
+    const { toast } = useToast();
 
     const handleSelectionChange = useCallback((count, ids) => {
         setSelectedCount(count);
@@ -47,7 +49,11 @@ export default function Users() {
 
     const handleDeleteSelected = async () => {
         if (!usersRef.current || selectedIds.length === 0) return;
-        const confirmed = await showConfirm(`Delete ${selectedIds.length} selected user(s)? This cannot be undone.`);
+        const count = selectedIds.length;
+        const confirmed = await showConfirm(
+            `Delete ${count} selected user${count === 1 ? '' : 's'}? This cannot be undone.`,
+            'Confirm Deletion'
+        );
         if (!confirmed) return;
         try {
             const result = await usersRef.current.deleteSelected(selectedIds);
@@ -57,13 +63,28 @@ export default function Users() {
                 setDeleteMode(false);
                 // Refresh list
                 if (usersRef.current && usersRef.current.refresh) usersRef.current.refresh();
-                await showAlert(`Successfully deleted ${selectedIds.length} user(s)`);
+                toast({
+                    title: 'Users Deleted',
+                    description: `Successfully deleted ${count} user${count === 1 ? '' : 's'}.`,
+                    variant: 'success',
+                    duration: 3000,
+                });
             } else {
-                await showAlert(result?.message || 'Failed to delete selected users');
+                toast({
+                    title: 'Delete Failed',
+                    description: result?.message || 'Failed to delete selected users.',
+                    variant: 'error',
+                    duration: 4000,
+                });
             }
         } catch (err) {
             console.error('Error deleting users:', err);
-            await showAlert('An error occurred while deleting users');
+            toast({
+                title: 'Error',
+                description: 'An unexpected error occurred while deleting users.',
+                variant: 'error',
+                duration: 4000,
+            });
         }
     };
 
@@ -151,7 +172,7 @@ export default function Users() {
             <div className="px-4 sm:px-6 pt-4 pb-3.5 shrink-0 border-b border-slate-200/70 bg-white shadow-2xs">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-indigo-700 text-white shadow-md shadow-violet-500/20 shrink-0">
+                        <div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-md shadow-blue-500/20 shrink-0">
                             <svg className="w-5 h-5 sm:w-5.5 sm:h-5.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                             </svg>
@@ -226,7 +247,7 @@ export default function Users() {
                         <input
                             type="text"
                             placeholder="Search users, email, role..."
-                            className="h-9 w-full rounded-xl border border-slate-200/90 bg-slate-50/60 pl-9.5 pr-8 text-xs text-slate-800 placeholder-slate-400 shadow-2xs transition-all focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-slate-300"
+                            className="h-9 w-full rounded-xl border border-slate-200/90 bg-slate-50/60 pl-10 pr-8 text-xs text-slate-800 placeholder-slate-400 shadow-2xs transition-all focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-slate-300"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />

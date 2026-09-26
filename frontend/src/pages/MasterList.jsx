@@ -12,6 +12,7 @@ import { useLiveRefresh } from '../utils/liveSync';
 import { useModal } from '../components/UI/ModalProvider';
 import ServerOfflineState from '../components/UI/ServerOfflineState';
 import ViewModeToggle from '../components/UI/ViewModeToggle';
+import { isAcademicEntity } from '../utils/entityHelpers';
 
 const DEFAULT_DEPARTMENTS = [];
 const ITEMS_PER_PAGE = 12;
@@ -167,8 +168,10 @@ export default function MasterList() {
   const startIndex = (safePage - 1) * ITEMS_PER_PAGE;
   const paginatedItems = filteredItems.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
-  const renderItemIcon = (type) => {
-    const isAcademic = type === 'Academic Program' || String(type).toLowerCase().includes('academic');
+  const renderItemIcon = (itemOrType) => {
+    const isAcademic = typeof itemOrType === 'object' && itemOrType !== null
+      ? isAcademicEntity(itemOrType)
+      : isAcademicEntity({ type: itemOrType });
     if (isAcademic) {
       return (
         <div className="h-9 w-9 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center shrink-0 border border-cyan-100 shadow-2xs">
@@ -355,7 +358,7 @@ export default function MasterList() {
             <input
               type="text"
               placeholder="Search master list..."
-              className="h-9 w-full rounded-xl border border-slate-200/90 bg-slate-50/60 pl-9.5 pr-8 text-xs text-slate-800 placeholder-slate-400 shadow-2xs transition-all focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-slate-300"
+              className="h-9 w-full rounded-xl border border-slate-200/90 bg-slate-50/60 pl-10 pr-8 text-xs text-slate-800 placeholder-slate-400 shadow-2xs transition-all focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-slate-300"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -415,7 +418,7 @@ export default function MasterList() {
               <h3 className="text-base font-bold text-slate-800 mb-1">No Items Found</h3>
               <p className="text-xs text-slate-500 max-w-sm mb-4">
                 {searchTerm || typeFilter !== 'all' || departmentFilter !== 'all'
-                  ? 'No master list items match your current filter or search criteria.'
+                  ? 'No master list items match your current filter or search query.'
                   : 'No programs or offices have been added to the master list yet.'}
               </p>
               {searchTerm || typeFilter !== 'all' || departmentFilter !== 'all' ? (
@@ -455,7 +458,7 @@ export default function MasterList() {
               <div className="space-y-2">
                 {paginatedItems.map((item) => {
                   const isSelected = selectedIds.includes(item.id);
-                  const isAcademic = item.type === 'Academic Program' || String(item.type).toLowerCase().includes('academic');
+                  const isAcademic = isAcademicEntity(item);
 
                   return (
                     <div
@@ -481,7 +484,7 @@ export default function MasterList() {
                               className="h-4 w-4 rounded border-rose-300 text-rose-600 focus:ring-rose-500 cursor-pointer shrink-0"
                             />
                           )}
-                          {renderItemIcon(item.type)}
+                          {renderItemIcon(item)}
                           <div className="min-w-0 flex-1">
                             <div className="text-sm font-bold text-slate-900 truncate leading-snug hover:text-indigo-600 transition-colors">
                               {item.name}
@@ -584,7 +587,7 @@ export default function MasterList() {
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 grid-rows-3 gap-2 sm:gap-2.5 lg:gap-3 flex-1 min-h-0 h-full p-1">
               {paginatedItems.map((item) => {
                 const isSelected = selectedIds.includes(item.id);
-                const isAcademic = item.type === 'Academic Program' || String(item.type).toLowerCase().includes('academic');
+                const isAcademic = isAcademicEntity(item);
 
                 return (
                   <div
@@ -611,7 +614,7 @@ export default function MasterList() {
                     {/* Header Row & 3-dot Menu */}
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-start gap-2.5 min-w-0 pr-2">
-                        {renderItemIcon(item.type)}
+                        {renderItemIcon(item)}
                         <div className="min-w-0 flex-1">
                           <h3 className="text-xs sm:text-[13px] font-bold text-slate-900 truncate leading-tight">
                             {item.name}

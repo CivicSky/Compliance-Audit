@@ -238,7 +238,7 @@ export default function Login() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', alignItems: 'flex-start', textAlign: 'left' }}>
                         {[
                             { icon: <ShieldCheck size={16} />, text: 'Compliance audit management' },
-                            { icon: <ClipboardList size={16} />, text: 'Criteria & requirements tracking' },
+                            { icon: <ClipboardList size={16} />, text: 'Sub Areas & standards tracking' },
                             { icon: <TrendingUp size={16} />, text: 'Real-time progress monitoring' },
                         ].map(({ icon, text }, i) => (
                             <div key={i} style={{

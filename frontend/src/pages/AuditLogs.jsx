@@ -23,7 +23,7 @@ export default function AuditLogs() {
     const [actionFilter, setActionFilter] = useState("all");
     const [currentPage, setCurrentPage] = useState(1);
     const [expandedLogId, setExpandedLogId] = useState(null);
-    const itemsPerPage = 8;
+    const itemsPerPage = 7;
 
     const actionStyles = {
         Created: {
@@ -271,8 +271,8 @@ export default function AuditLogs() {
 
         // File Upload
         if (/RequirementFileUploaded|Upload/i.test(rawAction)) {
-            let msg = `Uploaded evidence file ${ctx.fileName ? `"${ctx.fileName}"` : 'document'}`;
-            if (ctx.reqCode) msg += ` for Requirement ${ctx.reqCode}`;
+            let msg = `Uploaded standard file ${ctx.fileName ? `"${ctx.fileName}"` : 'document'}`;
+            if (ctx.reqCode) msg += ` for Standard ${ctx.reqCode}`;
             if (ctx.officeName) msg += ` in ${ctx.officeName}`;
             if (ctx.eventName) msg += ` under "${ctx.eventName}"`;
             return msg;
@@ -280,17 +280,17 @@ export default function AuditLogs() {
 
         // File Delete
         if (/RequirementFileDeleted|Unsubmit/i.test(rawAction)) {
-            let msg = `Removed evidence file ${ctx.fileName ? `"${ctx.fileName}"` : 'document'}`;
-            if (ctx.reqCode) msg += ` from Requirement ${ctx.reqCode}`;
+            let msg = `Removed standard file ${ctx.fileName ? `"${ctx.fileName}"` : 'document'}`;
+            if (ctx.reqCode) msg += ` from Standard ${ctx.reqCode}`;
             if (ctx.officeName) msg += ` in ${ctx.officeName}`;
             return msg;
         }
 
         // Requirement Added
         if (/RequirementAdded/i.test(rawAction) && actionLabel === "Created") {
-            let msg = `Created Requirement ${ctx.reqCode ? ctx.reqCode : ''}`;
+            let msg = `Created Standard ${ctx.reqCode ? ctx.reqCode : ''}`;
             if (ctx.reqDesc) msg += ` ("${ctx.reqDesc}")`;
-            if (ctx.critLabel) msg += ` under Criteria ${ctx.critLabel}`;
+            if (ctx.critLabel) msg += ` under Sub Area ${ctx.critLabel}`;
             if (ctx.areaName) msg += ` in ${ctx.areaName}`;
             if (ctx.eventName) msg += ` — "${ctx.eventName}"`;
             return msg;
@@ -301,18 +301,18 @@ export default function AuditLogs() {
             const changes = d.changes || {};
             const code = d.RequirementCode || ctx.reqCode || '';
             if (changes.RequirementCode) {
-                return `Updated Requirement: code changed from "${changes.RequirementCode.from}" to "${changes.RequirementCode.to}"`;
+                return `Updated Standard: code changed from "${changes.RequirementCode.from}" to "${changes.RequirementCode.to}"`;
             }
             if (changes.Description) {
                 const prev = String(changes.Description.from || '').slice(0, 60);
                 const next = String(changes.Description.to || '').slice(0, 60);
-                return `Updated Requirement ${code}: description changed from "${prev}" to "${next}"`;
+                return `Updated Standard ${code}: description changed from "${prev}" to "${next}"`;
             }
             const changedFields = Object.keys(changes);
             if (changedFields.length > 0) {
-                return `Updated Requirement ${code} (changed: ${changedFields.join(', ')})`;
+                return `Updated Standard ${code} (changed: ${changedFields.join(', ')})`;
             }
-            return `Updated Requirement ${code}${ctx.critLabel ? ` under Criteria ${ctx.critLabel}` : ''}`;
+            return `Updated Standard ${code}${ctx.critLabel ? ` under Sub Area ${ctx.critLabel}` : ''}`;
         }
 
         // Requirement Deleted
@@ -320,17 +320,17 @@ export default function AuditLogs() {
             const deleted = Array.isArray(d.deletedRequirements) ? d.deletedRequirements : [];
             if (deleted.length === 1) {
                 const r = deleted[0];
-                return `Deleted Requirement ${r.RequirementCode || ''}${r.Description ? ` ("${r.Description}")` : ''}${r.EventName ? ` from "${r.EventName}"` : ''}`;
+                return `Deleted Standard ${r.RequirementCode || ''}${r.Description ? ` ("${r.Description}")` : ''}${r.EventName ? ` from "${r.EventName}"` : ''}`;
             }
             if (deleted.length > 1) {
-                return `Deleted ${deleted.length} Requirements: ${deleted.map(r => r.RequirementCode || 'Unknown').join(', ')}`;
+                return `Deleted ${deleted.length} Standards: ${deleted.map(r => r.RequirementCode || 'Unknown').join(', ')}`;
             }
-            return `Deleted ${(d.deletedCount || d.requirementIds?.length || 0)} Requirement(s)`;
+            return `Deleted ${(d.deletedCount || d.requirementIds?.length || 0)} Standard(s)`;
         }
 
         // Criteria Added
         if (/CriteriaAdded|Criteria/i.test(rawAction) && actionLabel === "Created") {
-            let msg = `Created Criteria ${ctx.critLabel ? `"${ctx.critLabel}"` : ''}`;
+            let msg = `Created Sub Area ${ctx.critLabel ? `"${ctx.critLabel}"` : ''}`;
             if (ctx.areaName) msg += ` under ${ctx.areaName}`;
             if (ctx.eventName) msg += ` — "${ctx.eventName}"`;
             return msg;
@@ -342,12 +342,12 @@ export default function AuditLogs() {
             if (deleted.length === 1) {
                 const c = deleted[0];
                 const label = c.CriteriaCode && c.CriteriaName ? `${c.CriteriaCode}. ${c.CriteriaName}` : (c.CriteriaCode || c.CriteriaName || 'Unknown');
-                return `Deleted Criteria "${label}"${c.EventName ? ` from "${c.EventName}"` : ''}`;
+                return `Deleted Sub Area "${label}"${c.EventName ? ` from "${c.EventName}"` : ''}`;
             }
             if (deleted.length > 1) {
-                return `Deleted ${deleted.length} Criteria: ${deleted.map(c => c.CriteriaCode || 'Unknown').join(', ')}`;
+                return `Deleted ${deleted.length} Sub Areas: ${deleted.map(c => c.CriteriaCode || 'Unknown').join(', ')}`;
             }
-            return `Deleted ${(d.deletedCount || d.criteriaIds?.length || 0)} Criteria`;
+            return `Deleted ${(d.deletedCount || d.criteriaIds?.length || 0)} Sub Area(s)`;
         }
 
         // Area Added
@@ -804,7 +804,7 @@ export default function AuditLogs() {
                                 <input
                                     type="text"
                                     placeholder="Search activity, user, office..."
-                                    className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-8 text-xs text-slate-800 placeholder-slate-400 shadow-2xs transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-slate-300"
+                                    className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-8 text-xs text-slate-800 placeholder-slate-400 shadow-2xs transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-slate-300"
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
                                 />
@@ -851,7 +851,7 @@ export default function AuditLogs() {
 
                     {loading ? (
                         <div className="flex-1 overflow-y-auto">
-                            <CardListSkeleton count={8} />
+                            <CardListSkeleton count={7} />
                         </div>
                     ) : serverError ? (
                         <ServerOfflineState
@@ -1018,7 +1018,7 @@ export default function AuditLogs() {
                                                     {ctx.fileName && (
                                                         <div className="rounded-xl border border-amber-200/80 bg-white p-3 shadow-2xs">
                                                             <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 flex items-center gap-1">
-                                                                Evidence File
+                                                                Standard File
                                                             </span>
                                                             <span className="text-xs font-bold text-slate-900 mt-1 block truncate" title={ctx.fileName}>
                                                                 {ctx.fileName}

@@ -61,24 +61,35 @@ router.get('/auditors/office/:officeId', auth, async (req, res) => {
         await ensureAssignmentsTable();
         const { officeId } = req.params;
         const [rows] = await db.query(
-            `SELECT DISTINCT u.UserID, u.FirstName, u.LastName, u.Email, u.ProfilePic, ar.AreaCode, ar.AreaName
+            `SELECT u.UserID, u.FirstName, u.LastName, u.Email, u.ProfilePic,
+                    string_agg(DISTINCT ar.AreaCode, ', ') AS AreaCode,
+                    string_agg(DISTINCT ar.AreaName, ', ') AS AreaName
              FROM auditor_area_assignments aaa
              JOIN users u ON aaa.auditor_user_id = u.UserID
              JOIN areas ar ON aaa.area_id = ar.AreaID
-             JOIN offices o ON o.EventID = ar.EventID
-             WHERE o.OfficeID = ?`,
+             JOIN criteria c ON ar.AreaID = c.AreaID
+             JOIN requirements r ON c.CriteriaID = r.CriteriaID
+             JOIN compliancestatusoffices cso ON r.RequirementID = cso.RequirementID
+             WHERE cso.OfficeID = ?
+             GROUP BY u.UserID, u.FirstName, u.LastName, u.Email, u.ProfilePic`,
             [officeId]
         );
-        const formatted = (rows || []).map(r => ({
-            UserID: r.UserID ?? r.userid ?? r.id,
-            FirstName: r.FirstName ?? r.firstname ?? '',
-            LastName: r.LastName ?? r.lastname ?? '',
-            Email: r.Email ?? r.email ?? '',
-            ProfilePic: r.ProfilePic ?? r.profilepic ?? null,
-            AreaCode: r.AreaCode ?? r.areacode ?? '',
-            AreaName: r.AreaName ?? r.areaname ?? '',
-        }));
-        res.json({ success: true, auditors: formatted });
+        const auditorMap = new Map();
+        (rows || []).forEach(r => {
+            const uid = r.UserID ?? r.userid ?? r.id;
+            if (uid && !auditorMap.has(uid)) {
+                auditorMap.set(uid, {
+                    UserID: uid,
+                    FirstName: r.FirstName ?? r.firstname ?? '',
+                    LastName: r.LastName ?? r.lastname ?? '',
+                    Email: r.Email ?? r.email ?? '',
+                    ProfilePic: r.ProfilePic ?? r.profilepic ?? null,
+                    AreaCode: r.AreaCode ?? r.areacode ?? '',
+                    AreaName: r.AreaName ?? r.areaname ?? '',
+                });
+            }
+        });
+        res.json({ success: true, auditors: Array.from(auditorMap.values()) });
     } catch (err) {
         console.error('Error fetching office auditors:', err);
         res.status(500).json({ success: false, auditors: [] });
@@ -97,9 +108,13 @@ router.post('/assign', auth, restrictAuditor, async (req, res) => {
         // Delete existing area assignments for this auditor
         await db.query('DELETE FROM auditor_area_assignments WHERE auditor_user_id = ?', [userId]);
 
-        // Insert new area assignments
+        // Insert new area assignments & reassign any area from other auditors
         if (areaIds.length > 0) {
             for (const areaId of areaIds) {
+                await db.query(
+                    'DELETE FROM auditor_area_assignments WHERE area_id = ? AND auditor_user_id != ?',
+                    [areaId, userId]
+                );
                 await db.query(
                     'INSERT IGNORE INTO auditor_area_assignments (auditor_user_id, area_id, assigned_by) VALUES (?, ?, ?)',
                     [userId, areaId, req.user?.userId || null]
@@ -148,6 +163,28 @@ router.post('/assign', auth, restrictAuditor, async (req, res) => {
                     .filter(Boolean)
                     .join(', ');
 
+                let firstOfficeId = null;
+                try {
+                    const areaIdList = assignedAreas.map(a => Number(a.AreaID)).filter(Boolean);
+                    if (areaIdList.length > 0) {
+                        const [officeMatch] = await db.query(
+                            `SELECT DISTINCT o.OfficeID 
+                             FROM offices o
+                             JOIN compliancestatusoffices cso ON o.OfficeID = cso.OfficeID
+                             JOIN requirements r ON cso.RequirementID = r.RequirementID
+                             JOIN criteria c ON r.CriteriaID = c.CriteriaID
+                             WHERE c.AreaID IN (?)
+                             LIMIT 1`,
+                            [areaIdList]
+                        );
+                        if (officeMatch && officeMatch.length > 0) {
+                            firstOfficeId = officeMatch[0].OfficeID;
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Could not resolve first office for auditor assignment notification:', e.message);
+                }
+
                 await createNotifications({
                     userIds: [targetAuditorId],
                     adminId: req.user?.userId || null,
@@ -160,6 +197,7 @@ router.post('/assign', auth, restrictAuditor, async (req, res) => {
                         userId: targetAuditorId,
                         assignedCount: assignedAreas.length,
                         areaIds: assignedAreas.map(a => Number(a.AreaID)),
+                        officeId: firstOfficeId,
                         openSubmission: false
                     }
                 });
@@ -270,20 +308,35 @@ router.put('/:areaId', auth, restrictAuditor, async (req, res) => {
 // GET all areas
 router.get('/', auth, async (req, res) => {
     try {
+        const roleId = Number(req.user?.roleId || 0);
+        const userId = Number(req.user?.userId || 0);
+
+        let auditorFilter = '';
+        const params = [];
+
+        if (roleId === 4) {
+            auditorFilter = ' AND ar.AreaID IN (SELECT area_id FROM auditor_area_assignments WHERE auditor_user_id = ?)';
+            params.push(userId);
+        }
+
         const [areas] = await db.query(`
             SELECT 
-                AreaID,
-                AreaCode,
-                AreaName,
-                EventID,
-                Description,
-                SortOrder,
-                CreatedAt,
-                UpdatedAt
-            FROM areas
-            WHERE IsActive = TRUE
-            ORDER BY SortOrder ASC
-        `);
+                ar.AreaID,
+                ar.AreaCode,
+                ar.AreaName,
+                ar.EventID,
+                ar.Description,
+                ar.SortOrder,
+                ar.CreatedAt,
+                ar.UpdatedAt,
+                aaa.auditor_user_id AS AuditorUserID,
+                TRIM(CONCAT(u.FirstName, ' ', u.LastName)) AS AuditorName
+            FROM areas ar
+            LEFT JOIN auditor_area_assignments aaa ON ar.AreaID = aaa.area_id
+            LEFT JOIN users u ON aaa.auditor_user_id = u.UserID
+            WHERE ar.IsActive = TRUE ${auditorFilter}
+            ORDER BY ar.SortOrder ASC, ar.AreaCode ASC
+        `, params);
         res.json({
             success: true,
             data: areas
@@ -302,20 +355,35 @@ router.get('/', auth, async (req, res) => {
 router.get('/event/:eventId', auth, async (req, res) => {
     try {
         const { eventId } = req.params;
+        const roleId = Number(req.user?.roleId || 0);
+        const userId = Number(req.user?.userId || 0);
+
+        let auditorFilter = '';
+        const params = [eventId];
+
+        if (roleId === 4) {
+            auditorFilter = ' AND ar.AreaID IN (SELECT area_id FROM auditor_area_assignments WHERE auditor_user_id = ?)';
+            params.push(userId);
+        }
+
         const [areas] = await db.query(`
             SELECT 
-                AreaID,
-                AreaCode,
-                AreaName,
-                EventID,
-                Description,
-                SortOrder,
-                CreatedAt,
-                UpdatedAt
-            FROM areas
-            WHERE EventID = ? AND IsActive = TRUE
-            ORDER BY SortOrder ASC, AreaCode ASC
-        `, [eventId]);
+                ar.AreaID,
+                ar.AreaCode,
+                ar.AreaName,
+                ar.EventID,
+                ar.Description,
+                ar.SortOrder,
+                ar.CreatedAt,
+                ar.UpdatedAt,
+                aaa.auditor_user_id AS AuditorUserID,
+                TRIM(CONCAT(u.FirstName, ' ', u.LastName)) AS AuditorName
+            FROM areas ar
+            LEFT JOIN auditor_area_assignments aaa ON ar.AreaID = aaa.area_id
+            LEFT JOIN users u ON aaa.auditor_user_id = u.UserID
+            WHERE ar.EventID = ? AND ar.IsActive = TRUE ${auditorFilter}
+            ORDER BY ar.SortOrder ASC, ar.AreaCode ASC
+        `, params);
 
         res.json({
             success: true,
@@ -335,6 +403,22 @@ router.get('/event/:eventId', auth, async (req, res) => {
 router.get('/:areaId', auth, async (req, res) => {
     try {
         const { areaId } = req.params;
+        const roleId = Number(req.user?.roleId || 0);
+        const userId = Number(req.user?.userId || 0);
+
+        if (roleId === 4) {
+            const [check] = await db.query(
+                'SELECT 1 FROM auditor_area_assignments WHERE area_id = ? AND auditor_user_id = ? LIMIT 1',
+                [areaId, userId]
+            );
+            if (!check || check.length === 0) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Forbidden: You are not assigned to this area.'
+                });
+            }
+        }
+
         const [areas] = await db.query(`
             SELECT 
                 AreaID,

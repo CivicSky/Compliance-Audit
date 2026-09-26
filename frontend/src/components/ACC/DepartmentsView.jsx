@@ -18,9 +18,11 @@ import {
 } from 'lucide-react';
 import { eventDepartmentsAPI, officesAPI } from '../../utils/api';
 import { useModal } from '../UI/ModalProvider';
+import { isAcademicEntity } from '../../utils/entityHelpers';
 import { API_BASE_URL } from '../../utils/apiBase';
 import userIcon from '../../assets/images/user.svg';
 import DepartmentLevelDropdown from './DepartmentLevelDropdown';
+import SmartUserAvatar from '../UI/SmartUserAvatar';
 
 const ACCREDITATION_LEVELS = ['None', 'Candidate', 'Level I', 'Level II', 'Level III', 'Level IV'];
 
@@ -29,7 +31,6 @@ const FIXED_DEPARTMENTS = [
   { id: 2, name: 'SHTM' },
   { id: 3, name: 'SARFAID' },
   { id: 4, name: 'SSLATE' },
-  { id: 5, name: 'IBED' },
 ];
 
 export default function DepartmentsView({
@@ -40,6 +41,7 @@ export default function DepartmentsView({
   onSelectOffice,
   currentUser,
   onRefresh,
+  loading = false,
 }) {
   const { showAlert } = useModal();
 
@@ -50,9 +52,7 @@ export default function DepartmentsView({
   });
   const [selectedDeptId, setSelectedDeptId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [eventDepartments, setEventDepartments] = useState([]);
-  const [loadingEventDepts, setLoadingEventDepts] = useState(false);
-  const [updatingDeptLevel, setUpdatingDeptLevel] = useState(null);
+  const [updatingProgramLevel, setUpdatingProgramLevel] = useState(null);
   const [viewSection, setViewSection] = useState('academic'); // 'academic' or 'non-academic'
 
   const roleName = String(currentUser?.RoleName || '').toLowerCase();
@@ -79,69 +79,30 @@ export default function DepartmentsView({
     }
   }, [selectedEventId, events, activeEventId, onSelectEvent]);
 
-  // Fetch event departments when activeEventId changes
-  const fetchEventDepartments = useCallback(async () => {
-    if (!activeEventId || activeEventId === 'all') {
-      setEventDepartments([]);
-      return;
-    }
-    setLoadingEventDepts(true);
-    try {
-      const res = await eventDepartmentsAPI.getByEvent(activeEventId);
-      setEventDepartments(Array.isArray(res?.data) ? res.data : []);
-    } catch (err) {
-      console.error('Failed to fetch event departments:', err);
-      setEventDepartments([]);
-    } finally {
-      setLoadingEventDepts(false);
-    }
-  }, [activeEventId]);
-
-  useEffect(() => {
-    fetchEventDepartments();
-  }, [fetchEventDepartments]);
-
-  // Handle level change
-  const handleLevelChange = async (newLevelOrEvent, deptGroup) => {
+  // Handle program accreditation level change
+  const handleProgramLevelChange = async (newLevelOrEvent, program) => {
     if (newLevelOrEvent && typeof newLevelOrEvent.stopPropagation === 'function') {
       newLevelOrEvent.stopPropagation();
     }
     const newLevel = typeof newLevelOrEvent === 'string' ? newLevelOrEvent : newLevelOrEvent?.target?.value;
-    const deptId = deptGroup.deptId;
-    const eventDeptId = deptGroup.eventDeptId;
+    const progId = program.id ?? program.OfficeID;
 
-    if (!newLevel || newLevel === deptGroup.level) return;
-
-    if (!activeEventId || activeEventId === 'all') {
-      if (showAlert) {
-        showAlert('Please select a specific event tab before changing accreditation level', 'info');
-      }
-      return;
-    }
+    if (!newLevel || newLevel === (program.accreditation_level || 'None')) return;
 
     try {
-      setUpdatingDeptLevel(deptId);
-      if (eventDeptId) {
-        await eventDepartmentsAPI.updateLevel(eventDeptId, newLevel);
-      } else if (deptId) {
-        await eventDepartmentsAPI.assignDepartment({
-          event_id: Number(activeEventId),
-          department_id: Number(deptId),
-          accreditation_level: newLevel,
-        });
-      }
-      await fetchEventDepartments();
+      setUpdatingProgramLevel(progId);
+      await officesAPI.updateLevel(progId, newLevel);
       if (onRefresh) onRefresh();
       if (showAlert) {
-        showAlert(`Updated ${deptGroup.deptName} to ${newLevel}`, 'success');
+        showAlert(`Updated ${program.office_name || program.OfficeName} to ${newLevel}`, 'success');
       }
     } catch (err) {
-      console.error('Failed to update accreditation level:', err);
+      console.error('Failed to update program accreditation level:', err);
       if (showAlert) {
-        showAlert('Failed to update accreditation level', 'error');
+        showAlert('Failed to update program accreditation level', 'error');
       }
     } finally {
-      setUpdatingDeptLevel(null);
+      setUpdatingProgramLevel(null);
     }
   };
 
@@ -155,10 +116,7 @@ export default function DepartmentsView({
 
   // Is academic office check
   const isAcademicOffice = (o) => {
-    if (o.entity_type_id === 1) return true;
-    const typeName = String(o.office_type_name || o.office_type || o.TypeName || '').toLowerCase();
-    if (/\bnon\b|non-?academic/.test(typeName)) return false;
-    return /\bacademic\b/.test(typeName) || Boolean(o.department_id || o.department_name);
+    return isAcademicEntity(o);
   };
 
   // Split into academic and non-academic
@@ -170,35 +128,21 @@ export default function DepartmentsView({
     return officesInEvent.filter((o) => !isAcademicOffice(o));
   }, [officesInEvent]);
 
-  // Group academic offices by department - All 5 fixed departments ALWAYS present
+  // Group academic offices by department - All 4 fixed departments ALWAYS present
   const departmentsList = useMemo(() => {
     const map = new Map();
 
-    // 1. Always seed with ALL 5 predefined institutional departments
+    // 1. Always seed with ALL 4 predefined institutional departments
     for (const fd of FIXED_DEPARTMENTS) {
       map.set(String(fd.id), {
         deptId: fd.id,
         deptCode: fd.name,
         deptName: fd.name,
-        eventDeptId: null,
-        level: 'None',
         programs: [],
       });
     }
 
-    // 2. Overlay live accreditation levels and event department records for this event
-    for (const ed of eventDepartments) {
-      const key = String(ed.department_id);
-      if (map.has(key)) {
-        const item = map.get(key);
-        item.eventDeptId = ed.id || null;
-        item.level = ed.accreditation_level || 'None';
-        if (ed.department_name) item.deptName = ed.department_name;
-        if (ed.department_code || ed.department_name) item.deptCode = ed.department_code || ed.department_name;
-      }
-    }
-
-    // 3. Distribute academic programs into their predefined departments
+    // 2. Distribute academic programs into their predefined departments
     for (const office of academicOffices) {
       if (!office.department_id) continue; // Never create an unassigned/empty department card
       const deptKey = String(office.department_id);
@@ -215,17 +159,17 @@ export default function DepartmentsView({
       list = list.filter((dept) => {
         const matchDept =
           dept.deptCode.toLowerCase().includes(q) ||
-          dept.deptName.toLowerCase().includes(q) ||
-          dept.level.toLowerCase().includes(q);
+          dept.deptName.toLowerCase().includes(q);
         const matchPrograms = dept.programs.some((p) =>
-          (p.office_name || p.OfficeName || '').toLowerCase().includes(q)
+          (p.office_name || p.OfficeName || '').toLowerCase().includes(q) ||
+          (p.accreditation_level || '').toLowerCase().includes(q)
         );
         return matchDept || matchPrograms;
       });
     }
 
     return list;
-  }, [eventDepartments, academicOffices, searchTerm]);
+  }, [academicOffices, searchTerm]);
 
   // Currently selected department for drill-down
   const selectedDepartment = useMemo(() => {
@@ -292,7 +236,7 @@ export default function DepartmentsView({
                 placeholder="Search departments or programs..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="h-8 pl-8 pr-3 text-xs rounded-lg border border-slate-200 bg-slate-50/60 hover:bg-white focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 w-56 transition"
+                className="h-8 pl-9 pr-3 text-xs rounded-lg border border-slate-200 bg-slate-50/60 hover:bg-white focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 w-56 transition"
               />
             </div>
           </div>
@@ -339,9 +283,6 @@ export default function DepartmentsView({
             <span className="font-extrabold text-slate-800">
               {selectedDepartment.deptName}
             </span>
-            <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
-              {selectedDepartment.level}
-            </span>
           </div>
         ) : (
           <div className="flex items-center gap-2">
@@ -384,7 +325,7 @@ export default function DepartmentsView({
 
       {/* ── MAIN CONTENT AREA ── */}
       <div className="flex-1 overflow-y-auto p-6 min-h-0">
-        {loadingEventDepts ? (
+        {loading ? (
           <div className="h-64 flex flex-col items-center justify-center text-slate-400 gap-2">
             <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
             <span className="text-xs font-medium">Loading department structures...</span>
@@ -400,14 +341,9 @@ export default function DepartmentsView({
                     <GraduationCap className="h-6 w-6" />
                   </div>
                   <div>
-                    <div className="flex items-center gap-2.5">
-                      <h2 className="text-lg font-extrabold text-slate-900 tracking-tight">
-                        {selectedDepartment.deptName}
-                      </h2>
-                      <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
-                        {selectedDepartment.level}
-                      </span>
-                    </div>
+                    <h2 className="text-lg font-extrabold text-slate-900 tracking-tight">
+                      {selectedDepartment.deptName}
+                    </h2>
                     <p className="text-xs text-slate-500 mt-0.5">
                       {selectedDepartment.programs.length}{' '}
                       {selectedDepartment.programs.length === 1 ? 'Program' : 'Programs'}{' '}
@@ -416,23 +352,13 @@ export default function DepartmentsView({
                   </div>
                 </div>
 
-                {/* Level selector on drill-down header */}
-                <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-slate-200 shadow-2xs self-start sm:self-auto">
+                <div className="flex items-center gap-2 bg-white px-3.5 py-2 rounded-xl border border-slate-200 shadow-2xs self-start sm:self-auto">
                   <span className="text-xs font-semibold text-slate-500">
-                    Accreditation Level:
+                    Academic Programs:
                   </span>
-                  {isAdmin ? (
-                    <DepartmentLevelDropdown
-                      value={selectedDepartment.level || 'Level I'}
-                      onChange={(newLevel) => handleLevelChange(newLevel, selectedDepartment)}
-                      disabled={updatingDeptLevel === selectedDepartment.deptId}
-                      levels={ACCREDITATION_LEVELS}
-                    />
-                  ) : (
-                    <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-md">
-                      {selectedDepartment.level || 'Level I'}
-                    </span>
-                  )}
+                  <span className="text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-md">
+                    {selectedDepartment.programs.length} Active
+                  </span>
                 </div>
               </div>
             </div>
@@ -451,6 +377,7 @@ export default function DepartmentsView({
                 {selectedDepartment.programs.map((program) => {
                   const progId = program.id ?? program.OfficeID;
                   const heads = program.heads || [];
+                  const isUpdatingThisProg = updatingProgramLevel === progId;
 
                   return (
                     <div
@@ -472,13 +399,31 @@ export default function DepartmentsView({
                           {program.office_name || program.OfficeName}
                         </h4>
 
-                        <p className="text-[11px] text-slate-400 mt-1">
-                          Level: <span className="font-semibold text-slate-600">{selectedDepartment.level}</span>
-                        </p>
+                        {/* Program Accreditation Level Dropdown */}
+                        <div
+                          className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <span className="text-xs font-semibold text-slate-500">
+                            Accreditation Level:
+                          </span>
+                          {isAdmin ? (
+                            <DepartmentLevelDropdown
+                              value={program.accreditation_level || 'None'}
+                              onChange={(newLevel) => handleProgramLevelChange(newLevel, program)}
+                              disabled={isUpdatingThisProg}
+                              levels={ACCREDITATION_LEVELS}
+                            />
+                          ) : (
+                            <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-lg">
+                              {program.accreditation_level || 'None'}
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       {/* Footer Info: Requirements & Heads */}
-                      <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                      <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
                         <div className="flex items-center gap-1.5 font-medium">
                           <FileText className="h-3.5 w-3.5 text-slate-400" />
                           <span>{program.total_requirements || 0} Reqs</span>
@@ -487,12 +432,12 @@ export default function DepartmentsView({
                         {/* Heads Avatars */}
                         <div className="flex items-center -space-x-1.5">
                           {heads.slice(0, 3).map((h, i) => (
-                            <img
+                            <SmartUserAvatar
                               key={h.HeadID || i}
-                              src={h.ProfilePic ? `${API_BASE_URL}/uploads/profile-pics/${h.ProfilePic}` : userIcon}
-                              alt={h.full_name || 'Head'}
-                              className="h-6 w-6 rounded-full object-cover border-2 border-white shadow-2xs"
-                              onError={(e) => { e.target.src = userIcon; }}
+                              user={h}
+                              size="h-6 w-6"
+                              textSize="text-[9px] font-bold"
+                              ring="border-2 border-white shadow-2xs"
                               title={h.full_name || 'Assigned Head'}
                             />
                           ))}
@@ -526,7 +471,6 @@ export default function DepartmentsView({
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-5">
               {departmentsList.map((deptGroup) => {
                 const totalPrograms = deptGroup.programs.length;
-                const isUpdating = updatingDeptLevel === deptGroup.deptId;
 
                 return (
                   <div
@@ -534,7 +478,7 @@ export default function DepartmentsView({
                     onClick={() => setSelectedDeptId(deptGroup.deptId ?? deptGroup.deptCode)}
                     className="group rounded-2xl border border-slate-200/90 bg-white shadow-xs hover:shadow-md hover:border-blue-300 transition-all duration-200 flex flex-col justify-between overflow-hidden cursor-pointer"
                   >
-                    {/* Card Header (Photo 3 style) */}
+                    {/* Card Header */}
                     <div className="p-5 pb-4 border-b border-slate-100">
                       <div className="flex items-start justify-between gap-3 mb-2">
                         <div className="flex items-center gap-2">
@@ -543,24 +487,10 @@ export default function DepartmentsView({
                           </span>
                         </div>
 
-                        {/* Level Selector Dropdown right on card */}
-                        <div
-                          onClick={(e) => e.stopPropagation()}
-                          className="relative inline-flex items-center"
-                        >
-                          {isAdmin ? (
-                            <DepartmentLevelDropdown
-                              value={deptGroup.level || 'Level I'}
-                              onChange={(newLevel) => handleLevelChange(newLevel, deptGroup)}
-                              disabled={isUpdating}
-                              levels={ACCREDITATION_LEVELS}
-                            />
-                          ) : (
-                            <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-lg">
-                              {deptGroup.level || 'Level I'}
-                            </span>
-                          )}
-                        </div>
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200/80">
+                          <GraduationCap className="h-3.5 w-3.5 text-blue-600" />
+                          <span>{totalPrograms} {totalPrograms === 1 ? 'Program' : 'Programs'}</span>
+                        </span>
                       </div>
 
                       {/* Department Title */}
@@ -570,18 +500,6 @@ export default function DepartmentsView({
                       <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">
                         {deptGroup.deptName}
                       </p>
-
-                      {/* Quick Programs Count Badge */}
-                      <div className="mt-3 flex items-center gap-2">
-                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200/80">
-                          <GraduationCap className="h-3.5 w-3.5 text-blue-600" />
-                          <span>{totalPrograms} {totalPrograms === 1 ? 'Program' : 'Programs'}</span>
-                        </span>
-
-                        <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
-                          {deptGroup.level}
-                        </span>
-                      </div>
                     </div>
 
                     {/* Program Badges Preview */}
@@ -596,10 +514,15 @@ export default function DepartmentsView({
                           {deptGroup.programs.slice(0, 3).map((p) => (
                             <span
                               key={p.id ?? p.OfficeID}
-                              className="text-[11px] font-semibold text-slate-700 bg-white border border-slate-200 px-2 py-0.5 rounded-md truncate max-w-[180px]"
+                              className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-700 bg-white border border-slate-200 px-2 py-0.5 rounded-md truncate max-w-[200px]"
                               title={p.office_name || p.OfficeName}
                             >
-                              {p.office_name || p.OfficeName}
+                              <span className="truncate">{p.office_name || p.OfficeName}</span>
+                              {p.accreditation_level && p.accreditation_level !== 'None' && (
+                                <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200 shrink-0">
+                                  {p.accreditation_level}
+                                </span>
+                              )}
                             </span>
                           ))}
                           {totalPrograms > 3 && (
@@ -684,12 +607,13 @@ export default function DepartmentsView({
 
                         <div className="flex items-center -space-x-1.5">
                           {heads.slice(0, 3).map((h, i) => (
-                            <img
+                            <SmartUserAvatar
                               key={h.HeadID || i}
-                              src={h.ProfilePic ? `${API_BASE_URL}/uploads/profile-pics/${h.ProfilePic}` : userIcon}
-                              alt={h.full_name || 'Head'}
-                              className="h-6 w-6 rounded-full object-cover border-2 border-white shadow-2xs"
-                              onError={(e) => { e.target.src = userIcon; }}
+                              user={h}
+                              size="h-6 w-6"
+                              textSize="text-[9px] font-bold"
+                              ring="border-2 border-white shadow-2xs"
+                              title={h.full_name || 'Head'}
                             />
                           ))}
                           {heads.length > 3 && (

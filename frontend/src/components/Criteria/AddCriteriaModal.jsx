@@ -117,8 +117,8 @@ export default function AddCriteriaModal({ isOpen, onClose, onSuccess }) {
         // If ParentCriteriaID is set, AreaID is also optional (criteria can be nested without area)
         // So, AreaID is always optional
         // If creating a child (ParentCriteriaID set), CriteriaCode is not required and will be null
-        if (!formData.ParentCriteriaID && !formData.CriteriaCode.trim()) newErrors.CriteriaCode = 'Criteria code is required';
-        if (!formData.CriteriaName.trim()) newErrors.CriteriaName = 'Criteria name is required';
+        if (!formData.ParentCriteriaID && !formData.CriteriaCode.trim()) newErrors.CriteriaCode = 'Sub area code is required';
+        if (!formData.CriteriaName.trim()) newErrors.CriteriaName = 'Sub area name is required';
         if (!formData.Description.trim()) newErrors.Description = 'Description is required';
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
@@ -143,12 +143,12 @@ export default function AddCriteriaModal({ isOpen, onClose, onSuccess }) {
                 setFormData({ EventID: '', AreaID: '', CriteriaCode: '', CriteriaName: '', Description: '', ParentCriteriaID: '' });
                 if (onSuccess) onSuccess(data.data);
                 onClose();
-                await showAlert('Criteria added successfully!');
+                await showAlert('Sub area added successfully!');
             } else {
-                await showAlert(data.message || 'Failed to add criteria');
+                await showAlert(data.message || 'Failed to add sub area');
             }
         } catch (error) {
-            await showAlert('An error occurred while adding the criteria. Please try again.');
+            await showAlert('An error occurred while adding the sub area. Please try again.');
         } finally {
             setIsSubmitting(false);
         }
@@ -171,8 +171,8 @@ export default function AddCriteriaModal({ isOpen, onClose, onSuccess }) {
             <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-white z-10 shrink-0">
                     <div>
-                        <h2 className="text-base font-bold text-slate-900">Add New Criteria</h2>
-                        <p className="text-xs text-slate-500 mt-0.5">Define a new evaluation criteria for your assessment</p>
+                        <h2 className="text-base font-bold text-slate-900">Add New Sub Area</h2>
+                        <p className="text-xs text-slate-500 mt-0.5">Define a new evaluation sub area for your assessment</p>
                     </div>
                     <button
                         type="button"
@@ -227,15 +227,15 @@ export default function AddCriteriaModal({ isOpen, onClose, onSuccess }) {
                             </div>
                             {/* Parent Criteria Dropdown */}
                             <div>
-                                <label htmlFor="ParentCriteriaID" className="block text-xs font-semibold text-slate-700 mb-1.5">Parent Criteria (Optional)</label>
+                                <label htmlFor="ParentCriteriaID" className="block text-xs font-semibold text-slate-700 mb-1.5">Parent Sub Area (Optional)</label>
                                 <CustomSelect
                                     size="md"
                                     value={formData.ParentCriteriaID}
                                     onChange={(val) => handleInputChange({ target: { name: 'ParentCriteriaID', value: val } })}
                                     disabled={isSubmitting || !formData.EventID || criteriaList.length === 0 || !formData.AreaID}
-                                    placeholder={!formData.AreaID ? 'Select an area first to choose a parent criteria' : 'None (Top-level criteria)'}
+                                    placeholder={!formData.AreaID ? 'Select an area first to choose a parent sub area' : 'None (Top-level sub area)'}
                                     options={[
-                                        { value: "", label: "None (Top-level criteria)" },
+                                        { value: "", label: "None (Top-level sub area)" },
                                         ...criteriaList
                                             .filter(criteria =>
                                                 criteria.CriteriaCode !== formData.CriteriaCode &&
@@ -249,13 +249,13 @@ export default function AddCriteriaModal({ isOpen, onClose, onSuccess }) {
                                 />
                                 {formData.EventID && (
                                     <p className="text-emerald-600 text-[11px] mt-1">
-                                        {criteriaList.length} existing criteria in this accreditation
+                                        {criteriaList.length} existing sub areas in this accreditation
                                     </p>
                                 )}
                             </div>
                             {/* Criteria Code */}
                             <div>
-                                <label htmlFor="CriteriaCode" className="block text-xs font-semibold text-slate-700 mb-1.5">Criteria Code *</label>
+                                <label htmlFor="CriteriaCode" className="block text-xs font-semibold text-slate-700 mb-1.5">Sub Area Code *</label>
                                 <input
                                     type="text"
                                     id="CriteriaCode"
@@ -263,14 +263,14 @@ export default function AddCriteriaModal({ isOpen, onClose, onSuccess }) {
                                     value={formData.CriteriaCode}
                                     onChange={handleInputChange}
                                     className={`w-full px-3 py-2 text-xs border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ${errors.CriteriaCode ? 'border-red-400' : 'border-slate-200'}`}
-                                    placeholder={formData.ParentCriteriaID ? 'No code required for child criteria' : 'e.g., A.1, B.2.1'}
+                                    placeholder={formData.ParentCriteriaID ? 'No code required for child sub area' : 'e.g., A.1, B.2.1'}
                                     disabled={isSubmitting || !!formData.ParentCriteriaID}
                                 />
                                 {errors.CriteriaCode && <p className="text-red-500 text-[11px] mt-1">{errors.CriteriaCode}</p>}
                             </div>
                             {/* Criteria Name */}
                             <div>
-                                <label htmlFor="CriteriaName" className="block text-xs font-semibold text-slate-700 mb-1.5">Criteria Name *</label>
+                                <label htmlFor="CriteriaName" className="block text-xs font-semibold text-slate-700 mb-1.5">Sub Area Name *</label>
                                 <input
                                     type="text"
                                     id="CriteriaName"
@@ -278,7 +278,7 @@ export default function AddCriteriaModal({ isOpen, onClose, onSuccess }) {
                                     value={formData.CriteriaName}
                                     onChange={handleInputChange}
                                     className={`w-full px-3 py-2 text-xs border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ${errors.CriteriaName ? 'border-red-400' : 'border-slate-200'}`}
-                                    placeholder="Enter criteria name"
+                                    placeholder="Enter sub area name"
                                     disabled={isSubmitting}
                                 />
                                 {errors.CriteriaName && <p className="text-red-500 text-[11px] mt-1">{errors.CriteriaName}</p>}
@@ -293,7 +293,7 @@ export default function AddCriteriaModal({ isOpen, onClose, onSuccess }) {
                                     onChange={handleInputChange}
                                     rows="3"
                                     className={`w-full px-3 py-2 text-xs border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 resize-none transition-colors ${errors.Description ? 'border-red-400' : 'border-slate-200'}`}
-                                    placeholder="Enter a detailed description of this criteria"
+                                    placeholder="Enter a detailed description of this sub area"
                                     disabled={isSubmitting}
                                 />
                                 {errors.Description && <p className="text-red-500 text-[11px] mt-1">{errors.Description}</p>}
@@ -316,7 +316,7 @@ export default function AddCriteriaModal({ isOpen, onClose, onSuccess }) {
                                     {isSubmitting && (
                                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
                                     )}
-                                    {isSubmitting ? 'Adding...' : 'Add Criteria'}
+                                    {isSubmitting ? 'Adding...' : 'Add Sub Area'}
                                 </button>
                             </div>
                         </form>

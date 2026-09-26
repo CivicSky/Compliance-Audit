@@ -133,6 +133,11 @@ export default function ProofFooterBar({
                                         const text = await res.text();
                                         try { data = text ? JSON.parse(text) : {}; } catch (e) { data = { __raw: text }; }
                                         if (res.ok && data.success) {
+                                            toast({
+                                                title: 'Deleted',
+                                                description: 'Proof document deleted successfully.',
+                                                variant: 'success'
+                                            });
                                             setPersistedProof(null);
                                             setProofFileName('');
                                             setProofFileUrl('');

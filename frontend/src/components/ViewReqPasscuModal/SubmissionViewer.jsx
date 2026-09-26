@@ -4,6 +4,7 @@ import mammoth from 'mammoth/mammoth.browser';
 import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import pdfWorkerSrc from 'pdfjs-dist/legacy/build/pdf.worker.mjs?url';
 import YourWorkFileUpload from './YourWorkFileUpload';
+import SmartUserAvatar from './SmartUserAvatar';
 import { useToast } from '../UI/Toast';
 import { useModal } from '../UI/ModalProvider';
 import { API_BASE_URL } from '../../utils/apiBase';
@@ -531,16 +532,19 @@ export default function SubmissionViewer({
 		}
 	};
 
-	// 'Your Work' view only when there's exactly one assigned user and viewer is not admin.
-	const isYourWorkView = !canEditPrivateComments && users.length === 1;
-	const isReadOnlyWorkView = false;
+	// 'Your Work' view only when there's exactly one assigned user, viewer is allowed work actions, and the user is currentUser
+	const isCurrentUserSingleUser = users.length === 1 && users.some(u => Number(u?.UserID) === Number(currentUser?.UserID));
+	const isYourWorkView = Boolean(allowWorkActions) && !canEditPrivateComments && isCurrentUserSingleUser;
+	const isReadOnlyWorkView = !allowWorkActions;
 	const workUser = isYourWorkView
 		? (users.length === 1 ? users[0] : users.find(u => Number(u?.UserID) === Number(currentUser?.UserID)))
 		: null;
 	const workUserId = workUser?.UserID ? Number(workUser.UserID) : null;
-	const workHasUploaded = workUser?.HasUploaded === 1 || workUser?.HasUploaded === true;
 	const workFile = workUserId ? fileByUserId[workUserId] : null;
 	const workFiles = workUserId ? (filesByUserId[workUserId] || (workFile ? [workFile] : [])) : [];
+	const workHasUploaded = workUserId && filesByUserId[workUserId] !== undefined
+		? filesByUserId[workUserId].length > 0
+		: (workUser?.HasUploaded === 1 || workUser?.HasUploaded === true || workFiles.length > 0);
 	const workThumb = workUserId ? thumbByUserId[workUserId] : null;
 	const workLoadingFile = workUserId ? loadingByUserId[workUserId] : false;
 	const workLoadingThumb = workUserId ? thumbLoadingByUserId[workUserId] : false;
@@ -807,19 +811,42 @@ export default function SubmissionViewer({
 									});
 								}}
 								onUnsubmit={async (reqId, fileId) => {
+									let res = true;
+									if (onFileUnsubmit) {
+										res = await onFileUnsubmit(reqId, fileId);
+										if (res === false) return false;
+									}
 									if (workUserId) {
-										setFilesByUserId((prev) => ({
-											...prev,
-											[workUserId]: (prev[workUserId] || []).filter((f) => ((f.id && fileId) ? f.id !== fileId : f.fileName !== fileId))
-										}));
+										setFilesByUserId((prev) => {
+											const currentList = prev[workUserId] || [];
+											const updated = currentList.filter((f) => {
+												if (fileId && f.id && String(f.id) === String(fileId)) return false;
+												if (fileId && f.fileId && String(f.fileId) === String(fileId)) return false;
+												if (fileId && f.fileName && f.fileName === fileId) return false;
+												return true;
+											});
+											if (requirementId) {
+												dataCache.set(CacheKeys.userFiles(requirementId, workUserId, officeId), updated);
+												dataCache.set(CacheKeys.userFiles(requirementId, workUserId), updated);
+											}
+											return {
+												...prev,
+												[workUserId]: updated
+											};
+										});
 										setFileByUserId((prev) => {
-											const list = (filesByUserId[workUserId] || []).filter((f) => ((f.id && fileId) ? f.id !== fileId : f.fileName !== fileId));
-											return { ...prev, [workUserId]: list[list.length - 1] || null };
+											const curr = prev[workUserId];
+											if (!curr) return prev;
+											const matches = (fileId && curr.id && String(curr.id) === String(fileId)) ||
+															(fileId && curr.fileId && String(curr.fileId) === String(fileId)) ||
+															(fileId && curr.fileName && curr.fileName === fileId);
+											if (matches) {
+												return { ...prev, [workUserId]: null };
+											}
+											return prev;
 										});
 									}
-									if (onFileUnsubmit) {
-										await onFileUnsubmit(reqId, fileId);
-									}
+									return res;
 								}}
 								onRename={(reqId, fileId, newDisplayName) => {
 									if (workUserId) {
@@ -879,10 +906,9 @@ export default function SubmissionViewer({
 											: (u?.userFiles && Array.isArray(u.userFiles) && u.userFiles.length > 0)
 											? u.userFiles
 											: (userId && fileByUserId[userId] ? [fileByUserId[userId]] : []);
-										const hasUploaded = u?.HasUploaded === 1 || u?.HasUploaded === true || userFiles.length > 0;
-										const avatarSrc = u?.ProfilePic
-											? `${API_BASE_URL}/uploads/profile-pics/${u.ProfilePic}`
-											: '/src/assets/images/user.svg';
+										const hasUploaded = (userId && filesByUserId[userId] !== undefined)
+											? filesByUserId[userId].length > 0
+											: (userFiles.length > 0 || u?.HasUploaded === 1 || u?.HasUploaded === true);
 
 										return (
 											<div
@@ -899,29 +925,78 @@ export default function SubmissionViewer({
 												tabIndex={0}
 											>
 												<div className="flex items-center justify-between">
-													<div className="flex items-center gap-3 min-w-0">
-														<div className="relative shrink-0">
-															<img
-																src={avatarSrc}
-																alt={displayName}
-																onError={(e) => { e.target.src = '/src/assets/images/user.svg'; }}
-																className={`h-11 w-11 rounded-full object-cover border-2 ${hasUploaded ? 'border-emerald-500' : 'border-slate-200'}`}
-															/>
-															{hasUploaded && (
-																<span className="absolute -bottom-0.5 -right-0.5 flex h-[18px] w-[18px] min-w-[18px] min-h-[18px] shrink-0 items-center justify-center rounded-full border-2 border-white bg-emerald-500 text-white shadow-2xs">
-																	<svg className="w-2.5 h-2.5 stroke-white" fill="none" viewBox="0 0 24 24" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
-																		<polyline points="20 6 9 17 4 12" />
-																	</svg>
-																</span>
-															)}
-														</div>
-														<div className="min-w-0">
-															<div className="truncate text-xs font-bold text-slate-800">{displayName}</div>
-															<div className="mt-0.5 truncate text-[11px] font-medium text-slate-500">
-																{hasUploaded ? `${userFiles.length} evidence file(s) uploaded` : 'Assigned (Pending upload)'}
+													{(() => {
+														const approvedCount = userFiles.filter(f => f.reviewStatus === 'approved').length;
+														const rejectedCount = userFiles.filter(f => f.reviewStatus === 'rejected').length;
+														const isAllApproved = approvedCount === userFiles.length && userFiles.length > 0;
+														const isPartialApproved = approvedCount > 0 && !isAllApproved;
+														const hasRejected = rejectedCount > 0;
+
+														let borderColor = 'border-slate-200';
+														let badge = null;
+
+														if (hasUploaded) {
+															if (hasRejected) {
+																borderColor = 'border-rose-400';
+																badge = (
+																	<span className="absolute -bottom-0.5 -right-0.5 flex h-[18px] w-[18px] min-w-[18px] min-h-[18px] shrink-0 items-center justify-center rounded-full border-2 border-white bg-rose-500 text-white shadow-2xs" title="Needs Revision">
+																		<svg className="w-2.5 h-2.5 stroke-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+																			<line x1="12" y1="8" x2="12" y2="12"></line>
+																			<line x1="12" y1="16" x2="12.01" y2="16"></line>
+																		</svg>
+																	</span>
+																);
+															} else if (isAllApproved) {
+																borderColor = 'border-emerald-500';
+																badge = (
+																	<span className="absolute -bottom-0.5 -right-0.5 flex h-[18px] w-[18px] min-w-[18px] min-h-[18px] shrink-0 items-center justify-center rounded-full border-2 border-white bg-emerald-500 text-white shadow-2xs" title="All Approved">
+																		<svg className="w-2.5 h-2.5 stroke-white" fill="none" viewBox="0 0 24 24" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+																			<polyline points="20 6 9 17 4 12" />
+																		</svg>
+																	</span>
+																);
+															} else if (isPartialApproved) {
+																borderColor = 'border-blue-400';
+																badge = (
+																	<span className="absolute -bottom-0.5 -right-0.5 flex h-[18px] w-[18px] min-w-[18px] min-h-[18px] shrink-0 items-center justify-center rounded-full border-2 border-white bg-blue-500 text-white shadow-2xs" title="Partially Approved">
+																		<svg className="w-2.5 h-2.5 stroke-white" fill="none" viewBox="0 0 24 24" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+																			<polyline points="20 6 9 17 4 12" />
+																		</svg>
+																	</span>
+																);
+															} else {
+																borderColor = 'border-amber-400';
+																badge = (
+																	<span className="absolute -bottom-0.5 -right-0.5 flex h-[18px] w-[18px] min-w-[18px] min-h-[18px] shrink-0 items-center justify-center rounded-full border-2 border-white bg-amber-500 text-white shadow-2xs" title="Pending Review">
+																		<svg className="w-2.5 h-2.5 stroke-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+																			<circle cx="12" cy="12" r="9"/>
+																			<polyline points="12 7 12 12 15 14"/>
+																		</svg>
+																	</span>
+																);
+															}
+														}
+
+														return (
+															<div className="flex items-center gap-3 min-w-0">
+																<div className="relative shrink-0">
+																	<SmartUserAvatar
+																		user={u}
+																		size="h-11 w-11"
+																		textSize="text-xs"
+																		ring={`border-2 ${borderColor}`}
+																	/>
+																	{badge}
+																</div>
+																<div className="min-w-0">
+																	<div className="truncate text-xs font-bold text-slate-800">{displayName}</div>
+																	<div className="mt-0.5 truncate text-[11px] font-medium text-slate-500">
+																		{hasUploaded ? `${userFiles.length} standard file(s) uploaded` : 'Assigned (Pending upload)'}
+																	</div>
+																</div>
 															</div>
-														</div>
-													</div>
+														);
+													})()}
 
 													<div className="flex items-center gap-2">
 														{(() => {
@@ -934,16 +1009,11 @@ export default function SubmissionViewer({
 															}
 															const approvedCount = userFiles.filter(f => f.reviewStatus === 'approved').length;
 															const rejectedCount = userFiles.filter(f => f.reviewStatus === 'rejected').length;
+															const isAllApproved = approvedCount === userFiles.length && userFiles.length > 0;
+															const isPartialApproved = approvedCount > 0 && !isAllApproved;
+															const hasRejected = rejectedCount > 0;
 
-															if (isViewerAuditor) {
-																return (
-																	<span className="shrink-0 rounded-full px-3 py-1 text-[11px] font-bold bg-emerald-100 text-emerald-700 shadow-2xs">
-																		Submitted ({userFiles.length})
-																	</span>
-																);
-															}
-
-															if (rejectedCount > 0) {
+															if (hasRejected) {
 																return (
 																	<span className="shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200 shadow-2xs flex items-center gap-1">
 																		<span className="h-1.5 w-1.5 rounded-full bg-rose-500"></span>
@@ -951,7 +1021,7 @@ export default function SubmissionViewer({
 																	</span>
 																);
 															}
-															if (approvedCount === userFiles.length && userFiles.length > 0) {
+															if (isAllApproved) {
 																return (
 																	<span className="shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-2xs flex items-center gap-1">
 																		<span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
@@ -959,7 +1029,7 @@ export default function SubmissionViewer({
 																	</span>
 																);
 															}
-															if (approvedCount > 0) {
+															if (isPartialApproved) {
 																return (
 																	<span className="shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200 shadow-2xs flex items-center gap-1">
 																		<span className="h-1.5 w-1.5 rounded-full bg-blue-500"></span>
@@ -968,8 +1038,9 @@ export default function SubmissionViewer({
 																);
 															}
 															return (
-																<span className="shrink-0 rounded-full px-3 py-1 text-[11px] font-bold bg-emerald-100 text-emerald-700 shadow-2xs">
-																	Submitted
+																<span className="shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 shadow-2xs flex items-center gap-1">
+																	<span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+																	Pending Review
 																</span>
 															);
 														})()}
@@ -980,7 +1051,7 @@ export default function SubmissionViewer({
 									})}
 
 									{/* Single upload control placed below the user list for auditors to add files */}
-									{currentUser && onFileUpload && users.some((uu) => Number(uu?.UserID) === Number(currentUser?.UserID)) && (
+									{allowWorkActions && currentUser && onFileUpload && users.some((uu) => Number(uu?.UserID) === Number(currentUser?.UserID)) && (
 										<div className="mt-2 px-0">
 											<input
 												id={`user-upload-${requirementId}-${currentUser?.UserID}`}
@@ -998,7 +1069,7 @@ export default function SubmissionViewer({
 												<svg className="h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
 													<path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
 												</svg>
-												<span>+ Add More Evidence Files</span>
+												<span>+ Add More Standard Files</span>
 											</label>
 										</div>
 									)}

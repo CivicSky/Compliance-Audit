@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { X, Loader2 } from "lucide-react";
 import { usersAPI } from "../../utils/api";
 import ImageCropModal from "./ImageCropModal";
+import SmartUserAvatar from "../UI/SmartUserAvatar";
 
 const EditProfileModal = ({ user, isOpen, onClose, onUpdate }) => {
     const [formData, setFormData] = useState({
@@ -26,8 +27,8 @@ const EditProfileModal = ({ user, isOpen, onClose, onUpdate }) => {
                 email: user.Email || "",
                 profilePic: null
             });
-            // Always use the same logic as office head: if ProfilePic exists, use /uploads/profile-pics/filename
-            setProfilePicPreview(user.ProfilePic ? `/uploads/profile-pics/${user.ProfilePic}` : "/default-avatar.png");
+            // If ProfilePic exists, use /uploads/profile-pics/filename, else null
+            setProfilePicPreview(user.ProfilePic ? `/uploads/profile-pics/${user.ProfilePic}` : null);
             setRawImageForCrop("");
             setIsCropModalOpen(false);
         }
@@ -174,11 +175,13 @@ const EditProfileModal = ({ user, isOpen, onClose, onUpdate }) => {
                         <label className="block text-xs font-semibold text-slate-700 mb-1.5">Profile Picture</label>
                         <div className="flex items-start gap-3">
                             <div className="shrink-0 -mt-0.5">
-                                <img
+                                <SmartUserAvatar
+                                    user={user}
                                     src={profilePicPreview}
-                                    alt="Preview"
-                                    className="w-12 h-12 rounded-full object-cover border border-slate-200 shadow-2xs"
-                                    onError={e => { e.target.onerror = null; e.target.src = "/default-avatar.png"; }}
+                                    fullName={`${formData.firstName} ${formData.lastName}`.trim() || user?.full_name || 'User'}
+                                    size="w-12 h-12"
+                                    textSize="text-sm font-bold"
+                                    ring="border border-slate-200 shadow-2xs"
                                 />
                             </div>
 

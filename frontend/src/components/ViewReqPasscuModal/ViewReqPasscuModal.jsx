@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
@@ -37,6 +37,27 @@ export default function ViewReqPASSCUModal({
     const [requirements, setRequirements] = useState([]);
     const [loading, setLoading] = useState(false);
     const [officeData, setOfficeData] = useState(office);
+
+    useEffect(() => {
+        setOfficeData(office);
+    }, [office]);
+
+    const handleUpdateOfficeLevel = async (newLevel) => {
+        const officeId = officeData?.id || officeData?.OfficeID || office?.id;
+        if (!officeId) return;
+        try {
+            await officesAPI.updateLevel(officeId, newLevel);
+            setOfficeData(prev => ({
+                ...prev,
+                accreditation_level: newLevel,
+                AccreditationLevel: newLevel,
+            }));
+            showAlert(`Accreditation level updated to ${newLevel}`, 'success');
+        } catch (err) {
+            console.error('Failed to update accreditation level:', err);
+            showAlert('Failed to update accreditation level', 'error');
+        }
+    };
     const [editingCommentId, setEditingCommentId] = useState(null);
     const [commentInput, setCommentInput] = useState("");
     const [savingComment, setSavingComment] = useState(false);
@@ -145,6 +166,50 @@ export default function ViewReqPASSCUModal({
     const isAuditor = currentRoleId === 4 || 
                       String(currentUser?.RoleName || '').toLowerCase().includes('auditor') || 
                       currentUser?.isExternalAuditor;
+
+    const [officeAuditors, setOfficeAuditors] = useState([]);
+    const [auditorAssignedAreaIds, setAuditorAssignedAreaIds] = useState(new Set());
+
+    useEffect(() => {
+        const officeId = office?.id || officeData?.id || officeData?.OfficeID;
+        if (!isOpen || !officeId) return;
+        let mounted = true;
+        const token = localStorage.getItem('token');
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+        fetch(`${API_BASE_URL}/api/areas/auditors/office/${officeId}`, { headers })
+            .then(res => res.json())
+            .then(data => {
+                if (mounted && data.success) {
+                    setOfficeAuditors(data.auditors || []);
+                }
+            })
+            .catch(() => {});
+
+        return () => { mounted = false; };
+    }, [isOpen, office?.id, officeData?.id, officeData?.OfficeID]);
+
+    useEffect(() => {
+        if (!isOpen || !currentUser || !isAuditor) return;
+        const targetUserId = currentUser.UserID ?? currentUser.id ?? currentUser.user_id;
+        if (!targetUserId) return;
+        let mounted = true;
+
+        const token = localStorage.getItem('token');
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+        fetch(`${API_BASE_URL}/api/areas/assignments/${targetUserId}`, { headers })
+            .then(res => res.json())
+            .then(data => {
+                if (mounted && data.success) {
+                    const ids = new Set((data.assignments || []).map(a => Number(a.area_id ?? a.AreaID)));
+                    setAuditorAssignedAreaIds(ids);
+                }
+            })
+            .catch(() => {});
+
+        return () => { mounted = false; };
+    }, [isOpen, currentUser, isAuditor]);
 
     useEffect(() => {
         const fetchCurrentUser = async () => {
@@ -339,7 +404,9 @@ export default function ViewReqPASSCUModal({
                         EventCode: officeResponse.data.EventCode || office.EventCode || null,
                         DepartmentName: officeResponse.data.DepartmentName || officeResponse.data.department_name || office.DepartmentName || office.department_name || null,
                         department_name: officeResponse.data.DepartmentName || officeResponse.data.department_name || office.department_name || null,
-                        ProgramTypeName: officeResponse.data.ProgramTypeName || officeResponse.data.program_type_name || office.ProgramTypeName || office.program_type_name || null
+                        ProgramTypeName: officeResponse.data.ProgramTypeName || officeResponse.data.program_type_name || office.ProgramTypeName || office.program_type_name || null,
+                        heads: officeResponse.data.Heads || officeResponse.data.heads || office.heads || office.Heads || [],
+                        Heads: officeResponse.data.Heads || officeResponse.data.heads || office.heads || office.Heads || [],
                     };
                     setOfficeData(prev => ({ ...prev, ...updatedOfficeData }));
                 }
@@ -387,10 +454,10 @@ export default function ViewReqPASSCUModal({
     const handleUnsubmitUserFile = async (requirementId, fileId = null) => {
         if (!currentUser || !currentUser.UserID) {
             await showAlert('No user information available. Please reload and try again.');
-            return;
+            return false;
         }
-        const ok = await showConfirm('Are you sure you want to delete this evidence file?');
-        if (!ok) return;
+        const ok = await showConfirm('Are you sure you want to delete this standard file?');
+        if (!ok) return false;
         setUnsubmittingReqId(requirementId);
         try {
             const token = localStorage.getItem('token');
@@ -410,23 +477,73 @@ export default function ViewReqPASSCUModal({
             let data = {};
             try { data = await res.json(); } catch (e) { /* ignore JSON parse errors */ }
             if (res.ok && data.success) {
-                // refresh assigned users map
+                toast({
+                    title: 'Deleted',
+                    description: 'Standard file deleted successfully.',
+                    variant: 'success'
+                });
+
+                // Invalidate dataCache keys immediately
+                dataCache.invalidate(CacheKeys.officeReqs(office?.id));
+                dataCache.invalidate(CacheKeys.allUserFilesForReq(requirementId, office?.id));
+                dataCache.invalidate(CacheKeys.userFiles(requirementId, currentUser.UserID, office?.id));
+                dataCache.invalidate(CacheKeys.userFiles(requirementId, currentUser.UserID));
+
+                // Instantly update assigned users map optimistically so green avatar checkmark disappears with 0ms delay!
+                const rem = Number(data.remainingCount);
+                const hasMore = !isNaN(rem) ? rem > 0 : false;
+                setAssignedUsersMap(prev => {
+                    const reqUsers = prev[requirementId] || [];
+                    const updatedUsers = reqUsers.map(u => {
+                        if (Number(u.UserID) === Number(currentUser.UserID)) {
+                            return { ...u, HasUploaded: hasMore };
+                        }
+                        return u;
+                    });
+                    return { ...prev, [requirementId]: updatedUsers };
+                });
+                setSubmissionViewerUsers(prev => {
+                    if (!prev) return prev;
+                    return prev.map(u => {
+                        if (Number(u.UserID) === Number(currentUser.UserID)) {
+                            return { ...u, HasUploaded: hasMore };
+                        }
+                        return u;
+                    });
+                });
+
+                // Fetch fresh assigned users from server in background
                 const assignedRes = await requirementsAPI.getAssignedUsers(requirementId, office?.id);
                 if (assignedRes?.success) {
+                    const freshUsers = assignedRes.users || assignedRes.data || [];
                     setAssignedUsersMap(prev => ({
                         ...prev,
-                        [requirementId]: assignedRes.users || assignedRes.data || []
+                        [requirementId]: freshUsers
                     }));
+                    setSubmissionViewerUsers(freshUsers);
                 }
+                return true;
             } else if (res.status === 404) {
                 console.warn('Unsubmit: file not found on server');
+                toast({
+                    title: 'Notice',
+                    description: 'File was already removed.',
+                    variant: 'info'
+                });
+                dataCache.invalidate(CacheKeys.officeReqs(office?.id));
+                dataCache.invalidate(CacheKeys.allUserFilesForReq(requirementId, office?.id));
+                dataCache.invalidate(CacheKeys.userFiles(requirementId, currentUser.UserID, office?.id));
+                dataCache.invalidate(CacheKeys.userFiles(requirementId, currentUser.UserID));
+                return true;
             } else {
                 console.warn('Unsubmit: server returned error', res.status, data);
                 await showAlert(data.message || 'Failed to delete file.');
+                return false;
             }
         } catch (err) {
             console.error('Unsubmit error:', err);
             await showAlert('Failed to delete file.');
+            return false;
         } finally {
             try { await fetchOfficeRequirements(); } catch (e) { console.error('Refresh after unsubmit failed', e); }
             setUnsubmittingReqId(null);
@@ -440,7 +557,7 @@ export default function ViewReqPASSCUModal({
         const hasProofDoc = currentReq && Boolean(currentReq.DocumentProof || currentReq.ProofDocument || currentReq.hasProof || currentReq.has_proof || currentReq.file_url);
 
         if (!hasUserUploaded && !hasProofDoc) {
-            await showAlert('Cannot change compliance status: Evidence or proof document must be uploaded for this requirement first.');
+            await showAlert('Cannot change compliance status: Proof document must be uploaded for this standard first.');
             return;
         }
 
@@ -675,33 +792,37 @@ export default function ViewReqPASSCUModal({
             }
         });
 
-        await Promise.all(uploadPromises);
-        
-        if (successCount > 0) {
-            try {
-                const assignedRes = await requirementsAPI.getAssignedUsers(requirementId, office?.id);
-                if (assignedRes?.success) {
-                    setAssignedUsersMap(prev => ({
-                        ...prev,
-                        [requirementId]: assignedRes.users || assignedRes.data || []
-                    }));
-                }
-                await fetchOfficeRequirements(true);
-            } catch (rErr) {
-                console.warn('Post-upload refresh warning:', rErr);
-            }
-        } else if (fileList.length > 0) {
-            await showAlert('Failed to upload file(s)');
-        }
-        
-        setTimeout(() => {
+        try {
+            await Promise.all(uploadPromises);
+        } catch (uploadErr) {
+            console.error('Upload batch error:', uploadErr);
+        } finally {
             setUserUploadingReqId(null);
             setUploadProgressMap({});
-        }, 800);
+            if (e?.target) e.target.value = '';
+            if (userReqFileInputRef.current) {
+                userReqFileInputRef.current.value = '';
+            }
+        }
+        
+        if (successCount > 0) {
+            // Background sync: update assigned users badge and refresh requirements without blocking upload UI
+            requirementsAPI.getAssignedUsers(requirementId, office?.id)
+                .then(assignedRes => {
+                    if (assignedRes?.success) {
+                        setAssignedUsersMap(prev => ({
+                            ...prev,
+                            [requirementId]: assignedRes.users || assignedRes.data || []
+                        }));
+                    }
+                })
+                .catch(rErr => console.warn('Post-upload refresh warning:', rErr));
 
-        if (e?.target) e.target.value = '';
-        if (userReqFileInputRef.current) {
-            userReqFileInputRef.current.value = '';
+            fetchOfficeRequirements(true).catch(rErr => {
+                console.warn('Post-upload fetchOfficeRequirements warning:', rErr);
+            });
+        } else if (fileList.length > 0) {
+            await showAlert('Failed to upload file(s)');
         }
     };
 
@@ -759,6 +880,47 @@ export default function ViewReqPASSCUModal({
             setRemovingReqId(null);
         }
     };
+
+    const isUserAssignedToCurrentOffice = useMemo(() => {
+        if (!currentUser) return false;
+        const currentUid = Number(currentUser.UserID ?? currentUser.id ?? currentUser.user_id);
+        const officeHeadsList = officeData?.heads || officeData?.Heads || office?.heads || office?.Heads || [];
+        return officeHeadsList.some(h => Number(h.UserID ?? h.userid ?? h.id) === currentUid);
+    }, [currentUser, officeData, office]);
+
+    const isUserAssignedAuditorForOffice = useMemo(() => {
+        if (!currentUser || !isAuditor) return false;
+        const currentUid = Number(currentUser.UserID ?? currentUser.id ?? currentUser.user_id);
+        return officeAuditors.some(a => Number(a.UserID ?? a.userid ?? a.id) === currentUid);
+    }, [currentUser, isAuditor, officeAuditors]);
+
+    const canUserUploadEvidence = useCallback((req) => {
+        if (!currentUser) return false;
+        if (isAdmin) return true;
+
+        const currentUid = Number(currentUser.UserID ?? currentUser.id ?? currentUser.user_id);
+
+        if (isAuditor) {
+            if (req && (req.AreaID || req.area_id)) {
+                const reqAreaId = Number(req.AreaID || req.area_id);
+                if (auditorAssignedAreaIds.has(reqAreaId)) return true;
+            }
+            return isUserAssignedAuditorForOffice;
+        }
+
+        // Office heads and personnel
+        if (isUserAssignedToCurrentOffice) return true;
+
+        if (req) {
+            const reqId = req.RequirementID ?? req.requirementId;
+            const usersForReq = assignedUsersMap?.[reqId] || [];
+            if (usersForReq.some(u => Number(u.UserID ?? u.userid ?? u.id) === currentUid)) {
+                return true;
+            }
+        }
+
+        return false;
+    }, [currentUser, isAdmin, isAuditor, auditorAssignedAreaIds, isUserAssignedAuditorForOffice, isUserAssignedToCurrentOffice, assignedUsersMap]);
 
     const isUserAssignedToRequirement = (requirementId) => {
         if (!currentUser || !assignedUsersMap[requirementId]) return false;
@@ -1156,10 +1318,12 @@ export default function ViewReqPASSCUModal({
                     onDeleteOffice={onDeleteOffice}
                     onClose={onClose}
                     office={office}
+                    onUpdateLevel={handleUpdateOfficeLevel}
                 />
 
                 <OfficeInfoBar
                     officeData={officeData}
+                    requirements={requirements}
                     isAssignedInCurrentOffice={isAssignedInCurrentOffice}
                     assignedRequirementCount={assignedRequirementCount}
                 />
@@ -1185,6 +1349,8 @@ export default function ViewReqPASSCUModal({
                     expandedReqs={expandedReqs}
                     toggleExpandReq={toggleExpandReq}
                     isUserAssignedToRequirement={isUserAssignedToRequirement}
+                    isUserAssignedToCurrentOffice={isUserAssignedToCurrentOffice}
+                    canUserUploadEvidence={canUserUploadEvidence}
                     editingCommentId={editingCommentId}
                     commentInput={commentInput}
                     savingComment={savingComment}
@@ -1214,6 +1380,13 @@ export default function ViewReqPASSCUModal({
                     }}
                     onViewMySubmission={(req) => {
                         if (!currentUser) return;
+                        if (!canUserUploadEvidence(req)) {
+                            setSelectedSubmissionRequirement(req);
+                            const usersForReq = assignedUsersMap?.[req.RequirementID] || [];
+                            setSubmissionViewerUsers(usersForReq);
+                            setShowSubmissionViewer(true);
+                            return;
+                        }
                         const reqId = req?.RequirementID;
                         if (!reqId) return;
                         const userFromMap = (assignedUsersMap?.[reqId] || []).find((u) => u?.UserID === currentUser.UserID);
@@ -1329,8 +1502,11 @@ export default function ViewReqPASSCUModal({
                 leftStyle={overlayLeftStyle}
                 requirement={selectedSubmissionRequirement}
                 users={
-                    isOfficeHead && selectedSubmissionRequirement && currentUser
-                        ? (() => {
+                    (() => {
+                        const baseUsers = submissionViewerUsers || (selectedSubmissionRequirement ? (assignedUsersMap?.[selectedSubmissionRequirement.RequirementID] || []) : []);
+                        const canUpload = canUserUploadEvidence(selectedSubmissionRequirement);
+
+                        if (canUpload && isOfficeHead && selectedSubmissionRequirement && currentUser) {
                             const reqId = selectedSubmissionRequirement.RequirementID;
                             const userFromMap = (assignedUsersMap?.[reqId] || []).find((u) => u.UserID === currentUser.UserID);
                             const hasUploaded = hasUserUploadedForRequirement(reqId);
@@ -1338,26 +1514,26 @@ export default function ViewReqPASSCUModal({
                                 ? { ...userFromMap, HasUploaded: hasUploaded }
                                 : { ...currentUser, HasUploaded: hasUploaded };
                             return [entry];
-                        })()
-                        : (() => {
-                            const baseUsers = submissionViewerUsers || (selectedSubmissionRequirement ? (assignedUsersMap?.[selectedSubmissionRequirement.RequirementID] || []) : []);
-                            if (isAuditor && currentUser && selectedSubmissionRequirement) {
-                                const hasAuditor = baseUsers.some(u => u.UserID === currentUser.UserID);
-                                if (!hasAuditor) {
-                                    const reqId = selectedSubmissionRequirement.RequirementID;
-                                    const hasUploaded = hasUserUploadedForRequirement(reqId);
-                                    const auditorEntry = { ...currentUser, HasUploaded: hasUploaded };
-                                    return [auditorEntry, ...baseUsers];
-                                }
+                        }
+
+                        if (canUpload && isAuditor && currentUser && selectedSubmissionRequirement) {
+                            const hasAuditor = baseUsers.some(u => u.UserID === currentUser.UserID);
+                            if (!hasAuditor) {
+                                const reqId = selectedSubmissionRequirement.RequirementID;
+                                const hasUploaded = hasUserUploadedForRequirement(reqId);
+                                const auditorEntry = { ...currentUser, HasUploaded: hasUploaded };
+                                return [auditorEntry, ...baseUsers];
                             }
-                            return baseUsers;
-                        })()
+                        }
+
+                        return baseUsers;
+                    })()
                 }
                 officeId={office?.id}
                 currentUser={currentUser}
                 showPrivateComments={!!(isAdmin || isOfficeHead)}
                 canEditPrivateComments={!!isAdmin}
-                allowWorkActions={true}
+                allowWorkActions={canUserUploadEvidence(selectedSubmissionRequirement)}
                 viewerRoleId={currentRoleId}
                 onFileUpload={handleUserReqFileUpload}
                 onFileUnsubmit={handleUnsubmitUserFile}
@@ -1524,7 +1700,8 @@ export default function ViewReqPASSCUModal({
                 onUnsubmit={async (fileId) => {
                     const reqId = gridModalData?.requirement?.RequirementID;
                     if (!reqId) return;
-                    await handleUnsubmitUserFile(reqId, fileId);
+                    const ok = await handleUnsubmitUserFile(reqId, fileId);
+                    if (ok === false) return;
                     try {
                         const res = await api.get(`/api/requirements/${reqId}/user-file/${currentUser.UserID}${office?.id ? `?officeId=${office.id}` : ''}`);
                         if (res.data && res.data.success) {

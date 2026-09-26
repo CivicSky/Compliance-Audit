@@ -45,20 +45,30 @@ export function buildNotificationRedirect(notification) {
 	const table = String(notification?.RelatedTable || '').toLowerCase();
 	const meta = getNotificationMeta(notification);
 
-	if (table === 'office_head') return { path: '/home/officehead' };
 	if (table === 'users_role') return { path: '/home/profile' };
-	if (table === 'auditor_assignments' || table === 'auditor_area_assignments') return { path: '/home/criteria' };
+
+	const params = new URLSearchParams({
+		fromNotif: '1',
+		tab: 'categories',
+	});
 
 	if (meta.officeId) {
-		const params = new URLSearchParams({
-			fromNotif: '1',
-			officeId: String(meta.officeId),
-		});
-		if (meta.requirementId) params.set('requirementId', String(meta.requirementId));
-		if (meta.openSubmission) params.set('openSubmission', '1');
-		if (meta.viewUserId) params.set('viewUserId', String(meta.viewUserId));
-		return { path: `/home/organizations?${params.toString()}` };
+		params.set('officeId', String(meta.officeId));
+	} else if (table === 'office_head' || table === 'office_personnel' || table === 'offices') {
+		if (notification?.RelatedID) params.set('officeId', String(notification.RelatedID));
 	}
 
-	return null;
+	if (meta.requirementId) params.set('requirementId', String(meta.requirementId));
+	if (meta.openSubmission) params.set('openSubmission', '1');
+	if (meta.viewUserId) params.set('viewUserId', String(meta.viewUserId));
+
+	// Auditor area assignment notifications
+	if (table === 'auditor_assignments' || table === 'auditor_area_assignments') {
+		const areaId = meta.areaIds?.[0] || meta.areaId;
+		if (areaId) params.set('areaId', String(areaId));
+		if (meta.officeId) params.set('officeId', String(meta.officeId));
+		if (meta.eventId) params.set('eventId', String(meta.eventId));
+	}
+
+	return { path: `/home/acc-management?${params.toString()}` };
 }

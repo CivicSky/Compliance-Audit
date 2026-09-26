@@ -108,17 +108,17 @@ export default function Area() {
             );
 
             if (response.success) {
-                console.log('Evidence updated successfully');
+                console.log('Standard updated successfully');
                 if (requirementsPRef.current && requirementsPRef.current.refresh) {
                     requirementsPRef.current.refresh();
                 }
-                await showAlert('Evidence updated successfully!');
+                await showAlert('Standard updated successfully!');
             } else {
-                await showAlert(response.message || 'Failed to update evidence');
+                await showAlert(response.message || 'Failed to update standard');
             }
         } catch (error) {
-            console.error('Error updating evidence:', error);
-            await showAlert('An error occurred while updating the evidence');
+            console.error('Error updating standard:', error);
+            await showAlert('An error occurred while updating the standard');
         }
     };
 
@@ -152,7 +152,7 @@ export default function Area() {
         if (selectedIds.length === 0 || !requirementsPRef.current) return;
         
         // Confirm deletion
-        const confirmed = await showConfirm(`Are you sure you want to delete ${selectedIds.length} evidence item(s)? This action cannot be undone.`);
+        const confirmed = await showConfirm(`Are you sure you want to delete ${selectedIds.length} standard item(s)? This action cannot be undone.`);
         if (!confirmed) return;
         
         try {
@@ -163,16 +163,16 @@ export default function Area() {
                 setSelectedIds([]);
                 setDeleteMode(false);
                 // Show success message
-                console.log('Successfully deleted selected evidence');
-                await showAlert(`Successfully deleted ${selectedIds.length} evidence item(s)`);
+                console.log('Successfully deleted selected standard(s)');
+                await showAlert(`Successfully deleted ${selectedIds.length} standard item(s)`);
             } else {
                 // Show error message
-                console.error('Failed to delete evidence:', result.message);
-                await showAlert(result.message || 'Failed to delete evidence');
+                console.error('Failed to delete standard:', result.message);
+                await showAlert(result.message || 'Failed to delete standard');
             }
         } catch (error) {
-            console.error('Error deleting evidence:', error);
-            await showAlert('An error occurred while deleting evidence');
+            console.error('Error deleting standard:', error);
+            await showAlert('An error occurred while deleting standard');
         }
     };
 

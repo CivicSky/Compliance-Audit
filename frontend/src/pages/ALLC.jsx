@@ -42,9 +42,18 @@ function ALL() {
 
     const [auditorAssignments, setAuditorAssignments] = useState({ areaIds: new Set(), eventIds: new Set(), rawList: [] });
 
-    const isAuditor = currentUser?.RoleID === 4 ||
-        String(currentUser?.RoleName || '').toLowerCase().includes('auditor') ||
-        currentUser?.isExternalAuditor;
+    const roleId = Number(currentUser?.RoleID);
+    const roleName = String(currentUser?.RoleName || '').toLowerCase();
+    const isAuditor = roleId === 4 ||
+        roleName.includes('auditor') ||
+        Boolean(currentUser?.isExternalAuditor);
+    const isPersonnel = roleId === 2 ||
+        roleId === 3 ||
+        roleName.includes('office') ||
+        roleName === 'user' ||
+        roleName === 'personnel' ||
+        roleName === 'head';
+    const isAdmin = (roleId === 1 || roleName === 'admin') && !isAuditor && !isPersonnel;
 
     useEffect(() => {
         if (!currentUser || !isAuditor) return;
@@ -102,8 +111,6 @@ function ALL() {
     const [loadingCriteria, setLoadingCriteria] = useState(new Set());
     const [loadingRequirements, setLoadingRequirements] = useState(new Set());
     const [loadingNoAreaCriteria, setLoadingNoAreaCriteria] = useState(new Set());
-
-    const isAdmin = currentUser?.RoleName === 'admin' || currentUser?.RoleID === 1;
 
     const abortControllersRef = useRef({});
     const itemsPerPage = viewMode === 'list' ? 8 : 4;
@@ -422,7 +429,7 @@ function ALL() {
             }
         } catch (err) {
             const apiMessage = err?.response?.data?.message || err?.response?.data?.error;
-            throw new Error(apiMessage || 'Failed to edit criteria.');
+            throw new Error(apiMessage || 'Failed to edit sub area.');
         }
     };
 
@@ -453,7 +460,7 @@ function ALL() {
             }
         } catch (err) {
             const apiMessage = err?.response?.data?.message || err?.response?.data?.error;
-            throw new Error(apiMessage || 'Failed to add criteria.');
+            throw new Error(apiMessage || 'Failed to add sub area.');
         }
     };
 
@@ -635,7 +642,7 @@ function ALL() {
                         <div>
                             <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">Accreditation & Quality Standards</h1>
                             <p className="text-xs text-slate-500 mt-0.5">
-                                Manage accreditation frameworks, quality audit criteria, and requirement structures.
+                                Manage accreditation frameworks, quality audit sub areas, and standard structures.
                             </p>
                         </div>
                     </div>
@@ -745,7 +752,7 @@ function ALL() {
                             <input
                                 type="text"
                                 placeholder="Search accreditations or codes..."
-                                className="h-9 w-full rounded-xl border border-slate-200/90 bg-slate-50/60 pl-9.5 pr-8 text-xs text-slate-800 placeholder-slate-400 shadow-2xs transition-all focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                                className="h-9 w-full rounded-xl border border-slate-200/90 bg-slate-50/60 pl-10 pr-8 text-xs text-slate-800 placeholder-slate-400 shadow-2xs transition-all focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                                 value={searchTerm}
                                 onChange={handleSearchChange}
                             />
@@ -1115,6 +1122,7 @@ function ALL() {
             {!copyPopup.open && !editPopup.open && (
                 <EventPopup
                     selectedEvent={selectedEvent}
+                    isAdminProp={isAdmin}
                     areasData={areasData}
                     criteriaData={criteriaData}
                     requirementsData={requirementsData}

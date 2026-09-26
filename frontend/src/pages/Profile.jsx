@@ -3,6 +3,7 @@ import { User } from 'lucide-react';
 import { usersAPI } from '../utils/api';
 import EditProfileModal from '../components/EditProfile/EditProfileModal.jsx';
 import { API_BASE_URL } from '../utils/apiBase';
+import SmartUserAvatar from '../components/UI/SmartUserAvatar';
 
 function DetailRow({ label, value }) {
 	return (
@@ -63,13 +64,6 @@ export default function Profile() {
 		? `${user.FirstName || ''}${user.MiddleInitial ? ` ${user.MiddleInitial}.` : ''} ${user.LastName || ''}`.trim()
 		: '';
 
-	let profilePicUrl = '/default-avatar.png';
-	if (user?.TempPreview) {
-		profilePicUrl = user.TempPreview;
-	} else if (user?.ProfilePic) {
-		profilePicUrl = `${API_BASE_URL}/uploads/profile-pics/${user.ProfilePic}`;
-	}
-
 	if (loading) {
 		return (
 			<ProfileShell>
@@ -118,14 +112,13 @@ export default function Profile() {
 				<article className="rounded-xl border border-slate-200 bg-white shadow-sm">
 					<div className="flex flex-col gap-5 border-b border-slate-200 px-6 py-6 sm:flex-row sm:items-center sm:justify-between">
 						<div className="flex min-w-0 items-center gap-4">
-							<img
-								src={profilePicUrl}
-								alt=""
-								className="h-20 w-20 shrink-0 rounded-full border border-slate-200 bg-slate-100 object-cover"
-								onError={(e) => {
-									e.target.onerror = null;
-									e.target.src = '/default-avatar.png';
-								}}
+							<SmartUserAvatar
+								user={user}
+								src={user?.TempPreview || (user?.ProfilePic ? `${API_BASE_URL}/uploads/profile-pics/${user.ProfilePic}` : null)}
+								fullName={fullName}
+								size="h-20 w-20"
+								textSize="text-2xl font-bold"
+								ring="ring-2 ring-slate-200/80 shadow-sm"
 							/>
 
 							<div className="min-w-0">

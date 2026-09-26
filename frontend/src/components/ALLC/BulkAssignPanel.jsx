@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 
 function Checkbox({ checked, onChange, className = '' }) {
 	return (
@@ -166,7 +166,7 @@ export default function BulkAssignPanel({
 						onChange={(event) => handleCheck(event.target.checked)}
 					/>
 					<button type="button" className="min-w-0 flex-1 text-left" onClick={handleExpand}>
-						<span className="text-[9px] font-bold uppercase tracking-wider text-blue-100">Criteria</span>
+						<span className="text-[9px] font-bold uppercase tracking-wider text-blue-100">Sub Area</span>
 						<p className="text-xs font-semibold leading-snug text-white">{node.label}</p>
 					</button>
 					<span className="shrink-0 rounded-[4px] bg-white/15 px-1.5 py-0.5 text-[9px] font-bold text-white border border-white/10">
@@ -186,9 +186,9 @@ export default function BulkAssignPanel({
 
 				{critExpanded && (
 					<div className="mt-2 space-y-2 pb-2 pl-5">
-						{loading && <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">Loading evidence...</p>}
+						{loading && <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">Loading standards...</p>}
 						{!loading && requirementsLoaded && (node.requirements || []).length === 0 && (
-							<p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">No evidence</p>
+							<p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">No standards</p>
 						)}
 						{(node.requirements || []).map((req) => {
 							const reqId = Number(req.RequirementID);
@@ -237,6 +237,30 @@ export default function BulkAssignPanel({
 			roots: buildCriteriaTree(area.criteria),
 		}));
 	}, [filteredRequirementTree]);
+
+	// Auto-expand areas and criteria when search term is active so matching items are visible immediately
+	useEffect(() => {
+		const q = (requirementSearchTerm || '').trim().toLowerCase();
+		if (!q) return;
+
+		const nextExpandedAreas = new Set();
+		const nextExpandedCriteria = new Set();
+
+		(treesWithRoots || []).forEach((area) => {
+			nextExpandedAreas.add(area.key);
+
+			const expandBranch = (node) => {
+				const critKey = node.key || `criteria-${getCriteriaId(node)}`;
+				nextExpandedCriteria.add(critKey);
+				(node.children || []).forEach(expandBranch);
+			};
+
+			(area.roots || []).forEach(expandBranch);
+		});
+
+		setExpandedAreas(nextExpandedAreas);
+		setExpandedCriteria(nextExpandedCriteria);
+	}, [requirementSearchTerm, treesWithRoots]);
 
 	const loadAreaRequirementIds = async (area) => {
 		const areaId = getAreaId(area);
@@ -418,28 +442,52 @@ export default function BulkAssignPanel({
 						<section className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-stone-200/90 bg-app-surface">
 							<div className="border-b border-slate-100/80 px-4 py-3.5 bg-slate-50/50">
 								<div className="flex items-center justify-between gap-2">
-									<h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">2. Select evidence</h3>
+									<h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">2. Select standards</h3>
 									<label className="flex cursor-pointer items-center gap-1.5 text-[11px] font-semibold text-slate-500 hover:text-slate-700 transition">
 										<Checkbox checked={allRequirementsSelected} onChange={(event) => toggleRequirementBatch(allRequirementIds, event.target.checked)} />
 										All
 									</label>
 								</div>
-								<p className="mt-1 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Area &gt; Criteria &gt; Evidence</p>
-								<div className="mt-3">
+								<p className="mt-1 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Area &gt; Sub Area &gt; Standard</p>
+								<div className="mt-3 relative">
+									<svg className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+										<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+									</svg>
 									<input
-										type="search"
-										className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 hover:bg-slate-100/50 focus:bg-white transition-all shadow-sm"
-										placeholder="Search loaded hierarchy..."
+										type="text"
+										className="w-full rounded-lg border border-slate-200 pl-10 pr-8 py-2 text-xs text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 hover:bg-slate-100/50 focus:bg-white transition-all shadow-sm"
+										placeholder="Search areas, sub areas, or standards (e.g. A.1)..."
 										value={requirementSearchTerm}
 										onChange={(event) => setRequirementSearchTerm(event.target.value)}
 									/>
+									{requirementSearchTerm && (
+										<button
+											type="button"
+											onClick={() => setRequirementSearchTerm('')}
+											className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-200/50 transition-colors"
+											title="Clear search"
+										>
+											<svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+												<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+											</svg>
+										</button>
+									)}
 								</div>
 							</div>
 							<div className="flex-1 space-y-3 overflow-y-auto p-3 [scrollbar-width:thin]">
 								{requirementTree.length === 0 ? (
 									<p className="py-8 text-center text-xs text-slate-500">No areas for this accreditation.</p>
 								) : treesWithRoots.length === 0 ? (
-									<p className="py-8 text-center text-xs text-slate-500">No matches in loaded hierarchy.</p>
+									<div className="py-8 text-center text-xs text-slate-500 flex flex-col items-center gap-2">
+										<p>No standards match "{requirementSearchTerm}".</p>
+										<button
+											type="button"
+											onClick={() => setRequirementSearchTerm('')}
+											className="text-xs text-blue-600 hover:underline font-semibold"
+										>
+											Clear search
+										</button>
+									</div>
 								) : (
 									treesWithRoots.map((area) => {
 										const areaRequirementIds = area.roots.flatMap((root) => gatherLoadedRequirementIds(root));
@@ -472,9 +520,9 @@ export default function BulkAssignPanel({
 												{areaExpanded && (
 													<div className="space-y-2 p-3">
 														{areaLoading ? (
-															<p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">Loading criteria...</p>
+															<p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">Loading sub areas...</p>
 														) : area.roots.length === 0 ? (
-															<p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">No criteria</p>
+															<p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">No sub areas</p>
 														) : (
 															area.roots.map((root) => renderCriteriaNode(root))
 														)}
@@ -494,7 +542,7 @@ export default function BulkAssignPanel({
 								<span className="text-slate-400 font-bold uppercase tracking-wider text-[9px] mr-1.5">Offices</span> {officeCount}
 							</span>
 							<span className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-1.5 font-semibold text-slate-700 shadow-sm">
-								<span className="text-slate-400 font-bold uppercase tracking-wider text-[9px] mr-1.5">Evidence</span> {reqCount}
+								<span className="text-slate-400 font-bold uppercase tracking-wider text-[9px] mr-1.5">Standards</span> {reqCount}
 							</span>
 							{(error || success) && (
 								<p className={`text-xs font-medium ${error ? 'text-rose-700' : 'text-emerald-700'}`}>{error || success}</p>
