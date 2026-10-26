@@ -95,9 +95,9 @@ export default function Login() {
         const user = localStorage.getItem("user");
         if (token && user) {
             const userData = JSON.parse(user);
-            const roleId = Number(userData?.RoleID);
-            const roleName = String(userData?.RoleName || '').toLowerCase();
-            const isAdmin = roleId === 1 || roleName === 'admin';
+            const roleid = Number(userData?.roleid);
+            const rolename = String(userData?.rolename || '').toLowerCase();
+            const isAdmin = roleid === 1 || rolename === 'admin';
             const destination = isAdmin ? "/home" : "/home/acc-management";
             navigate(destination, { replace: true });
         }
@@ -137,16 +137,16 @@ export default function Login() {
                 axios.defaults.headers.common["Authorization"] =
                     `Bearer ${response.token}`;
 
-                const roleId = Number(response.user?.RoleID);
-                const roleName = String(response.user?.RoleName || '').toLowerCase();
-                const isAdmin = roleId === 1 || roleName === 'admin';
+                const roleid = Number(response.user?.roleid);
+                const rolename = String(response.user?.rolename || '').toLowerCase();
+                const isAdmin = roleid === 1 || rolename === 'admin';
                 const destination = isAdmin ? "/home" : "/home/acc-management";
                 navigate(destination, { replace: true });
             } else {
-                if (response.approvalStatus === 'pending') {
+                if (response.approvalstatus === 'pending') {
                     setError("Your account is pending approval. Please wait for admin approval.");
                     await showAlert("Your account is still pending approval. Please wait for the administrator to review your account.");
-                } else if (response.approvalStatus === 'denied') {
+                } else if (response.approvalstatus === 'denied') {
                     setError("Your account has been denied access.");
                     await showAlert("Your account has been denied access. Please contact the administrator for more information.");
                 } else {
@@ -272,7 +272,7 @@ export default function Login() {
 
                     {/* Header */}
                     <div style={{ textAlign: 'center', marginBottom: '2rem' }} className="animate-slide-down">
-                        <img src={logo} alt="LCCB Logo"
+                        <img src={auditrackLogo} alt="Auditrack Logo"
                             style={{ width: '64px', height: '64px', objectFit: 'contain', margin: '0 auto 1rem', filter: 'drop-shadow(0 2px 8px rgba(37,99,235,0.18))' }} />
                         <h1 style={{ fontSize: '1.6rem', fontWeight: 700, color: '#0f172a', margin: '0 0 0.25rem', letterSpacing: '-0.4px' }}>
                             Welcome back

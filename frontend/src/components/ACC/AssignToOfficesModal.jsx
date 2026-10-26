@@ -48,16 +48,16 @@ export default function AssignToOfficesModal({
   }, [areasData]);
 
   // Fetch live fresh data directly on mount or when event changes
-  const fetchFreshData = useCallback(async (eventId) => {
+  const fetchFreshData = useCallback(async (eventid) => {
     try {
       setLoadingData(true);
       const res = await officesAPI.getAll().catch(() => []);
       const list = Array.isArray(res) ? res : (res?.data || []);
       setLocalOffices(list);
 
-      const targetEventId = eventId && eventId !== 'all'
-        ? eventId
-        : localStorage.getItem('acc_selected_event_id') || localStorage.getItem('selected_audit_event_id') || (events && events[0]?.EventID);
+      const targetEventId = eventid && eventid !== 'all'
+        ? eventid
+        : localStorage.getItem('acc_selected_event_id') || localStorage.getItem('selected_audit_event_id') || (events && events[0]?.eventid);
 
       if (targetEventId && targetEventId !== 'all') {
         const token = localStorage.getItem('token');
@@ -82,16 +82,16 @@ export default function AssignToOfficesModal({
         // Fast batch-fetch all requirements for this event
         let allEventReqs = [];
         try {
-          const reqRes = await axios.get(`${API_BASE_URL}/api/requirements/all?eventId=${targetEventId}`, { headers });
+          const reqRes = await axios.get(`${API_BASE_URL}/api/requirements/all?eventid=${targetEventId}`, { headers });
           allEventReqs = reqRes.data?.data || reqRes.data || [];
         } catch (rErr) {
           console.warn('Batch requirements fetch notice:', rErr.message);
         }
 
-        // Group requirements by CriteriaID
+        // Group requirements by criteriaid
         const reqsByCriteria = {};
         allEventReqs.forEach((r) => {
-          const cId = String(r.CriteriaID || r.criteria_id);
+          const cId = String(r.criteriaid || r.criteriaid);
           if (!reqsByCriteria[cId]) reqsByCriteria[cId] = [];
           reqsByCriteria[cId].push(r);
         });
@@ -99,7 +99,7 @@ export default function AssignToOfficesModal({
         // Ensure requirements are attached to all criteria (with fallback if batch returned empty)
         const criteriaWithReqs = await Promise.all(
           allCriteria.map(async (crit) => {
-            const critId = String(crit.CriteriaID || crit.id);
+            const critId = String(crit.criteriaid || crit.id);
             let reqs = reqsByCriteria[critId] || [];
             if (reqs.length === 0 && allEventReqs.length === 0) {
               try {
@@ -116,16 +116,16 @@ export default function AssignToOfficesModal({
         // Build criteria hierarchy (parent -> children)
         const criteriaMap = {};
         criteriaWithReqs.forEach(c => {
-          const cId = String(c.CriteriaID || c.id);
+          const cId = String(c.criteriaid || c.id);
           criteriaMap[cId] = c;
         });
 
         const topLevelCriteria = [];
         criteriaWithReqs.forEach(c => {
-          const parentId = c.ParentCriteriaID ? String(c.ParentCriteriaID) : null;
+          const parentId = c.parentcriteriaid ? String(c.parentcriteriaid) : null;
           if (parentId && criteriaMap[parentId]) {
-            if (!c.AreaID && criteriaMap[parentId].AreaID) {
-              c.AreaID = criteriaMap[parentId].AreaID;
+            if (!c.areaid && criteriaMap[parentId].areaid) {
+              c.areaid = criteriaMap[parentId].areaid;
             }
             criteriaMap[parentId].children.push(c);
           } else {
@@ -134,8 +134,8 @@ export default function AssignToOfficesModal({
         });
 
         const groupedAreas = (Array.isArray(areas) ? areas : []).map(a => {
-          const aId = String(a.AreaID || a.id);
-          const crits = topLevelCriteria.filter(c => String(c.AreaID || c.area_id) === aId);
+          const aId = String(a.areaid || a.id);
+          const crits = topLevelCriteria.filter(c => String(c.areaid || c.areaid) === aId);
           return { ...a, criteria: crits };
         });
 
@@ -149,7 +149,7 @@ export default function AssignToOfficesModal({
   }, [events]);
 
   useEffect(() => {
-    const effectiveEventId = selectedEventId || localStorage.getItem('acc_selected_event_id') || localStorage.getItem('selected_audit_event_id') || (events && events[0]?.EventID);
+    const effectiveEventId = selectedEventId || localStorage.getItem('acc_selected_event_id') || localStorage.getItem('selected_audit_event_id') || (events && events[0]?.eventid);
     if (effectiveEventId) {
       fetchFreshData(effectiveEventId);
     }
@@ -177,7 +177,7 @@ export default function AssignToOfficesModal({
     // Filter by selected event ID if provided
     if (selectedEventId && selectedEventId !== 'all') {
       list = list.filter(o => {
-        const evId = String(o.event_id || o.EventID || '');
+        const evId = String(o.eventid || o.eventid || '');
         return evId === String(selectedEventId);
       });
     }
@@ -192,7 +192,7 @@ export default function AssignToOfficesModal({
     if (!q) return list;
 
     return list.filter(o => {
-      const name = String(o.OfficeName || o.office_name || '').toLowerCase();
+      const name = String(o.officename || o.officename || '').toLowerCase();
       const dept = String(o.department_name || o.DepartmentCode || '').toLowerCase();
       return name.includes(q) || dept.includes(q);
     });
@@ -214,14 +214,14 @@ export default function AssignToOfficesModal({
     if (!q) return localAreasData;
 
     const matchesReq = (r) => {
-      const code = String(r.RequirementCode || r.code || r.req_code || '').toLowerCase();
+      const code = String(r.requirementcode || r.code || r.req_code || '').toLowerCase();
       const title = String(r.RequirementTitle || r.Title || r.title || r.RequirementName || r.description || r.Description || '').toLowerCase();
       return code.includes(q) || title.includes(q);
     };
 
     const filterCriteria = (crit) => {
-      const critCode = String(crit.CriteriaCode || crit.code || '').toLowerCase();
-      const critName = String(crit.CriteriaName || crit.name || crit.title || '').toLowerCase();
+      const critCode = String(crit.criteriacode || crit.code || '').toLowerCase();
+      const critName = String(crit.criterianame || crit.name || crit.title || '').toLowerCase();
       const critSelfMatches = critCode.includes(q) || critName.includes(q);
 
       const matchingReqs = (crit.requirements || []).filter(r => matchesReq(r) || critSelfMatches);
@@ -238,9 +238,9 @@ export default function AssignToOfficesModal({
     };
 
     return (localAreasData || []).map((area) => {
-      const areaCode = String(area.AreaCode || area.code || '').toLowerCase();
-      const areaName = String(area.AreaName || area.name || area.title || '').toLowerCase();
-      const areaSelfMatches = areaCode.includes(q) || areaName.includes(q);
+      const areacode = String(area.areacode || area.code || '').toLowerCase();
+      const areaname = String(area.areaname || area.name || area.title || '').toLowerCase();
+      const areaSelfMatches = areacode.includes(q) || areaname.includes(q);
 
       const filteredCriteria = (area.criteria || []).map(c => {
         if (areaSelfMatches) return c;
@@ -266,11 +266,11 @@ export default function AssignToOfficesModal({
     const matchedCritIds = new Set();
 
     filteredAreasData.forEach((area) => {
-      const areaId = String(area.id || area.AreaID);
-      matchedAreaIds.add(areaId);
+      const areaid = String(area.id || area.areaid);
+      matchedAreaIds.add(areaid);
 
       const markCrit = (crit) => {
-        const critId = String(crit.id || crit.CriteriaID);
+        const critId = String(crit.id || crit.criteriaid);
         matchedCritIds.add(critId);
         (crit.children || []).forEach(markCrit);
       };
@@ -283,17 +283,17 @@ export default function AssignToOfficesModal({
   }, [requirementSearch, filteredAreasData]);
 
   // Office Selection Handlers
-  const toggleOffice = (officeId) => {
+  const toggleOffice = (officeid) => {
     setSelectedOfficeIds(prev => {
       const next = new Set(prev);
-      if (next.has(officeId)) next.delete(officeId);
-      else next.add(officeId);
+      if (next.has(officeid)) next.delete(officeid);
+      else next.add(officeid);
       return next;
     });
   };
 
   const toggleAllOffices = () => {
-    const allFilteredIds = filteredOffices.map(o => Number(o.OfficeID || o.id));
+    const allFilteredIds = filteredOffices.map(o => Number(o.officeid || o.id));
     const allSelected = allFilteredIds.every(id => selectedOfficeIds.has(id));
 
     setSelectedOfficeIds(prev => {
@@ -318,7 +318,7 @@ export default function AssignToOfficesModal({
   };
 
   const getAllReqIdsForCriteria = (criteria) => {
-    const ids = (criteria.requirements || []).map(r => Number(r.id || r.RequirementID));
+    const ids = (criteria.requirements || []).map(r => Number(r.id || r.requirementid));
     (criteria.children || []).forEach(child => {
       ids.push(...getAllReqIdsForCriteria(child));
     });
@@ -360,8 +360,8 @@ export default function AssignToOfficesModal({
     });
   };
 
-  const toggleExpandArea = (areaId) => {
-    const normId = String(areaId);
+  const toggleExpandArea = (areaid) => {
+    const normId = String(areaid);
     setExpandedAreas(prev => {
       const next = new Set(prev);
       if (next.has(normId)) next.delete(normId);
@@ -411,8 +411,8 @@ export default function AssignToOfficesModal({
                       if (onSelectEvent) onSelectEvent(val);
                     }}
                     options={events.map(ev => ({
-                      value: String(ev.EventID || ev.id),
-                      label: ev.EventCode || ev.EventName
+                      value: String(ev.eventid || ev.id),
+                      label: ev.eventcode || ev.eventname
                     }))}
                     placeholder="Select accreditation"
                   />
@@ -493,14 +493,14 @@ export default function AssignToOfficesModal({
               </div>
             ) : (
               filteredOffices.map((office) => {
-                const officeId = Number(office.OfficeID || office.id);
-                const isSelected = selectedOfficeIds.has(officeId);
+                const officeid = Number(office.officeid || office.id);
+                const isSelected = selectedOfficeIds.has(officeid);
                 const isAcademic = isAcademicEntity(office);
 
                 return (
                   <div
-                    key={officeId}
-                    onClick={() => toggleOffice(officeId)}
+                    key={officeid}
+                    onClick={() => toggleOffice(officeid)}
                     className={`p-3 rounded-xl border transition-all cursor-pointer flex items-start gap-3 bg-white ${isSelected
                         ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-xs'
                         : 'border-slate-200 hover:border-slate-300'
@@ -510,7 +510,7 @@ export default function AssignToOfficesModal({
                     <input
                       type="checkbox"
                       checked={isSelected}
-                      onChange={() => toggleOffice(officeId)}
+                      onChange={() => toggleOffice(officeid)}
                       onClick={(e) => e.stopPropagation()}
                       className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500/30 cursor-pointer"
                     />
@@ -523,18 +523,18 @@ export default function AssignToOfficesModal({
                           {isAcademic ? <GraduationCap className="h-4 w-4" /> : <Building2 className="h-4 w-4" />}
                         </div>
                         <h4 className="text-xs font-bold text-slate-900 truncate">
-                          {office.OfficeName || office.office_name}
+                          {office.officename || office.officename}
                         </h4>
                       </div>
 
                       <div className="grid grid-cols-2 gap-2 mt-2 pt-1.5 border-t border-slate-100 text-[10px] text-slate-500">
                         <div>
                           <span className="block font-semibold uppercase text-[8px] text-slate-400">CREATED</span>
-                          <span>{formatDateString(office.created_at || office.CreatedAt)}</span>
+                          <span>{formatDateString(office.createdat || office.createdat)}</span>
                         </div>
                         <div>
                           <span className="block font-semibold uppercase text-[8px] text-slate-400">UPDATED</span>
-                          <span>{formatDateString(office.updated_at || office.UpdatedAt)}</span>
+                          <span>{formatDateString(office.updatedat || office.updatedat)}</span>
                         </div>
                       </div>
 
@@ -608,18 +608,18 @@ export default function AssignToOfficesModal({
               </div>
             ) : (
               filteredAreasData.map((area) => {
-                const areaId = String(area.id || area.AreaID);
-                const isExpanded = expandedAreas.has(areaId);
+                const areaid = String(area.id || area.areaid);
+                const isExpanded = expandedAreas.has(areaid);
                 const criteriaList = area.criteria || [];
-                const areaCode = area.AreaCode || area.code || '';
-                const areaName = area.AreaName || area.name || area.title || 'Area';
+                const areacode = area.areacode || area.code || '';
+                const areaname = area.areaname || area.name || area.title || 'Area';
 
                 const allAreaReqIds = [];
-                criteriaList.forEach(c => (c.requirements || []).forEach(r => allAreaReqIds.push(Number(r.id || r.RequirementID))));
+                criteriaList.forEach(c => (c.requirements || []).forEach(r => allAreaReqIds.push(Number(r.id || r.requirementid))));
                 const isAreaAllSelected = allAreaReqIds.length > 0 && allAreaReqIds.every(id => selectedRequirementIds.has(id));
 
                 return (
-                  <div key={areaId} className="rounded-xl border border-blue-200 bg-white overflow-hidden shadow-2xs">
+                  <div key={areaid} className="rounded-xl border border-blue-200 bg-white overflow-hidden shadow-2xs">
                     {/* Area Banner */}
                     <div className="flex items-center justify-between px-4 py-3 bg-blue-600 text-white select-none">
                       <div className="flex items-center gap-3 min-w-0">
@@ -632,16 +632,16 @@ export default function AssignToOfficesModal({
                         />
                         <span className="text-xs font-semibold bg-white/20 px-2 py-0.5 rounded text-white uppercase">AREA</span>
                         <h3
-                          onClick={() => toggleExpandArea(areaId)}
+                          onClick={() => toggleExpandArea(areaid)}
                           className="text-xs font-bold text-white truncate cursor-pointer hover:underline"
                         >
-                          {areaCode ? `${areaCode} - ${areaName}` : areaName}
+                          {areacode ? `${areacode} - ${areaname}` : areaname}
                         </h3>
                       </div>
 
                       <button
                         type="button"
-                        onClick={() => toggleExpandArea(areaId)}
+                        onClick={() => toggleExpandArea(areaid)}
                         className="p-1 text-white/80 hover:text-white rounded"
                       >
                         {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
@@ -652,11 +652,11 @@ export default function AssignToOfficesModal({
                     {isExpanded && (
                       <div className="p-3 space-y-2 bg-slate-50 border-t border-blue-100">
                         {criteriaList.map((crit) => {
-                          const critId = String(crit.id || crit.CriteriaID);
+                          const critId = String(crit.id || crit.criteriaid);
                           const isCritExpanded = expandedCriteria.has(critId);
                           const reqs = crit.requirements || [];
-                          const critCode = crit.CriteriaCode || crit.code || '';
-                          const critName = crit.CriteriaName || crit.name || crit.title || 'Sub Area';
+                          const critCode = crit.criteriacode || crit.code || '';
+                          const critName = crit.criterianame || crit.name || crit.title || 'Sub Area';
 
                           const critChildren = crit.children || [];
                           const allCritReqIds = getAllReqIdsForCriteria(crit);
@@ -700,9 +700,9 @@ export default function AssignToOfficesModal({
                                   {reqs.length > 0 && (
                                     <div className="space-y-1.5">
                                       {reqs.map((req) => {
-                                        const reqId = Number(req.id || req.RequirementID);
+                                        const reqId = Number(req.id || req.requirementid);
                                         const isReqSelected = selectedRequirementIds.has(reqId);
-                                        const reqCode = req.RequirementCode || req.code || req.req_code || `Req #${reqId}`;
+                                        const reqCode = req.requirementcode || req.code || req.req_code || `Req #${reqId}`;
                                         const reqTitle = req.RequirementTitle || req.Title || req.title || req.RequirementName || req.description || req.Description || '';
 
                                         return (
@@ -741,12 +741,12 @@ export default function AssignToOfficesModal({
                                   {critChildren.length > 0 && (
                                     <div className="space-y-2 pt-1">
                                       {critChildren.map((subCrit) => {
-                                        const subCritId = String(subCrit.id || subCrit.CriteriaID);
+                                        const subCritId = String(subCrit.id || subCrit.criteriaid);
                                         const isSubCritExpanded = expandedCriteria.has(subCritId);
                                         const subReqs = subCrit.requirements || [];
-                                        const subCritCode = subCrit.CriteriaCode || subCrit.code || '';
-                                        const subCritName = subCrit.CriteriaName || subCrit.name || subCrit.title || 'Sub Area';
-                                        const subReqIds = subReqs.map(r => Number(r.id || r.RequirementID));
+                                        const subCritCode = subCrit.criteriacode || subCrit.code || '';
+                                        const subCritName = subCrit.criterianame || subCrit.name || subCrit.title || 'Sub Area';
+                                        const subReqIds = subReqs.map(r => Number(r.id || r.requirementid));
                                         const isSubAllSelected = subReqIds.length > 0 && subReqIds.every(id => selectedRequirementIds.has(id));
 
                                         return (
@@ -787,9 +787,9 @@ export default function AssignToOfficesModal({
                                                   <p className="text-[11px] text-slate-400 italic px-2 py-1">No standards in this sub area.</p>
                                                 ) : (
                                                   subReqs.map((req) => {
-                                                    const reqId = Number(req.id || req.RequirementID);
+                                                    const reqId = Number(req.id || req.requirementid);
                                                     const isReqSelected = selectedRequirementIds.has(reqId);
-                                                    const reqCode = req.RequirementCode || req.code || req.req_code || `Req #${reqId}`;
+                                                    const reqCode = req.requirementcode || req.code || req.req_code || `Req #${reqId}`;
                                                     const reqTitle = req.RequirementTitle || req.Title || req.title || req.RequirementName || req.description || req.Description || '';
 
                                                     return (

@@ -11,10 +11,10 @@ import SmartUserAvatar from '../UI/SmartUserAvatar';
 function displayNameFromUser(user) {
   if (!user || typeof user !== 'object') return '';
   if (user.FullName && String(user.FullName).trim()) return String(user.FullName).trim();
-  const { FirstName, MiddleInitial, LastName } = user;
-  if (!FirstName && !LastName) return '';
-  const mid = MiddleInitial ? ` ${MiddleInitial}.` : '';
-  return `${FirstName || ''}${mid} ${LastName || ''}`.replace(/\s+/g, ' ').trim();
+  const { firstname, middleinitial, lastname } = user;
+  if (!firstname && !lastname) return '';
+  const mid = middleinitial ? ` ${middleinitial}.` : '';
+  return `${firstname || ''}${mid} ${lastname || ''}`.replace(/\s+/g, ' ').trim();
 }
 
 function readStoredDisplayName() {
@@ -34,12 +34,12 @@ function readStoredUserRole() {
     const raw = localStorage.getItem('user');
     if (!raw) return '';
     const u = JSON.parse(raw);
-    if (u.RoleName) return u.RoleName;
-    const roleId = Number(u.RoleID);
-    if (roleId === 1) return 'Administrator';
-    if (roleId === 4) return 'Auditor';
-    if (roleId === 3) return 'Office Head';
-    if (roleId === 2) return 'Staff';
+    if (u.rolename) return u.rolename;
+    const roleid = Number(u.roleid);
+    if (roleid === 1) return 'Administrator';
+    if (roleid === 4) return 'Auditor';
+    if (roleid === 3) return 'Office Head';
+    if (roleid === 2) return 'Staff';
     return '';
   } catch {
     return '';
@@ -62,9 +62,9 @@ export default function Header({ onToggleMobileMenu, isAdmin: propIsAdmin }) {
 
   const isAdmin = propIsAdmin !== undefined ? propIsAdmin : Boolean(
     currentUser && (
-      Number(currentUser.RoleID) === 1 ||
-      String(currentUser.RoleName || '').toLowerCase() === 'admin' ||
-      String(currentUser.RoleName || '').toLowerCase() === 'administrator'
+      Number(currentUser.roleid) === 1 ||
+      String(currentUser.rolename || '').toLowerCase() === 'admin' ||
+      String(currentUser.rolename || '').toLowerCase() === 'administrator'
     )
   );
 
@@ -102,20 +102,20 @@ export default function Header({ onToggleMobileMenu, isAdmin: propIsAdmin }) {
   // Fetch unread count
   useEffect(() => {
     const token = localStorage.getItem('token');
-    let userId = null;
+    let userid = null;
     if (token) {
       const userData = localStorage.getItem('user');
       if (userData) {
         try {
-          userId = JSON.parse(userData).UserID;
+          userid = JSON.parse(userData).userid;
         } catch {}
       }
     }
-    if (!userId) return;
+    if (!userid) return;
 
     const fetchUnread = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/notifications/user/${userId}/counts`, {
+        const response = await fetch(`${API_BASE_URL}/api/notifications/user/${userid}/counts`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -155,7 +155,7 @@ export default function Header({ onToggleMobileMenu, isAdmin: propIsAdmin }) {
           setCurrentUser(response.user);
           const n = displayNameFromUser(response.user);
           if (n) setName(n);
-          if (response.user.RoleName) setRole(response.user.RoleName);
+          if (response.user.rolename) setRole(response.user.rolename);
         }
       } catch {
         setName(readStoredDisplayName());

@@ -75,8 +75,8 @@ export default function RoleProtectedRoute({ allowedRoles = [], forbiddenRoles =
         return <Navigate to="/login" state={{ from: location }} replace />;
     }
 
-    const userRoleId = Number(currentUser?.RoleID);
-    const userRoleName = String(currentUser?.RoleName || currentUser?.role_name || '').toLowerCase();
+    const userRoleId = Number(currentUser?.roleid);
+    const userRoleName = String(currentUser?.rolename || currentUser?.rolename || '').toLowerCase();
     const isAuditor = userRoleId === 4 || userRoleName.includes('auditor') || currentUser?.isExternalAuditor;
 
     // Check forbidden roles

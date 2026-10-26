@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 
-export default function EventOptionsPopup({ onEdit, onCopy, onDelete, onClose, anchorRef }) {
+export default function EventOptionsPopup({ onEdit, onCopy, onDelete, onAssignPersonnel, onClose, anchorRef }) {
     const [anchorRect, setAnchorRect] = useState(null);
     const menuRef = useRef(null);
 
@@ -54,6 +54,22 @@ export default function EventOptionsPopup({ onEdit, onCopy, onDelete, onClose, a
             style={{ position: 'fixed', top: position.top, left: position.left, zIndex: 9999 }}
             className="w-48 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl animate-in fade-in zoom-in-95 duration-100"
         >
+            {onAssignPersonnel && (
+                <button
+                    type="button"
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 transition whitespace-nowrap cursor-pointer"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onClose();
+                        onAssignPersonnel?.();
+                    }}
+                >
+                    <svg className="h-4 w-4 text-indigo-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                    </svg>
+                    <span>Assign Personnel</span>
+                </button>
+            )}
             <button
                 type="button"
                 className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition whitespace-nowrap cursor-pointer"

@@ -35,15 +35,15 @@ export default function ACCPage() {
   const [isAddOfficeOpen, setIsAddOfficeOpen] = useState(false);
   const [assignSaving, setAssignSaving] = useState(false);
 
-  const roleName = String(currentUser?.RoleName || '').toLowerCase();
-  const roleId = Number(currentUser?.RoleID);
-  const isAuditor = roleId === 4 || roleName.includes('auditor') || Boolean(currentUser?.isExternalAuditor);
-  const isOfficer = roleId === 2 || roleId === 3 || roleName.includes('office') || roleName === 'user' || roleName === 'personnel' || roleName === 'head';
-  const isAdmin = (roleId === 1 || roleName === 'admin') && !isAuditor && !isOfficer;
+  const rolename = String(currentUser?.rolename || '').toLowerCase();
+  const roleid = Number(currentUser?.roleid);
+  const isAuditor = roleid === 4 || rolename.includes('auditor') || Boolean(currentUser?.isExternalAuditor);
+  const isOfficer = roleid === 2 || roleid === 3 || rolename.includes('office') || rolename === 'user' || rolename === 'personnel' || rolename === 'head';
+  const isAdmin = (roleid === 1 || rolename === 'admin') && !isAuditor && !isOfficer;
 
   // Helper to load full hierarchy for selected event
-  const loadEventStructure = useCallback(async (eventId) => {
-    if (!eventId || eventId === 'all') return;
+  const loadEventStructure = useCallback(async (eventid) => {
+    if (!eventid || eventid === 'all') return;
     try {
       const token = localStorage.getItem('token');
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
@@ -51,7 +51,7 @@ export default function ACCPage() {
       // 1. Fetch areas for event
       let areas = [];
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/areas/event/${eventId}`, { headers });
+        const res = await axios.get(`${API_BASE_URL}/api/areas/event/${eventid}`, { headers });
         areas = res.data?.data || res.data || [];
       } catch {
         areas = await areasAPI.getAll().catch(() => []);
@@ -60,7 +60,7 @@ export default function ACCPage() {
       // 2. Fetch criteria for event
       let allCriteria = [];
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/criteria/event/${eventId}`, { headers });
+        const res = await axios.get(`${API_BASE_URL}/api/criteria/event/${eventid}`, { headers });
         allCriteria = res.data?.data || res.data || [];
       } catch {
         allCriteria = [];
@@ -69,7 +69,7 @@ export default function ACCPage() {
       // 3. Batch-fetch all requirements for the event in one fast request
       let allEventReqs = [];
       try {
-        const reqRes = await axios.get(`${API_BASE_URL}/api/requirements/all?eventId=${eventId}`, { headers });
+        const reqRes = await axios.get(`${API_BASE_URL}/api/requirements/all?eventid=${eventid}`, { headers });
         allEventReqs = reqRes.data?.data || reqRes.data || [];
       } catch (rErr) {
         console.warn('Batch requirements fetch notice:', rErr.message);
@@ -77,14 +77,14 @@ export default function ACCPage() {
 
       const reqsByCriteria = {};
       allEventReqs.forEach((r) => {
-        const cId = String(r.CriteriaID || r.criteria_id);
+        const cId = String(r.criteriaid || r.criteriaid);
         if (!reqsByCriteria[cId]) reqsByCriteria[cId] = [];
         reqsByCriteria[cId].push(r);
       });
 
       const criteriaWithReqs = await Promise.all(
         allCriteria.map(async (crit) => {
-          const critId = String(crit.CriteriaID || crit.id);
+          const critId = String(crit.criteriaid || crit.id);
           let reqs = reqsByCriteria[critId] || [];
           if (reqs.length === 0 && allEventReqs.length === 0) {
             try {
@@ -101,17 +101,17 @@ export default function ACCPage() {
         })
       );
 
-      // Group criteria by AreaID
+      // Group criteria by areaid
       const criteriaByArea = {};
       criteriaWithReqs.forEach((crit) => {
-        const areaId = String(crit.AreaID || crit.area_id || 'no_area');
-        if (!criteriaByArea[areaId]) criteriaByArea[areaId] = [];
-        criteriaByArea[areaId].push(crit);
+        const areaid = String(crit.areaid || crit.areaid || 'no_area');
+        if (!criteriaByArea[areaid]) criteriaByArea[areaid] = [];
+        criteriaByArea[areaid].push(crit);
       });
 
       // Attach criteria to areas
       const structuredAreas = areas.map((area) => {
-        const aId = String(area.AreaID || area.id);
+        const aId = String(area.areaid || area.id);
         return {
           ...area,
           criteria: criteriaByArea[aId] || []
@@ -145,10 +145,10 @@ export default function ACCPage() {
 
       if (eventsList.length > 0) {
         setSelectedEventId((prev) => {
-          if (prev && prev !== 'all' && eventsList.some(e => String(e.EventID || e.id) === String(prev))) {
+          if (prev && prev !== 'all' && eventsList.some(e => String(e.eventid || e.id) === String(prev))) {
             return prev;
           }
-          const firstId = String(eventsList[0].EventID || eventsList[0].id);
+          const firstId = String(eventsList[0].eventid || eventsList[0].id);
           setSelectedEvent(eventsList[0]);
           return firstId;
         });
@@ -168,11 +168,11 @@ export default function ACCPage() {
   useLiveRefresh(fetchData);
 
   // Handle Event selection
-  const handleSelectEvent = async (eventId) => {
-    setSelectedEventId(eventId);
-    const match = events.find(e => String(e.EventID || e.id) === String(eventId));
+  const handleSelectEvent = async (eventid) => {
+    setSelectedEventId(eventid);
+    const match = events.find(e => String(e.eventid || e.id) === String(eventid));
     if (match) setSelectedEvent(match);
-    await loadEventStructure(eventId);
+    await loadEventStructure(eventid);
   };
 
   // Handle office selection -> opens ViewReqPasscuModal
@@ -180,16 +180,16 @@ export default function ACCPage() {
     if (!office) return;
     const normalized = {
       ...office,
-      id: office.id ?? office.OfficeID,
-      OfficeID: office.OfficeID ?? office.id,
-      office_name: office.office_name ?? office.OfficeName,
-      OfficeName: office.OfficeName ?? office.office_name,
-      event_id: office.event_id ?? office.EventID ?? selectedEventId,
-      EventID: office.EventID ?? office.event_id ?? selectedEventId,
-      event_code: office.event_code ?? office.EventCode ?? selectedEvent?.EventCode ?? selectedEvent?.EventName,
-      EventCode: office.EventCode ?? office.event_code ?? selectedEvent?.EventCode ?? selectedEvent?.EventName,
-      event_name: office.event_name ?? office.EventName ?? selectedEvent?.EventName,
-      EventName: office.EventName ?? office.event_name ?? selectedEvent?.EventName,
+      id: office.id ?? office.officeid,
+      officeid: office.officeid ?? office.id,
+      officename: office.officename ?? office.officename,
+      officename: office.officename ?? office.officename,
+      eventid: office.eventid ?? office.eventid ?? selectedEventId,
+      eventid: office.eventid ?? office.eventid ?? selectedEventId,
+      eventcode: office.eventcode ?? office.eventcode ?? selectedEvent?.eventcode ?? selectedEvent?.eventname,
+      eventcode: office.eventcode ?? office.eventcode ?? selectedEvent?.eventcode ?? selectedEvent?.eventname,
+      eventname: office.eventname ?? office.eventname ?? selectedEvent?.eventname,
+      eventname: office.eventname ?? office.eventname ?? selectedEvent?.eventname,
       department_name: office.department_name ?? office.DepartmentName,
       DepartmentName: office.DepartmentName ?? office.department_name,
     };
@@ -201,8 +201,8 @@ export default function ACCPage() {
   const handleAssignToOffices = async (officeIds, requirementIds) => {
     try {
       setAssignSaving(true);
-      for (const officeId of officeIds) {
-        await officesAPI.addOfficeRequirements(officeId, requirementIds);
+      for (const officeid of officeIds) {
+        await officesAPI.addOfficeRequirements(officeid, requirementIds);
       }
 
       setIsAssignModalOpen(false);
@@ -226,7 +226,7 @@ export default function ACCPage() {
       setOffices(officesList);
       setEvents(eventsList);
 
-      const targetId = currentEventId && currentEventId !== 'all' ? currentEventId : (eventsList[0]?.EventID || eventsList[0]?.id);
+      const targetId = currentEventId && currentEventId !== 'all' ? currentEventId : (eventsList[0]?.eventid || eventsList[0]?.id);
       if (targetId) {
         await loadEventStructure(targetId);
       }

@@ -16,13 +16,13 @@ const auth = async function (req, res, next) {
 
   try {
     const decoded = jwt.verify(token, "MY_SECRET_KEY");
-    req.user = decoded; // Contains userId and roleId if signed with roleId
+    req.user = decoded; // Contains userid and roleid if signed with roleid
 
-    // Fallback: If roleId is missing from token payload, fetch from DB
-    if (!req.user.roleId && req.user.userId) {
-      const [[userRow]] = await db.query("SELECT RoleID FROM users WHERE UserID = ?", [req.user.userId]);
+    // Fallback: If roleid is missing from token payload, fetch from DB
+    if (!req.user.roleid && req.user.userid) {
+      const [[userRow]] = await db.query("SELECT roleid FROM users WHERE userid = ?", [req.user.userid]);
       if (userRow) {
-        req.user.roleId = Number(userRow.RoleID);
+        req.user.roleid = Number(userRow.roleid);
       }
     }
 
@@ -32,19 +32,19 @@ const auth = async function (req, res, next) {
   }
 };
 
-// Middleware to restrict Auditor (RoleID === 4) from making structural changes (create, edit, delete)
+// Middleware to restrict Auditor (roleid === 4) from making structural changes (create, edit, delete)
 const restrictAuditor = async function (req, res, next) {
   if (!req.user) {
     return res.status(401).json({ success: false, message: "Unauthorized" });
   }
 
-  let roleId = Number(req.user.roleId);
-  if (!roleId && req.user.userId) {
-    const [[userRow]] = await db.query("SELECT RoleID FROM users WHERE UserID = ?", [req.user.userId]);
-    if (userRow) roleId = Number(userRow.RoleID);
+  let roleid = Number(req.user.roleid);
+  if (!roleid && req.user.userid) {
+    const [[userRow]] = await db.query("SELECT roleid FROM users WHERE userid = ?", [req.user.userid]);
+    if (userRow) roleid = Number(userRow.roleid);
   }
 
-  if (roleId === 4) {
+  if (roleid === 4) {
     return res.status(403).json({
       success: false,
       message: "Forbidden: External Auditors are not permitted to modify compliance structures or records.",
@@ -54,19 +54,19 @@ const restrictAuditor = async function (req, res, next) {
   next();
 };
 
-// Middleware to restrict Auditor (RoleID === 4) from downloading files
+// Middleware to restrict Auditor (roleid === 4) from downloading files
 const restrictAuditorDownloads = async function (req, res, next) {
   if (!req.user) {
     return res.status(401).json({ success: false, message: "Unauthorized" });
   }
 
-  let roleId = Number(req.user.roleId);
-  if (!roleId && req.user.userId) {
-    const [[userRow]] = await db.query("SELECT RoleID FROM users WHERE UserID = ?", [req.user.userId]);
-    if (userRow) roleId = Number(userRow.RoleID);
+  let roleid = Number(req.user.roleid);
+  if (!roleid && req.user.userid) {
+    const [[userRow]] = await db.query("SELECT roleid FROM users WHERE userid = ?", [req.user.userid]);
+    if (userRow) roleid = Number(userRow.roleid);
   }
 
-  if (roleId === 4) {
+  if (roleid === 4) {
     return res.status(403).json({
       success: false,
       message: "Forbidden: File downloading is restricted for Auditors.",
@@ -76,19 +76,19 @@ const restrictAuditorDownloads = async function (req, res, next) {
   next();
 };
 
-// Middleware to require Admin (RoleID === 1) access
+// Middleware to require Admin (roleid === 1) access
 const requireAdmin = async function (req, res, next) {
   if (!req.user) {
     return res.status(401).json({ success: false, message: "Unauthorized" });
   }
 
-  let roleId = Number(req.user.roleId);
-  if (!roleId && req.user.userId) {
-    const [[userRow]] = await db.query("SELECT RoleID FROM users WHERE UserID = ?", [req.user.userId]);
-    if (userRow) roleId = Number(userRow.RoleID);
+  let roleid = Number(req.user.roleid);
+  if (!roleid && req.user.userid) {
+    const [[userRow]] = await db.query("SELECT roleid FROM users WHERE userid = ?", [req.user.userid]);
+    if (userRow) roleid = Number(userRow.roleid);
   }
 
-  if (roleId !== 1) {
+  if (roleid !== 1) {
     return res.status(403).json({
       success: false,
       message: "Forbidden: Administrator access required.",

@@ -42,20 +42,20 @@ export default function AccreditationMasterList({
     }
   };
 
-  const toggleArea = (areaId) => {
+  const toggleArea = (areaid) => {
     setExpandedAreas(prev => {
       const next = new Set(prev);
-      if (next.has(areaId)) next.delete(areaId);
-      else next.add(areaId);
+      if (next.has(areaid)) next.delete(areaid);
+      else next.add(areaid);
       return next;
     });
   };
 
-  const toggleCriteria = (criteriaId) => {
+  const toggleCriteria = (criteriaid) => {
     setExpandedCriteria(prev => {
       const next = new Set(prev);
-      if (next.has(criteriaId)) next.delete(criteriaId);
-      else next.add(criteriaId);
+      if (next.has(criteriaid)) next.delete(criteriaid);
+      else next.add(criteriaid);
       return next;
     });
   };
@@ -73,7 +73,7 @@ export default function AccreditationMasterList({
     if (!q) return list;
 
     return list.filter(o => {
-      const name = String(o.OfficeName || o.office_name || '').toLowerCase();
+      const name = String(o.officename || o.officename || '').toLowerCase();
       const dept = String(o.department_name || o.DepartmentCode || '').toLowerCase();
       return name.includes(q) || dept.includes(q);
     });
@@ -90,7 +90,7 @@ export default function AccreditationMasterList({
         const critMatch = String(c.name || '').toLowerCase().includes(q) || String(c.code || '').toLowerCase().includes(q);
         const reqMatch = (c.requirements || []).some(r =>
           String(r.description || r.Description || '').toLowerCase().includes(q) ||
-          String(r.code || r.RequirementCode || '').toLowerCase().includes(q)
+          String(r.code || r.requirementcode || '').toLowerCase().includes(q)
         );
         return critMatch || reqMatch;
       });
@@ -112,7 +112,7 @@ export default function AccreditationMasterList({
         <div className="min-w-0">
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-bold tracking-tight text-slate-800 uppercase truncate">
-              {event?.EventCode || event?.code || event?.EventName || event?.title || 'PAASCU-COPY'}
+              {event?.eventcode || event?.code || event?.eventname || event?.title || 'PAASCU-COPY'}
             </h1>
             {onOpenAssignToOffices && (
               <button
@@ -130,10 +130,10 @@ export default function AccreditationMasterList({
           </p>
           <div className="flex items-center gap-2 mt-1.5 text-[10px]">
             <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-50 text-slate-600 border border-slate-200">
-              Created: {formatDateString(event?.CreatedAt || event?.created_at)}
+              Created: {formatDateString(event?.createdat || event?.createdat)}
             </span>
             <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-50 text-slate-600 border border-slate-200">
-              Updated: {formatDateString(event?.UpdatedAt || event?.updated_at)}
+              Updated: {formatDateString(event?.updatedat || event?.updatedat)}
             </span>
           </div>
         </div>
@@ -230,17 +230,17 @@ export default function AccreditationMasterList({
           <div className="flex-1 p-4 overflow-y-auto space-y-3">
             {/* Area Blocks */}
             {filteredAreas.map((area) => {
-              const areaId = area.id || area.AreaID;
-              const isExpanded = expandedAreas.has(areaId);
+              const areaid = area.id || area.areaid;
+              const isExpanded = expandedAreas.has(areaid);
               const criteriaList = area.criteria || [];
-              const areaCode = area.AreaCode || area.code || '';
-              const areaName = area.AreaName || area.name || area.title || 'Area';
+              const areacode = area.areacode || area.code || '';
+              const areaname = area.areaname || area.name || area.title || 'Area';
 
               return (
-                <div key={areaId} className="rounded-xl border border-blue-200/80 bg-white overflow-hidden shadow-2xs">
+                <div key={areaid} className="rounded-xl border border-blue-200/80 bg-white overflow-hidden shadow-2xs">
                   {/* Area Banner Header */}
                   <div
-                    onClick={() => toggleArea(areaId)}
+                    onClick={() => toggleArea(areaid)}
                     className="flex items-center justify-between px-4 py-3.5 bg-blue-600 hover:bg-blue-700 text-white cursor-pointer transition-colors select-none"
                   >
                     <div className="flex items-center gap-3 min-w-0">
@@ -251,10 +251,10 @@ export default function AccreditationMasterList({
                       )}
                       <div className="min-w-0">
                         <h2 className="text-sm font-bold text-white tracking-wide truncate">
-                          {areaCode ? `${areaCode}: ${areaName}` : areaName}
+                          {areacode ? `${areacode}: ${areaname}` : areaname}
                         </h2>
                         <p className="text-[11px] font-medium text-blue-100/90 mt-0.5">
-                          Created: {formatDateString(area.CreatedAt || area.createdAt)} Updated: {formatDateString(area.UpdatedAt || area.updatedAt)}
+                          Created: {formatDateString(area.createdat || area.createdat)} Updated: {formatDateString(area.updatedat || area.updatedat)}
                         </p>
                       </div>
                     </div>
@@ -273,11 +273,11 @@ export default function AccreditationMasterList({
                         <p className="text-xs text-slate-400 italic px-3 py-2">No sub areas defined in this area yet.</p>
                       ) : (
                         criteriaList.map((crit) => {
-                          const critId = crit.id || crit.CriteriaID;
+                          const critId = crit.id || crit.criteriaid;
                           const isCritExpanded = expandedCriteria.has(critId);
                           const reqs = crit.requirements || [];
-                          const critCode = crit.CriteriaCode || crit.code || '';
-                          const critName = crit.CriteriaName || crit.name || crit.title || 'Sub Area';
+                          const critCode = crit.criteriacode || crit.code || '';
+                          const critName = crit.criterianame || crit.name || crit.title || 'Sub Area';
 
                           return (
                             <div key={critId} className="rounded-lg border border-slate-200 bg-white overflow-hidden shadow-2xs">
@@ -308,8 +308,8 @@ export default function AccreditationMasterList({
                                   {reqs.length > 0 && (
                                     <div className="space-y-1.5">
                                       {reqs.map((req) => {
-                                        const reqId = req.id || req.RequirementID;
-                                        const reqCode = req.RequirementCode || req.code || req.req_code || `Req #${reqId}`;
+                                        const reqId = req.id || req.requirementid;
+                                        const reqCode = req.requirementcode || req.code || req.req_code || `Req #${reqId}`;
                                         const reqTitle = req.RequirementTitle || req.Title || req.title || req.RequirementName || req.description || req.Description || '';
 
                                         return (
@@ -337,11 +337,11 @@ export default function AccreditationMasterList({
                                   {(crit.children || []).length > 0 && (
                                     <div className="space-y-2 pt-1">
                                       {(crit.children || []).map((subCrit) => {
-                                        const subCritId = subCrit.id || subCrit.CriteriaID;
+                                        const subCritId = subCrit.id || subCrit.criteriaid;
                                         const isSubCritExpanded = expandedCriteria.has(subCritId);
                                         const subReqs = subCrit.requirements || [];
-                                        const subCritCode = subCrit.CriteriaCode || subCrit.code || '';
-                                        const subCritName = subCrit.CriteriaName || subCrit.name || subCrit.title || 'Sub Area';
+                                        const subCritCode = subCrit.criteriacode || subCrit.code || '';
+                                        const subCritName = subCrit.criterianame || subCrit.name || subCrit.title || 'Sub Area';
 
                                         return (
                                           <div key={subCritId} className="rounded-lg border border-blue-200 bg-white overflow-hidden shadow-2xs ml-2">
@@ -374,8 +374,8 @@ export default function AccreditationMasterList({
                                                   <p className="text-[11px] text-slate-400 italic px-2 py-1">No requirements in this subcriterion.</p>
                                                 ) : (
                                                   subReqs.map((req) => {
-                                                    const reqId = req.id || req.RequirementID;
-                                                    const reqCode = req.RequirementCode || req.code || req.req_code || `Req #${reqId}`;
+                                                    const reqId = req.id || req.requirementid;
+                                                    const reqCode = req.requirementcode || req.code || req.req_code || `Req #${reqId}`;
                                                     const reqTitle = req.RequirementTitle || req.Title || req.title || req.RequirementName || req.description || req.Description || '';
 
                                                     return (
@@ -491,7 +491,7 @@ export default function AccreditationMasterList({
 
                 return (
                   <div
-                    key={office.OfficeID || office.id}
+                    key={office.officeid || office.id}
                     onClick={() => onSelectOffice && onSelectOffice(office)}
                     className="p-3.5 rounded-xl border border-slate-200 bg-white app-card-hover cursor-pointer group"
                   >
@@ -508,7 +508,7 @@ export default function AccreditationMasterList({
 
                         <div>
                           <h4 className="text-xs font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
-                            {office.OfficeName || office.office_name}
+                            {office.officename || office.officename}
                           </h4>
                           <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
                             {office.department_name || office.DepartmentCode || (isAcademic ? 'Academic' : 'Institution-wide')}
@@ -532,11 +532,11 @@ export default function AccreditationMasterList({
                     <div className="grid grid-cols-2 gap-2 mt-3 pt-2.5 border-t border-slate-100 text-[10px] text-slate-500">
                       <div>
                         <span className="block font-semibold uppercase text-[9px] text-slate-400">CREATED</span>
-                        <span>{formatDateString(office.created_at || office.CreatedAt)}</span>
+                        <span>{formatDateString(office.createdat || office.createdat)}</span>
                       </div>
                       <div>
                         <span className="block font-semibold uppercase text-[9px] text-slate-400">UPDATED</span>
-                        <span>{formatDateString(office.updated_at || office.UpdatedAt)}</span>
+                        <span>{formatDateString(office.updatedat || office.updatedat)}</span>
                       </div>
                     </div>
 

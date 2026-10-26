@@ -6,13 +6,13 @@ import { Loader2 } from 'lucide-react';
  * Status values: 3 = Not Complied, 4 = Partially Complied, 5 = Complied
  */
 export default function StatusSlider({
-  statusId = 3,
+  statusid = 3,
   onChange,
   disabled = false,
   updating = false,
   className = ''
 }) {
-  const currentStatus = Number(statusId) || 3;
+  const currentStatus = Number(statusid) || 3;
   const [internalStatus, setInternalStatus] = useState(currentStatus);
   const [isDragging, setIsDragging] = useState(false);
   const trackRef = useRef(null);

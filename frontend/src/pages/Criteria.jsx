@@ -40,7 +40,7 @@ export default function Criteria() {
     const criteriaPRef = useRef();
 
     // Default to admin (show features) until we confirm otherwise
-    const isAdmin = !!(currentUser && (currentUser.RoleName === 'admin' || currentUser.RoleID === 1));
+    const isAdmin = !!(currentUser && (currentUser.rolename === 'admin' || currentUser.roleid === 1));
 
     // Fetch current user on mount
     useEffect(() => {
@@ -92,10 +92,10 @@ export default function Criteria() {
                     setEvents(res.data);
                     if (res.data.length > 0) {
                         const savedId = localStorage.getItem('acc_selected_event_id') || localStorage.getItem('selected_audit_event_id');
-                        const valid = res.data.find(e => String(e.EventID || e.id) === String(savedId));
+                        const valid = res.data.find(e => String(e.eventid || e.id) === String(savedId));
                         const target = valid || res.data[0];
-                        setSelectedEventType(target.EventName || target.eventType);
-                        setSelectedEventId(target.EventID || target.id);
+                        setSelectedEventType(target.eventname || target.eventType);
+                        setSelectedEventId(target.eventid || target.id);
                     }
                 } else {
                     setEvents([]);
@@ -190,10 +190,10 @@ export default function Criteria() {
             setSelectedIds([]);
             setDeleteMode(false);
             if (criteriaPRef.current?.refresh) criteriaPRef.current.refresh();
-            await showAlert('Deleted successfully!');
+            await showAlert('Sub area(s) deleted successfully!');
         } catch (err) {
             console.error('Failed to delete criteria', err);
-            await showAlert('Delete failed');
+            await showAlert('Failed to delete sub area(s).');
         }
     };
 
@@ -226,13 +226,13 @@ export default function Criteria() {
                                 size="md"
                                 value={selectedEventId || ''}
                                 onChange={(val) => {
-                                    const selected = events.find(ev => String(ev.EventID) === val);
+                                    const selected = events.find(ev => String(ev.eventid) === val);
                                     setSelectedEventId(val);
-                                    setSelectedEventType(selected?.EventName || '');
+                                    setSelectedEventType(selected?.eventname || '');
                                 }}
                                 options={events.map(event => ({
-                                    value: String(event.EventID),
-                                    label: event.EventName || event.eventType,
+                                    value: String(event.eventid),
+                                    label: event.eventname || event.eventType,
                                 }))}
                             />
                         </div>
@@ -294,7 +294,7 @@ export default function Criteria() {
                 <CriteriaP
                     ref={criteriaPRef}
                     searchTerm={searchTerm}
-                    eventId={selectedEventId}
+                    eventid={selectedEventId}
                     deleteMode={deleteMode}
                     selectedIds={selectedIds}
                     onSelectionChange={(count, ids) => {
@@ -310,9 +310,10 @@ export default function Criteria() {
                 <AddCriteriaModal
                     isOpen={isModalOpen}
                     onClose={() => setIsModalOpen(false)}
-                    onSuccess={() => {
+                    onSuccess={async () => {
                         setIsModalOpen(false);
                         if (criteriaPRef.current?.refresh) criteriaPRef.current.refresh();
+                        await showAlert('Sub area added successfully!');
                     }}
                 />
             )}
@@ -323,11 +324,23 @@ export default function Criteria() {
                     visible={isEditCriteriaModalOpen}
                     onClose={() => setIsEditCriteriaModalOpen(false)}
                     event={editCriteria}
-                    onSave={(updated) => {
-                        setIsEditCriteriaModalOpen(false);
-                        if (criteriaPRef.current?.refresh) criteriaPRef.current.refresh();
+                    onSave={async (updated) => {
+                        try {
+                            const { criteriaAPI } = await import('../utils/api');
+                            const response = await criteriaAPI.updateCriteria(updated.criteriaid, updated);
+                            if (response?.success) {
+                                setIsEditCriteriaModalOpen(false);
+                                if (criteriaPRef.current?.refresh) criteriaPRef.current.refresh();
+                                await showAlert('Sub area updated successfully!');
+                            } else {
+                                await showAlert(response?.message || 'Failed to update sub area');
+                            }
+                        } catch (err) {
+                            console.error('Error updating sub area:', err);
+                            await showAlert('Failed to update sub area');
+                        }
                     }}
-                    userRole={currentUser?.RoleID}
+                    userRole={currentUser?.roleid}
                 />
             )}
 

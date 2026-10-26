@@ -23,7 +23,7 @@ const multerStorage = multer.diskStorage({
 const upload = multer({ storage: multerStorage });
 
 // upload profile
-router.put('/:id', auth, upload.single('profilePic'), userController.updateUser);
+router.put('/:id', auth, upload.single('profilepic'), userController.updateUser);
 
 // Update approval status (admin only)
 router.put('/:id/approval-status', auth, requireAdmin, userController.updateApprovalStatus);
@@ -35,6 +35,8 @@ router.get("/me", auth, userController.getLoggedInUser);
 router.use(express.json());
 
 // User authentication routes
+router.post('/change-password/send-otp', auth, userController.sendChangePasswordOtp);
+router.post('/change-password/verify-and-change', auth, userController.verifyAndChangePassword);
 router.post('/registration-invite', auth, userController.createRegistrationInvite);
 router.get('/registration-invite/:token', userController.validateRegistrationInvite);
 router.post('/send-registration-otp', userController.sendRegistrationOtp);

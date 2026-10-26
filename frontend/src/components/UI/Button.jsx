@@ -49,6 +49,6 @@ const Button = forwardRef(({
   );
 });
 
-Button.displayName = 'Button';
+Button.displayname = 'Button';
 
 export default Button;

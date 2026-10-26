@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const db = require('../db');
 const { recordLog } = require('./logsController');
 const loginRateLimiter = require('../middleware/loginRateLimiter');
@@ -8,12 +10,32 @@ const normalizeEmail = (email) => String(email || '').trim().toLowerCase();
 const COMPANY_EMAIL_DOMAIN = '@lccbonline.edu.ph';
 const isCompanyEmail = (email) => normalizeEmail(email).endsWith(COMPANY_EMAIL_DOMAIN);
 const pendingRegistrationStore = new Map();
+const pendingPasswordChangeStore = new Map();
 const OTP_TTL_MS = 10 * 60 * 1000;
 const INVITE_TTL_MS = 10 * 60 * 1000;
 const JWT_SECRET = process.env.JWT_SECRET || 'MY_SECRET_KEY';
 const INVITE_TOKEN_SECRET = process.env.INVITE_TOKEN_SECRET || JWT_SECRET;
 
 const hashValue = (value) => crypto.createHash('sha256').update(String(value)).digest('hex');
+
+const cleanExpiredPasswordChangeRequests = () => {
+  const now = Date.now();
+  for (const [userid, entry] of pendingPasswordChangeStore.entries()) {
+    if (!entry || entry.expiresAt <= now) {
+      pendingPasswordChangeStore.delete(userid);
+    }
+  }
+};
+
+const maskEmail = (email) => {
+  if (!email || typeof email !== 'string') return '';
+  const [localPart, domain] = email.split('@');
+  if (!domain) return email;
+  if (localPart.length <= 2) {
+    return `${localPart[0]}***@${domain}`;
+  }
+  return `${localPart[0]}***${localPart[localPart.length - 1]}@${domain}`;
+};
 
 const verifyInviteTokenPayload = (token) => {
   if (!token) {
@@ -26,12 +48,12 @@ const verifyInviteTokenPayload = (token) => {
       return { success: false, status: 400, message: 'Invalid invite link' };
     }
 
-    const roleId = Number.parseInt(decoded.roleId, 10) || 2;
+    const roleid = Number.parseInt(decoded.roleid, 10) || 2;
     return {
       success: true,
       invite: {
         email: decoded.email ? normalizeEmail(decoded.email) : null,
-        roleId,
+        roleid,
         allowAnyEmail: Boolean(decoded.allowAnyEmail),
         expiresAt: decoded.exp ? decoded.exp * 1000 : Date.now() + INVITE_TTL_MS,
       },
@@ -54,13 +76,13 @@ const cleanExpiredPendingRegistrations = () => {
 };
 
 const createPendingRegistration = async (registrationData) => {
-  const firstName = String(registrationData.firstName || '').trim();
-  const middleInitial = String(registrationData.middleInitial || '').trim();
-  const lastName = String(registrationData.lastName || '').trim();
+  const firstname = String(registrationData.firstname || '').trim();
+  const middleinitial = String(registrationData.middleinitial || '').trim();
+  const lastname = String(registrationData.lastname || '').trim();
   const password = String(registrationData.password || '');
   const email = normalizeEmail(registrationData.email);
   const inviteToken = String(registrationData.inviteToken || '').trim();
-  let roleId = Number.parseInt(registrationData.roleId, 10) || 2;
+  let roleid = Number.parseInt(registrationData.roleid, 10) || 2;
   let allowAnyEmail = false;
 
   if (inviteToken) {
@@ -72,20 +94,20 @@ const createPendingRegistration = async (registrationData) => {
       return { success: false, status: 403, message: 'This invite link is for a different email address' };
     }
 
-    roleId = invite.roleId;
+    roleid = invite.roleid;
     if (invite.allowAnyEmail) allowAnyEmail = true;
   }
 
-  if (!firstName || !lastName || !email || !password) {
+  if (!firstname || !lastname || !email || !password) {
     return { success: false, status: 400, message: 'First name, last name, email, and password are required' };
   }
 
-  const isAuditor = Number(roleId) === 4;
+  const isAuditor = Number(roleid) === 4;
   if (!isCompanyEmail(email) && !isAuditor && !allowAnyEmail) {
     return { success: false, status: 400, message: `Only ${COMPANY_EMAIL_DOMAIN} email addresses can register` };
   }
 
-  const [existingUsers] = await db.query('SELECT UserID FROM users WHERE Email = ?', [email]);
+  const [existingUsers] = await db.query('SELECT userid FROM users WHERE Email = ?', [email]);
   if (existingUsers.length > 0) {
     return { success: false, status: 400, message: 'Email already registered' };
   }
@@ -93,12 +115,12 @@ const createPendingRegistration = async (registrationData) => {
   const otp = crypto.randomInt(100000, 1000000).toString();
   pendingRegistrationStore.set(email, {
     registrationData: {
-      firstName,
-      middleInitial: middleInitial || null,
-      lastName,
+      firstname,
+      middleinitial: middleinitial || null,
+      lastname,
       email,
-      passwordHash: crypto.createHash('md5').update(password).digest('hex'),
-      roleId,
+      passwordhash: crypto.createHash('md5').update(password).digest('hex'),
+      roleid,
       inviteToken: inviteToken || null,
     },
     otpHash: hashValue(otp),
@@ -106,7 +128,7 @@ const createPendingRegistration = async (registrationData) => {
     expiresAt: Date.now() + OTP_TTL_MS,
   });
 
-  return { success: true, email, otp, roleId };
+  return { success: true, email, otp, roleid };
 };
 
 const generateOtpEmailHtml = (otp) => {
@@ -127,19 +149,17 @@ const generateOtpEmailHtml = (otp) => {
           
           <!-- Header Banner -->
           <tr>
-            <td style="background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%); padding: 32px 30px; text-align: center;">
+            <td style="background-color: #ffffff; padding: 32px 30px 24px 30px; text-align: center; border-bottom: 1px solid #e2e8f0;">
               <table role="presentation" align="center" cellspacing="0" cellpadding="0">
                 <tr>
-                  <td align="center" style="padding-bottom: 10px;">
-                    <div style="display: inline-block; width: 44px; height: 44px; background-color: rgba(255, 255, 255, 0.2); border-radius: 12px; line-height: 44px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.35);">
-                      <span style="font-size: 22px; color: #ffffff; font-weight: bold;">&#10003;</span>
-                    </div>
+                  <td align="center" style="padding-bottom: 12px;">
+                    <img src="cid:auditrack-logo" alt="Auditrack Logo" width="58" height="58" style="display: block; margin: 0 auto; border-radius: 12px; object-fit: contain;" />
                   </td>
                 </tr>
                 <tr>
                   <td align="center">
-                    <h1 style="margin: 0; font-size: 24px; font-weight: 800; color: #ffffff; letter-spacing: -0.3px;">Auditrack</h1>
-                    <p style="margin: 4px 0 0 0; font-size: 11px; color: #bfdbfe; font-weight: 600; text-transform: uppercase; letter-spacing: 1.2px;">Compliance & Accreditation Portal</p>
+                    <h1 style="margin: 0; font-size: 24px; font-weight: 800; color: #1e40af; letter-spacing: -0.3px;">Auditrack</h1>
+                    <p style="margin: 4px 0 0 0; font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 1.2px;">Compliance & Accreditation Portal</p>
                   </td>
                 </tr>
               </table>
@@ -208,7 +228,104 @@ const generateOtpEmailHtml = (otp) => {
   `.trim();
 };
 
-const sendOtpEmail = async (email, otp) => {
+const generatePasswordChangeOtpEmailHtml = (otp, userName) => {
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auditrack - Password Change Verification Code</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #334155;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f1f5f9; padding: 40px 15px;">
+    <tr>
+      <td align="center">
+        <!-- Main Container Card -->
+        <table role="presentation" width="100%" style="max-width: 500px; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.07); border: 1px solid #e2e8f0; overflow: hidden;" cellspacing="0" cellpadding="0">
+          
+          <!-- Header Banner -->
+          <tr>
+            <td style="background-color: #ffffff; padding: 32px 30px 24px 30px; text-align: center; border-bottom: 1px solid #e2e8f0;">
+              <table role="presentation" align="center" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td align="center" style="padding-bottom: 12px;">
+                    <img src="cid:auditrack-logo" alt="Auditrack Logo" width="58" height="58" style="display: block; margin: 0 auto; border-radius: 12px; object-fit: contain;" />
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center">
+                    <h1 style="margin: 0; font-size: 24px; font-weight: 800; color: #1e40af; letter-spacing: -0.3px;">Auditrack</h1>
+                    <p style="margin: 4px 0 0 0; font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 1.2px;">Account Security</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Main Body -->
+          <tr>
+            <td style="padding: 36px 32px 28px 32px;">
+              <h2 style="margin: 0 0 10px 0; font-size: 18px; font-weight: 700; color: #0f172a; text-align: center;">
+                Password Change Verification
+              </h2>
+              <p style="margin: 0 0 24px 0; font-size: 13px; line-height: 1.6; color: #64748b; text-align: center;">
+                Hello${userName ? ` <strong>${userName}</strong>` : ''}, we received a request to change your account password. Enter the 6-digit one-time PIN below to verify your identity.
+              </p>
+
+              <!-- Emphasized OTP Display Box -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin: 0 0 24px 0;">
+                <tr>
+                  <td align="center">
+                    <div style="display: inline-block; width: 100%; max-width: 360px; background: linear-gradient(180deg, #f8fafc 0%, #eff6ff 100%); border: 2px dashed #93c5fd; border-radius: 14px; padding: 18px 12px; text-align: center;">
+                      <div style="font-family: 'Courier New', Consolas, Menlo, Monaco, monospace; font-size: 38px; font-weight: 900; letter-spacing: 10px; color: #1e40af; padding: 4px 0; margin-left: 10px;">
+                        ${otp}
+                      </div>
+                      <div style="margin-top: 10px; display: inline-block; background-color: #dbeafe; color: #1e40af; font-size: 11px; font-weight: 700; padding: 3px 12px; border-radius: 20px;">
+                        &#9201; Valid for 10 minutes
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Security Notice -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #fef2f2; border-radius: 10px; border-left: 3px solid #ef4444; padding: 12px 14px; margin-bottom: 22px;">
+                <tr>
+                  <td style="font-size: 12px; color: #991b1b; line-height: 1.5;">
+                    <strong style="color: #7f1d1d;">Security Warning:</strong> If you did NOT request to change your password, please ignore this email or notify your system administrator immediately.
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin: 0; font-size: 11px; color: #94a3b8; text-align: center; line-height: 1.5;">
+                Never share this verification code with anyone. Auditrack staff will never ask for your code.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f8fafc; padding: 20px 30px; border-top: 1px solid #e2e8f0; text-align: center;">
+              <p style="margin: 0 0 3px 0; font-size: 11px; color: #64748b; font-weight: 600;">
+                Auditrack Compliance Management System
+              </p>
+              <p style="margin: 0; font-size: 10px; color: #94a3b8;">
+                La Consolacion College Bacolod • Automated Security Message
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+};
+
+const sendOtpEmail = async (email, otp, customSubject, customHtml, customText) => {
   let nodemailer;
   try {
     nodemailer = require('nodemailer');
@@ -234,13 +351,29 @@ const sendOtpEmail = async (email, otp) => {
     tls: { rejectUnauthorized: false },
   });
 
+  const logoCandidates = [
+    path.join(__dirname, '../assets/logo.png'),
+    path.join(__dirname, '../../frontend/public/logo.png'),
+    path.join(__dirname, '../../../Compliance-audit-mobile/assets/images/logo.png'),
+  ];
+  const logoPath = logoCandidates.find((p) => fs.existsSync(p));
+  const attachments = [];
+  if (logoPath) {
+    attachments.push({
+      filename: 'logo.png',
+      path: logoPath,
+      cid: 'auditrack-logo',
+    });
+  }
+
   try {
     await transporter.sendMail({
       from: process.env.SMTP_FROM || `"Auditrack Compliance" <${user}>`,
       to: email,
-      subject: `${otp} is your Auditrack verification code`,
-      text: `Your Auditrack registration one-time PIN is ${otp}. It expires in 10 minutes.`,
-      html: generateOtpEmailHtml(otp),
+      subject: customSubject || `${otp} is your Auditrack verification code`,
+      text: customText || `Your Auditrack registration one-time PIN is ${otp}. It expires in 10 minutes.`,
+      html: customHtml || generateOtpEmailHtml(otp),
+      attachments,
     });
     return { sent: true };
   } catch (error) {
@@ -262,7 +395,7 @@ exports.sendRegistrationOtp = async (req, res) => {
   try {
     const body = req.body || {};
     const email = normalizeEmail(body.email);
-    const hasRegistrationPayload = Boolean(body.firstName || body.lastName || body.password);
+    const hasRegistrationPayload = Boolean(body.firstname || body.lastname || body.password);
 
     cleanExpiredPendingRegistrations();
 
@@ -282,7 +415,7 @@ exports.sendRegistrationOtp = async (req, res) => {
       }
     }
 
-    const isAuditor = Number(body.roleId) === 4;
+    const isAuditor = Number(body.roleid) === 4;
     if (!isCompanyEmail(email) && !isAuditor && !allowAnyEmail && !pendingRegistrationStore.has(email)) {
       return res.status(400).json({
         success: false,
@@ -400,7 +533,7 @@ exports.verifyRegistrationOtp = async (req, res) => {
       }
     }
 
-    const [existingUsers] = await db.query('SELECT UserID FROM users WHERE Email = ?', [email]);
+    const [existingUsers] = await db.query('SELECT userid FROM users WHERE Email = ?', [email]);
     if (existingUsers.length > 0) {
       pendingRegistrationStore.delete(email);
       return res.status(400).json({ success: false, message: 'Email already registered' });
@@ -409,28 +542,28 @@ exports.verifyRegistrationOtp = async (req, res) => {
     const isInvited = Boolean(registrationData.inviteToken);
     const initialApprovalStatus = isInvited ? 'approved' : 'pending';
 
-    const roleId = Number(registrationData.roleId) || 2;
+    const roleid = Number(registrationData.roleid) || 2;
     const [result] = await db.query(
-      'INSERT INTO users (FirstName, MiddleInitial, LastName, Email, PasswordHash, RoleID, approval_status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO users (firstname, middleinitial, lastname, Email, passwordhash, roleid, approvalstatus) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [
-        registrationData.firstName,
-        registrationData.middleInitial || null,
-        registrationData.lastName,
+        registrationData.firstname,
+        registrationData.middleinitial || null,
+        registrationData.lastname,
         registrationData.email,
-        registrationData.passwordHash,
-        roleId,
+        registrationData.passwordhash,
+        roleid,
         initialApprovalStatus,
       ]
     );
 
     const insertedUserId = result.insertId;
 
-    // If registered as Personnel (RoleID 3) and approved, auto-create headofoffice entry
-    if (roleId === 3 && initialApprovalStatus === 'approved') {
+    // If registered as Personnel (roleid 3) and approved, auto-create headofoffice entry
+    if (roleid === 3 && initialApprovalStatus === 'approved') {
       try {
-        const [existingHead] = await db.query('SELECT HeadID FROM headofoffice WHERE UserID = ? LIMIT 1', [insertedUserId]);
+        const [existingHead] = await db.query('SELECT headid FROM headofoffice WHERE userid = ? LIMIT 1', [insertedUserId]);
         if (existingHead.length === 0) {
-          await db.query('INSERT INTO headofoffice (UserID, Position) VALUES (?, ?)', [insertedUserId, 'Personnel']);
+          await db.query('INSERT INTO headofoffice (userid, Position) VALUES (?, ?)', [insertedUserId, 'Personnel']);
         }
       } catch (headErr) {
         console.error('Failed to create headofoffice entry for new personnel:', headErr);
@@ -447,12 +580,214 @@ exports.verifyRegistrationOtp = async (req, res) => {
       message: isInvited
         ? 'Account registered and verified successfully. You can now log in.'
         : 'Email verified. Your account is pending approval.',
-      userId: result.insertId,
+      userid: result.insertId,
       email,
     });
   } catch (error) {
     console.error('Verify registration OTP error:', error?.stack || error);
     res.status(500).json({ success: false, message: error?.message || 'Failed to verify one-time PIN' });
+  }
+};
+
+// ===============================
+// CHANGE PASSWORD WITH OTP
+// ===============================
+exports.sendChangePasswordOtp = async (req, res) => {
+  try {
+    cleanExpiredPasswordChangeRequests();
+    const userid = req.user?.userid;
+    if (!userid) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    const { currentPassword } = req.body || {};
+    if (!currentPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please enter your current password to verify your identity before requesting an OTP code.',
+      });
+    }
+
+    const [users] = await db.query(
+      'SELECT userid, firstname, lastname, email, passwordhash FROM users WHERE userid = ?',
+      [userid]
+    );
+
+    if (!users || users.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const user = users[0];
+    const currentHash = crypto.createHash('md5').update(String(currentPassword)).digest('hex');
+    const dbHash = String(user.passwordhash || user.PasswordHash || '');
+    if (dbHash !== currentHash) {
+      return res.status(400).json({
+        success: false,
+        message: 'Current password is incorrect. Please enter your valid current password.',
+      });
+    }
+
+    const email = normalizeEmail(user.Email || user.email);
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'No registered email address found for this account' });
+    }
+
+    // Cooldown check: prevent requesting more than once every 45 seconds
+    const existing = pendingPasswordChangeStore.get(userid);
+    if (existing && existing.requestedAt && (Date.now() - existing.requestedAt < 45000)) {
+      const waitSeconds = Math.ceil((45000 - (Date.now() - existing.requestedAt)) / 1000);
+      return res.status(429).json({
+        success: false,
+        message: `Please wait ${waitSeconds}s before requesting a new verification code.`,
+        waitSeconds,
+      });
+    }
+
+    const otp = crypto.randomInt(100000, 1000000).toString();
+    const fullName = `${user.firstname || ''} ${user.lastname || ''}`.trim() || 'User';
+
+    pendingPasswordChangeStore.set(userid, {
+      otpHash: hashValue(otp),
+      email,
+      attempts: 0,
+      requestedAt: Date.now(),
+      expiresAt: Date.now() + OTP_TTL_MS,
+    });
+
+    const subject = `${otp} is your Auditrack password change verification code`;
+    const htmlContent = generatePasswordChangeOtpEmailHtml(otp, fullName);
+    const textContent = `Your Auditrack password change verification code is ${otp}. It expires in 10 minutes.`;
+
+    const otpResult = await sendOtpEmail(email, otp, subject, htmlContent, textContent);
+    if (!otpResult.sent) {
+      pendingPasswordChangeStore.delete(userid);
+      return res.status(502).json({
+        success: false,
+        message: otpResult.reason ? `Failed to send verification email: ${otpResult.reason}` : 'Failed to send verification code email.',
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Verification code sent to ${maskEmail(email)}.`,
+      maskedEmail: maskEmail(email),
+      cooldownSeconds: 45,
+    });
+  } catch (error) {
+    console.error('Send change password OTP error:', error);
+    res.status(500).json({
+      success: false,
+      message: error?.message || 'Failed to send verification code',
+    });
+  }
+};
+
+exports.verifyAndChangePassword = async (req, res) => {
+  try {
+    cleanExpiredPasswordChangeRequests();
+    const userid = req.user?.userid;
+    if (!userid) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    const { currentPassword, newPassword, otp } = req.body || {};
+
+    if (!currentPassword || !newPassword || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: 'Current password, new password, and verification code are required.',
+      });
+    }
+
+    const cleanOtp = String(otp).trim();
+    if (cleanOtp.length !== 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Verification code must be 6 digits.',
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password must be at least 6 characters long.',
+      });
+    }
+
+    if (currentPassword === newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password must be different from your current password.',
+      });
+    }
+
+    // 1. Verify OTP
+    const pending = pendingPasswordChangeStore.get(userid);
+    if (!pending || pending.expiresAt <= Date.now()) {
+      pendingPasswordChangeStore.delete(userid);
+      return res.status(400).json({
+        success: false,
+        message: 'Verification code expired or not requested. Please request a new code.',
+      });
+    }
+
+    if (pending.attempts >= 5) {
+      pendingPasswordChangeStore.delete(userid);
+      return res.status(429).json({
+        success: false,
+        message: 'Too many incorrect verification attempts. Please request a new code.',
+      });
+    }
+
+    if (pending.otpHash !== hashValue(cleanOtp)) {
+      pending.attempts += 1;
+      pendingPasswordChangeStore.set(userid, pending);
+      return res.status(400).json({
+        success: false,
+        message: 'Incorrect verification code. Please check your email and try again.',
+      });
+    }
+
+    // 2. Verify current password
+    const [users] = await db.query(
+      'SELECT userid, passwordhash, Email FROM users WHERE userid = ?',
+      [userid]
+    );
+
+    if (!users || users.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    const currentHash = crypto.createHash('md5').update(currentPassword).digest('hex');
+    if (users[0].passwordhash !== currentHash) {
+      return res.status(400).json({
+        success: false,
+        message: 'Current password is incorrect.',
+      });
+    }
+
+    // 3. Update password in database
+    const newHash = crypto.createHash('md5').update(newPassword).digest('hex');
+    await db.query('UPDATE users SET passwordhash = ? WHERE userid = ?', [newHash, userid]);
+
+    // 4. Remove OTP store entry
+    pendingPasswordChangeStore.delete(userid);
+
+    // 5. Audit log
+    try {
+      recordLog(userid, 'PasswordChanged', 'User changed account password with OTP verification');
+    } catch (e) {}
+
+    return res.json({
+      success: true,
+      message: 'Password successfully updated! You can use your new password next time you sign in.',
+    });
+  } catch (error) {
+    console.error('Verify and change password error:', error);
+    res.status(500).json({
+      success: false,
+      message: error?.message || 'Failed to update password.',
+    });
   }
 };
 
@@ -463,10 +798,10 @@ exports.registerUser = async (req, res) => {
 exports.createRegistrationInvite = async (req, res) => {
   try {
     const email = normalizeEmail(req.body?.email);
-    const roleId = Number.parseInt(req.body?.roleId, 10) || 3;
+    const roleid = Number.parseInt(req.body?.roleid, 10) || 3;
     const allowAnyEmail = Boolean(req.body?.allowAnyEmail);
 
-    if (email && !isCompanyEmail(email) && roleId !== 4 && !allowAnyEmail) {
+    if (email && !isCompanyEmail(email) && roleid !== 4 && !allowAnyEmail) {
       return res.status(400).json({
         success: false,
         message: `Only ${COMPANY_EMAIL_DOMAIN} email addresses can register`,
@@ -475,9 +810,9 @@ exports.createRegistrationInvite = async (req, res) => {
 
     const payload = {
       type: 'registration_invite',
-      roleId,
+      roleid,
       allowAnyEmail,
-      createdBy: req.user?.userId || null,
+      createdBy: req.user?.userid || null,
     };
 
     if (email) payload.email = email;
@@ -487,7 +822,7 @@ exports.createRegistrationInvite = async (req, res) => {
     const requestOrigin = req.get('origin');
     const fallbackFrontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     const frontendUrl = String(requestOrigin || fallbackFrontendUrl).replace(/\/$/, '');
-    const registerPath = roleId === 4 ? '/register-auditor' : '/register';
+    const registerPath = roleid === 4 ? '/register-auditor' : '/register';
     const inviteUrl = `${frontendUrl}${registerPath}?invite=${encodeURIComponent(token)}`;
 
     res.json({
@@ -496,7 +831,7 @@ exports.createRegistrationInvite = async (req, res) => {
       token,
       allowAnyEmail,
       expiresAt: decoded.exp ? decoded.exp * 1000 : Date.now() + INVITE_TTL_MS,
-      roleId,
+      roleid,
       email: email || null,
     });
   } catch (error) {
@@ -561,7 +896,7 @@ exports.loginUser = async (req, res) => {
       .digest("hex");
 
     const [users] = await db.query(
-      "SELECT UserID, FirstName, MiddleInitial, LastName, Email, RoleID, ProfilePic, approval_status FROM users WHERE Email = ? AND PasswordHash = ?",
+      "SELECT userid, firstname, middleinitial, lastname, Email, roleid, profilepic, approvalstatus FROM users WHERE Email = ? AND passwordhash = ?",
       [email, hashedPassword]
     );
 
@@ -586,30 +921,30 @@ exports.loginUser = async (req, res) => {
 
     const user = users[0];
 
-    if (user.approval_status === 'pending') {
+    if (user.approvalstatus === 'pending') {
       return res.status(403).json({
         success: false,
         message: "Your account is pending approval. Please wait for admin approval.",
-        approvalStatus: 'pending'
+        approvalstatus: 'pending'
       });
     }
 
-    if (user.approval_status === 'denied') {
+    if (user.approvalstatus === 'denied') {
       return res.status(403).json({
         success: false,
         message: "Your account has been denied. Please contact the administrator.",
-        approvalStatus: 'denied'
+        approvalstatus: 'denied'
       });
     }
 
     const token = jwt.sign(
-      { userId: user.UserID, roleId: user.RoleID },
+      { userid: user.userid, roleid: user.roleid },
       "MY_SECRET_KEY",
       { expiresIn: "8h" }
     );
 
-    if (user && user.UserID) {
-      try { recordLog(user.UserID, 'Login', `User ${user.Email} logged in`); } catch (e) {}
+    if (user && user.userid) {
+      try { recordLog(user.userid, 'Login', `User ${user.Email} logged in`); } catch (e) {}
     }
 
     try { loginRateLimiter.reset(email, req.ip); } catch (e) {}
@@ -631,9 +966,9 @@ exports.loginUser = async (req, res) => {
 
 exports.logoutUser = async (req, res) => {
   try {
-    const userId = req.user?.userId || null;
-    if (userId) {
-      try { recordLog(userId, 'Logout', `User ${userId} logged out`); } catch (e) {}
+    const userid = req.user?.userid || null;
+    if (userid) {
+      try { recordLog(userid, 'Logout', `User ${userid} logged out`); } catch (e) {}
     }
     res.json({ success: true, message: 'Logout successful' });
   } catch (error) {
@@ -685,7 +1020,7 @@ exports.getCurrentUser = async (req, res) => {
     }
 
     const [users] = await db.query(
-      "SELECT u.UserID, u.FirstName, u.MiddleInitial, u.LastName, u.Email, u.RoleID, u.ProfilePic, u.approval_status, r.RoleName FROM users u LEFT JOIN roles r ON u.RoleID = r.RoleID WHERE u.Email = ?",
+      "SELECT u.userid, u.firstname, u.middleinitial, u.lastname, u.Email, u.roleid, u.profilepic, u.approvalstatus, r.rolename FROM users u LEFT JOIN roles r ON u.roleid = r.roleid WHERE u.Email = ?",
       [email]
     );
 
@@ -699,7 +1034,7 @@ exports.getCurrentUser = async (req, res) => {
     const user = users[0];
     const userWithFullName = {
       ...user,
-      FullName: `${user.FirstName}${user.MiddleInitial ? " " + user.MiddleInitial + "." : ""} ${user.LastName}`,
+      FullName: `${user.firstname}${user.middleinitial ? " " + user.middleinitial + "." : ""} ${user.lastname}`,
     };
 
     res.json({
@@ -722,59 +1057,59 @@ exports.getUsers = async (req, res) => {
   try {
     const [users] = await db.query(
       `SELECT
-         u.UserID,
-         u.FirstName,
-         u.MiddleInitial,
-         u.LastName,
+         u.userid,
+         u.firstname,
+         u.middleinitial,
+         u.lastname,
          u.Email,
-         u.RoleID,
-         u.ProfilePic,
-         u.approval_status,
-         r.RoleName,
+         u.roleid,
+         u.profilepic,
+         u.approvalstatus,
+         r.rolename,
          reqOff.AssignedOffices AS RequirementAssignedOffices,
          perOff.AssignedOffices AS PersonnelAssignedOffices,
          audAreas.AssignedAreas AS assignedArea
        FROM users u
-       LEFT JOIN roles r ON u.RoleID = r.RoleID
+       LEFT JOIN roles r ON u.roleid = r.roleid
        LEFT JOIN (
          SELECT
-           rua.UserID,
-           string_agg(DISTINCT o.OfficeName, '||' ORDER BY o.OfficeName) AS AssignedOffices
-         FROM requirement_user_assignments rua
-         LEFT JOIN offices o ON o.OfficeID = rua.OfficeID
-         GROUP BY rua.UserID
-       ) reqOff ON reqOff.UserID = u.UserID
+           rua.userid,
+           string_agg(DISTINCT o.officename, '||' ORDER BY o.officename) AS AssignedOffices
+         FROM requirementuserassignments rua
+         LEFT JOIN offices o ON o.officeid = rua.officeid
+         GROUP BY rua.userid
+       ) reqOff ON reqOff.userid = u.userid
        LEFT JOIN (
          SELECT
-           h.UserID,
-           string_agg(DISTINCT o.OfficeName, '||' ORDER BY o.OfficeName) AS AssignedOffices
+           h.userid,
+           string_agg(DISTINCT o.officename, '||' ORDER BY o.officename) AS AssignedOffices
          FROM headofoffice h
-         LEFT JOIN office_head_assignments oha ON oha.HeadID = h.HeadID
-         LEFT JOIN offices o ON o.OfficeID = oha.OfficeID
-         GROUP BY h.UserID
-       ) perOff ON perOff.UserID = u.UserID
+         LEFT JOIN officeheadassignments oha ON oha.headid = h.headid
+         LEFT JOIN offices o ON o.officeid = oha.officeid
+         GROUP BY h.userid
+       ) perOff ON perOff.userid = u.userid
        LEFT JOIN (
          SELECT
-           aaa.auditor_user_id AS UserID,
-           string_agg(DISTINCT CONCAT(ar.AreaCode, ': ', ar.AreaName), ', ' ORDER BY CONCAT(ar.AreaCode, ': ', ar.AreaName)) AS AssignedAreas
-         FROM auditor_area_assignments aaa
-         JOIN areas ar ON aaa.area_id = ar.AreaID
-         GROUP BY aaa.auditor_user_id
-       ) audAreas ON audAreas.UserID = u.UserID`
+           aaa.auditoruserid AS userid,
+           string_agg(DISTINCT CONCAT(ar.areacode, ': ', ar.areaname), ', ' ORDER BY CONCAT(ar.areacode, ': ', ar.areaname)) AS AssignedAreas
+         FROM auditorareaassignments aaa
+         JOIN areas ar ON aaa.areaid = ar.areaid
+         GROUP BY aaa.auditoruserid
+       ) audAreas ON audAreas.userid = u.userid`
     );
 
     const usersWithFullName = users.map((user) => {
-      const first = user.FirstName || user.firstname || '';
-      const middle = user.MiddleInitial || user.middleinitial ? ` ${user.MiddleInitial || user.middleinitial}.` : '';
-      const last = user.LastName || user.lastname || '';
+      const first = user.firstname || user.firstname || '';
+      const middle = user.middleinitial || user.middleinitial ? ` ${user.middleinitial || user.middleinitial}.` : '';
+      const last = user.lastname || user.lastname || '';
       const area = user.assignedArea || user.assignedarea || user.AssignedAreas || user.assignedareas || null;
 
       return {
         ...user,
-        UserID: user.UserID ?? user.userid ?? user.id,
-        FirstName: first,
-        MiddleInitial: user.MiddleInitial || user.middleinitial || null,
-        LastName: last,
+        userid: user.userid ?? user.userid ?? user.id,
+        firstname: first,
+        middleinitial: user.middleinitial || user.middleinitial || null,
+        lastname: last,
         FullName: `${first}${middle} ${last}`.trim() || 'Unknown',
         assignedArea: area,
         AssignedOffices: Array.from(
@@ -801,23 +1136,23 @@ exports.getUsers = async (req, res) => {
 
 exports.getLoggedInUser = async (req, res) => {
   try {
-    const userId = req.user.userId; // from decoded token
+    const userid = req.user.userid; // from decoded token
 
     const [rows] = await db.query(
-      `SELECT u.UserID, u.FirstName, u.MiddleInitial, u.LastName, u.Email, u.RoleID, u.ProfilePic, u.approval_status, r.RoleName,
+      `SELECT u.userid, u.firstname, u.middleinitial, u.lastname, u.Email, u.roleid, u.profilepic, u.approvalstatus, r.rolename,
               audAreas.AssignedAreas AS assignedArea
        FROM users u
-       LEFT JOIN roles r ON u.RoleID = r.RoleID
+       LEFT JOIN roles r ON u.roleid = r.roleid
        LEFT JOIN (
          SELECT
-           aaa.auditor_user_id AS UserID,
-           string_agg(DISTINCT CONCAT(ar.AreaCode, ': ', ar.AreaName), ', ' ORDER BY CONCAT(ar.AreaCode, ': ', ar.AreaName)) AS AssignedAreas
-         FROM auditor_area_assignments aaa
-         JOIN areas ar ON aaa.area_id = ar.AreaID
-         GROUP BY aaa.auditor_user_id
-       ) audAreas ON audAreas.UserID = u.UserID
-       WHERE u.UserID = ?`,
-      [userId]
+           aaa.auditoruserid AS userid,
+           string_agg(DISTINCT CONCAT(ar.areacode, ': ', ar.areaname), ', ' ORDER BY CONCAT(ar.areacode, ': ', ar.areaname)) AS AssignedAreas
+         FROM auditorareaassignments aaa
+         JOIN areas ar ON aaa.areaid = ar.areaid
+         GROUP BY aaa.auditoruserid
+       ) audAreas ON audAreas.userid = u.userid
+       WHERE u.userid = ?`,
+      [userid]
     );
 
     if (rows.length === 0) {
@@ -825,12 +1160,15 @@ exports.getLoggedInUser = async (req, res) => {
     }
 
     const row = rows[0];
+    const userEmail = row.Email || row.email || '';
     const userObj = {
       ...row,
-      UserID: row.UserID ?? row.userid ?? row.id,
-      FirstName: row.FirstName || row.firstname || '',
-      MiddleInitial: row.MiddleInitial || row.middleinitial || null,
-      LastName: row.LastName || row.lastname || '',
+      userid: row.userid ?? row.userid ?? row.id,
+      firstname: row.firstname || row.firstname || '',
+      middleinitial: row.middleinitial || row.middleinitial || null,
+      lastname: row.lastname || row.lastname || '',
+      Email: userEmail,
+      email: userEmail,
       assignedArea: row.assignedArea || row.assignedarea || row.AssignedAreas || row.assignedareas || null,
     };
 
@@ -850,15 +1188,29 @@ exports.getLoggedInUser = async (req, res) => {
 // ===============================
 exports.updateUser = async (req, res) => {
   try {
-    const userId = req.params.id;
-    const tokenUserId = req.user.userId;
+    const userid = req.params.id;
+    const tokenUserId = req.user.userid;
 
-    if (parseInt(userId) !== tokenUserId) {
+    if (parseInt(userid) !== tokenUserId) {
       return res.status(403).json({ success: false, message: "Not authorized" });
     }
 
-    const { FirstName, MiddleInitial, LastName, Email } = req.body;
-    let ProfilePic = req.file ? req.file.filename : req.body.ProfilePic || null;
+    const [existing] = await db.query(
+      "SELECT firstname, middleinitial, lastname, Email, profilepic FROM users WHERE userid = ?",
+      [userid]
+    );
+    if (!existing || existing.length === 0) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+    const current = existing[0];
+
+    const nextFirstName = req.body.firstname !== undefined && req.body.firstname !== '' ? req.body.firstname : current.firstname;
+    const nextMiddleInitial = req.body.middleinitial !== undefined ? req.body.middleinitial : current.middleinitial;
+    const nextLastName = req.body.lastname !== undefined && req.body.lastname !== '' ? req.body.lastname : current.lastname;
+    const nextEmail = req.body.Email || req.body.email || current.Email;
+    const nextProfilePic = req.file
+      ? req.file.filename
+      : (req.body.profilepic !== undefined ? req.body.profilepic : current.profilepic);
 
     if (req.file) {
       try {
@@ -870,17 +1222,13 @@ exports.updateUser = async (req, res) => {
     }
 
     const [result] = await db.query(
-      `UPDATE users SET FirstName = ?, MiddleInitial = ?, LastName = ?, Email = ?, ProfilePic = ? WHERE UserID = ?`,
-      [FirstName, MiddleInitial || null, LastName, Email, ProfilePic, userId]
+      `UPDATE users SET firstname = ?, middleinitial = ?, lastname = ?, Email = ?, profilepic = ? WHERE userid = ?`,
+      [nextFirstName, nextMiddleInitial || null, nextLastName, nextEmail, nextProfilePic, userid]
     );
 
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
-
     const [rows] = await db.query(
-      "SELECT UserID, FirstName, MiddleInitial, LastName, Email, RoleID, ProfilePic, approval_status FROM users WHERE UserID = ?",
-      [userId]
+      "SELECT userid, firstname, middleinitial, lastname, Email, roleid, profilepic, approvalstatus FROM users WHERE userid = ?",
+      [userid]
     );
 
     res.json({ success: true, user: rows[0] });
@@ -896,11 +1244,11 @@ exports.updateUser = async (req, res) => {
 // ===============================
 exports.updateApprovalStatus = async (req, res) => {
   try {
-    const userId = req.params.id;
-    const { approval_status } = req.body;
+    const userid = req.params.id;
+    const { approvalstatus } = req.body;
 
-    // Validate approval_status
-    if (!['approved', 'pending', 'denied'].includes(approval_status)) {
+    // Validate approvalstatus
+    if (!['approved', 'pending', 'denied'].includes(approvalstatus)) {
       return res.status(400).json({ 
         success: false, 
         message: "Invalid approval status. Must be 'approved', 'pending', or 'denied'" 
@@ -908,8 +1256,8 @@ exports.updateApprovalStatus = async (req, res) => {
     }
 
     const [result] = await db.query(
-      "UPDATE users SET approval_status = ? WHERE UserID = ?",
-      [approval_status, userId]
+      "UPDATE users SET approvalstatus = ? WHERE userid = ?",
+      [approvalstatus, userid]
     );
 
     if (result.affectedRows === 0) {
@@ -917,17 +1265,17 @@ exports.updateApprovalStatus = async (req, res) => {
     }
 
     const [rows] = await db.query(
-      "SELECT UserID, FirstName, MiddleInitial, LastName, Email, RoleID, ProfilePic, approval_status FROM users WHERE UserID = ?",
-      [userId]
+      "SELECT userid, firstname, middleinitial, lastname, Email, roleid, profilepic, approvalstatus FROM users WHERE userid = ?",
+      [userid]
     );
     // If the user was denied, remove their related records and delete the user
-    if (approval_status === 'denied') {
+    if (approvalstatus === 'denied') {
       try {
         // cleanup assignments and headofoffice entries
-        await db.query('DELETE FROM requirement_user_assignments WHERE UserID = ?', [userId]);
-        await db.query('DELETE FROM headofoffice WHERE UserID = ?', [userId]);
-        const [delResult] = await db.query('DELETE FROM users WHERE UserID = ?', [userId]);
-        try { recordLog(req.user.userId, 'UserDeniedDeleted', `User ${userId} denied and deleted`); } catch (e) {}
+        await db.query('DELETE FROM requirementuserassignments WHERE userid = ?', [userid]);
+        await db.query('DELETE FROM headofoffice WHERE userid = ?', [userid]);
+        const [delResult] = await db.query('DELETE FROM users WHERE userid = ?', [userid]);
+        try { recordLog(req.user.userid, 'UserDeniedDeleted', `User ${userid} denied and deleted`); } catch (e) {}
         return res.json({ success: true, message: `User denied and deleted`, deletedRows: delResult.affectedRows });
       } catch (cleanupErr) {
         console.error('Failed to cleanup/delete denied user:', cleanupErr);
@@ -937,11 +1285,11 @@ exports.updateApprovalStatus = async (req, res) => {
 
     res.json({ 
       success: true, 
-      message: `User approval status updated to ${approval_status}`,
+      message: `User approval status updated to ${approvalstatus}`,
       user: rows[0] 
     });
-    if (req.user && req.user.userId) {
-      try { recordLog(req.user.userId, 'UserApprovalUpdated', `User ${userId} approval set to ${approval_status}`); } catch (e) {}
+    if (req.user && req.user.userid) {
+      try { recordLog(req.user.userid, 'UserApprovalUpdated', `User ${userid} approval set to ${approvalstatus}`); } catch (e) {}
     }
   } catch (error) {
     console.error("Update approval status error:", error);
@@ -954,14 +1302,14 @@ exports.updateApprovalStatus = async (req, res) => {
 // ===============================
 exports.updateUserRole = async (req, res) => {
   try {
-    const userId = req.params.id;
-    const { roleId } = req.body;
+    const userid = req.params.id;
+    const { roleid } = req.body;
 
-    if (!userId) {
+    if (!userid) {
       return res.status(400).json({ success: false, message: "User ID is required" });
     }
 
-    if (!roleId || ![1, 2].includes(parseInt(roleId))) {
+    if (!roleid || ![1, 2].includes(parseInt(roleid))) {
       return res.status(400).json({ 
         success: false, 
         message: "Invalid role ID. Must be 1 (Admin) or 2 (User)" 
@@ -969,12 +1317,12 @@ exports.updateUserRole = async (req, res) => {
     }
 
     const [[existingUser]] = await db.query(
-      `SELECT u.UserID, u.FirstName, u.LastName, u.RoleID, r.RoleName
+      `SELECT u.userid, u.firstname, u.lastname, u.roleid, r.rolename
        FROM users u
-       LEFT JOIN roles r ON r.RoleID = u.RoleID
-       WHERE u.UserID = ?
+       LEFT JOIN roles r ON r.roleid = u.roleid
+       WHERE u.userid = ?
        LIMIT 1`,
-      [userId]
+      [userid]
     );
 
     if (!existingUser) {
@@ -982,32 +1330,32 @@ exports.updateUserRole = async (req, res) => {
     }
 
     const [result] = await db.query(
-      "UPDATE users SET RoleID = ? WHERE UserID = ?",
-      [roleId, userId]
+      "UPDATE users SET roleid = ? WHERE userid = ?",
+      [roleid, userid]
     );
 
     const [rows] = await db.query(
-      `SELECT u.UserID, u.FirstName, u.MiddleInitial, u.LastName, u.Email, u.RoleID, u.ProfilePic, u.approval_status, r.RoleName
+      `SELECT u.userid, u.firstname, u.middleinitial, u.lastname, u.Email, u.roleid, u.profilepic, u.approvalstatus, r.rolename
        FROM users u
-       LEFT JOIN roles r ON r.RoleID = u.RoleID
-       WHERE u.UserID = ?`,
-      [userId]
+       LEFT JOIN roles r ON r.roleid = u.roleid
+       WHERE u.userid = ?`,
+      [userid]
     );
 
     const updatedUser = rows[0];
-    const oldRoleLabel = existingUser.RoleName || (Number(existingUser.RoleID) === 1 ? 'Admin' : 'User');
-    const newRoleLabel = updatedUser?.RoleName || (Number(updatedUser?.RoleID) === 1 ? 'Admin' : 'User');
+    const oldRoleLabel = existingUser.rolename || (Number(existingUser.roleid) === 1 ? 'Admin' : 'User');
+    const newRoleLabel = updatedUser?.rolename || (Number(updatedUser?.roleid) === 1 ? 'Admin' : 'User');
 
-    if (req.user && req.user.userId && Number(existingUser.RoleID) !== Number(roleId)) {
+    if (req.user && req.user.userid && Number(existingUser.roleid) !== Number(roleid)) {
       try {
         await createNotifications({
-          userIds: [Number(userId)],
-          adminId: req.user.userId,
+          userIds: [Number(userid)],
+          adminid: req.user.userid,
           title: 'Role Updated',
           message: `Your role was changed from ${oldRoleLabel} to ${newRoleLabel}.`,
           type: 'announcement',
-          relatedTable: 'users_role',
-          relatedId: Number(userId),
+          relatedtable: 'users_role',
+          relatedid: Number(userid),
         });
       } catch (notifError) {
         console.error('Failed to create role change notification:', notifError);
@@ -1016,11 +1364,11 @@ exports.updateUserRole = async (req, res) => {
 
     res.json({ 
       success: true, 
-      message: `User role updated to ${roleId === 1 ? 'Admin' : 'User'}`,
+      message: `User role updated to ${roleid === 1 ? 'Admin' : 'User'}`,
       user: updatedUser 
     });
-    if (req.user && req.user.userId) {
-      try { recordLog(req.user.userId, 'UserRoleUpdated', `User ${userId} role set to ${roleId}`); } catch (e) {}
+    if (req.user && req.user.userid) {
+      try { recordLog(req.user.userid, 'UserRoleUpdated', `User ${userid} role set to ${roleid}`); } catch (e) {}
     }
   } catch (error) {
     console.error("Update user role error:", error);
@@ -1033,12 +1381,12 @@ exports.updateUserRole = async (req, res) => {
 // ===============================
 exports.deleteUsers = async (req, res) => {
   try {
-    const adminId = req.user && req.user.userId;
-    if (!adminId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+    const adminid = req.user && req.user.userid;
+    if (!adminid) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
     // Verify admin
-    const [[adminRow]] = await db.query('SELECT RoleID FROM users WHERE UserID = ?', [adminId]);
-    if (!adminRow || Number(adminRow.RoleID) !== 1) {
+    const [[adminRow]] = await db.query('SELECT roleid FROM users WHERE userid = ?', [adminid]);
+    if (!adminRow || Number(adminRow.roleid) !== 1) {
       return res.status(403).json({ success: false, message: 'Only admins can delete users' });
     }
 
@@ -1048,20 +1396,20 @@ exports.deleteUsers = async (req, res) => {
     }
 
     // Prevent deleting the requesting admin
-    if (ids.includes(adminId)) {
+    if (ids.includes(adminid)) {
       return res.status(400).json({ success: false, message: 'Cannot delete the currently authenticated user' });
     }
 
     const placeholders = ids.map(() => '?').join(',');
 
     // Remove assignments and related records referencing these users
-    await db.query(`DELETE FROM requirement_user_assignments WHERE UserID IN (${placeholders})`, ids);
-    await db.query(`DELETE FROM headofoffice WHERE UserID IN (${placeholders})`, ids);
+    await db.query(`DELETE FROM requirementuserassignments WHERE userid IN (${placeholders})`, ids);
+    await db.query(`DELETE FROM headofoffice WHERE userid IN (${placeholders})`, ids);
 
     // Finally delete from users
-    const [result] = await db.query(`DELETE FROM users WHERE UserID IN (${placeholders})`, ids);
+    const [result] = await db.query(`DELETE FROM users WHERE userid IN (${placeholders})`, ids);
 
-    try { recordLog(adminId, 'DeleteUsers', `Deleted users: ${ids.join(',')}`); } catch (e) {}
+    try { recordLog(adminid, 'DeleteUsers', `Deleted users: ${ids.join(',')}`); } catch (e) {}
 
     res.json({ success: true, message: `Deleted ${result.affectedRows} user(s)` });
   } catch (error) {

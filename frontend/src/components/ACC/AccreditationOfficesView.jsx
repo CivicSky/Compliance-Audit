@@ -62,6 +62,25 @@ export default function AccreditationOfficesView({
     return Array.from(depts);
   }, [localOffices]);
 
+  const [assignedOfficeIds, setAssignedOfficeIds] = useState(new Set());
+
+  useEffect(() => {
+    import('../../utils/api').then(({ requirementsAPI }) => {
+      requirementsAPI.getMyAssignments().then(res => {
+        if (res && res.success) {
+          const ids = new Set();
+          (res.data || []).forEach(r => {
+            if (r.officeid) ids.add(String(r.officeid));
+          });
+          (res.officeIds || []).forEach(id => {
+            if (id) ids.add(String(id));
+          });
+          setAssignedOfficeIds(ids);
+        }
+      }).catch(() => {});
+    }).catch(() => {});
+  }, []);
+
   // Filter offices by active event tab, search query, role, and filters
   const filteredOffices = useMemo(() => {
     let currentUser = null;
@@ -72,25 +91,28 @@ export default function AccreditationOfficesView({
       currentUser = null;
     }
 
-    const rId = Number(currentUser?.RoleID);
-    const rName = String(currentUser?.RoleName || currentUser?.role_name || '').toLowerCase();
+    const rId = Number(currentUser?.roleid);
+    const rName = String(currentUser?.rolename || currentUser?.rolename || '').toLowerCase();
     const isPersonnelUser = (rId === 2 || rId === 3 || rName.includes('personnel') || rName.includes('office') || rName === 'user' || rName === 'head') && !rName.includes('auditor') && rId !== 4 && rId !== 1 && rName !== 'admin';
 
     let list = localOffices;
 
     // Filter by Personnel assignment
     if (isPersonnelUser && currentUser) {
-      const uid = String(currentUser.UserID ?? currentUser.id ?? '');
-      const hid = String(currentUser.HeadID ?? currentUser.head_id ?? '');
+      const uid = String(currentUser.userid ?? currentUser.id ?? '');
+      const hid = String(currentUser.headid ?? currentUser.headid ?? '');
 
       list = list.filter(o => {
+        const oid = String(o.id ?? o.officeid ?? '');
+        if (assignedOfficeIds.has(oid)) return true;
+
         if (Array.isArray(o.heads) && o.heads.length > 0) {
           const matchedHead = o.heads.some(h => {
-            if (uid && (String(h.UserID ?? '') === uid || String(h.user_id ?? '') === uid)) return true;
-            if (hid && (String(h.HeadID ?? '') === hid || String(h.head_id ?? '') === hid)) return true;
-            const headName = String(h.full_name || `${h.FirstName || ''} ${h.LastName || ''}`).toLowerCase().trim();
-            const userFirst = String(currentUser.FirstName || currentUser.first_name || '').toLowerCase().trim();
-            const userLast = String(currentUser.LastName || currentUser.last_name || '').toLowerCase().trim();
+            if (uid && (String(h.userid ?? '') === uid || String(h.userid ?? '') === uid)) return true;
+            if (hid && (String(h.headid ?? '') === hid || String(h.headid ?? '') === hid)) return true;
+            const headName = String(h.full_name || `${h.firstname || ''} ${h.lastname || ''}`).toLowerCase().trim();
+            const userFirst = String(currentUser.firstname || currentUser.firstname || '').toLowerCase().trim();
+            const userLast = String(currentUser.lastname || currentUser.lastname || '').toLowerCase().trim();
             if (userFirst && userLast && headName) {
               if (headName.includes(userFirst) && headName.includes(userLast)) return true;
             } else if (userFirst && headName && headName.includes(userFirst)) {
@@ -102,14 +124,14 @@ export default function AccreditationOfficesView({
         }
 
         if (hid) {
-          if (String(o.head_id ?? '') === hid) return true;
+          if (String(o.headid ?? '') === hid) return true;
           if (Array.isArray(o.head_ids) && o.head_ids.some(id => String(id) === hid)) return true;
         }
 
         if (o.head_name && o.head_name !== 'Unassigned' && o.head_name !== 'unassigned') {
           const headName = String(o.head_name).toLowerCase().trim();
-          const userFirst = String(currentUser.FirstName || currentUser.first_name || '').toLowerCase().trim();
-          const userLast = String(currentUser.LastName || currentUser.last_name || '').toLowerCase().trim();
+          const userFirst = String(currentUser.firstname || currentUser.firstname || '').toLowerCase().trim();
+          const userLast = String(currentUser.lastname || currentUser.lastname || '').toLowerCase().trim();
           if (userFirst && userLast) {
             if (headName.includes(userFirst) && headName.includes(userLast)) return true;
           } else if (userFirst && headName && headName.includes(userFirst)) {
@@ -123,7 +145,7 @@ export default function AccreditationOfficesView({
 
     // Filter by Event Tab
     if (activeEventTab && activeEventTab !== 'all') {
-      list = list.filter(o => String(o.EventID || o.event_id) === String(activeEventTab));
+      list = list.filter(o => String(o.eventid || o.eventid) === String(activeEventTab));
     }
 
     // Filter by Office Type
@@ -143,11 +165,11 @@ export default function AccreditationOfficesView({
     // Filter by Status
     if (statusFilter !== 'all') {
       list = list.filter(o => {
-        const rawPct = Number(o.compliance_percent ?? o.CompliancePercent ?? o.compliance_percentage ?? o.compliancePercentage ?? 0);
+        const rawPct = Number(o.compliancepercent ?? o.compliancepercent ?? o.compliance_percentage ?? o.compliancePercentage ?? 0);
         const pct = isNaN(rawPct) ? 0 : rawPct;
-        if (statusFilter === 'complied') return pct >= 100 || o.overall_status === 'Complied' || o.OverallStatus === 'Complied';
-        if (statusFilter === 'partial') return (pct > 0 && pct < 100) || o.overall_status === 'Partially Complied' || o.OverallStatus === 'Partially Complied';
-        if (statusFilter === 'not') return pct === 0 && (o.overall_status === 'Not Complied' || o.OverallStatus === 'Not Complied' || !o.overall_status);
+        if (statusFilter === 'complied') return pct >= 100 || o.overallstatus === 'Complied' || o.overallstatus === 'Complied';
+        if (statusFilter === 'partial') return (pct > 0 && pct < 100) || o.overallstatus === 'Partially Complied' || o.overallstatus === 'Partially Complied';
+        if (statusFilter === 'not') return pct === 0 && (o.overallstatus === 'Not Complied' || o.overallstatus === 'Not Complied' || !o.overallstatus);
         return true;
       });
     }
@@ -156,14 +178,14 @@ export default function AccreditationOfficesView({
     const q = searchTerm.trim().toLowerCase();
     if (q) {
       list = list.filter(o =>
-        String(o.OfficeName || o.office_name || '').toLowerCase().includes(q) ||
+        String(o.officename || o.officename || '').toLowerCase().includes(q) ||
         String(o.DepartmentCode || o.department_name || '').toLowerCase().includes(q) ||
-        String(o.EventCode || o.event_name || '').toLowerCase().includes(q)
+        String(o.eventcode || o.eventname || '').toLowerCase().includes(q)
       );
     }
 
     return list;
-  }, [localOffices, activeEventTab, officeTypeFilter, departmentFilter, statusFilter, searchTerm]);
+  }, [localOffices, activeEventTab, officeTypeFilter, departmentFilter, statusFilter, searchTerm, assignedOfficeIds]);
 
   // Reset page when filters change
   useEffect(() => {
@@ -301,14 +323,18 @@ export default function AccreditationOfficesView({
         <div className="flex-1 min-h-0 flex flex-col h-full">
           <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 grid-rows-3 gap-2 sm:gap-2.5 lg:gap-3 flex-1 min-h-0 h-full p-1' : 'space-y-3 pt-1 pb-1 overflow-y-auto flex-1'}>
             {paginatedOffices.map((office, idx) => {
-              const officeId = office.OfficeID || office.id;
+              const officeid = office.officeid || office.id;
               const isAcademic = isAcademicEntity(office);
 
-              const reqCount = office.total_requirements || office.requirementCount || 66;
-              const rawPct = Number(office.compliance_percent ?? office.CompliancePercent ?? office.compliance_percentage ?? office.compliancePercentage ?? 0);
+              const reqCount = Number(office.totalrequirements || 0);
+              const rawPct = Number(office.compliancepercent ?? office.compliancepercent ?? office.compliance_percentage ?? office.compliancePercentage ?? 0);
               const compliancePct = isNaN(rawPct) ? 0 : rawPct;
-              const statusLabel = office.overall_status || (compliancePct >= 100 ? 'Complied' : compliancePct > 0 ? 'Partially Complied' : 'Not Complied');
-              const statusBadgeClass = (compliancePct >= 100 || statusLabel === 'Complied')
+              const statusLabel = reqCount === 0
+                ? 'No Standards'
+                : (office.overallstatus || (compliancePct >= 100 ? 'Complied' : compliancePct > 0 ? 'Partially Complied' : 'Not Complied'));
+              const statusBadgeClass = reqCount === 0 || statusLabel === 'No Standards'
+                ? 'bg-slate-100 text-slate-600 border-slate-200'
+                : (compliancePct >= 100 || statusLabel === 'Complied')
                 ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                 : (compliancePct > 0 || statusLabel === 'Partially Complied')
                 ? 'bg-amber-50 text-amber-700 border-amber-200'
@@ -319,7 +345,7 @@ export default function AccreditationOfficesView({
 
               return (
                 <div
-                  key={officeId}
+                  key={officeid}
                   draggable
                   onDragStart={(e) => handleDragStart(e, idx)}
                   onDragOver={(e) => handleDragOver(e, idx)}
@@ -351,11 +377,11 @@ export default function AccreditationOfficesView({
 
                     <div className="min-w-0 flex-1">
                       <h3 className="text-xs sm:text-[13px] font-extrabold text-slate-900 group-hover:text-blue-600 transition-colors truncate leading-tight">
-                        {office.OfficeName || office.office_name}
+                        {office.officename || office.officename}
                       </h3>
                       <div className="flex items-center gap-1 mt-0.5 min-w-0 overflow-hidden">
                         <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide truncate max-w-[110px]">
-                          {office.EventCode || office.event_code || (office.EventName ? String(office.EventName).split(' ')[0] : 'PAASCU-COPY')}
+                          {office.eventcode || office.eventcode || (office.eventname ? String(office.eventname).split(' ')[0] : 'PAASCU-COPY')}
                         </span>
                         <span className="text-slate-300 shrink-0">•</span>
                         <span className="text-[10px] font-bold text-slate-500 uppercase shrink-0">
@@ -380,11 +406,11 @@ export default function AccreditationOfficesView({
                   <div className="grid grid-cols-2 gap-1.5 mt-1 pt-1.5 border-t border-slate-100 text-[10px] text-slate-500 shrink-0">
                     <div>
                       <span className="block text-[8px] sm:text-[9px] font-extrabold uppercase tracking-wider text-slate-400">CREATED</span>
-                      <span className="font-semibold text-slate-700 truncate block">{formatDateString(office.created_at || office.CreatedAt)}</span>
+                      <span className="font-semibold text-slate-700 truncate block">{formatDateString(office.createdat || office.createdat)}</span>
                     </div>
                     <div>
                       <span className="block text-[8px] sm:text-[9px] font-extrabold uppercase tracking-wider text-slate-400">UPDATED</span>
-                      <span className="font-semibold text-slate-700 truncate block">{formatDateString(office.updated_at || office.UpdatedAt)}</span>
+                      <span className="font-semibold text-slate-700 truncate block">{formatDateString(office.updatedat || office.updatedat)}</span>
                     </div>
                   </div>
 

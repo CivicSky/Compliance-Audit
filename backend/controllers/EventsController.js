@@ -23,14 +23,14 @@ const copyEvent = async (req, res) => {
     }
 
     // Get source event
-    const [rows] = await db.query('SELECT * FROM Events WHERE EventID = ?', [sourceEventId]);
+    const [rows] = await db.query('SELECT * FROM Events WHERE eventid = ?', [sourceEventId]);
     if (!rows.length) {
       return res.status(404).json({ success: false, message: 'Source event not found' });
     }
     const sourceEvent = rows[0];
 
-    // Check if EventCode already exists
-    const [existingCode] = await db.query('SELECT * FROM Events WHERE EventCode = ?', [newEventCode]);
+    // Check if eventcode already exists
+    const [existingCode] = await db.query('SELECT * FROM Events WHERE eventcode = ?', [newEventCode]);
     if (existingCode && existingCode.length > 0) {
       return res.status(400).json({
         success: false,
@@ -40,7 +40,7 @@ const copyEvent = async (req, res) => {
 
     // Insert new event
     const [result] = await db.query(
-      'INSERT INTO Events (EventName, EventCode, Description, CreatedAt, UpdatedAt) VALUES (?, ?, ?, NOW(), NOW())',
+      'INSERT INTO Events (eventname, eventcode, Description, createdat, updatedat) VALUES (?, ?, ?, NOW(), NOW())',
       [newEventName, newEventCode, newDescription || sourceEvent.Description || null]
     );
 
@@ -51,67 +51,67 @@ const copyEvent = async (req, res) => {
     const newEventId = result.insertId;
 
     // 1. Copy AREAS
-    const [areas] = await db.query('SELECT * FROM areas WHERE EventID = ?', [sourceEventId]);
+    const [areas] = await db.query('SELECT * FROM areas WHERE eventid = ?', [sourceEventId]);
     const areaIdMap = {}; // oldAreaId -> newAreaId
     for (const area of areas) {
-      const oldAreaId = area.AreaID ?? area.areaid;
+      const oldAreaId = area.areaid ?? area.areaid;
       const [areaResult] = await db.query(
-        'INSERT INTO areas (AreaCode, AreaName, EventID, Description, IsActive, SortOrder, CreatedAt, UpdatedAt) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())',
-        [area.AreaCode ?? area.areacode, area.AreaName ?? area.areaname, newEventId, area.Description ?? area.description, area.IsActive ?? area.isactive ?? 1, area.SortOrder ?? area.sortorder ?? 0]
+        'INSERT INTO areas (areacode, areaname, eventid, Description, isactive, sortorder, createdat, updatedat) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())',
+        [area.areacode ?? area.areacode, area.areaname ?? area.areaname, newEventId, area.Description ?? area.description, area.isactive ?? area.isactive ?? 1, area.sortorder ?? area.sortorder ?? 0]
       );
-      const newAreaId = areaResult[0]?.AreaID ?? areaResult[0]?.areaid ?? areaResult.insertId;
+      const newAreaId = areaResult[0]?.areaid ?? areaResult[0]?.areaid ?? areaResult.insertId;
       if (oldAreaId) areaIdMap[oldAreaId] = newAreaId;
     }
 
-    // 2. Copy CRITERIA (including no-area criteria) with ParentCriteriaID remapping
-    const [criteria] = await db.query('SELECT * FROM criteria WHERE EventID = ?', [sourceEventId]);
+    // 2. Copy CRITERIA (including no-area criteria) with parentcriteriaid remapping
+    const [criteria] = await db.query('SELECT * FROM criteria WHERE eventid = ?', [sourceEventId]);
     const criteriaIdMap = {}; // oldCriteriaId -> newCriteriaId
-    // First pass: insert all criteria without ParentCriteriaID
+    // First pass: insert all criteria without parentcriteriaid
     for (const crit of criteria) {
-      const oldCritId = crit.CriteriaID ?? crit.criteriaid;
-      const origAreaId = crit.AreaID ?? crit.areaid;
+      const oldCritId = crit.criteriaid ?? crit.criteriaid;
+      const origAreaId = crit.areaid ?? crit.areaid;
       const newAreaId = origAreaId && areaIdMap[origAreaId] ? areaIdMap[origAreaId] : null;
       try {
         const [critResult] = await db.query(
-          'INSERT INTO criteria (CriteriaCode, EventID, AreaID, ParentCriteriaID, CriteriaName, Description, CreatedAt, UpdatedAt, IsActive) VALUES (?, ?, ?, NULL, ?, ?, NOW(), NOW(), ?)',
-          [crit.CriteriaCode ?? crit.criteriacode, newEventId, newAreaId, crit.CriteriaName ?? crit.criterianame, crit.Description ?? crit.description, crit.IsActive ?? crit.isactive ?? 1]
+          'INSERT INTO criteria (criteriacode, eventid, areaid, parentcriteriaid, criterianame, Description, createdat, updatedat, isactive) VALUES (?, ?, ?, NULL, ?, ?, NOW(), NOW(), ?)',
+          [crit.criteriacode ?? crit.criteriacode, newEventId, newAreaId, crit.criterianame ?? crit.criterianame, crit.Description ?? crit.description, crit.isactive ?? crit.isactive ?? 1]
         );
-        const newCritId = critResult[0]?.CriteriaID ?? critResult[0]?.criteriaid ?? critResult.insertId;
+        const newCritId = critResult[0]?.criteriaid ?? critResult[0]?.criteriaid ?? critResult.insertId;
         if (oldCritId) criteriaIdMap[oldCritId] = newCritId;
       } catch (err) {
         console.error('Error inserting criteria:', err, crit);
         throw err;
       }
     }
-    // Second pass: update ParentCriteriaID for those that had it
+    // Second pass: update parentcriteriaid for those that had it
     for (const crit of criteria) {
-      const oldCritId = crit.CriteriaID ?? crit.criteriaid;
-      const oldParentId = crit.ParentCriteriaID ?? crit.parentcriteriaid;
+      const oldCritId = crit.criteriaid ?? crit.criteriaid;
+      const oldParentId = crit.parentcriteriaid ?? crit.parentcriteriaid;
       if (oldParentId) {
         const newCritId = criteriaIdMap[oldCritId];
         const newParentId = criteriaIdMap[oldParentId] || null;
         if (newCritId && newParentId) {
           try {
-            await db.query('UPDATE criteria SET ParentCriteriaID = ? WHERE CriteriaID = ?', [newParentId, newCritId]);
+            await db.query('UPDATE criteria SET parentcriteriaid = ? WHERE criteriaid = ?', [newParentId, newCritId]);
           } catch (err) {
-            console.error('Error updating ParentCriteriaID:', err, crit);
+            console.error('Error updating parentcriteriaid:', err, crit);
             throw err;
           }
         }
       }
     }
 
-    // 3. Copy REQUIREMENTS with ParentRequirementCode remapping
+    // 3. Copy REQUIREMENTS with parentrequirementcode remapping
     const criteriaIds = Object.keys(criteriaIdMap).map(Number).filter(Boolean);
     if (criteriaIds.length > 0) {
-      const [requirements] = await db.query(`SELECT * FROM requirements WHERE CriteriaID IN (${criteriaIds.join(',')})`);
+      const [requirements] = await db.query(`SELECT * FROM requirements WHERE criteriaid IN (${criteriaIds.join(',')})`);
       for (const req of requirements) {
-        const origCritId = req.CriteriaID ?? req.criteriaid;
+        const origCritId = req.criteriaid ?? req.criteriaid;
         const newCriteriaId = origCritId && criteriaIdMap[origCritId] ? criteriaIdMap[origCritId] : null;
         try {
           await db.query(
-            'INSERT INTO requirements (RequirementCode, Description, CriteriaID, ParentRequirementCode, CreatedAt, UpdatedAt) VALUES (?, ?, ?, ?, NOW(), NOW())',
-            [req.RequirementCode ?? req.requirementcode, req.Description ?? req.description, newCriteriaId, req.ParentRequirementCode ?? req.parentrequirementcode ?? null]
+            'INSERT INTO requirements (requirementcode, Description, criteriaid, parentrequirementcode, createdat, updatedat) VALUES (?, ?, ?, ?, NOW(), NOW())',
+            [req.requirementcode ?? req.requirementcode, req.Description ?? req.description, newCriteriaId, req.parentrequirementcode ?? req.parentrequirementcode ?? null]
           );
         } catch (err) {
           console.error('Error inserting requirement:', err, req);
@@ -125,18 +125,18 @@ const copyEvent = async (req, res) => {
       success: true,
       message: 'Event copied successfully',
       data: {
-        EventID: newEventId,
-        EventName: newEventName,
-        EventCode: newEventCode,
+        eventid: newEventId,
+        eventname: newEventName,
+        eventcode: newEventCode,
         Description: newDescription || sourceEvent.Description,
         FolderPath: sanitize(newEventCode || newEventName)
       }
     });
-    if (req.user && req.user.userId) {
+    if (req.user && req.user.userid) {
       try {
-        recordLog(req.user.userId, 'EventCopied', {
-          sourceEventId: sourceEvent.EventID,
-          sourceEventName: sourceEvent.EventName,
+        recordLog(req.user.userid, 'EventCopied', {
+          sourceEventId: sourceEvent.eventid,
+          sourceEventName: sourceEvent.eventname,
           newEventId,
           newEventName,
           newEventCode
@@ -152,20 +152,20 @@ const copyEvent = async (req, res) => {
 // Get all events (with role-based scoping for Personnel and Auditors)
 const getAllEvents = async (req, res) => {
   try {
-    const userId = Number(req.user?.userId);
-    let roleId = Number(req.user?.roleId);
+    const userid = Number(req.user?.userid);
+    let roleid = Number(req.user?.roleid);
 
-    // If roleId not present on req.user, look up user's role from DB
-    if (!roleId && userId) {
-      const [[userRow]] = await db.query('SELECT RoleID FROM users WHERE UserID = ?', [userId]);
-      if (userRow) roleId = Number(userRow.RoleID);
+    // If roleid not present on req.user, look up user's role from DB
+    if (!roleid && userid) {
+      const [[userRow]] = await db.query('SELECT roleid FROM users WHERE userid = ?', [userid]);
+      if (userRow) roleid = Number(userRow.roleid);
     }
 
-    const isAdmin = roleId === 1;
+    const isAdmin = roleid === 1;
 
     // Admins see all events
-    if (isAdmin || !userId) {
-      const [events] = await db.query('SELECT * FROM Events ORDER BY CreatedAt DESC');
+    if (isAdmin || !userid) {
+      const [events] = await db.query('SELECT * FROM Events ORDER BY createdat DESC');
       return res.json({
         success: true,
         data: events
@@ -173,15 +173,15 @@ const getAllEvents = async (req, res) => {
     }
 
     // Auditor: only see events where they have area assignments
-    if (roleId === 4) {
+    if (roleid === 4) {
       const [events] = await db.query(
         `SELECT DISTINCT e.*
          FROM Events e
-         JOIN areas ar ON ar.EventID = e.EventID
-         JOIN auditor_area_assignments aaa ON aaa.area_id = ar.AreaID
-         WHERE aaa.auditor_user_id = ?
-         ORDER BY e.CreatedAt DESC`,
-        [userId]
+         JOIN areas ar ON ar.eventid = e.eventid
+         JOIN auditorareaassignments aaa ON aaa.areaid = ar.areaid
+         WHERE aaa.auditoruserid = ?
+         ORDER BY e.createdat DESC`,
+        [userid]
       );
       return res.json({
         success: true,
@@ -189,48 +189,80 @@ const getAllEvents = async (req, res) => {
       });
     }
 
-    // Personnel / Office Head / Officer (RoleID 2, 3, etc.):
-    // Only see events where the user is managing an office/program or assigned requirements under that specific accreditation
+    // Personnel / Office Head / Officer (roleid 2, 3, etc.):
+    // Only see events where the user is managing an office/program or assigned requirements/areas under that specific accreditation
     const [events] = await db.query(
       `SELECT DISTINCT e.*
        FROM Events e
-       WHERE e.EventID IN (
-         -- 1. Direct office assignment via office_head_assignments (joined with headofoffice)
-         SELECT o.EventID
-         FROM office_head_assignments oha
-         JOIN headofoffice h ON oha.HeadID = h.HeadID
-         JOIN offices o ON oha.OfficeID = o.OfficeID
-         WHERE h.UserID = ? AND o.EventID IS NOT NULL
+       WHERE e.eventid IN (
+         -- 1. Direct office assignment via officeheadassignments (joined with headofoffice)
+         SELECT o.eventid
+         FROM officeheadassignments oha
+         JOIN headofoffice h ON oha.headid = h.headid
+         JOIN offices o ON oha.officeid = o.officeid
+         WHERE h.userid = ? AND o.eventid IS NOT NULL
 
          UNION
 
          -- 2. Direct requirement assignments to user on an office under the event
-         SELECT o.EventID
-         FROM requirement_user_assignments rua
-         JOIN offices o ON rua.OfficeID = o.OfficeID
-         WHERE rua.UserID = ? AND o.EventID IS NOT NULL
+         SELECT o.eventid
+         FROM requirementuserassignments rua
+         JOIN offices o ON rua.officeid = o.officeid
+         WHERE rua.userid = ? AND o.eventid IS NOT NULL
 
          UNION
 
          -- 3. Direct requirement assignments linked to criteria under the event
-         SELECT c.EventID
-         FROM requirement_user_assignments rua
-         JOIN requirements r ON rua.RequirementID = r.RequirementID
-         JOIN criteria c ON r.CriteriaID = c.CriteriaID
-         WHERE rua.UserID = ? AND c.EventID IS NOT NULL
+         SELECT c.eventid
+         FROM requirementuserassignments rua
+         JOIN requirements r ON rua.requirementid = r.requirementid
+         JOIN criteria c ON r.criteriaid = c.criteriaid
+         WHERE rua.userid = ? AND c.eventid IS NOT NULL
 
          UNION
 
          -- 4. Direct requirement assignments linked to criteria -> area under the event
-         SELECT a.EventID
-         FROM requirement_user_assignments rua
-         JOIN requirements r ON rua.RequirementID = r.RequirementID
-         JOIN criteria c ON r.CriteriaID = c.CriteriaID
-         JOIN areas a ON c.AreaID = a.AreaID
-         WHERE rua.UserID = ? AND a.EventID IS NOT NULL
+         SELECT a.eventid
+         FROM requirementuserassignments rua
+         JOIN requirements r ON rua.requirementid = r.requirementid
+         JOIN criteria c ON r.criteriaid = c.criteriaid
+         JOIN areas a ON c.areaid = a.areaid
+         WHERE rua.userid = ? AND a.eventid IS NOT NULL
+
+         UNION
+
+         -- 5. Direct assignment via personnelassignments table
+         SELECT pa.eventid
+         FROM personnelassignments pa
+         WHERE pa.userid = ? AND pa.eventid IS NOT NULL
+
+         UNION
+
+         -- 6. Assignment via personnelassignments linked to area
+         SELECT ar.eventid
+         FROM personnelassignments pa
+         JOIN areas ar ON pa.areaid = ar.areaid
+         WHERE pa.userid = ? AND ar.eventid IS NOT NULL
+
+         UNION
+
+         -- 7. Assignment via personnelassignments linked to criteria
+         SELECT c.eventid
+         FROM personnelassignments pa
+         JOIN criteria c ON pa.criteriaid = c.criteriaid
+         WHERE pa.userid = ? AND c.eventid IS NOT NULL
+
+         UNION
+
+         -- 8. Assignment via personnelassignments linked to requirements
+         SELECT c.eventid
+         FROM personnelassignments pa
+         JOIN requirements r ON pa.requirementid = r.requirementid
+         JOIN criteria c ON r.criteriaid = c.criteriaid
+         WHERE pa.userid = ? AND c.eventid IS NOT NULL
        )
-       ORDER BY e.CreatedAt DESC`,
-      [userId, userId, userId, userId]
+       ORDER BY e.createdat DESC`,
+      [userid, userid, userid, userid, userid, userid, userid, userid]
     );
 
     return res.json({
@@ -249,10 +281,10 @@ const getAllEvents = async (req, res) => {
 // Add new event
 const addEvent = async (req, res) => {
   try {
-    const { EventName, EventCode, Description, accreditation_level } = req.body;
+    const { eventname, eventcode, Description, accreditationlevel } = req.body;
 
     // Validate required fields
-    if (!EventName || !EventCode) {
+    if (!eventname || !eventcode) {
       return res.status(400).json({
         success: false,
         message: 'Event name and code are required'
@@ -261,12 +293,12 @@ const addEvent = async (req, res) => {
 
     // Insert new event
     const [result] = await db.query(
-      'INSERT INTO Events (EventName, EventCode, Description, CreatedAt, UpdatedAt, accreditation_level) VALUES (?, ?, ?, NOW(), NOW(), ?)',
-      [EventName, EventCode, Description || null, accreditation_level || 'N/A']
+      'INSERT INTO Events (eventname, eventcode, Description, createdat, updatedat, accreditationlevel) VALUES (?, ?, ?, NOW(), NOW(), ?)',
+      [eventname, eventcode, Description || null, accreditationlevel || 'N/A']
     );
 
-    // Create folder for the event inside uploads/events using EventCode (preferred for shorter, stable folder names)
-    const sanitizedName = sanitizeFolderName(EventCode || EventName);
+    // Create folder for the event inside uploads/events using eventcode (preferred for shorter, stable folder names)
+    const sanitizedName = sanitizeFolderName(eventcode || eventname);
     const eventFolderPath = path.join(__dirname, '..', 'uploads', 'events', sanitizedName);
     
     // Ensure uploads/events directory exists
@@ -285,17 +317,17 @@ const addEvent = async (req, res) => {
       success: true,
       message: 'Event added successfully',
       data: {
-        EventID: result.insertId,
-        EventName,
-        EventCode,
+        eventid: result.insertId,
+        eventname,
+        eventcode,
         Description,
-        accreditation_level: accreditation_level || 'N/A',
+        accreditationlevel: accreditationlevel || 'N/A',
         FolderPath: sanitizedName
       }
     });
-    if (req.user && req.user.userId) {
+    if (req.user && req.user.userid) {
       try {
-        recordLog(req.user.userId, 'EventAdded', { EventID: result.insertId, EventName, EventCode });
+        recordLog(req.user.userid, 'EventAdded', { eventid: result.insertId, eventname, eventcode });
       } catch (e) {}
     }
   } catch (error) {
@@ -325,35 +357,35 @@ const deleteEvents = async (req, res) => {
       // 1. Clean up requirements under criteria linked to these events (or under areas of these events)
       try {
         const [targetCriteria] = await db.query(
-          `SELECT CriteriaID FROM criteria WHERE EventID IN (${placeholders}) OR AreaID IN (SELECT AreaID FROM areas WHERE EventID IN (${placeholders}))`,
+          `SELECT criteriaid FROM criteria WHERE eventid IN (${placeholders}) OR areaid IN (SELECT areaid FROM areas WHERE eventid IN (${placeholders}))`,
           [...eventIds, ...eventIds]
         );
         if (targetCriteria && targetCriteria.length > 0) {
-          const critIds = targetCriteria.map(c => c.CriteriaID ?? c.criteriaid).filter(Boolean);
+          const critIds = targetCriteria.map(c => c.criteriaid ?? c.criteriaid).filter(Boolean);
           if (critIds.length > 0) {
             const critPlaceholders = critIds.map(() => '?').join(',');
-            await db.query(`DELETE FROM office_proof_documents WHERE requirement_id IN (SELECT RequirementID FROM requirements WHERE CriteriaID IN (${critPlaceholders}))`, critIds);
-            await db.query(`DELETE FROM requirement_user_assignments WHERE RequirementID IN (SELECT RequirementID FROM requirements WHERE CriteriaID IN (${critPlaceholders}))`, critIds);
-            await db.query(`DELETE FROM compliancestatusoffices WHERE RequirementID IN (SELECT RequirementID FROM requirements WHERE CriteriaID IN (${critPlaceholders}))`, critIds);
-            await db.query(`DELETE FROM requirements WHERE CriteriaID IN (${critPlaceholders})`, critIds);
+            await db.query(`DELETE FROM officeproofdocuments WHERE requirementid IN (SELECT requirementid FROM requirements WHERE criteriaid IN (${critPlaceholders}))`, critIds);
+            await db.query(`DELETE FROM requirementuserassignments WHERE requirementid IN (SELECT requirementid FROM requirements WHERE criteriaid IN (${critPlaceholders}))`, critIds);
+            await db.query(`DELETE FROM compliancestatusoffices WHERE requirementid IN (SELECT requirementid FROM requirements WHERE criteriaid IN (${critPlaceholders}))`, critIds);
+            await db.query(`DELETE FROM requirements WHERE criteriaid IN (${critPlaceholders})`, critIds);
           }
         }
         // Cleanup any remaining orphaned requirements
-        await db.query(`DELETE FROM office_proof_documents WHERE requirement_id IN (SELECT RequirementID FROM requirements WHERE CriteriaID IS NULL OR CriteriaID NOT IN (SELECT CriteriaID FROM criteria))`);
-        await db.query(`DELETE FROM requirement_user_assignments WHERE RequirementID IN (SELECT RequirementID FROM requirements WHERE CriteriaID IS NULL OR CriteriaID NOT IN (SELECT CriteriaID FROM criteria))`);
-        await db.query(`DELETE FROM compliancestatusoffices WHERE RequirementID IN (SELECT RequirementID FROM requirements WHERE CriteriaID IS NULL OR CriteriaID NOT IN (SELECT CriteriaID FROM criteria))`);
-        await db.query(`DELETE FROM requirements WHERE CriteriaID IS NULL OR CriteriaID NOT IN (SELECT CriteriaID FROM criteria)`);
+        await db.query(`DELETE FROM officeproofdocuments WHERE requirementid IN (SELECT requirementid FROM requirements WHERE criteriaid IS NULL OR criteriaid NOT IN (SELECT criteriaid FROM criteria))`);
+        await db.query(`DELETE FROM requirementuserassignments WHERE requirementid IN (SELECT requirementid FROM requirements WHERE criteriaid IS NULL OR criteriaid NOT IN (SELECT criteriaid FROM criteria))`);
+        await db.query(`DELETE FROM compliancestatusoffices WHERE requirementid IN (SELECT requirementid FROM requirements WHERE criteriaid IS NULL OR criteriaid NOT IN (SELECT criteriaid FROM criteria))`);
+        await db.query(`DELETE FROM requirements WHERE criteriaid IS NULL OR criteriaid NOT IN (SELECT criteriaid FROM criteria)`);
       } catch (cascadeErr) {
         console.error('Error during cascading requirement cleanup in deleteEvents:', cascadeErr);
       }
 
       // Fetch names and codes for logging before deletion
-      const [toDeleteRows] = await db.query(`SELECT EventID, EventName, EventCode FROM Events WHERE EventID IN (${placeholders})`, eventIds);
-      const deletedNames = toDeleteRows.map(r => r.EventName);
-      const deletedCodes = toDeleteRows.map(r => r.EventCode);
+      const [toDeleteRows] = await db.query(`SELECT eventid, eventname, eventcode FROM Events WHERE eventid IN (${placeholders})`, eventIds);
+      const deletedNames = toDeleteRows.map(r => r.eventname);
+      const deletedCodes = toDeleteRows.map(r => r.eventcode);
 
       const [result] = await db.query(
-        `DELETE FROM Events WHERE EventID IN (${placeholders})`,
+        `DELETE FROM Events WHERE eventid IN (${placeholders})`,
         eventIds
       );
     // Attempt to delete corresponding folders under uploads/events for each deleted event name
@@ -407,8 +439,8 @@ const deleteEvents = async (req, res) => {
       deletedCount: result.affectedRows,
       deletedFolders
     });
-    if (req.user && req.user.userId) {
-      try { recordLog(req.user.userId, 'EventDeleted', { eventIds, deletedNames }); } catch (e) {}
+    if (req.user && req.user.userid) {
+      try { recordLog(req.user.userid, 'EventDeleted', { eventIds, deletedNames }); } catch (e) {}
     }
   } catch (error) {
     console.error('Error deleting events:', error);
@@ -423,13 +455,13 @@ const deleteEvents = async (req, res) => {
 const updateEvent = async (req, res) => {
   try {
     const { id } = req.params;
-    const { EventName, EventCode, Description, status, accreditation_level } = req.body;
+    const { eventname, eventcode, Description, status, accreditationlevel } = req.body;
 
     // Debug logging
-    console.log('updateEvent called with:', { id, EventName, EventCode, Description, accreditation_level });
+    console.log('updateEvent called with:', { id, eventname, eventcode, Description, accreditationlevel });
 
     // Validate required fields
-    if (!EventName || !EventCode) {
+    if (!eventname || !eventcode) {
       return res.status(400).json({
         success: false,
         message: 'Event name and code are required'
@@ -440,19 +472,19 @@ const updateEvent = async (req, res) => {
     let existingEventName = null;
     let existingEventCode = null;
     try {
-      const [existingRows] = await db.query('SELECT EventName, EventCode FROM Events WHERE EventID = ?', [id]);
+      const [existingRows] = await db.query('SELECT eventname, eventcode FROM Events WHERE eventid = ?', [id]);
       if (existingRows && existingRows.length > 0) {
-        existingEventName = existingRows[0].EventName;
-        existingEventCode = existingRows[0].EventCode;
+        existingEventName = existingRows[0].eventname;
+        existingEventCode = existingRows[0].eventcode;
       }
     } catch (err) {
       console.warn('Could not fetch existing event name/code for folder rename check:', err.message || err);
     }
 
-    // Update event, including status and accreditation_level (do not touch CreatedAt)
+    // Update event, including status and accreditationlevel (do not touch createdat)
     const [result] = await db.query(
-      'UPDATE Events SET EventName = ?, EventCode = ?, Description = ?, status = ?, accreditation_level = ?, UpdatedAt = NOW() WHERE EventID = ?',
-      [EventName, EventCode, Description || null, status || 'active', accreditation_level || 'N/A', id]
+      'UPDATE Events SET eventname = ?, eventcode = ?, Description = ?, status = ?, accreditationlevel = ?, updatedat = NOW() WHERE eventid = ?',
+      [eventname, eventcode, Description || null, status || 'active', accreditationlevel || 'N/A', id]
     );
 
     if (result.affectedRows === 0) {
@@ -464,21 +496,21 @@ const updateEvent = async (req, res) => {
     }
 
     console.log('Event updated successfully for id:', id);
-    if (req.user && req.user.userId) {
+    if (req.user && req.user.userid) {
       try {
         const changes = {};
-        if (existingEventName && existingEventName !== EventName) changes.EventName = { from: existingEventName, to: EventName };
-        if (existingEventCode && existingEventCode !== EventCode) changes.EventCode = { from: existingEventCode, to: EventCode };
-        recordLog(req.user.userId, 'EventUpdated', { EventID: id, EventName, EventCode, changes });
+        if (existingEventName && existingEventName !== eventname) changes.eventname = { from: existingEventName, to: eventname };
+        if (existingEventCode && existingEventCode !== eventcode) changes.eventcode = { from: existingEventCode, to: eventcode };
+        recordLog(req.user.userid, 'EventUpdated', { eventid: id, eventname, eventcode, changes });
       } catch (e) {}
     }
     // If the event name changed, attempt to rename its uploads folder to match new sanitized name
     try {
-      // Prefer renaming folders when EventCode changed; fallback to EventName if code absent
-      if ((existingEventCode && existingEventCode !== EventCode) || (!existingEventCode && existingEventName && existingEventName !== EventName)) {
+      // Prefer renaming folders when eventcode changed; fallback to eventname if code absent
+      if ((existingEventCode && existingEventCode !== eventcode) || (!existingEventCode && existingEventName && existingEventName !== eventname)) {
         const eventsBasePath = path.join(__dirname, '..', 'uploads', 'events');
         const oldSan = sanitizeFolderName(existingEventCode || existingEventName);
-        const newSan = sanitizeFolderName(EventCode || EventName);
+        const newSan = sanitizeFolderName(eventcode || eventname);
 
         // Locate actual old folder: try exact, then match by sanitized entry names
         let oldFolderPath = path.join(eventsBasePath, oldSan);
@@ -514,9 +546,9 @@ const updateEvent = async (req, res) => {
       success: true,
       message: 'Event updated successfully',
       data: {
-        EventID: parseInt(id),
-        EventName,
-        EventCode,
+        eventid: parseInt(id),
+        eventname,
+        eventcode,
         Description,
         status
       }
@@ -533,35 +565,38 @@ const updateEvent = async (req, res) => {
 // Get list of downloadable event folders (DB-driven — works with Supabase storage)
 const getDownloadableFolders = async (req, res) => {
   try {
-    // Return events that have at least one approved uploaded file in the DB
+    // Return events that have at least one approved requirement file or office proof document
     const [rows] = await db.query(`
-      SELECT DISTINCT e.EventID, e.EventName, e.EventCode
+      SELECT DISTINCT e.eventid, e.eventname, e.eventcode
       FROM events e
       WHERE EXISTS (
-        SELECT 1 FROM office_proof_documents opd
-        JOIN offices o ON o.OfficeID = opd.office_id
-        WHERE o.EventID = e.EventID 
-          AND opd.file_path IS NOT NULL 
-          AND opd.file_path != ''
-          AND LOWER(COALESCE(opd.review_status, '')) = 'approved'
+        SELECT 1 FROM officeproofdocuments opd
+        JOIN offices o ON o.officeid = opd.officeid
+        WHERE o.eventid = e.eventid 
+          AND opd.filepath IS NOT NULL 
+          AND opd.filepath != ''
+          AND (
+            opd.requirementid IS NULL 
+            OR LOWER(COALESCE(opd.reviewstatus, '')) = 'approved'
+          )
       )
-      ORDER BY e.EventName ASC
+      ORDER BY e.eventname ASC
     `);
 
     const folders = [];
     rows.forEach(r => {
-      if (r.EventID) folders.push(String(r.EventID));
-      if (r.EventCode) {
-        folders.push(r.EventCode);
-        folders.push(sanitizeFolderName(r.EventCode));
+      if (r.eventid) folders.push(String(r.eventid));
+      if (r.eventcode) {
+        folders.push(r.eventcode);
+        folders.push(sanitizeFolderName(r.eventcode));
       }
-      if (r.EventName) {
-        folders.push(r.EventName);
-        folders.push(sanitizeFolderName(r.EventName));
+      if (r.eventname) {
+        folders.push(r.eventname);
+        folders.push(sanitizeFolderName(r.eventname));
       }
     });
 
-    res.json({ success: true, folders, eventIds: rows.map(r => r.EventID) });
+    res.json({ success: true, folders, eventIds: rows.map(r => r.eventid) });
   } catch (error) {
     console.error('Error fetching downloadable folders:', error);
     res.status(500).json({ success: false, message: 'Error fetching downloadable folders' });
@@ -571,33 +606,33 @@ const getDownloadableFolders = async (req, res) => {
 // Download event folder as zip — streams files from DB records (Supabase URLs or local disk)
 const downloadEventZip = async (req, res) => {
   try {
-    const { eventName } = req.params;
-    if (!eventName) {
+    const { eventname } = req.params;
+    if (!eventname) {
       return res.status(400).json({ success: false, message: 'Event name is required' });
     }
 
-    const sanitizedName = sanitizeFolderName(eventName);
+    const sanitizedName = sanitizeFolderName(eventname);
 
-    // Look up the event from DB by ID, EventCode, EventName, or sanitized name
+    // Look up the event from DB by ID, eventcode, eventname, or sanitized name
     let event = null;
-    if (!isNaN(Number(eventName)) && Number(eventName) > 0) {
-      const [byId] = await db.query('SELECT EventID, EventName, EventCode FROM events WHERE EventID = ? LIMIT 1', [Number(eventName)]);
+    if (!isNaN(Number(eventname)) && Number(eventname) > 0) {
+      const [byId] = await db.query('SELECT eventid, eventname, eventcode FROM events WHERE eventid = ? LIMIT 1', [Number(eventname)]);
       if (byId && byId.length > 0) event = byId[0];
     }
     if (!event) {
       const [eventRows] = await db.query(
-        `SELECT EventID, EventName, EventCode FROM events WHERE EventCode = ? OR EventName = ? LIMIT 1`,
-        [eventName, eventName]
+        `SELECT eventid, eventname, eventcode FROM events WHERE eventcode = ? OR eventname = ? LIMIT 1`,
+        [eventname, eventname]
       );
       if (eventRows && eventRows.length > 0) event = eventRows[0];
     }
     if (!event) {
-      const [allEvents] = await db.query('SELECT EventID, EventName, EventCode FROM events');
+      const [allEvents] = await db.query('SELECT eventid, eventname, eventcode FROM events');
       event = allEvents.find(e => 
-        sanitizeFolderName(e.EventCode || e.EventName) === sanitizedName ||
-        sanitizeFolderName(e.EventName) === sanitizedName ||
-        sanitizeFolderName(e.EventCode) === sanitizedName ||
-        String(e.EventID) === String(eventName)
+        sanitizeFolderName(e.eventcode || e.eventname) === sanitizedName ||
+        sanitizeFolderName(e.eventname) === sanitizedName ||
+        sanitizeFolderName(e.eventcode) === sanitizedName ||
+        String(e.eventid) === String(eventname)
       );
     }
 
@@ -605,32 +640,35 @@ const downloadEventZip = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Event not found' });
     }
 
-    // Fetch all APPROVED uploaded evidence files for this event, with office name for folder structure
+    // Fetch all APPROVED uploaded evidence files and office proof documents for this event
     const [files] = await db.query(`
       SELECT
         opd.id,
-        opd.file_name,
-        opd.display_name,
-        opd.file_path,
-        opd.requirement_id,
-        o.OfficeName,
-        r.RequirementCode,
+        opd.filename,
+        opd.displayname,
+        opd.filepath,
+        opd.requirementid,
+        o.officename,
+        r.requirementcode,
         r.Description AS RequirementDescription
-      FROM office_proof_documents opd
-      JOIN offices o ON o.OfficeID = opd.office_id
-      LEFT JOIN requirements r ON r.RequirementID = opd.requirement_id
-      WHERE o.EventID = ?
-        AND opd.file_path IS NOT NULL
-        AND opd.file_path != ''
-        AND LOWER(COALESCE(opd.review_status, '')) = 'approved'
-      ORDER BY o.OfficeName, opd.requirement_id, opd.uploaded_at
-    `, [event.EventID]);
+      FROM officeproofdocuments opd
+      JOIN offices o ON o.officeid = opd.officeid
+      LEFT JOIN requirements r ON r.requirementid = opd.requirementid
+      WHERE o.eventid = ?
+        AND opd.filepath IS NOT NULL
+        AND opd.filepath != ''
+        AND (
+          opd.requirementid IS NULL 
+          OR LOWER(COALESCE(opd.reviewstatus, '')) = 'approved'
+        )
+      ORDER BY o.officename, opd.requirementid, opd.uploadedat
+    `, [event.eventid]);
 
     if (!files.length) {
       return res.status(404).json({ success: false, message: 'No approved evidence files found for this event' });
     }
 
-    const zipDisplayName = sanitizeFolderName(event.EventCode || event.EventName || sanitizedName);
+    const zipDisplayName = sanitizeFolderName(event.eventcode || event.eventname || sanitizedName);
     const zipFileName = `${zipDisplayName}.zip`;
     res.attachment(zipFileName);
     res.contentType('application/zip');
@@ -656,10 +694,10 @@ const downloadEventZip = async (req, res) => {
 
     for (const file of files) {
       // Office folder
-      const officeFolder = safeName(file.OfficeName || 'Office');
-      // Evidence file name — prefer display_name, fallback to file_name
-      let rawFileName = file.display_name || file.file_name || 'evidence';
-      const ext = path.extname(file.file_name || file.file_path || '') || '';
+      const officeFolder = safeName(file.officename || 'Office');
+      // Evidence file name — prefer displayname, fallback to filename
+      let rawFileName = file.displayname || file.filename || 'evidence';
+      const ext = path.extname(file.filename || file.filepath || '') || '';
       if (ext && !rawFileName.toLowerCase().endsWith(ext.toLowerCase())) {
         rawFileName = `${rawFileName}${ext}`;
       }
@@ -667,19 +705,19 @@ const downloadEventZip = async (req, res) => {
       // Zip path: accreditation / office / evidence_file
       const zipPath = `${accreditationFolder}/${officeFolder}/${evidenceFileName}`;
 
-      const filePath = file.file_path;
+      const filepath = file.filepath;
 
       try {
-        if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+        if (filepath.startsWith('http://') || filepath.startsWith('https://')) {
           // Fetch remote file buffer (handles 301/302 redirects automatically)
-          const resp = await axios.get(filePath, { 
+          const resp = await axios.get(filepath, { 
             responseType: 'arraybuffer', 
             timeout: 30000 
           });
           archive.append(Buffer.from(resp.data), { name: zipPath });
         } else {
           // Local file path
-          const absPath = path.join(__dirname, '..', filePath.replace(/^\//, ''));
+          const absPath = path.join(__dirname, '..', filepath.replace(/^\//, ''));
           if (fs.existsSync(absPath)) {
             archive.file(absPath, { name: zipPath });
           } else {
@@ -687,7 +725,7 @@ const downloadEventZip = async (req, res) => {
           }
         }
       } catch (fileErr) {
-        console.warn(`Skipping file ${file.file_name}:`, fileErr.message);
+        console.warn(`Skipping file ${file.filename}:`, fileErr.message);
       }
     }
 
@@ -703,7 +741,7 @@ const downloadEventZip = async (req, res) => {
 // Get accreditation levels
 const getAccreditationLevels = async (req, res) => {
   try {
-    const [rows] = await db.query('SELECT * FROM accreditation_levels ORDER BY id ASC');
+    const [rows] = await db.query('SELECT * FROM accreditationlevels ORDER BY id ASC');
     res.json({
       success: true,
       data: rows
@@ -713,11 +751,11 @@ const getAccreditationLevels = async (req, res) => {
     res.json({
       success: true,
       data: [
-        { id: 1, level_name: 'Level I' },
-        { id: 2, level_name: 'Level II' },
-        { id: 3, level_name: 'Level III' },
-        { id: 4, level_name: 'Level IV' },
-        { id: 5, level_name: 'N/A' }
+        { id: 1, levelname: 'Level I' },
+        { id: 2, levelname: 'Level II' },
+        { id: 3, levelname: 'Level III' },
+        { id: 4, levelname: 'Level IV' },
+        { id: 5, levelname: 'N/A' }
       ]
     });
   }

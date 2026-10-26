@@ -13,13 +13,13 @@ export default function AddCriteriaForm({
 	onSubmit,
 }) {
 	const selectedParent = useMemo(
-		() => parentCriteriaOptions.find((c) => String(c.CriteriaID) === String(criteriaForm.ParentCriteriaID)),
-		[parentCriteriaOptions, criteriaForm.ParentCriteriaID]
+		() => parentCriteriaOptions.find((c) => String(c.criteriaid) === String(criteriaForm.parentcriteriaid)),
+		[parentCriteriaOptions, criteriaForm.parentcriteriaid]
 	);
 
 	const selectedArea = useMemo(
-		() => (areas || []).find((a) => String(a.AreaID) === String(criteriaForm.AreaID)),
-		[areas, criteriaForm.AreaID]
+		() => (areas || []).find((a) => String(a.areaid) === String(criteriaForm.areaid)),
+		[areas, criteriaForm.areaid]
 	);
 
 	return (
@@ -28,15 +28,15 @@ export default function AddCriteriaForm({
 				<label className="mb-1 block text-xs font-semibold text-stone-600">Area</label>
 				<CustomSelect
 					size="md"
-					value={criteriaForm.AreaID}
+					value={criteriaForm.areaid}
 					onChange={(v) => {
-						setCriteriaForm((prev) => ({ ...prev, AreaID: v, ParentCriteriaID: v ? prev.ParentCriteriaID : '' }));
+						setCriteriaForm((prev) => ({ ...prev, areaid: v, parentcriteriaid: v ? prev.parentcriteriaid : '' }));
 					}}
 					options={[
 						{ value: '', label: 'No area (optional)' },
 						...(areas || []).map((area) => ({
-							value: String(area.AreaID),
-							label: area.AreaCode ? `${area.AreaCode} - ${area.AreaName}` : area.AreaName
+							value: String(area.areaid),
+							label: area.areacode ? `${area.areacode} - ${area.areaname}` : area.areaname
 						}))
 					]}
 					placeholder="No area (optional)"
@@ -45,7 +45,7 @@ export default function AddCriteriaForm({
 					<div className="mt-2">
 						<LongSelectPreview
 							label="Selected area"
-							title={selectedArea.AreaCode ? `${selectedArea.AreaCode} - ${selectedArea.AreaName}` : selectedArea.AreaName}
+							title={selectedArea.areacode ? `${selectedArea.areacode} - ${selectedArea.areaname}` : selectedArea.areaname}
 						/>
 					</div>
 				)}
@@ -55,14 +55,14 @@ export default function AddCriteriaForm({
 				<label className="mb-1 block text-xs font-semibold text-stone-600">Parent sub area (optional)</label>
 				<CustomSelect
 					size="md"
-					value={criteriaForm.ParentCriteriaID}
-					onChange={(val) => setCriteriaForm((prev) => ({ ...prev, ParentCriteriaID: val }))}
-					disabled={!criteriaForm.AreaID}
+					value={criteriaForm.parentcriteriaid}
+					onChange={(val) => setCriteriaForm((prev) => ({ ...prev, parentcriteriaid: val }))}
+					disabled={!criteriaForm.areaid}
 					options={[
 						{ value: '', label: 'No parent (optional)' },
 						...parentCriteriaOptions.map((crit) => ({
-							value: String(crit.CriteriaID),
-							label: crit.CriteriaCode ? `${crit.CriteriaCode} - ${crit.CriteriaName}` : crit.CriteriaName
+							value: String(crit.criteriaid),
+							label: crit.criteriacode ? `${crit.criteriacode} - ${crit.criterianame}` : crit.criterianame
 						}))
 					]}
 					placeholder="No parent (optional)"
@@ -72,13 +72,13 @@ export default function AddCriteriaForm({
 						label="Selected parent sub area"
 						title={
 							selectedParent
-								? selectedParent.CriteriaCode
-									? `${selectedParent.CriteriaCode} - ${selectedParent.CriteriaName}`
-									: selectedParent.CriteriaName
+								? selectedParent.criteriacode
+									? `${selectedParent.criteriacode} - ${selectedParent.criterianame}`
+									: selectedParent.criterianame
 								: null
 						}
 						body={selectedParent?.Description || null}
-						emptyHint={criteriaForm.AreaID ? 'No parent selected — this will be a top-level sub area.' : null}
+						emptyHint={criteriaForm.areaid ? 'No parent selected — this will be a top-level sub area.' : null}
 					/>
 				</div>
 			</div>
@@ -87,10 +87,10 @@ export default function AddCriteriaForm({
 				<label className="mb-1 block text-xs font-semibold text-stone-600">Sub area code</label>
 				<input
 					className={fieldClass}
-					placeholder={criteriaForm.ParentCriteriaID ? 'No code required for child sub area' : 'Sub area code'}
-					value={criteriaForm.CriteriaCode}
-					onChange={(e) => setCriteriaForm((prev) => ({ ...prev, CriteriaCode: (e.target.value || '').toUpperCase() }))}
-					disabled={!!criteriaForm.ParentCriteriaID}
+					placeholder={criteriaForm.parentcriteriaid ? 'No code required for child sub area' : 'Sub Area "A"'}
+					value={criteriaForm.criteriacode}
+					onChange={(e) => setCriteriaForm((prev) => ({ ...prev, criteriacode: (e.target.value || '').toUpperCase() }))}
+					disabled={!!criteriaForm.parentcriteriaid}
 				/>
 			</div>
 
@@ -99,8 +99,8 @@ export default function AddCriteriaForm({
 				<input
 					className={fieldClass}
 					placeholder="Sub area name"
-					value={criteriaForm.CriteriaName}
-					onChange={(e) => setCriteriaForm((prev) => ({ ...prev, CriteriaName: e.target.value }))}
+					value={criteriaForm.criterianame}
+					onChange={(e) => setCriteriaForm((prev) => ({ ...prev, criterianame: e.target.value }))}
 				/>
 			</div>
 

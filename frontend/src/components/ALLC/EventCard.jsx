@@ -9,6 +9,7 @@ export default function EventCard({
     onEdit,
     onCopy,
     onDelete,
+    onAssignPersonnel,
     showCheckbox = false,
     isChecked = false,
     onToggleSelect,
@@ -18,14 +19,14 @@ export default function EventCard({
     const [showOptions, setShowOptions] = useState(false);
     const dotBtnRef = useRef(null);
 
-    const isActive = String(event.status || event.Status || '').toLowerCase().trim() !== 'inactive';
-    const accLevel = event.accreditation_level && String(event.accreditation_level).toUpperCase() !== 'N/A'
-        ? event.accreditation_level
+    const isactive = String(event.status || event.Status || '').toLowerCase().trim() !== 'inactive';
+    const accLevel = event.accreditationlevel && String(event.accreditationlevel).toUpperCase() !== 'N/A'
+        ? event.accreditationlevel
         : null;
 
     return (
         <div
-            key={event.EventID}
+            key={event.eventid}
             className={`group relative overflow-hidden rounded-2xl border transition-all duration-200 bg-white p-4 sm:p-5 h-full min-h-0 flex flex-col justify-between ${
                 isChecked
                     ? 'border-blue-400/80 bg-blue-50/30 shadow-md ring-2 ring-blue-500/20'
@@ -52,7 +53,7 @@ export default function EventCard({
                         e.stopPropagation();
                         onToggleSelect?.(event, e.target.checked);
                     }}
-                    aria-label={`Select ${event.EventName} for deletion`}
+                    aria-label={`Select ${event.eventname} for deletion`}
                     className="h-4.5 w-4.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                 />
             </div>
@@ -72,7 +73,7 @@ export default function EventCard({
                                 <svg className="w-3 h-3 text-blue-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
                                 </svg>
-                                {event.EventCode || 'STANDARD'}
+                                {event.eventcode || 'STANDARD'}
                             </span>
 
                             {accLevel && (
@@ -82,17 +83,17 @@ export default function EventCard({
                             )}
 
                             <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                                isActive
+                                isactive
                                     ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
                                     : 'bg-slate-100 text-slate-600 border border-slate-200'
                             }`}>
-                                <span className={`h-1.5 w-1.5 rounded-full ${isActive ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
-                                {isActive ? 'Active' : 'Inactive'}
+                                <span className={`h-1.5 w-1.5 rounded-full ${isactive ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
+                                {isactive ? 'Active' : 'Inactive'}
                             </span>
                         </div>
 
                         <h3 className="text-base sm:text-lg font-bold leading-snug text-slate-900 group-hover:text-blue-600 transition-colors line-clamp-1">
-                            {event.EventName}
+                            {event.eventname}
                         </h3>
 
                         {event.Description && (
@@ -124,6 +125,7 @@ export default function EventCard({
                                     onEdit={() => onEdit?.(event)}
                                     onCopy={() => onCopy?.(event)}
                                     onDelete={() => onDelete?.(event)}
+                                    onAssignPersonnel={() => onAssignPersonnel?.(event)}
                                     onClose={() => setShowOptions(false)}
                                     anchorRef={dotBtnRef}
                                 />
@@ -144,11 +146,11 @@ export default function EventCard({
                         <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto custom-scrollbar">
                             {assignedAreas.map(a => (
                                 <span
-                                    key={a.id || a.area_id || a.AreaCode}
+                                    key={a.id || a.areaid || a.areacode}
                                     className="inline-flex items-center gap-1 rounded-md bg-white border border-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-700 shadow-2xs whitespace-nowrap"
                                 >
                                     <Check className="w-3 h-3 text-emerald-500 inline shrink-0" />
-                                    <span>{a.AreaCode || a.AreaName}</span>
+                                    <span>{a.areacode || a.areaname}</span>
                                 </span>
                             ))}
                         </div>
@@ -164,7 +166,7 @@ export default function EventCard({
                             </svg>
                             <div className="min-w-0">
                                 <span className="block text-[9px] font-semibold uppercase tracking-wider text-slate-400">Created</span>
-                                <span className="text-slate-700 font-medium truncate block">{formatDateTime(event.CreatedAt)}</span>
+                                <span className="text-slate-700 font-medium truncate block">{formatDateTime(event.createdat)}</span>
                             </div>
                         </div>
                         <div className="flex items-center gap-1.5 min-w-0">
@@ -173,7 +175,7 @@ export default function EventCard({
                             </svg>
                             <div className="min-w-0">
                                 <span className="block text-[9px] font-semibold uppercase tracking-wider text-slate-400">Updated</span>
-                                <span className="text-slate-700 font-medium truncate block">{formatDateTime(event.UpdatedAt || event.CreatedAt)}</span>
+                                <span className="text-slate-700 font-medium truncate block">{formatDateTime(event.updatedat || event.createdat)}</span>
                             </div>
                         </div>
                     </div>

@@ -11,7 +11,7 @@ const RequirementsP = forwardRef(
       deleteMode = false,
       onSelectionChange,
       onRequirementClick,
-      eventId = ''
+      eventid = ''
     },
     ref
   ) => {
@@ -43,48 +43,48 @@ const RequirementsP = forwardRef(
     // Fetch requirements data from database
     useEffect(() => {
       fetchRequirements();
-    }, [fetchRequirements, eventId]);
+    }, [fetchRequirements, eventid]);
 
     // Live syncing on mutations / window focus
-    useLiveRefresh(fetchRequirements, { deps: [eventId] });
+    useLiveRefresh(fetchRequirements, { deps: [eventid] });
 
     // Filter and sort requirements based on search term and filters
     useEffect(() => {
       let filtered = requirements;
 
-      // Filter by selected eventId FIRST
-      if (eventId) {
-        filtered = requirements.filter(req => String(req.EventID) === String(eventId));
+      // Filter by selected eventid FIRST
+      if (eventid) {
+        filtered = requirements.filter(req => String(req.eventid) === String(eventid));
       }
 
       // Apply search filter
       if (searchTerm.trim()) {
         filtered = filtered.filter(req => {
-          const requirementCode = req.RequirementCode?.toLowerCase() || '';
-          const description = req.Description?.toLowerCase() || '';
-          const criteriaName = req.CriteriaName?.toLowerCase() || '';
-          const eventName = req.EventName?.toLowerCase() || '';
+          const requirementcode = req.requirementcode?.toLowerCase() || '';
+          const description = (req.description || req.Description || '').toLowerCase();
+          const criterianame = req.criterianame?.toLowerCase() || '';
+          const eventname = req.eventname?.toLowerCase() || '';
           const searchLower = searchTerm.toLowerCase();
 
           return (
-            requirementCode.includes(searchLower) ||
+            requirementcode.includes(searchLower) ||
             description.includes(searchLower) ||
-            criteriaName.includes(searchLower) ||
-            eventName.includes(searchLower)
+            criterianame.includes(searchLower) ||
+            eventname.includes(searchLower)
           );
         });
       }
 
       // Apply event filters
       if (filterOptions.events.length > 0) {
-        filtered = filtered.filter(req => filterOptions.events.includes(req.EventName));
+        filtered = filtered.filter(req => filterOptions.events.includes(req.eventname));
       }
 
       // Apply type filters
       if (filterOptions.types.length > 0) {
         filtered = filtered.filter(req => {
-          const hasParent = req.ParentRequirementCode;
-          const nestingLevel = req.RequirementCode ? req.RequirementCode.split('.').length - 1 : 0;
+          const hasParent = req.parentrequirementcode;
+          const nestingLevel = req.requirementcode ? req.requirementcode.split('.').length - 1 : 0;
 
           return filterOptions.types.some(type => {
             if (type === 'main') return !hasParent;
@@ -97,11 +97,11 @@ const RequirementsP = forwardRef(
 
       // Sort by requirement code or name (ascending)
       const sortedFiltered = [...filtered].sort((a, b) => {
-        return (a.RequirementCode || '').localeCompare(b.RequirementCode || '');
+        return (a.requirementcode || '').localeCompare(b.requirementcode || '');
       });
 
       setFilteredRequirements(sortedFiltered);
-    }, [requirements, searchTerm, filterOptions, eventId]);
+    }, [requirements, searchTerm, filterOptions, eventid]);
 
     // Handle selection changes and notify parent component
     useEffect(() => {
@@ -117,13 +117,13 @@ const RequirementsP = forwardRef(
       }
     }, [deleteMode]);
 
-    const handleCheckboxChange = (requirementId, isChecked) => {
+    const handleCheckboxChange = (requirementid, isChecked) => {
       setSelectedRequirements(prev => {
         const newSet = new Set(prev);
         if (isChecked) {
-          newSet.add(requirementId);
+          newSet.add(requirementid);
         } else {
-          newSet.delete(requirementId);
+          newSet.delete(requirementid);
         }
         return newSet;
       });
@@ -139,7 +139,7 @@ const RequirementsP = forwardRef(
 
         if (response.success) {
           // Remove deleted requirements from local state
-          setRequirements(prev => prev.filter(req => !requirementIds.includes(req.RequirementID)));
+          setRequirements(prev => prev.filter(req => !requirementIds.includes(req.requirementid)));
           setSelectedRequirements(new Set());
           return { success: true };
         } else {
@@ -248,57 +248,57 @@ const RequirementsP = forwardRef(
           {(() => {
             // Group by Area
             const areaGroups = filteredRequirements.reduce((acc, req) => {
-              const areaCode = req.AreaCode || "No Area";
-              if (!acc[areaCode]) {
-                acc[areaCode] = {
-                  areaName: req.AreaName || "Unknown Area",
+              const areacode = req.areacode || "No Area";
+              if (!acc[areacode]) {
+                acc[areacode] = {
+                  areaname: req.areaname || "Unknown Area",
                   requirements: []
                 };
               }
-              acc[areaCode].requirements.push(req);
+              acc[areacode].requirements.push(req);
               return acc;
             }, {});
 
-              return Object.entries(areaGroups).map(([areaCode, areaData]) => (
-                <div key={areaCode} className="space-y-4">
+              return Object.entries(areaGroups).map(([areacode, areaData]) => (
+                <div key={areacode} className="space-y-4">
                   {/* AREA HEADER */}
                   <div className="bg-gradient-to-r from-purple-600 to-purple-700 text-white px-4 py-3 rounded-lg shadow-md">
-                    <h3 className="text-base font-bold">{areaCode}</h3>
-                    <p className="text-xs text-purple-100 mt-1">{areaData.areaName}</p>
+                    <h3 className="text-base font-bold">{areacode}</h3>
+                    <p className="text-xs text-purple-100 mt-1">{areaData.areaname}</p>
                   </div>
 
                   {/* Group by Criteria */}
                   {(() => {
                   const criteriaGroups = areaData.requirements.reduce((acc, req) => {
-                    const criteriaCode = req.CriteriaCode || "No Sub Area";
-                    if (!acc[criteriaCode]) {
-                      acc[criteriaCode] = {
-                        criteriaName: req.CriteriaName || "Unknown Sub Area",
+                    const criteriacode = req.criteriacode || "No Sub Area";
+                    if (!acc[criteriacode]) {
+                      acc[criteriacode] = {
+                        criterianame: req.criterianame || "Unknown Sub Area",
                         requirements: []
                       };
                     }
-                    acc[criteriaCode].requirements.push(req);
+                    acc[criteriacode].requirements.push(req);
                     return acc;
                   }, {});
 
-                  return Object.entries(criteriaGroups).map(([criteriaCode, criteriaData]) => (
-                    <div key={criteriaCode} className="ml-4 space-y-2">
+                  return Object.entries(criteriaGroups).map(([criteriacode, criteriaData]) => (
+                    <div key={criteriacode} className="ml-4 space-y-2">
                       {/* CRITERIA HEADER */}
                       <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white px-4 py-3 rounded-lg shadow-md">
-                        <h3 className="text-sm font-bold">{criteriaCode}</h3>
-                        <p className="text-xs text-indigo-100 mt-1">{criteriaData.criteriaName}</p>
+                        <h3 className="text-sm font-bold">{criteriacode}</h3>
+                        <p className="text-xs text-indigo-100 mt-1">{criteriaData.criterianame}</p>
                       </div>
 
                       {/* Requirements */}
                       <div className="ml-4 space-y-2">
                         {criteriaData.requirements.map((requirement) => (
                           <div
-                            key={requirement.RequirementID}
+                            key={requirement.requirementid}
                             onClick={() => !deleteMode && onRequirementClick && onRequirementClick(requirement)}
                             className={`
                               bg-white rounded-xl shadow-2xs border border-slate-200 border-l-4 border-l-cyan-500
                               ${deleteMode ? "cursor-pointer hover:border-rose-300" : "app-card-hover cursor-pointer"}
-                              ${selectedRequirements.has(requirement.RequirementID) ? "ring-2 ring-rose-500 border-rose-500 bg-rose-50/25" : ""}
+                              ${selectedRequirements.has(requirement.requirementid) ? "ring-2 ring-rose-500 border-rose-500 bg-rose-50/25" : ""}
                             `}
                           >
                             <div className="flex items-center justify-between p-4">
@@ -307,9 +307,9 @@ const RequirementsP = forwardRef(
                                 {deleteMode && (
                                   <input
                                     type="checkbox"
-                                    checked={selectedRequirements.has(requirement.RequirementID)}
+                                    checked={selectedRequirements.has(requirement.requirementid)}
                                     onChange={(e) =>
-                                      handleCheckboxChange(requirement.RequirementID, e.target.checked)
+                                      handleCheckboxChange(requirement.requirementid, e.target.checked)
                                     }
                                     className="w-4 h-4 text-rose-600 border-rose-300 rounded focus:ring-rose-500"
                                     onClick={(e) => e.stopPropagation()}
@@ -320,21 +320,21 @@ const RequirementsP = forwardRef(
                                 <div className="flex flex-col flex-1 min-w-0">
                                   <div className="flex items-center gap-2">
                                     <h3 className="font-semibold text-gray-900 text-base">
-                                      {requirement.RequirementCode}
+                                      {requirement.requirementcode}
                                     </h3>
-                                    {requirement.ParentRequirementCode && (
+                                    {requirement.parentrequirementcode && (
                                       <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
-                                        Child of {requirement.ParentRequirementCode}
+                                        Child of {requirement.parentrequirementcode}
                                       </span>
                                     )}
-                                    {requirement.RequirementCode && requirement.RequirementCode.split('.').length > 2 && (
+                                    {requirement.requirementcode && requirement.requirementcode.split('.').length > 2 && (
                                       <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded">
-                                        Level {requirement.RequirementCode.split('.').length - 1}
+                                        Level {requirement.requirementcode.split('.').length - 1}
                                       </span>
                                     )}
                                   </div>
                                   <p className="text-sm text-gray-600 line-clamp-2 mt-1">
-                                    {requirement.Description}
+                                    {requirement.description || requirement.Description}
                                   </p>
                                 </div>
                               </div>

@@ -15,18 +15,18 @@ const EditOfficeHeadModal = ({ visible, onClose, head = {}, onSave }) => {
 
   if (!visible) return null;
 
-  const firstName = head.FirstName || head.user?.FirstName || '';
-  const middleInitial = head.MiddleInitial || head.user?.MiddleInitial || '';
-  const lastName = head.LastName || head.user?.LastName || '';
-  const fullName = [firstName, middleInitial ? `${middleInitial}.` : '', lastName].filter(Boolean).join(' ') || 'Personnel';
+  const firstname = head.firstname || head.user?.firstname || '';
+  const middleinitial = head.middleinitial || head.user?.middleinitial || '';
+  const lastname = head.lastname || head.user?.lastname || '';
+  const fullName = [firstname, middleinitial ? `${middleinitial}.` : '', lastname].filter(Boolean).join(' ') || 'Personnel';
   const email = head.Email || head.email || head.user?.Email || '';
-  const profilePic = head.ProfilePic || head.user?.ProfilePic;
+  const profilepic = head.profilepic || head.user?.profilepic;
 
-  const avatarUrl = profilePic
-    ? (profilePic.startsWith('http') ? profilePic : `${API_BASE_URL}/uploads/profile-pics/${profilePic}`)
+  const avatarUrl = profilepic
+    ? (profilepic.startsWith('http') ? profilepic : `${API_BASE_URL}/uploads/profile-pics/${profilepic}`)
     : null;
 
-  const initials = `${firstName.charAt(0) || ''}${lastName.charAt(0) || ''}`.toUpperCase() || 'P';
+  const initials = `${firstname.charAt(0) || ''}${lastname.charAt(0) || ''}`.toUpperCase() || 'P';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -35,14 +35,14 @@ const EditOfficeHeadModal = ({ visible, onClose, head = {}, onSave }) => {
     setIsSubmitting(true);
 
     const updated = {
-      HeadID: head.HeadID,
+      headid: head.headid,
       Position: position.trim(),
-      OfficeID: head.OfficeID,
+      officeid: head.officeid,
       // Preserve user personal details
-      FirstName: firstName,
-      MiddleInitial: middleInitial,
-      LastName: lastName,
-      ContactInfo: head.ContactInfo || '',
+      firstname: firstname,
+      middleinitial: middleinitial,
+      lastname: lastname,
+      contactinfo: head.contactinfo || '',
     };
 
     try {

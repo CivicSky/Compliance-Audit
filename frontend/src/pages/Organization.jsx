@@ -7,7 +7,7 @@ import EventsAddDelete from "../components/ALLC/eventsadddelete";
 import EventTabs from "../components/Organization/EventTabs";
 import OfficeAddDelete from "../components/Organization/officeadddelete";
 import AddEventModal from "../components/Events/AddEventModal";
-import { officesAPI, officeHeadsAPI, officetypesAPI, eventsAPI, usersAPI, masterlistAPI } from "../utils/api";
+import api, { officesAPI, officeHeadsAPI, officetypesAPI, eventsAPI, usersAPI, masterlistAPI } from "../utils/api";
 import OfficesP from "../components/OfficesP/OfficesP";
 import AddOfficeModal from "../components/Organization/AddOfficeModal";
 import EditOfficeModal from "../components/Organization/EditOfficeModal";
@@ -24,13 +24,11 @@ const normalizeOfficeRecord = (office) => {
     if (!office) return null;
     return {
         ...office,
-        id: office.id ?? office.OfficeID,
-        OfficeID: office.OfficeID ?? office.id,
-        office_name: office.office_name ?? office.OfficeName,
-        OfficeName: office.OfficeName ?? office.office_name,
-        event_id: office.event_id ?? office.EventID,
-        EventID: office.EventID ?? office.event_id,
-        accreditation_level: office.accreditation_level ?? office.AccreditationLevel,
+        id: office.id ?? office.officeid,
+        officeid: office.officeid ?? office.id,
+        officename: office.officename,
+        eventid: office.eventid,
+        accreditationlevel: office.accreditationlevel,
     };
 };
 
@@ -70,14 +68,14 @@ export default function Organization({ selectedEventIdProp, onEventSelect }) {
         }
     }, [selectedEventIdProp]);
 
-    const handleEventTabChange = (eventId) => {
-        setSelectedEventType(eventId);
-        if (eventId) {
-            localStorage.setItem('acc_selected_event_id', String(eventId));
-            localStorage.setItem('selected_audit_event_id', String(eventId));
+    const handleEventTabChange = (eventid) => {
+        setSelectedEventType(eventid);
+        if (eventid) {
+            localStorage.setItem('acc_selected_event_id', String(eventid));
+            localStorage.setItem('selected_audit_event_id', String(eventid));
         }
         if (typeof onEventSelect === 'function') {
-            onEventSelect(eventId);
+            onEventSelect(eventid);
         }
     };
     const [events, setEvents] = useState([]);
@@ -89,7 +87,7 @@ export default function Organization({ selectedEventIdProp, onEventSelect }) {
             return null;
         }
     });
-    const isAdmin = currentUser?.RoleName === 'admin' || currentUser?.RoleID === 1;
+    const isAdmin = currentUser?.rolename === 'admin' || currentUser?.roleid === 1;
     const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
 
     const officesPRef = useRef();
@@ -150,9 +148,9 @@ export default function Organization({ selectedEventIdProp, onEventSelect }) {
                         setSelectedEventType((prev) => {
                             const saved = localStorage.getItem('acc_selected_event_id') || localStorage.getItem('selected_audit_event_id');
                             const candidate = prev && prev !== 'all' ? prev : saved;
-                            const found = res.data.find(e => String(e.EventID || e.id) === String(candidate));
+                            const found = res.data.find(e => String(e.eventid || e.id) === String(candidate));
                             const target = found || res.data[0];
-                            const targetId = String(target.EventID || target.id);
+                            const targetId = String(target.eventid || target.id);
                             localStorage.setItem('acc_selected_event_id', targetId);
                             localStorage.setItem('selected_audit_event_id', targetId);
                             return targetId;
@@ -201,12 +199,12 @@ export default function Organization({ selectedEventIdProp, onEventSelect }) {
         const fetchLookups = async () => {
             try {
                 const [depsRes, ptypesRes] = await Promise.all([
-                    fetch('/api/departments').then(r => r.ok ? r.json() : { data: [] }).catch(() => ({ data: [] })),
-                    fetch('/api/program_types').then(r => r.ok ? r.json() : { data: [] }).catch(() => ({ data: [] })),
+                    api.get('/api/departments').then(r => r.data).catch(() => ({ data: [] })),
+                    api.get('/api/programtypes').then(r => r.data).catch(() => ({ data: [] })),
                 ]);
 
-                const deps = Array.isArray(depsRes) ? depsRes : (depsRes.data || []);
-                const ptypes = Array.isArray(ptypesRes) ? ptypesRes : (ptypesRes.data || []);
+                const deps = Array.isArray(depsRes) ? depsRes : (depsRes?.data || depsRes?.departments || []);
+                const ptypes = Array.isArray(ptypesRes) ? ptypesRes : (ptypesRes?.data || ptypesRes?.programtypes || []);
 
                 setDepartments(deps);
                 setProgramTypes(ptypes);
@@ -253,8 +251,8 @@ export default function Organization({ selectedEventIdProp, onEventSelect }) {
         }
     };
 
-    const openOfficeFromNotification = useCallback(async (officeId, deepLink = null) => {
-        const targetId = String(officeId || '');
+    const openOfficeFromNotification = useCallback(async (officeid, deepLink = null) => {
+        const targetId = String(officeid || '');
         if (!targetId) return false;
 
         if (officesPRef.current?.openOfficeById) {
@@ -283,34 +281,34 @@ export default function Organization({ selectedEventIdProp, onEventSelect }) {
         }
         if (notifDeepLinkHandled.current) return;
 
-        let officeId = searchParams.get('officeId');
-        const areaId = searchParams.get('areaId');
+        let officeid = searchParams.get('officeid');
+        const areaid = searchParams.get('areaid');
 
         const deepLink = {
-            requirementId: searchParams.get('requirementId') || null,
+            requirementid: searchParams.get('requirementid') || null,
             openSubmission: searchParams.get('openSubmission') === '1',
             viewUserId: searchParams.get('viewUserId') || null,
-            areaId: areaId || null,
+            areaid: areaid || null,
         };
 
         const run = async () => {
-            if (!officeId && areaId) {
-                // The notification meta should already include officeId from the backend.
+            if (!officeid && areaid) {
+                // The notification meta should already include officeid from the backend.
                 // Fallback: fetch all offices and pick the first one linked to this area.
                 try {
                     const allOffices = await officesAPI.getAll();
                     const list = Array.isArray(allOffices?.data) ? allOffices.data : (Array.isArray(allOffices) ? allOffices : []);
                     if (list.length > 0) {
-                        officeId = list[0].id || list[0].OfficeID;
+                        officeid = list[0].id || list[0].officeid;
                     }
                 } catch (e) {
-                    console.warn('Could not resolve office for areaId notification:', e);
+                    console.warn('Could not resolve office for areaid notification:', e);
                 }
             }
 
-            if (!officeId) return;
+            if (!officeid) return;
 
-            const opened = await openOfficeFromNotification(officeId, deepLink);
+            const opened = await openOfficeFromNotification(officeid, deepLink);
             if (opened) {
                 notifDeepLinkHandled.current = true;
                 setSearchParams({}, { replace: true });
@@ -350,17 +348,21 @@ export default function Organization({ selectedEventIdProp, onEventSelect }) {
         }
     };
 
-    // Delete a single office from actions menu
+    // Delete a single office or program from actions menu
     const handleDeleteOffice = async (office) => {
         if (!office) return;
-        const ok = await showConfirm(`Delete office "${office.office_name || office.OfficeName || office.id}"? This cannot be undone.`);
+        const isAcademic = isAcademicEntity(office);
+        const itemType = isAcademic ? 'Program' : 'Office';
+        const ok = await showConfirm(`Delete ${itemType.toLowerCase()} "${office.officename || office.name || office.id}"? This cannot be undone.`);
         if (!ok) return;
         try {
-            await officesAPI.deleteOffice(office.id || office.OfficeID);
+            const res = await officesAPI.deleteOffice(office.id || office.officeid);
+            setIsViewReqModalOpen(false);
+            setSelectedOffice(null);
             if (officesPRef.current?.refresh) await officesPRef.current.refresh();
-            await showAlert('Office deleted');
+            await showAlert(res?.message || `${itemType} deleted successfully!`);
         } catch (err) {
-            console.error('Failed to delete office', err);
+            console.error(`Failed to delete ${itemType.toLowerCase()}`, err);
             await showAlert('Delete failed');
         }
     };
@@ -377,20 +379,20 @@ export default function Organization({ selectedEventIdProp, onEventSelect }) {
                 // Fetch the updated office details and update selectedOffice so the view modal shows fresh data
                 try {
                     const updated = await officesAPI.getById(updatedOffice.id);
-                    if (updated && updated.OfficeID) {
+                    if (updated && updated.officeid) {
                         const mapped = {
-                            id: updated.OfficeID,
-                            office_name: updated.OfficeName,
-                            office_type_id: updated.OfficeTypeID,
-                            office_type_name: updated.TypeName || updated.office_type_name || '',
-                            accreditation_level: updated.accreditation_level || updatedOffice.accreditation_level || 'Candidate',
+                            id: updated.officeid,
+                            officename: updated.officename,
+                            officetypeid: updated.officetypeid,
+                            office_type_name: updated.typename || updated.office_type_name || '',
+                            accreditationlevel: updated.accreditationlevel || updatedOffice.accreditationlevel || 'Candidate',
                             head_ids: updated.HeadIDs || [],
                             heads: updated.Heads || [],
                             head_name: updated.HeadName || (updated.Heads ? (updated.Heads.map(h=> h.full_name).join(', ')) : ''),
-                            event_id: updated.EventID || updated.event_id,
-                            event_name: updated.EventName || updated.EventName || '',
-                            compliance_percent: updated.CompliancePercent || 0,
-                            overall_status: updated.OverallStatus || updated.overall_status || 'Not Complied'
+                            eventid: updated.eventid || updated.eventid,
+                            eventname: updated.eventname || updated.eventname || '',
+                            compliancepercent: updated.compliancepercent || 0,
+                            overallstatus: updated.overallstatus || updated.overallstatus || 'Not Complied'
                         };
                         setSelectedOffice(mapped);
                     }
@@ -412,10 +414,30 @@ export default function Organization({ selectedEventIdProp, onEventSelect }) {
         }
     };
 
-    // Delete selected offices
+    const [selectedItems, setSelectedItems] = useState([]);
+
+    // Delete selected offices or programs
     const handleDeleteSelected = async () => {
         if (selectedIds.length === 0) return;
-        const ok = await showConfirm(`Delete ${selectedIds.length} office(s)?`);
+
+        const hasAcademic = selectedItems.some(o => isAcademicEntity(o));
+        const hasNonAcademic = selectedItems.some(o => !isAcademicEntity(o));
+
+        let singularLabel = 'item';
+        let pluralLabel = 'items';
+        if (hasAcademic && !hasNonAcademic) {
+            singularLabel = 'program';
+            pluralLabel = 'programs';
+        } else if (!hasAcademic && hasNonAcademic) {
+            singularLabel = 'office';
+            pluralLabel = 'offices';
+        }
+
+        const confirmMsg = selectedIds.length === 1
+            ? `Delete 1 ${singularLabel}?`
+            : `Delete ${selectedIds.length} ${pluralLabel}?`;
+
+        const ok = await showConfirm(confirmMsg);
         if (!ok) return;
 
         try {
@@ -423,6 +445,7 @@ export default function Organization({ selectedEventIdProp, onEventSelect }) {
 
             setSelectedCount(0);
             setSelectedIds([]);
+            setSelectedItems([]);
             setDeleteMode(false);
 
             // Refresh the list after deletion
@@ -430,16 +453,21 @@ export default function Organization({ selectedEventIdProp, onEventSelect }) {
                 await officesPRef.current.refresh();
             }
 
-            await showAlert('Deleted successfully!');
+            const successMsg = selectedIds.length === 1
+                ? `Successfully deleted ${singularLabel}!`
+                : `Successfully deleted ${selectedIds.length} ${pluralLabel}!`;
+
+            await showAlert(successMsg);
         } catch (err) {
             console.error(err);
             await showAlert('Delete failed');
         }
     };
 
-    const handleSelectionChange = useCallback((count, ids) => {
+    const handleSelectionChange = useCallback((count, ids, items = []) => {
         setSelectedCount(count);
         setSelectedIds(ids);
+        setSelectedItems(items);
     }, []);
 
     const isPaascu = selectedEventType && (selectedEventType === 'PAASCU' || selectedEventType === 'PASSCU');
@@ -461,14 +489,14 @@ export default function Organization({ selectedEventIdProp, onEventSelect }) {
         }
     }, [selectedEventType]);
 
-    const fetchAvailableMasterList = useCallback(async (eventId) => {
-        if (!eventId) {
+    const fetchAvailableMasterList = useCallback(async (eventid) => {
+        if (!eventid) {
             setMasterListItems([]);
             return;
         }
         setMasterListLoading(true);
         try {
-            const res = await masterlistAPI.getAvailableForEvent(eventId);
+            const res = await masterlistAPI.getAvailableForEvent(eventid);
             const items = Array.isArray(res) ? res : (res.data || []);
             setMasterListItems(items);
         } catch (err) {
@@ -508,28 +536,28 @@ export default function Organization({ selectedEventIdProp, onEventSelect }) {
         try {
             const isAcademic = isAcademicEntity(item);
             const matchedType = officeTypes.find(t => {
-                const name = String(t.TypeName || t.name || '').toLowerCase();
+                const name = String(t.typename || t.name || '').toLowerCase();
                 if (isAcademic) {
                     return name.includes('academic') && !name.includes('non');
                 } else {
                     return name.includes('non');
                 }
             });
-            const typeId = matchedType ? (matchedType.OfficeTypeID || matchedType.id) : (isAcademic ? 2 : 1);
+            const typeId = matchedType ? (matchedType.officetypeid || matchedType.id) : (isAcademic ? 2 : 1);
 
             const payload = {
-                master_list_id: parseInt(item.id),
-                OfficeName: item.name || "",
-                OfficeTypeID: parseInt(typeId),
+                masterlistid: parseInt(item.id),
+                officename: item.name || "",
+                officetypeid: parseInt(typeId),
                 HeadIDs: [],
-                EventID: parseInt(selectedEventType)
+                eventid: parseInt(selectedEventType)
             };
 
             const res = await officesAPI.createOffice(payload);
-            const success = res?.success === true || res?.data?.success === true || res?.office || res?.OfficeID || res?.id;
+            const success = res?.success === true || res?.data?.success === true || res?.office || res?.officeid || res?.id;
 
             if (success) {
-                await showAlert(`Successfully added "${item.name}" to the audit event!`);
+                await showAlert(`Successfully added "${item.name}" to the accreditation!`);
                 if (officesPRef.current?.refresh) {
                     officesPRef.current.refresh();
                 }
@@ -619,7 +647,7 @@ export default function Organization({ selectedEventIdProp, onEventSelect }) {
                                 type="button"
                                 onClick={() => {
                                     if (!selectedEventType) {
-                                        showAlert("Please select an Event tab first (e.g. RQAT, PACUCOA 2026) to add categories.");
+                                        showAlert("Please select an Accreditation tab first (e.g. RQAT, PACUCOA 2026) to add categories.");
                                         return;
                                     }
                                     setShowAddSidebar(prev => !prev);
@@ -631,7 +659,7 @@ export default function Organization({ selectedEventIdProp, onEventSelect }) {
                                 }`}
                             >
                                 <Plus className="h-3.5 w-3.5" />
-                                <span>{showAddSidebar ? 'Close Panel' : 'Add to Event'}</span>
+                                <span>{showAddSidebar ? 'Close Panel' : 'Add to Accreditation'}</span>
                             </button>
                         </div>
                     )}
@@ -700,19 +728,6 @@ export default function Organization({ selectedEventIdProp, onEventSelect }) {
                 <EventTabs selectedEventId={selectedEventType} onChange={handleEventTabChange} />
             </div>
 
-            {/* List header (rendered outside scrollable area so it doesn't move) */}
-            {viewMode === 'list' && (
-                <div className="px-4 overflow-x-auto">
-                    <div className="hidden md:grid grid-cols-[minmax(120px,1fr)_160px_160px_100px_140px_80px] gap-6 px-6 py-3 mb-1 bg-white border border-slate-200 rounded-xl shadow-sm text-xs font-semibold text-gray-700 w-full min-w-[720px]">
-                        <div className="flex items-center">Office Name</div>
-                        <div className="flex items-center justify-center">Office Type</div>
-                        <div className="flex items-center justify-center">Compliance Status</div>
-                        <div className="flex items-center justify-center">Requirements</div>
-                        <div className="flex items-center justify-start">Personnel</div>
-                        <div className="flex items-center justify-end">Actions</div>
-                    </div>
-                </div>
-            )}
 
             {/* Split layout: Left Available Categories (Drag Sources) + Right Grid/List */}
             <div 
@@ -725,7 +740,7 @@ export default function Organization({ selectedEventIdProp, onEventSelect }) {
                         {/* Header */}
                         <div className="flex items-center justify-between mb-2 shrink-0">
                             <h3 className="text-xs font-bold text-slate-800">
-                                Available for {events.find(e => String(e.EventID) === String(selectedEventType))?.EventCode || 'Event'}
+                                Available for {events.find(e => String(e.eventid) === String(selectedEventType))?.eventcode || 'Accreditation'}
                             </h3>
                             <button
                                 type="button"
@@ -804,7 +819,7 @@ export default function Organization({ selectedEventIdProp, onEventSelect }) {
                                         </div>
                                         <div className="flex items-center gap-1.5 mt-0.5">
                                             <span className={`px-1 rounded-[3px] text-[8px] font-semibold border ${
-                                                item.entityTypeId === 1 || item.type === 'Academic Program'
+                                                item.entitytypeid === 1 || item.type === 'Academic Program'
                                                     ? 'bg-blue-50/50 text-blue-700 border-blue-100'
                                                     : 'bg-emerald-50/50 text-emerald-700 border-emerald-100'
                                             }`}>
@@ -854,13 +869,13 @@ export default function Organization({ selectedEventIdProp, onEventSelect }) {
                                 <svg className="h-8 w-8 text-blue-500 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                                 </svg>
-                                <p className="text-sm font-bold text-slate-800">Drop here to assign to current event</p>
+                                <p className="text-sm font-bold text-slate-800">Drop here to assign to current accreditation</p>
                                 <p className="text-[10px] text-slate-400">Instantly assigns category with 0 heads (heads can be assigned later)</p>
                             </div>
                         </div>
                     )}
 
-                    <div className="relative z-10 w-full h-full">
+                    <div className="relative z-10 w-full h-full flex flex-col min-h-0">
                         <OfficesP
                             ref={officesPRef}
                             searchTerm={searchTerm}
@@ -921,6 +936,7 @@ export default function Organization({ selectedEventIdProp, onEventSelect }) {
                     onDeepLinkHandled={() => setModalDeepLink(null)}
                     onEditOffice={handleEditOffice}
                     onAddRequirements={handleAddRequirements}
+                    onDeleteOffice={handleDeleteOffice}
                 />
             )}
 
@@ -936,6 +952,7 @@ export default function Organization({ selectedEventIdProp, onEventSelect }) {
                     onDeepLinkHandled={() => setModalDeepLink(null)}
                     onEditOffice={handleEditOffice}
                     onAddRequirements={handleAddRequirements}
+                    onDeleteOffice={handleDeleteOffice}
                 />
             )}
 
@@ -953,7 +970,7 @@ export default function Organization({ selectedEventIdProp, onEventSelect }) {
                             onSave={handleEditSave}
                             officeTypes={officeTypes}
                             heads={heads}
-                            userRole={currentUser?.RoleID}
+                            userRole={currentUser?.roleid}
                         />
                     );
                 })()

@@ -5,47 +5,47 @@ const eventDepartmentsController = {
   // GET all departments participating in an event with their levels and program stats
   getByEvent: async (req, res) => {
     try {
-      const { eventId } = req.params;
-      if (!eventId) {
+      const { eventid } = req.params;
+      if (!eventid) {
         return res.status(400).json({ success: false, message: 'Event ID is required' });
       }
 
       let query;
       let params;
 
-      if (String(eventId).toLowerCase() === 'all') {
+      if (String(eventid).toLowerCase() === 'all') {
         query = `
           SELECT 
-            d.id AS department_id,
+            d.id AS departmentid,
             d.name AS department_name,
             d.code AS department_code,
             NULL::integer AS id,
-            NULL::integer AS event_id,
-            NULL::timestamp AS created_at,
-            NULL::timestamp AS updated_at,
-            COUNT(DISTINCT o."OfficeID") AS program_count
+            NULL::integer AS eventid,
+            NULL::timestamp AS createdat,
+            NULL::timestamp AS updatedat,
+            COUNT(DISTINCT o."officeid") AS program_count
           FROM departments d
-          LEFT JOIN offices o ON o.master_list_id IN (SELECT id FROM master_list WHERE department_id = d.id)
+          LEFT JOIN offices o ON o.masterlistid IN (SELECT id FROM masterlist WHERE departmentid = d.id)
           GROUP BY d.id, d.name, d.code
           ORDER BY d.id ASC
         `;
         params = [];
       } else {
-        const numericEventId = Number(eventId);
+        const numericEventId = Number(eventid);
         query = `
           SELECT 
-            d.id AS department_id,
+            d.id AS departmentid,
             d.name AS department_name,
             d.code AS department_code,
             ed.id AS id,
-            COALESCE(ed.event_id, ?) AS event_id,
-            ed.created_at,
-            ed.updated_at,
-            COUNT(DISTINCT o."OfficeID") AS program_count
+            COALESCE(ed.eventid, ?) AS eventid,
+            ed.createdat,
+            ed.updatedat,
+            COUNT(DISTINCT o."officeid") AS program_count
           FROM departments d
-          LEFT JOIN event_departments ed ON ed.department_id = d.id AND ed.event_id = ?
-          LEFT JOIN offices o ON o."EventID" = ? AND o.master_list_id IN (SELECT id FROM master_list WHERE department_id = d.id)
-          GROUP BY d.id, d.name, d.code, ed.id, ed.event_id, ed.created_at, ed.updated_at
+          LEFT JOIN eventdepartments ed ON ed.departmentid = d.id AND ed.eventid = ?
+          LEFT JOIN offices o ON o."eventid" = ? AND o.masterlistid IN (SELECT id FROM masterlist WHERE departmentid = d.id)
+          GROUP BY d.id, d.name, d.code, ed.id, ed.eventid, ed.createdat, ed.updatedat
           ORDER BY d.id ASC
         `;
         params = [numericEventId, numericEventId, numericEventId];
@@ -62,22 +62,22 @@ const eventDepartmentsController = {
   // Assign a department to an event
   assignDepartment: async (req, res) => {
     try {
-      const { event_id, department_id } = req.body;
+      const { eventid, departmentid } = req.body;
 
-      if (!event_id || !department_id) {
+      if (!eventid || !departmentid) {
         return res.status(400).json({ success: false, message: 'Event ID and Department ID are required.' });
       }
 
       const [existing] = await db.query(
-        `SELECT id FROM event_departments WHERE event_id = ? AND department_id = ? LIMIT 1`,
-        [Number(event_id), Number(department_id)]
+        `SELECT id FROM eventdepartments WHERE eventid = ? AND departmentid = ? LIMIT 1`,
+        [Number(eventid), Number(departmentid)]
       );
 
       let record;
       if (existing.length > 0) {
         const [updated] = await db.query(
-          `UPDATE event_departments 
-           SET updated_at = CURRENT_TIMESTAMP 
+          `UPDATE eventdepartments 
+           SET updatedat = CURRENT_TIMESTAMP 
            WHERE id = ? 
            RETURNING *`,
           [existing[0].id]
@@ -85,10 +85,10 @@ const eventDepartmentsController = {
         record = updated[0];
       } else {
         const [inserted] = await db.query(
-          `INSERT INTO event_departments (event_id, department_id)
+          `INSERT INTO eventdepartments (eventid, departmentid)
            VALUES (?, ?)
            RETURNING *`,
-          [Number(event_id), Number(department_id)]
+          [Number(eventid), Number(departmentid)]
         );
         record = inserted[0];
       }
@@ -97,24 +97,24 @@ const eventDepartmentsController = {
       if (record?.id) {
         await db.query(
           `UPDATE offices 
-           SET event_department_id = ? 
-           WHERE "EventID" = ? 
-             AND event_department_id IS NULL 
-             AND master_list_id IN (SELECT id FROM master_list WHERE department_id = ?)`,
-          [record.id, Number(event_id), Number(department_id)]
+           SET eventdepartmentid = ? 
+           WHERE "eventid" = ? 
+             AND eventdepartmentid IS NULL 
+             AND masterlistid IN (SELECT id FROM masterlist WHERE departmentid = ?)`,
+          [record.id, Number(eventid), Number(departmentid)]
         );
       }
 
       // Fetch joined department name
-      const [deptRows] = await db.query('SELECT name FROM departments WHERE id = ?', [Number(department_id)]);
-      const departmentName = deptRows[0]?.name || `Department #${department_id}`;
+      const [deptRows] = await db.query('SELECT name FROM departments WHERE id = ?', [Number(departmentid)]);
+      const departmentName = deptRows[0]?.name || `Department #${departmentid}`;
 
-      if (req.user?.userId) {
+      if (req.user?.userid) {
         try {
-          await recordLog(req.user.userId, 'DepartmentAccredited', {
-            eventId: event_id,
+          await recordLog(req.user.userid, 'DepartmentAccredited', {
+            eventid: eventid,
             department: departmentName,
-            level: accreditation_level,
+            level: req.body.accreditationlevel || 'N/A',
           });
         } catch (logErr) {
           console.error('Failed to record log:', logErr);
@@ -139,22 +139,22 @@ const eventDepartmentsController = {
   updateLevel: async (req, res) => {
     try {
       const { id } = req.params;
-      const { accreditation_level } = req.body;
+      const { accreditationlevel } = req.body;
 
-      if (!accreditation_level) {
+      if (!accreditationlevel) {
         return res.status(400).json({ success: false, message: 'Accreditation level is required.' });
       }
 
       // Update academic programs under this event department
       await db.query(
-        `UPDATE offices SET accreditation_level = ? WHERE event_department_id = ?`,
-        [accreditation_level, Number(id)]
+        `UPDATE offices SET accreditationlevel = ? WHERE eventdepartmentid = ?`,
+        [accreditationlevel, Number(id)]
       );
 
       res.json({
         success: true,
         message: 'Accreditation level updated for programs successfully',
-        data: { id: Number(id), accreditation_level },
+        data: { id: Number(id), accreditationlevel },
       });
     } catch (err) {
       console.error('Error updating accreditation level:', err);
@@ -168,9 +168,9 @@ const eventDepartmentsController = {
       const { id } = req.params;
 
       // Nullify office foreign keys first
-      await db.query(`UPDATE offices SET event_department_id = NULL WHERE event_department_id = ?`, [Number(id)]);
+      await db.query(`UPDATE offices SET eventdepartmentid = NULL WHERE eventdepartmentid = ?`, [Number(id)]);
 
-      const [deleted] = await db.query(`DELETE FROM event_departments WHERE id = ? RETURNING *`, [Number(id)]);
+      const [deleted] = await db.query(`DELETE FROM eventdepartments WHERE id = ? RETURNING *`, [Number(id)]);
 
       if (deleted.length === 0) {
         return res.status(404).json({ success: false, message: 'Event department not found.' });

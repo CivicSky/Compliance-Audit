@@ -56,6 +56,6 @@ const Select = forwardRef(({
   );
 });
 
-Select.displayName = 'Select';
+Select.displayname = 'Select';
 
 export default Select;

@@ -1,13 +1,13 @@
 import { API_BASE_URL } from '../../utils/apiBase';
 
 import React, { useState, useEffect, useMemo } from "react";
-import { officeHeadsAPI } from "../../utils/api";
+import api, { officeHeadsAPI } from "../../utils/api";
 import { useModal } from "../UI/ModalProvider";
 import CustomSelect from "../UI/CustomSelect";
 import SmartUserAvatar from "../UI/SmartUserAvatar";
 
 export default function EditOfficeModal({ visible, onClose, office, onSave, officeTypes, userRole = 'user' }) {
-    const [officeName, setOfficeName] = useState("");
+    const [officename, setOfficeName] = useState("");
     const [officeTypeID, setOfficeTypeID] = useState("");
     const [selectedHeadIDs, setSelectedHeadIDs] = useState([]); // Array for multiple heads
     const [heads, setHeads] = useState([]);
@@ -15,20 +15,20 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
     const [programTypes, setProgramTypes] = useState([]);
     const [selectedDepartmentID, setSelectedDepartmentID] = useState("");
     const [selectedProgramTypeID, setSelectedProgramTypeID] = useState("");
-    const [accreditationLevel, setAccreditationLevel] = useState("Candidate");
+    const [accreditationlevel, setAccreditationLevel] = useState("None");
     const [loadingHeads, setLoadingHeads] = useState(false);
     const [showHeadDropdown, setShowHeadDropdown] = useState(false);
     const isAdmin = userRole === 'admin' || userRole === 1;
     const MAX_HEADS = 4;
 
     const getHeadDisplayName = (head) => {
-        return `${head?.FirstName || ""} ${head?.MiddleInitial ? `${head.MiddleInitial}.` : ""} ${head?.LastName || ""}`
+        return `${head?.firstname || ""} ${head?.middleinitial ? `${head.middleinitial}.` : ""} ${head?.lastname || ""}`
             .replace(/\s+/g, " ")
             .trim();
     };
 
     const getHeadPicUrl = (head) => {
-        return head?.ProfilePic ? `${API_BASE_URL}/uploads/profile-pics/${head.ProfilePic}` : null;
+        return head?.profilepic ? `${API_BASE_URL}/uploads/profile-pics/${head.profilepic}` : null;
     };
 
     const [headSearchTerm, setHeadSearchTerm] = useState("");
@@ -37,7 +37,7 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
         const query = headSearchTerm.trim().toLowerCase();
         if (!query) return heads;
         return heads.filter((head) => {
-            const fullName = `${head.FirstName || ""} ${head.MiddleInitial ? `${head.MiddleInitial}.` : ""} ${head.LastName || ""}`
+            const fullName = `${head.firstname || ""} ${head.middleinitial ? `${head.middleinitial}.` : ""} ${head.lastname || ""}`
                 .replace(/\s+/g, " ")
                 .trim()
                 .toLowerCase();
@@ -51,12 +51,12 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
     const [isSaving, setIsSaving] = useState(false);
 
     const getOfficeTypeById = (id) => {
-        return officeTypes?.find((t) => String(t.OfficeTypeID || t.id) === String(id));
+        return officeTypes?.find((t) => String(t.officetypeid || t.id) === String(id));
     };
 
-    const isAcademicType = (officeTypeId) => {
-        const t = getOfficeTypeById(officeTypeId);
-        const name = String(t?.TypeName || t?.name || office?.office_type_name || office?.TypeName || '').toLowerCase();
+    const isAcademicType = (officetypeid) => {
+        const t = getOfficeTypeById(officetypeid);
+        const name = String(t?.typename || t?.name || office?.office_type_name || office?.typename || '').toLowerCase();
         if (!name) return false;
         if (/\bnon\b|non-?academic|not\s+academic/.test(name)) return false;
         return /\bacademic\b/.test(name);
@@ -70,11 +70,11 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
 
     useEffect(() => {
         if (!office) return;
-        setOfficeName(office.office_name || office.OfficeName || "");
-        setOfficeTypeID(office.office_type || office.office_type_id || office.OfficeTypeID || "");
-        setSelectedDepartmentID(office.department_id || office.DepartmentID || office.departmentID || "");
+        setOfficeName(office.officename || office.officename || "");
+        setOfficeTypeID(office.office_type || office.officetypeid || office.officetypeid || "");
+        setSelectedDepartmentID(office.departmentid || office.DepartmentID || office.departmentID || "");
         setSelectedProgramTypeID(office.program_type_id || office.ProgramTypeID || office.programTypeID || "");
-        setAccreditationLevel(office.accreditation_level || office.AccreditationLevel || "Candidate");
+        setAccreditationLevel(office.accreditationlevel || "None");
 
         let headIds = [];
         if (Array.isArray(office.head_ids) && office.head_ids.length > 0) {
@@ -82,11 +82,11 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
         } else if (Array.isArray(office.HeadIDs) && office.HeadIDs.length > 0) {
             headIds = office.HeadIDs;
         } else if (Array.isArray(office.heads) && office.heads.length > 0) {
-            headIds = office.heads.map(h => h.HeadID ?? h.head_id ?? h.id ?? h.UserID);
-        } else if (office.head_id) {
-            headIds = [office.head_id];
-        } else if (office.HeadID) {
-            headIds = [office.HeadID];
+            headIds = office.heads.map(h => h.headid ?? h.headid ?? h.id ?? h.userid);
+        } else if (office.headid) {
+            headIds = [office.headid];
+        } else if (office.headid) {
+            headIds = [office.headid];
         }
 
         setSelectedHeadIDs(headIds.map(Number).filter(n => !isNaN(n)));
@@ -97,27 +97,13 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
 
         const fetchLookups = async () => {
             try {
-                let deps = [];
-                try {
-                    const res = await fetch('/api/departments');
-                    if (res.ok) {
-                        const json = await res.json();
-                        deps = Array.isArray(json) ? json : (json.data || json.departments || []);
-                    }
-                } catch (err) {
-                    // ignore lookup failures
-                }
+                const [depsRes, ptypesRes] = await Promise.all([
+                    api.get('/api/departments').then(r => r.data).catch(() => ({ data: [] })),
+                    api.get('/api/programtypes').then(r => r.data).catch(() => ({ data: [] })),
+                ]);
 
-                let ptypes = [];
-                try {
-                    const res2 = await fetch('/api/program_types');
-                    if (res2.ok) {
-                        const json2 = await res2.json();
-                        ptypes = Array.isArray(json2) ? json2 : (json2.data || json2.program_types || []);
-                    }
-                } catch (err) {
-                    // ignore lookup failures
-                }
+                const deps = Array.isArray(depsRes) ? depsRes : (depsRes?.data || depsRes?.departments || []);
+                const ptypes = Array.isArray(ptypesRes) ? ptypesRes : (ptypesRes?.data || ptypesRes?.programtypes || []);
 
                 setDepartments(Array.isArray(deps) ? deps : []);
                 setProgramTypes(Array.isArray(ptypes) ? ptypes : []);
@@ -168,7 +154,7 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
         const findProgramTypeId = (match) => {
             if (!Array.isArray(programTypes) || programTypes.length === 0) return null;
             const found = programTypes.find((p) => {
-                const pname = String(p.name || p.ProgramTypeName || p.Name || p.TypeName || '').toLowerCase();
+                const pname = String(p.name || p.ProgramTypeName || p.Name || p.typename || '').toLowerCase();
                 return pname.includes(match);
             });
             return found ? (found.id ?? found.ProgramTypeID ?? found.ID ?? found.Id ?? '') : null;
@@ -189,24 +175,24 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
         setSelectedProgramTypeID("");
     }, [officeTypeID, selectedDepartmentID, departments, programTypes]);
 
-    const getHeadId = (h) => Number(h?.HeadID ?? h?.head_id ?? h?.UserID ?? h?.user_id ?? h?.id);
+    const getHeadId = (h) => Number(h?.headid ?? h?.headid ?? h?.userid ?? h?.userid ?? h?.id);
 
     // Toggle head selection
     const toggleHeadSelection = (rawId) => {
-        const headId = Number(rawId);
+        const headid = Number(rawId);
         const selectedNums = selectedHeadIDs.map(Number);
 
-        if (!selectedNums.includes(headId) && selectedNums.length >= MAX_HEADS) {
+        if (!selectedNums.includes(headid) && selectedNums.length >= MAX_HEADS) {
             showAlert(`You can select up to ${MAX_HEADS} heads.`);
             return;
         }
 
         setSelectedHeadIDs(prev => {
             const nums = prev.map(Number);
-            if (nums.includes(headId)) {
-                return nums.filter(id => id !== headId);
+            if (nums.includes(headid)) {
+                return nums.filter(id => id !== headid);
             } else {
-                return [...nums, headId];
+                return [...nums, headid];
             }
         });
     };
@@ -218,7 +204,7 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
         const selectedHeads = heads.filter(h => selectedNums.includes(getHeadId(h)));
         if (selectedHeads.length === 1 && selectedHeads[0]) {
             const h = selectedHeads[0];
-            return `${h.FirstName || h.first_name || ''} ${h.LastName || h.last_name || ''}`.trim() || '1 head selected';
+            return `${h.firstname || h.firstname || ''} ${h.lastname || h.lastname || ''}`.trim() || '1 head selected';
         }
         if (selectedHeads.length > 0) {
             return `${selectedHeads.length} heads selected`;
@@ -231,18 +217,18 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
         if (!office || isSaving) return;
 
         const updatedOffice = {
-            master_list_id: office.master_list_id || null,
-            OfficeName: officeName,
-            OfficeTypeID: officeTypeID,
-            accreditation_level: isAcademicType(officeTypeID) ? accreditationLevel : null,
-            HeadIDs: selectedHeadIDs.map(id => parseInt(id, 10)).filter(id => !isNaN(id)),
-            EventID: office.event_id || office.EventID || null,
+            masterlistid: office.masterlistid || null,
+            officename: officename,
+            officetypeid: officeTypeID,
+            accreditationlevel: isAcademicType(officeTypeID) ? accreditationlevel : null,
+            HeadIDs: [],
+            eventid: office.eventid || office.eventid || null,
         };
 
         setIsSaving(true);
         try {
             if (typeof onSave === 'function') {
-                const res = await onSave({ id: office.id || office.OfficeID, ...updatedOffice });
+                const res = await onSave({ id: office.id || office.officeid, ...updatedOffice });
                 if (res && res.success === false) {
                     return;
                 }
@@ -285,7 +271,7 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
                         <label className="block text-sm font-semibold text-gray-800 mb-1">Office Name</label>
                         <input
                             type="text"
-                            value={officeName}
+                            value={officename}
                             onChange={(e) => setOfficeName(e.target.value)}
                             disabled={!isAdmin}
                             className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
@@ -304,8 +290,8 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
                             options={[
                                 { value: "", label: "Select Office Type" },
                                 ...(officeTypes || []).map((type) => ({
-                                    value: String(type.OfficeTypeID || type.id),
-                                    label: type.TypeName || type.name,
+                                    value: String(type.officetypeid || type.id),
+                                    label: type.typename || type.name,
                                 })),
                             ]}
                             required
@@ -343,7 +329,7 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
                                             { value: "", label: "Select Program Type (Optional)" },
                                             ...programTypes.map((pt) => ({
                                                 value: String(pt.id ?? pt.ProgramTypeID),
-                                                label: pt.name || pt.ProgramTypeName || pt.TypeName,
+                                                label: pt.name || pt.ProgramTypeName || pt.typename,
                                             })),
                                         ]}
                                     />
@@ -353,11 +339,12 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
                             <div>
                                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">Accreditation Level</label>
                                 <CustomSelect
-                                    value={accreditationLevel}
+                                    value={accreditationlevel}
                                     onChange={(val) => setAccreditationLevel(val)}
                                     disabled={!isAdmin}
                                     placeholder="Select Accreditation Level"
                                     options={[
+                                        { value: "None", label: "None" },
                                         { value: "Candidate", label: "Candidate" },
                                         { value: "Level I", label: "Level I" },
                                         { value: "Level II", label: "Level II" },
@@ -369,80 +356,7 @@ export default function EditOfficeModal({ visible, onClose, office, onSave, offi
                         </>
                     )}
 
-                    <div>
-                        <label className="block text-sm font-semibold text-gray-800 mb-1">
-                            Office Head(s) <span className="text-xs text-gray-400 font-normal">(Max {MAX_HEADS})</span>
-                        </label>
-                        <div className="relative">
-                            <button
-                                type="button"
-                                onClick={() => isAdmin && setShowHeadDropdown(!showHeadDropdown)}
-                                disabled={!isAdmin}
-                                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-left bg-white text-gray-900 flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
-                            >
-                                <span className={selectedHeadIDs.length === 0 ? "text-gray-400" : "text-gray-900 font-medium"}>
-                                    {getSelectedHeadsText()}
-                                </span>
-                                <svg className={`h-4 w-4 text-gray-400 transition-transform ${showHeadDropdown ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                                </svg>
-                            </button>
 
-                            {/* Dropdown Menu */}
-                            <div className={`mt-2 max-h-60 overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg p-2 space-y-1 ${showHeadDropdown ? 'block' : 'hidden'}`}>
-                                <div className="p-1 mb-1 border-b border-gray-100">
-                                    <input
-                                        type="text"
-                                        placeholder="Search heads..."
-                                        value={headSearchTerm}
-                                        onChange={(e) => setHeadSearchTerm(e.target.value)}
-                                        className="w-full px-2 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                        onClick={(e) => e.stopPropagation()}
-                                    />
-                                </div>
-                                {loadingHeads ? (
-                                    <div className="p-3 text-center text-xs text-gray-500">Loading heads...</div>
-                                ) : filteredHeads.length === 0 ? (
-                                    <div className="p-3 text-center text-xs text-gray-500">No heads found</div>
-                                ) : (
-                                    filteredHeads.map((head) => {
-                                        const hId = getHeadId(head);
-                                        const isSelected = selectedHeadIDs.map(Number).includes(hId);
-                                        const isAssigned = head.isAssigned && !isSelected;
-                                        const fullName = getHeadDisplayName(head);
-                                        const picUrl = getHeadPicUrl(head);
-
-                                        return (
-                                            <label
-                                                key={hId}
-                                                className={`flex items-center gap-3 p-2 rounded cursor-pointer transition ${
-                                                    isSelected ? 'bg-blue-50 text-blue-700' : 'hover:bg-gray-50 text-gray-700'
-                                                } ${isAssigned ? 'opacity-60' : ''}`}
-                                            >
-                                                <input
-                                                    type="checkbox"
-                                                    checked={isSelected}
-                                                    onChange={() => toggleHeadSelection(hId)}
-                                                    disabled={!isSelected && isHeadLimitReached}
-                                                    className="rounded text-blue-600 focus:ring-blue-500"
-                                                />
-                                                <SmartUserAvatar
-                                                    user={head}
-                                                    fullName={fullName}
-                                                    size="h-10 w-10"
-                                                    textSize="text-xs font-bold"
-                                                    ring="border border-gray-200"
-                                                />
-                                                <span className="flex-1 self-center text-sm leading-snug">
-                                                    <span className="font-medium text-gray-800">{fullName || `Head #${head.HeadID}`}</span>
-                                                </span>
-                                            </label>
-                                        );
-                                    })
-                                )}
-                            </div>
-                        </div>
-                    </div>
 
                     <div className="flex justify-end gap-2.5 pt-4 border-t border-slate-100">
                         {isAdmin && (

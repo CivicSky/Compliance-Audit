@@ -5,7 +5,7 @@ const masterlistController = require('../controllers/masterlistController');
 const auth = require('../middleware/auth');
 
 router.get('/', auth, masterlistController.getAll);
-router.get('/available/:eventId', auth, masterlistController.getAvailableForEvent);
+router.get('/available/:eventid', auth, masterlistController.getAvailableForEvent);
 router.post('/add', auth, masterlistController.addItem);
 router.put('/:id', auth, masterlistController.updateItem);
 router.post('/delete-multiple', auth, masterlistController.deleteMultiple);

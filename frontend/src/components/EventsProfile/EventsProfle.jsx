@@ -79,20 +79,20 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, viewMode = 'g
         // Apply search filter
         if (searchTerm.trim()) {
             filtered = events.filter(event => {
-                const eventName = event.EventName?.toLowerCase() || '';
+                const eventname = event.eventname?.toLowerCase() || '';
                 const description = event.Description?.toLowerCase() || '';
-                const eventCode = event.EventCode?.toLowerCase() || '';
+                const eventcode = event.eventcode?.toLowerCase() || '';
                 const searchLower = searchTerm.toLowerCase();
 
-                return eventName.includes(searchLower) ||
+                return eventname.includes(searchLower) ||
                     description.includes(searchLower) ||
-                    eventCode.includes(searchLower);
+                    eventcode.includes(searchLower);
             });
         }
 
         // Sort by event name in ascending order
         const sortedFiltered = [...filtered].sort((a, b) => {
-            return (a.EventName || '').localeCompare(b.EventName || '');
+            return (a.eventname || '').localeCompare(b.eventname || '');
         });
 
         setFilteredEvents(sortedFiltered);
@@ -123,13 +123,13 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, viewMode = 'g
         }
     }, [filteredEvents.length, currentPage, itemsPerPage]);
 
-    const handleCheckboxChange = (eventId, isChecked) => {
+    const handleCheckboxChange = (eventid, isChecked) => {
         setSelectedEvents(prev => {
             const newSet = new Set(prev);
             if (isChecked) {
-                newSet.add(eventId);
+                newSet.add(eventid);
             } else {
-                newSet.delete(eventId);
+                newSet.delete(eventid);
             }
             return newSet;
         });
@@ -142,7 +142,7 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, viewMode = 'g
             const response = await eventsAPI.deleteEvents(eventIds);
 
             if (response.success) {
-                setEvents(prev => prev.filter(event => !eventIds.includes(event.EventID)));
+                setEvents(prev => prev.filter(event => !eventIds.includes(event.eventid)));
                 setSelectedEvents(new Set());
                 toast?.({
                     title: 'Events Deleted',
@@ -179,9 +179,9 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, viewMode = 'g
         e.stopPropagation();
         e.preventDefault();
         try {
-            setDownloadingId(event.EventID);
-            const keyName = event.EventID;
-            const sanitizedName = String(event.EventCode || event.EventName || `event_${event.EventID}`).replace(/[<>:"/\\|?*]/g, '_').trim();
+            setDownloadingId(event.eventid);
+            const keyName = event.eventid;
+            const sanitizedName = String(event.eventcode || event.eventname || `event_${event.eventid}`).replace(/[<>:"/\\|?*]/g, '_').trim();
             const url = await eventsAPI.downloadEventZip(keyName);
 
             const link = document.createElement('a');
@@ -255,9 +255,10 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, viewMode = 'g
     const totalPages = Math.max(1, Math.ceil(filteredEvents.length / itemsPerPage));
     const startIdx = (currentPage - 1) * itemsPerPage;
     const paginatedEvents = filteredEvents.slice(startIdx, startIdx + itemsPerPage);
+    const visibleEvents = viewMode === 'list' ? filteredEvents : paginatedEvents;
 
     return (
-        <div className={viewMode === 'list' ? 'mt-1 w-full flex flex-col pb-24' : 'w-full h-full min-h-0 flex-1 flex flex-col pt-1 px-0.5'}>
+        <div className={viewMode === 'list' ? 'mt-1 w-full flex flex-col pb-3' : 'w-full h-full min-h-0 flex-1 flex flex-col pt-1 px-0.5 overflow-hidden'}>
             {/* Search Results Counter */}
             {searchTerm.trim() && (
                 <div className="text-xs text-slate-500 mb-2 shrink-0">
@@ -271,29 +272,29 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, viewMode = 'g
                         {deleteMode && <span>Select</span>}
                         <span>Event Name & Code</span>
                     </div>
-                    <div className="col-span-3 flex items-center justify-center">Status</div>
-                    <div className="col-span-2 flex items-center justify-center">Archive Status</div>
+                    <div className="col-span-3 flex items-center">Status</div>
+                    <div className="col-span-2 flex items-center">Archive Status</div>
                     <div className="col-span-2 flex items-center justify-end">Download</div>
                 </div>
             )}
 
-            <div className={viewMode === 'list' ? 'flex flex-col gap-2 pt-1 pb-1' : 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 flex-1 min-h-0'}>
-                {paginatedEvents.map((event) => {
+            <div className={viewMode === 'list' ? 'flex flex-col gap-2 pt-1 pb-1' : 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 grid-rows-3 gap-3 flex-1 min-h-0 overflow-hidden'}>
+                {visibleEvents.map((event) => {
                     const isFolderReady = downloadableFolders.some(folder => 
-                        String(folder) === String(event.EventID) ||
-                        normalizeName(folder) === normalizeName(event.EventCode) ||
-                        normalizeName(folder) === normalizeName(event.EventName) ||
-                        normalizeName(folder) === normalizeName(event.EventCode || event.EventName)
+                        String(folder) === String(event.eventid) ||
+                        normalizeName(folder) === normalizeName(event.eventcode) ||
+                        normalizeName(folder) === normalizeName(event.eventname) ||
+                        normalizeName(folder) === normalizeName(event.eventcode || event.eventname)
                     );
-                    const isSelected = selectedEvents.has(event.EventID);
-                    const isDownloading = downloadingId === event.EventID;
+                    const isSelected = selectedEvents.has(event.eventid);
+                    const isDownloading = downloadingId === event.eventid;
 
                     if (viewMode === 'list') {
                         return (
                             <div
-                                key={event.EventID}
+                                key={event.eventid}
                                 onClick={() => {
-                                    if (deleteMode) handleCheckboxChange(event.EventID, !isSelected);
+                                    if (deleteMode) handleCheckboxChange(event.eventid, !isSelected);
                                     else if (onEventClick) onEventClick(event);
                                 }}
                                 className={`relative rounded-xl border border-slate-200 bg-white shadow-2xs ${
@@ -308,7 +309,7 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, viewMode = 'g
                                                 <input
                                                     type="checkbox"
                                                     checked={isSelected}
-                                                    onChange={(e) => handleCheckboxChange(event.EventID, e.target.checked)}
+                                                    onChange={(e) => handleCheckboxChange(event.eventid, e.target.checked)}
                                                     onClick={(e) => e.stopPropagation()}
                                                     className="h-4 w-4 rounded border-rose-300 text-rose-600 focus:ring-rose-500 cursor-pointer"
                                                 />
@@ -321,10 +322,10 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, viewMode = 'g
                                         </div>
                                         <div className="min-w-0 flex-1">
                                             <div className="flex items-center gap-1.5 flex-wrap">
-                                                <h3 className="text-xs font-bold text-slate-900 truncate">{event.EventName}</h3>
-                                                {event.EventCode && (
+                                                <h3 className="text-xs font-bold text-slate-900 truncate">{event.eventname}</h3>
+                                                {event.eventcode && (
                                                     <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-mono font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                                                        {event.EventCode}
+                                                        {event.eventcode}
                                                     </span>
                                                 )}
                                             </div>
@@ -335,19 +336,19 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, viewMode = 'g
                                     </div>
 
                                     {/* Status (col-span-3) */}
-                                    <div className="col-span-3 flex items-center justify-center">
+                                    <div className="col-span-3 flex items-center">
                                         <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold tracking-wide border ${
-                                            event.status === 'active' || event.CreatedAt
+                                            event.status === 'active' || event.createdat
                                                 ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                                                 : 'bg-slate-100 text-slate-600 border-slate-200'
                                         }`}>
-                                            <span className={`h-1.5 w-1.5 rounded-full ${event.status === 'active' || event.CreatedAt ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
-                                            {event.status === 'active' || event.CreatedAt ? 'Active' : 'Archived'}
+                                            <span className={`h-1.5 w-1.5 rounded-full ${event.status === 'active' || event.createdat ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
+                                            {event.status === 'active' || event.createdat ? 'Active' : 'Archived'}
                                         </span>
                                     </div>
 
                                     {/* Archive Availability Status (col-span-2) */}
-                                    <div className="col-span-2 flex items-center justify-center">
+                                    <div className="col-span-2 flex items-center">
                                         {isFolderReady ? (
                                             <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/80 px-2 py-0.5 text-[10px] font-bold">
                                                 ZIP Ready
@@ -384,7 +385,7 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, viewMode = 'g
 
                     return (
                         <div
-                            key={event.EventID}
+                            key={event.eventid}
                             className={`group relative flex flex-col justify-between rounded-2xl bg-white shadow-2xs transition-all duration-200 ${
                                 isSelected
                                     ? 'border-2 border-rose-500 ring-2 ring-inset ring-rose-400/50 bg-rose-50/25 shadow-sm'
@@ -402,9 +403,9 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, viewMode = 'g
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
                                             </svg>
                                         </div>
-                                        {event.EventCode && (
+                                        {event.eventcode && (
                                             <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200 truncate">
-                                                {event.EventCode}
+                                                {event.eventcode}
                                             </span>
                                         )}
                                     </div>
@@ -414,18 +415,18 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, viewMode = 'g
                                             <input
                                                 type="checkbox"
                                                 checked={isSelected}
-                                                onChange={(e) => handleCheckboxChange(event.EventID, e.target.checked)}
+                                                onChange={(e) => handleCheckboxChange(event.eventid, e.target.checked)}
                                                 onClick={(e) => e.stopPropagation()}
                                                 className="h-4 w-4 rounded border-rose-300 text-rose-600 focus:ring-rose-500 cursor-pointer"
                                             />
                                         ) : (
                                             <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold tracking-wide border ${
-                                                event.status === 'active' || event.CreatedAt
+                                                event.status === 'active' || event.createdat
                                                     ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                                                     : 'bg-slate-100 text-slate-600 border-slate-200'
                                             }`}>
-                                                <span className={`h-1.5 w-1.5 rounded-full ${event.status === 'active' || event.CreatedAt ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
-                                                {event.status === 'active' || event.CreatedAt ? 'Active' : 'Archived'}
+                                                <span className={`h-1.5 w-1.5 rounded-full ${event.status === 'active' || event.createdat ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
+                                                {event.status === 'active' || event.createdat ? 'Active' : 'Archived'}
                                             </span>
                                         )}
                                     </div>
@@ -434,7 +435,7 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, viewMode = 'g
                                 {/* Event Title & Description */}
                                 <div className="min-h-0 flex-1">
                                     <h3 className="text-sm font-bold text-slate-900 group-hover:text-emerald-600 transition-colors line-clamp-2 leading-snug">
-                                        {event.EventName}
+                                        {event.eventname}
                                     </h3>
                                     {event.Description && (
                                         <p className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">
@@ -480,15 +481,17 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, viewMode = 'g
                 })}
             </div>
 
-            <div className="pt-2">
-                <Pagination
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    onPageChange={(page) => setCurrentPage(page)}
-                    fixed={true}
-                    showWhenSinglePage={false}
-                />
-            </div>
+            {viewMode === 'grid' && (
+                <div className="pt-2">
+                    <Pagination
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        onPageChange={(page) => setCurrentPage(page)}
+                        fixed={true}
+                        showWhenSinglePage={false}
+                    />
+                </div>
+            )}
         </div>
     );
 });

@@ -12,7 +12,7 @@ export default function ModalHeader({ event, onClose, mainMode }) {
 				{event && (
 					<div className="mt-1.5">
 						<span className="inline-flex items-center rounded-[6px] border border-blue-150 bg-blue-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-blue-700 shadow-sm">
-							{event.EventCode || event.EventName}
+							{event.eventcode || event.eventname}
 						</span>
 					</div>
 				)}

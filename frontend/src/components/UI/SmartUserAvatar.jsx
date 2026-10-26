@@ -14,14 +14,14 @@ export function getAvatarStyle(identifier = '') {
     let key = '';
     if (typeof identifier === 'object' && identifier !== null) {
         key = String(
-            identifier.UserID || 
+            identifier.userid || 
             identifier.id || 
-            identifier.HeadID || 
+            identifier.headid || 
             identifier.Email || 
             identifier.email || 
             identifier.FullName || 
             identifier.full_name || 
-            `${identifier.FirstName || identifier.firstName || ''} ${identifier.LastName || identifier.lastName || ''}`.trim() || 
+            `${identifier.firstname || identifier.firstname || ''} ${identifier.lastname || identifier.lastname || ''}`.trim() || 
             ''
         ).toLowerCase().trim();
     } else {
@@ -39,9 +39,9 @@ export function getAvatarStyle(identifier = '') {
     return avatarPalettes[Math.abs(hash) % avatarPalettes.length];
 }
 
-export function getInitials(firstName = '', lastName = '', fullName = '') {
-    const fn = (firstName || '').trim();
-    const ln = (lastName || '').trim();
+export function getInitials(firstname = '', lastname = '', fullName = '') {
+    const fn = (firstname || '').trim();
+    const ln = (lastname || '').trim();
     if (fn && ln) {
         return `${fn.charAt(0)}${ln.charAt(0)}`.toUpperCase();
     }
@@ -72,16 +72,16 @@ export default function SmartUserAvatar({
 }) {
     const [imgFailed, setImgFailed] = useState(false);
 
-    const firstName = user?.FirstName || user?.firstName || '';
-    const lastName = user?.LastName || user?.lastName || '';
-    const resolvedFullName = explicitFullName || name || user?.full_name || user?.FullName || user?.name || `${firstName} ${lastName}`.trim() || firstName || user?.Email || 'User';
-    const initials = explicitInitials || getInitials(firstName, lastName, resolvedFullName);
+    const firstname = user?.firstname || user?.firstname || '';
+    const lastname = user?.lastname || user?.lastname || '';
+    const resolvedFullName = explicitFullName || name || user?.full_name || user?.FullName || user?.name || `${firstname} ${lastname}`.trim() || firstname || user?.Email || 'User';
+    const initials = explicitInitials || getInitials(firstname, lastname, resolvedFullName);
     const style = getAvatarStyle(user || resolvedFullName);
     const tooltip = title || resolvedFullName;
 
     const rawPic = src !== undefined
         ? src
-        : (user?.ProfilePic || user?.profilePic || user?.avatar || user?.TempPreview || user?.profile_pic || user?.head_profile_pic);
+        : (user?.profilepic || user?.profilepic || user?.avatar || user?.TempPreview || user?.profilepic || user?.head_profile_pic);
 
     // Reset error when source changes
     useEffect(() => {

@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, ChevronRight, Calendar, Plus } from 'lucide-react';
+import { ChevronDown, ChevronRight, Calendar, Plus, UserPlus } from 'lucide-react';
 import AreaSection from './AreaSection';
 import CriteriaSection from './CriteriaSection';
 import RequirementsSection from './RequirementsSection';
@@ -8,8 +8,11 @@ import AddAreaPop from './addareapop';
 import EditAreaModal from '../EditArea/EditArea';
 import EditCriteriaModal from '../Criteria/EditCriteriaModal';
 import EditRequirementsModal from '../Requirement/EditRequirementsModal';
-import { usersAPI, officesAPI } from '../../utils/api';
+import AssignPersonnelModal from './AssignPersonnelModal';
+import AssignPersonnelScopeModal from '../OfficeHead/AssignPersonnelScopeModal';
+import { usersAPI, officesAPI, personnelAssignmentsAPI } from '../../utils/api';
 import { useModal } from "../UI/ModalProvider";
+import { useToast } from "../UI/Toast";
 
 import { formatDateTime } from '../../utils/formatDateTime';
 
@@ -45,6 +48,7 @@ export default function EventPopup({
     isAdmin: isAdminProp
 }) {
     const { showConfirm, showAlert } = useModal();
+    const { toast } = useToast();
 
     const [isActionOpen, setIsActionOpen] = useState(false);
     const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
@@ -67,6 +71,130 @@ export default function EventPopup({
     const [officeSearch, setOfficeSearch] = useState('');
     const [activeOfficeTab, setActiveOfficeTab] = useState("All");
 
+    // Personnel assignments state
+    const [personnelAssignments, setPersonnelAssignments] = useState([]);
+    const [myAssignedScope, setMyAssignedScope] = useState({ areaIds: new Set(), criteriaIds: new Set(), requirementIds: new Set() });
+    const [assignModal, setAssignModal] = useState({ open: false, targetType: null, target: null });
+    const [isAssignScopeModalOpen, setIsAssignScopeModalOpen] = useState(false);
+
+    const fetchPersonnelAssignments = useCallback(async () => {
+        if (!selectedEvent?.eventid) return;
+        try {
+            const res = await personnelAssignmentsAPI.getByEvent(selectedEvent.eventid);
+            if (res?.success) setPersonnelAssignments(res.data || []);
+        } catch (err) {
+            console.warn('Failed to load personnel assignments:', err);
+        }
+    }, [selectedEvent?.eventid]);
+
+    const fetchMyAssignments = useCallback(async () => {
+        try {
+            const res = await personnelAssignmentsAPI.getMyAssignments();
+            if (res?.success) {
+                setMyAssignedScope({
+                    areaIds: new Set(res.assignedAreaIds || []),
+                    criteriaIds: new Set(res.assignedCriteriaIds || []),
+                    requirementIds: new Set(res.assignedRequirementIds || [])
+                });
+            }
+        } catch (err) {}
+    }, []);
+
+    useEffect(() => {
+        fetchPersonnelAssignments();
+        fetchMyAssignments();
+    }, [fetchPersonnelAssignments, fetchMyAssignments]);
+
+    const currentUid = Number(currentUser?.userid ?? currentUser?.id ?? 0);
+    const { assignedCounts, assignedPersonnelMap } = useMemo(() => {
+        const counts = { areas: {}, criteria: {}, requirements: {} };
+        const map = { areas: {}, criteria: {}, requirements: {} };
+
+        (personnelAssignments || []).forEach(pa => {
+            const userObj = {
+                userid: pa.userid,
+                firstname: pa.firstname,
+                lastname: pa.lastname,
+                email: pa.email,
+                profilepic: pa.profilepic,
+                fullname: `${pa.firstname || ''} ${pa.lastname || ''}`.trim() || pa.email || `User #${pa.userid}`
+            };
+
+            if (pa.areaid && !pa.criteriaid && !pa.requirementid) {
+                const aid = Number(pa.areaid);
+                counts.areas[aid] = (counts.areas[aid] || 0) + 1;
+                if (!map.areas[aid]) map.areas[aid] = [];
+                if (!map.areas[aid].some(u => Number(u.userid) === Number(pa.userid))) {
+                    map.areas[aid].push(userObj);
+                }
+            } else if (pa.criteriaid && !pa.requirementid) {
+                const cid = Number(pa.criteriaid);
+                counts.criteria[cid] = (counts.criteria[cid] || 0) + 1;
+                if (!map.criteria[cid]) map.criteria[cid] = [];
+                if (!map.criteria[cid].some(u => Number(u.userid) === Number(pa.userid))) {
+                    map.criteria[cid].push(userObj);
+                }
+            } else if (pa.requirementid) {
+                const rid = Number(pa.requirementid);
+                counts.requirements[rid] = (counts.requirements[rid] || 0) + 1;
+                if (!map.requirements[rid]) map.requirements[rid] = [];
+                if (!map.requirements[rid].some(u => Number(u.userid) === Number(pa.userid))) {
+                    map.requirements[rid].push(userObj);
+                }
+            }
+        });
+
+        return { assignedCounts: counts, assignedPersonnelMap: map };
+    }, [personnelAssignments]);
+
+    // Helper to find all personnel assigned to children of an area
+    const getChildPersonnelForArea = useCallback((areaid, criteriaList = []) => {
+        const directUsers = assignedPersonnelMap.areas[Number(areaid)] || [];
+        const directUserIds = new Set(directUsers.map(u => Number(u.userid)));
+        const childUsersMap = new Map();
+
+        (criteriaList || []).forEach(crit => {
+            const critId = Number(crit.criteriaid);
+            const critUsers = assignedPersonnelMap.criteria[critId] || [];
+            critUsers.forEach(u => {
+                if (!directUserIds.has(Number(u.userid)) && !childUsersMap.has(Number(u.userid))) {
+                    childUsersMap.set(Number(u.userid), u);
+                }
+            });
+
+            const reqs = requirementsData[critId] || [];
+            reqs.forEach(r => {
+                const reqUsers = assignedPersonnelMap.requirements[Number(r.requirementid)] || [];
+                reqUsers.forEach(u => {
+                    if (!directUserIds.has(Number(u.userid)) && !childUsersMap.has(Number(u.userid))) {
+                        childUsersMap.set(Number(u.userid), u);
+                    }
+                });
+            });
+        });
+
+        return Array.from(childUsersMap.values());
+    }, [assignedPersonnelMap, requirementsData]);
+
+    // Helper to find all personnel assigned to child standards of a criteria
+    const getChildPersonnelForCriteria = useCallback((criteriaid) => {
+        const directUsers = assignedPersonnelMap.criteria[Number(criteriaid)] || [];
+        const directUserIds = new Set(directUsers.map(u => Number(u.userid)));
+        const childUsersMap = new Map();
+
+        const reqs = requirementsData[Number(criteriaid)] || [];
+        reqs.forEach(r => {
+            const reqUsers = assignedPersonnelMap.requirements[Number(r.requirementid)] || [];
+            reqUsers.forEach(u => {
+                if (!directUserIds.has(Number(u.userid)) && !childUsersMap.has(Number(u.userid))) {
+                    childUsersMap.set(Number(u.userid), u);
+                }
+            });
+        });
+
+        return Array.from(childUsersMap.values());
+    }, [assignedPersonnelMap, requirementsData]);
+
     const formatDateString = (dateStr) => {
         if (!dateStr) return "N/A";
         try {
@@ -87,9 +215,9 @@ export default function EventPopup({
         
         // Filter by tab
         if (activeOfficeTab === "Programs") {
-            list = list.filter(o => o.entity_type_id === 1 || String(o.category_name || o.TypeName || "").toLowerCase().includes("academic program") || String(o.category_name || o.TypeName || "").toLowerCase().includes("program"));
+            list = list.filter(o => o.entitytypeid === 1 || String(o.category_name || o.typename || "").toLowerCase().includes("academic program") || String(o.category_name || o.typename || "").toLowerCase().includes("program"));
         } else if (activeOfficeTab === "Offices") {
-            list = list.filter(o => o.entity_type_id === 2 || String(o.category_name || o.TypeName || "").toLowerCase().includes("non-academic") || String(o.category_name || o.TypeName || "").toLowerCase().includes("office"));
+            list = list.filter(o => o.entitytypeid === 2 || String(o.category_name || o.typename || "").toLowerCase().includes("non-academic") || String(o.category_name || o.typename || "").toLowerCase().includes("office"));
         }
 
         // Filter by search query
@@ -97,7 +225,7 @@ export default function EventPopup({
         if (!query) return list;
 
         return list.filter(o => {
-            const name = String(o.OfficeName || o.office_name || "").toLowerCase();
+            const name = String(o.officename || o.officename || "").toLowerCase();
             const dept = String(o.department_name || "").toLowerCase();
             return name.includes(query) || dept.includes(query);
         });
@@ -106,24 +234,24 @@ export default function EventPopup({
     const [selectedOfficeIdsLocal, setSelectedOfficeIdsLocal] = useState(new Set());
     const [assignedAreaIds, setAssignedAreaIds] = useState(new Set());
 
-    const roleId = Number(currentUser?.RoleID);
-    const roleName = String(currentUser?.RoleName || '').toLowerCase();
+    const roleid = Number(currentUser?.roleid);
+    const rolename = String(currentUser?.rolename || '').toLowerCase();
 
-    const isAuditor = roleId === 4 || 
-                      roleName.includes('auditor') || 
+    const isAuditor = roleid === 4 || 
+                      rolename.includes('auditor') || 
                       Boolean(currentUser?.isExternalAuditor);
 
-    const isPersonnel = roleId === 2 || 
-                        roleId === 3 || 
-                        roleName.includes('office') || 
-                        roleName === 'user' || 
-                        roleName === 'personnel' || 
-                        roleName === 'head';
+    const isPersonnel = roleid === 2 || 
+                        roleid === 3 || 
+                        rolename.includes('office') || 
+                        rolename === 'user' || 
+                        rolename === 'personnel' || 
+                        rolename === 'head';
 
     const isAdmin = !isAuditor && !isPersonnel && (
         isAdminProp !== undefined 
             ? Boolean(isAdminProp) 
-            : (roleId === 1 || roleName === 'admin')
+            : (roleid === 1 || rolename === 'admin')
     );
 
     const canEdit = isAdmin;
@@ -148,12 +276,12 @@ export default function EventPopup({
         const fetchAssignments = async () => {
             try {
                 const token = localStorage.getItem('token');
-                const res = await fetch(`/api/areas/assignments/${currentUser.UserID}`, {
+                const res = await fetch(`/api/areas/assignments/${currentUser.userid}`, {
                     headers: token ? { 'Authorization': `Bearer ${token}` } : {}
                 });
                 const data = await res.json();
                 if (mounted && res.ok && data.success) {
-                    const ids = new Set((data.assignments || []).map(a => Number(a.area_id)));
+                    const ids = new Set((data.assignments || []).map(a => Number(a.areaid)));
                     setAssignedAreaIds(ids);
                 }
             } catch (e) {}
@@ -171,7 +299,7 @@ export default function EventPopup({
                 setLoadingOffices(true);
                 const all = await officesAPI.getAll();
                 if (!mounted) return;
-                const forEvent = (all || []).filter(o => Number(o.event_id) === Number(selectedEvent.EventID) || Number(o.EventID) === Number(selectedEvent.EventID));
+                const forEvent = (all || []).filter(o => Number(o.eventid) === Number(selectedEvent.eventid) || Number(o.eventid) === Number(selectedEvent.eventid));
                 setOffices(forEvent);
             } catch (err) {
                 console.error('Failed to load offices', err);
@@ -194,46 +322,46 @@ export default function EventPopup({
         return values.some(value => String(value || '').toLowerCase().includes(normalizedSearch));
     };
 
-    const getFilteredRequirementsForCriteria = (criteriaId) => {
-        const requirements = requirementsData[criteriaId] || [];
+    const getFilteredRequirementsForCriteria = (criteriaid) => {
+        const requirements = requirementsData[criteriaid] || [];
         if (!hasSearch) return requirements;
         return requirements.filter(req =>
-            matchesSearch(req.RequirementCode, req.Description)
+            matchesSearch(req.requirementcode, req.Description)
         );
     };
 
     const getFilteredCriteria = (criteriaList = []) => {
         if (!hasSearch) return criteriaList;
         return criteriaList.filter(crit => {
-            const matchingRequirements = getFilteredRequirementsForCriteria(crit.CriteriaID);
+            const matchingRequirements = getFilteredRequirementsForCriteria(crit.criteriaid);
             return (
-                matchesSearch(crit.CriteriaCode, crit.CriteriaName, crit.Description) ||
+                matchesSearch(crit.criteriacode, crit.criterianame, crit.Description) ||
                 matchingRequirements.length > 0
             );
         });
     };
 
-    const allAreasForEvent = (areasData[selectedEvent.EventID] || []).slice().sort((a, b) => {
-        const aCode = String(a.AreaCode || a.AreaName || '').trim();
-        const bCode = String(b.AreaCode || b.AreaName || '').trim();
+    const allAreasForEvent = (areasData[selectedEvent.eventid] || []).slice().sort((a, b) => {
+        const aCode = String(a.areacode || a.areaname || '').trim();
+        const bCode = String(b.areacode || b.areaname || '').trim();
         return aCode.localeCompare(bCode, undefined, { numeric: true, sensitivity: 'base' });
     });
     const visibleAreas = allAreasForEvent.filter(area => {
         // Scoping for Auditors: only show assigned area(s)
         if (isAuditor) {
-            const isAssigned = assignedAreaIds.has(Number(area.AreaID));
+            const isAssigned = assignedAreaIds.has(Number(area.areaid));
             if (!isAssigned) return false;
         }
 
         if (!hasSearch) return true;
-        const matchingCriteria = getFilteredCriteria(criteriaData[area.AreaID] || []);
+        const matchingCriteria = getFilteredCriteria(criteriaData[area.areaid] || []);
         return (
-            matchesSearch(area.AreaCode, area.AreaName, area.Description) ||
+            matchesSearch(area.areacode, area.areaname, area.Description) ||
             matchingCriteria.length > 0
         );
     });
 
-    const noAreaCriteriaAll = noAreaCriteriaData[selectedEvent.EventID] || [];
+    const noAreaCriteriaAll = noAreaCriteriaData[selectedEvent.eventid] || [];
     const visibleNoAreaCriteria = isAuditor ? [] : getFilteredCriteria(noAreaCriteriaAll);
     const hasAnyVisibleResults = visibleAreas.length > 0 || visibleNoAreaCriteria.length > 0;
 
@@ -258,7 +386,7 @@ export default function EventPopup({
     };
 
     const toggleRequirementSelect = (requirement, checked) => {
-        const reqId = Number(requirement.RequirementID);
+        const reqId = Number(requirement.requirementid);
         setSelectedRequirementIds(prev => {
             const next = new Set(prev);
             if (checked) next.add(reqId);
@@ -268,13 +396,13 @@ export default function EventPopup({
     };
 
     const toggleCriteriaSelect = (criteria, checked) => {
-        const criteriaId = Number(criteria.CriteriaID);
-        const requirementIds = (requirementsData[criteriaId] || []).map(req => Number(req.RequirementID));
+        const criteriaid = Number(criteria.criteriaid);
+        const requirementIds = (requirementsData[criteriaid] || []).map(req => Number(req.requirementid));
 
         setSelectedCriteriaIds(prev => {
             const next = new Set(prev);
-            if (checked) next.add(criteriaId);
-            else next.delete(criteriaId);
+            if (checked) next.add(criteriaid);
+            else next.delete(criteriaid);
             return next;
         });
 
@@ -289,25 +417,25 @@ export default function EventPopup({
     };
 
     const toggleAreaSelect = (area, checked) => {
-        const areaId = Number(area.AreaID);
-        const criteria = criteriaData[areaId] || [];
-        const criteriaIds = criteria.map(crit => Number(crit.CriteriaID));
+        const areaid = Number(area.areaid);
+        const criteria = criteriaData[areaid] || [];
+        const criteriaIds = criteria.map(crit => Number(crit.criteriaid));
         const requirementIds = criteria.flatMap(crit =>
-            (requirementsData[Number(crit.CriteriaID)] || []).map(req => Number(req.RequirementID))
+            (requirementsData[Number(crit.criteriaid)] || []).map(req => Number(req.requirementid))
         );
 
         setSelectedAreaIds(prev => {
             const next = new Set(prev);
-            if (checked) next.add(areaId);
-            else next.delete(areaId);
+            if (checked) next.add(areaid);
+            else next.delete(areaid);
             return next;
         });
 
         setSelectedCriteriaIds(prev => {
             const next = new Set(prev);
-            criteriaIds.forEach(criteriaId => {
-                if (checked) next.add(criteriaId);
-                else next.delete(criteriaId);
+            criteriaIds.forEach(criteriaid => {
+                if (checked) next.add(criteriaid);
+                else next.delete(criteriaid);
             });
             return next;
         });
@@ -323,7 +451,7 @@ export default function EventPopup({
     };
 
     const toggleOfficeSelect = (office, checked) => {
-        const id = Number(office.id || office.OfficeID || office.office_id || office.OfficeID);
+        const id = Number(office.id || office.officeid || office.officeid || office.officeid);
         setSelectedOfficeIdsLocal(prev => {
             const next = new Set(prev);
             if (checked) next.add(id);
@@ -336,21 +464,33 @@ export default function EventPopup({
 
     const handleBulkDelete = async () => {
         if (deleteCount === 0 || deleting) return;
-            const confirmed = await showConfirm('Delete selected items? This action cannot be undone.');
+        const confirmed = await showConfirm('Delete selected items? This action cannot be undone.');
         if (!confirmed) return;
+
+        const countAreas = selectedAreaIds.size;
+        const countCriteria = selectedCriteriaIds.size;
+        const countRequirements = selectedRequirementIds.size;
 
         try {
             setDeleting(true);
             setDeleteError('');
             await onBulkDelete?.({
-                eventId: selectedEvent.EventID,
+                eventid: selectedEvent.eventid,
                 areaIds: Array.from(selectedAreaIds),
                 criteriaIds: Array.from(selectedCriteriaIds),
                 requirementIds: Array.from(selectedRequirementIds)
             });
+            const parts = [];
+            if (countAreas > 0) parts.push(`${countAreas} area${countAreas > 1 ? 's' : ''}`);
+            if (countCriteria > 0) parts.push(`${countCriteria} sub area${countCriteria > 1 ? 's' : ''}`);
+            if (countRequirements > 0) parts.push(`${countRequirements} standard${countRequirements > 1 ? 's' : ''}`);
+            const desc = parts.length > 0 ? `${parts.join(', ')} deleted successfully.` : 'Items deleted successfully.';
+            toast?.({ title: 'Success', description: desc, variant: 'success' });
             exitDeleteMode();
         } catch (err) {
-            setDeleteError(err?.message || 'Failed to delete selected items.');
+            const errorMsg = err?.message || 'Failed to delete selected items.';
+            setDeleteError(errorMsg);
+            toast?.({ title: 'Error', description: errorMsg, variant: 'error' });
         } finally {
             setDeleting(false);
         }
@@ -364,13 +504,22 @@ export default function EventPopup({
             setDeleting(true);
             setDeleteError('');
             await onBulkDelete?.({
-                eventId: selectedEvent.EventID,
+                eventid: selectedEvent.eventid,
                 areaIds,
                 criteriaIds,
                 requirementIds
             });
+            if (areaIds.length > 0) {
+                toast?.({ title: 'Success', description: 'Area deleted successfully.', variant: 'success' });
+            } else if (criteriaIds.length > 0) {
+                toast?.({ title: 'Success', description: 'Sub area deleted successfully.', variant: 'success' });
+            } else if (requirementIds.length > 0) {
+                toast?.({ title: 'Success', description: 'Standard deleted successfully.', variant: 'success' });
+            }
         } catch (err) {
-            await showAlert(err?.message || 'Failed to delete item.');
+            const errorMsg = err?.message || 'Failed to delete item.';
+            await showAlert(errorMsg);
+            toast?.({ title: 'Error', description: errorMsg, variant: 'error' });
         } finally {
             setDeleting(false);
         }
@@ -394,26 +543,26 @@ export default function EventPopup({
                             {/* Name + meta */}
                             <div className="min-w-0">
                                 <h2 className="truncate text-lg font-bold tracking-tight text-slate-900 leading-snug">
-                                    {selectedEvent.EventCode || selectedEvent.EventName}
+                                    {selectedEvent.eventcode || selectedEvent.eventname}
                                 </h2>
                                 <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-                                    {selectedEvent.EventName && selectedEvent.EventName !== selectedEvent.EventCode && (
+                                    {selectedEvent.eventname && selectedEvent.eventname !== selectedEvent.eventcode && (
                                         <span className="text-xs font-medium text-slate-500 truncate max-w-xs md:max-w-md">
-                                            {selectedEvent.EventName}
+                                            {selectedEvent.eventname}
                                         </span>
                                     )}
-                                    {selectedEvent.EventName && selectedEvent.EventName !== selectedEvent.EventCode && (
+                                    {selectedEvent.eventname && selectedEvent.eventname !== selectedEvent.eventcode && (
                                         <span className="text-slate-300">·</span>
                                     )}
                                     <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 border border-slate-200/80">
-                                        Created: {formatDateTime(selectedEvent.CreatedAt)}
+                                        Created: {formatDateTime(selectedEvent.createdat)}
                                     </span>
                                     <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 border border-slate-200/80">
-                                        Updated: {formatDateTime(selectedEvent.UpdatedAt || selectedEvent.CreatedAt)}
+                                        Updated: {formatDateTime(selectedEvent.updatedat || selectedEvent.createdat)}
                                     </span>
-                                    {selectedEvent.accreditation_level && selectedEvent.accreditation_level.toUpperCase() !== 'N/A' && (
+                                    {selectedEvent.accreditationlevel && selectedEvent.accreditationlevel.toUpperCase() !== 'N/A' && (
                                         <span className="inline-flex items-center rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 border border-emerald-200/80">
-                                            {selectedEvent.accreditation_level}
+                                            {selectedEvent.accreditationlevel}
                                         </span>
                                     )}
                                 </div>
@@ -422,6 +571,19 @@ export default function EventPopup({
 
                         {/* Right: actions + close */}
                         <div className="flex shrink-0 items-center gap-2">
+                            {/* Primary Assign Personnel Button */}
+                            {isAdmin && (
+                                <button
+                                    type="button"
+                                    onClick={() => setIsAssignScopeModalOpen(true)}
+                                    className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 text-xs font-semibold text-white shadow-xs transition-all hover:bg-indigo-700 active:scale-95 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
+                                    title="Assign Personnel"
+                                    aria-label="Assign Personnel"
+                                >
+                                    <UserPlus className="w-3.5 h-3.5 shrink-0" strokeWidth={2.5} />
+                                    <span>Assign Personnel</span>
+                                </button>
+                            )}
                             {isAdmin && (
                                 <button
                                     type="button"
@@ -456,6 +618,17 @@ export default function EventPopup({
                                         <>
                                             <div className="fixed inset-0 z-40" onClick={() => setIsActionMenuOpen(false)} />
                                             <div className="absolute right-0 top-10 z-50 w-48 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl animate-in fade-in zoom-in-95 duration-100" onClick={(e) => e.stopPropagation()}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setIsAssignScopeModalOpen(true);
+                                                        setIsActionMenuOpen(false);
+                                                    }}
+                                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 transition whitespace-nowrap cursor-pointer"
+                                                >
+                                                    <UserPlus className="h-4 w-4 text-indigo-600 shrink-0" />
+                                                    <span>Assign Personnel</span>
+                                                </button>
                                                 <button
                                                     type="button"
                                                     onClick={() => {
@@ -603,10 +776,10 @@ export default function EventPopup({
                                         </div>
                                     ) : (
                                         filteredOffices.map((office) => {
-                                            const isAcademic = office.entity_type_id === 1 || String(office.category_name || office.TypeName || "").toLowerCase().includes("academic program") || String(office.category_name || office.TypeName || "").toLowerCase().includes("program");
+                                            const isAcademic = office.entitytypeid === 1 || String(office.category_name || office.typename || "").toLowerCase().includes("academic program") || String(office.category_name || office.typename || "").toLowerCase().includes("program");
                                             return (
                                                 <div
-                                                    key={office.id || office.OfficeID || office.office_id}
+                                                    key={office.id || office.officeid || office.officeid}
                                                     className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm hover:shadow-md transition-shadow relative flex flex-col gap-2.5 animate-fadeIn"
                                                 >
                                                     {/* Header with Icon, Name, and Actions */}
@@ -630,7 +803,7 @@ export default function EventPopup({
                                                             {/* Name and Subtitle */}
                                                             <div className="min-w-0">
                                                                 <h5 className="text-xs font-bold text-slate-800 truncate leading-snug">
-                                                                    {office.OfficeName || office.office_name}
+                                                                    {office.officename || office.officename}
                                                                 </h5>
                                                                 <p className="text-[10px] text-slate-500 truncate mt-0.5 leading-normal">
                                                                     {office.department_name || 'Institution-wide'}
@@ -660,11 +833,11 @@ export default function EventPopup({
                                                     <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-2.5 text-[9px] text-slate-400 font-semibold tracking-wider">
                                                         <div>
                                                             <p className="uppercase text-slate-400 font-bold mb-0.5">Created</p>
-                                                            <p className="text-slate-655 font-bold">{formatDateString(office.created_at)}</p>
+                                                            <p className="text-slate-655 font-bold">{formatDateString(office.createdat)}</p>
                                                         </div>
                                                         <div>
                                                             <p className="uppercase text-slate-400 font-bold mb-0.5">Updated</p>
-                                                            <p className="text-slate-655 font-bold">{formatDateString(office.updated_at)}</p>
+                                                            <p className="text-slate-655 font-bold">{formatDateString(office.updatedat)}</p>
                                                         </div>
                                                     </div>
 
@@ -678,9 +851,9 @@ export default function EventPopup({
                                                             }`}>
                                                                 {isAcademic ? 'Academic Program' : 'Non-Academic Office'}
                                                             </span>
-                                                            {isAcademic && office.accreditation_level && office.accreditation_level !== 'None' && (
+                                                            {isAcademic && office.accreditationlevel && office.accreditationlevel !== 'None' && (
                                                                 <span className="px-1.5 py-0.5 rounded-[4px] text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                                                    {office.accreditation_level}
+                                                                    {office.accreditationlevel}
                                                                 </span>
                                                             )}
                                                         </div>
@@ -710,7 +883,7 @@ export default function EventPopup({
                                 />
                             </div>
                             <div className="mt-2 pt-2">
-                                {loadingAreas.has(selectedEvent.EventID) ? (
+                                {loadingAreas.has(selectedEvent.eventid) ? (
                                     <div className="text-center text-gray-500">Loading areas...</div>
                                 ) : allAreasForEvent.length === 0 ? (
                                     <div className="text-center text-gray-500">No areas found for this accreditation</div>
@@ -719,23 +892,37 @@ export default function EventPopup({
                                 ) : (
                                     <div className="space-y-3">
                                         {visibleAreas.map((area) => {
-                                            const areaCriteria = getFilteredCriteria(criteriaData[area.AreaID] || []);
+                                            const areaId = Number(area.areaid);
+                                            const areaCriteria = getFilteredCriteria(criteriaData[area.areaid] || []);
+                                            const areaAssignedUsers = assignedPersonnelMap.areas[areaId] || [];
+                                            const areaChildUsers = getChildPersonnelForArea(areaId, criteriaData[area.areaid] || []);
+                                            const visibleAreaAssignedUsers = (isAdmin || isAuditor)
+                                                ? areaAssignedUsers
+                                                : areaAssignedUsers.filter((u) => Number(u.userid) === currentUid);
+                                            const visibleAreaChildUsers = (isAdmin || isAuditor)
+                                                ? areaChildUsers
+                                                : areaChildUsers.filter((u) => Number(u.userid) === currentUid);
+
                                             return (
                                                 <AreaSection
-                                                    key={area.AreaID}
+                                                    key={area.areaid}
                                                     area={area}
-                                                    isExpanded={expandedAreas.has(area.AreaID)}
-                                                    onToggle={() => onToggleArea(area.AreaID)}
-                                                    loading={loadingCriteria.has(area.AreaID)}
+                                                    isExpanded={expandedAreas.has(area.areaid)}
+                                                    onToggle={() => onToggleArea(area.areaid)}
+                                                    loading={loadingCriteria.has(area.areaid)}
                                                     showCheckbox={deleteMode}
-                                                    isChecked={selectedAreaIds.has(Number(area.AreaID))}
+                                                    isChecked={selectedAreaIds.has(areaId)}
                                                     onToggleSelect={(checked) => toggleAreaSelect(area, checked)}
                                                     onMenuClick={!canEdit ? undefined : (item) => { setEditAreaData(item); setIsEditAreaOpen(true); }}
-                                                    onDeleteClick={!canEdit ? undefined : (item) => handleSingleDelete({ areaIds: [Number(item.AreaID)] })}
-                                                    isAssigned={assignedAreaIds.has(Number(area.AreaID))}
+                                                    onDeleteClick={!canEdit ? undefined : (item) => handleSingleDelete({ areaIds: [Number(item.areaid)] })}
+                                                    onAssignClick={!canEdit ? undefined : (item) => setAssignModal({ open: true, targetType: 'area', target: item })}
+                                                    assignedPersonnelCount={assignedCounts.areas[areaId] || 0}
+                                                    assignedPersonnel={visibleAreaAssignedUsers}
+                                                    childPersonnel={visibleAreaChildUsers}
+                                                    isAssigned={assignedAreaIds.has(areaId) || myAssignedScope.areaIds.has(areaId)}
                                                     isAuditor={isAuditor}
                                                 >
-                                                    {loadingCriteria.has(area.AreaID) ? (
+                                                    {loadingCriteria.has(area.areaid) ? (
                                                         <p className="text-xs text-gray-500 ml-4 mt-2">Loading sub areas...</p>
                                                     ) : areaCriteria.length === 0 ? (
                                                         <p className="text-xs text-gray-500 ml-4 mt-2">
@@ -746,17 +933,17 @@ export default function EventPopup({
                                                             <span className="absolute left-0 top-0 bottom-0 w-1 bg-blue-300 rounded-full" />
                                                             <div className="space-y-2">
                                                                 {(() => {
-                                                                    // Build a tree of criteria by ParentCriteriaID
+                                                                    // Build a tree of criteria by parentcriteriaid
                                                                     const list = areaCriteria || [];
                                                                     const map = new Map();
                                                                     const roots = [];
                                                                     for (const c of list) {
-                                                                        const id = String(c.CriteriaID);
+                                                                        const id = String(c.criteriaid);
                                                                         map.set(id, { ...c, children: [] });
                                                                     }
                                                                     for (const c of list) {
-                                                                        const parentId = c.ParentCriteriaID ?? c.ParentCriteriaID;
-                                                                        const id = String(c.CriteriaID);
+                                                                        const parentId = c.parentcriteriaid ?? c.parentcriteriaid;
+                                                                        const id = String(c.criteriaid);
                                                                         if (parentId === null || parentId === undefined || String(parentId) === '' ) {
                                                                             roots.push(map.get(id));
                                                                         } else {
@@ -766,33 +953,72 @@ export default function EventPopup({
                                                                         }
                                                                     }
 
-                                                                    const renderNode = (node, depth = 0) => (
-                                                                        <CriteriaSection
-                                                                            key={node.CriteriaID}
-                                                                            criteria={node}
-                                                                            isExpanded={expandedCriteria.has(node.CriteriaID)}
-                                                                            onToggle={() => onToggleCriteria(node.CriteriaID)}
-                                                                            loading={loadingRequirements.has(node.CriteriaID)}
-                                                                            showCheckbox={deleteMode}
-                                                                            isChecked={selectedCriteriaIds.has(Number(node.CriteriaID))}
-                                                                            onToggleSelect={(checked) => toggleCriteriaSelect(node, checked)}
-                                                                            onMenuClick={!canEdit ? undefined : (c) => { setEditCriteriaData(c); setIsEditCriteriaOpen(true); }}
-                                                                            onDeleteClick={!canEdit ? undefined : (c) => handleSingleDelete({ criteriaIds: [Number(c.CriteriaID)] })}
-                                                                        >
-                                                                            <div className="ml-6 space-y-2">
-                                                                                {node.children && node.children.map(child => renderNode(child, depth + 1))}
-                                                                                <RequirementsSection
-                                                                                    requirements={getFilteredRequirementsForCriteria(node.CriteriaID)}
-                                                                                    isLoading={loadingRequirements.has(node.CriteriaID)}
-                                                                                    showCheckbox={deleteMode}
-                                                                                    selectedRequirementIds={selectedRequirementIds}
-                                                                                    onToggleRequirement={toggleRequirementSelect}
-                                                                                    onMenuClick={!canEdit ? undefined : (req) => { setEditRequirementData(req); setIsEditRequirementOpen(true); }}
-                                                                                    onDeleteClick={!canEdit ? undefined : (req) => handleSingleDelete({ requirementIds: [Number(req.RequirementID)] })}
-                                                                                />
-                                                                            </div>
-                                                                        </CriteriaSection>
-                                                                    );
+                                                                    const renderNode = (node, depth = 0) => {
+                                                                        const critId = Number(node.criteriaid);
+                                                                        const critAssignedUsers = assignedPersonnelMap.criteria[critId] || [];
+                                                                        const critDirectIds = new Set(critAssignedUsers.map(u => Number(u.userid)));
+                                                                        const inheritedFromArea = (areaAssignedUsers || []).filter(u => !critDirectIds.has(Number(u.userid)));
+                                                                        const critChildUsers = getChildPersonnelForCriteria(critId).filter(
+                                                                            u => !critDirectIds.has(Number(u.userid)) && !inheritedFromArea.some(a => Number(a.userid) === Number(u.userid))
+                                                                        );
+
+                                                                        const inheritedForReqs = [
+                                                                            ...critAssignedUsers.map(u => ({ ...u, source: 'Sub-area' })),
+                                                                            ...inheritedFromArea.map(u => ({ ...u, source: 'Area' }))
+                                                                        ];
+
+                                                                        const visibleCritAssignedUsers = (isAdmin || isAuditor)
+                                                                            ? critAssignedUsers
+                                                                            : critAssignedUsers.filter((u) => Number(u.userid) === currentUid);
+                                                                        const visibleInheritedFromArea = (isAdmin || isAuditor)
+                                                                            ? inheritedFromArea
+                                                                            : inheritedFromArea.filter((u) => Number(u.userid) === currentUid);
+                                                                        const visibleCritChildUsers = (isAdmin || isAuditor)
+                                                                            ? critChildUsers
+                                                                            : critChildUsers.filter((u) => Number(u.userid) === currentUid);
+                                                                        const visibleInheritedForReqs = (isAdmin || isAuditor)
+                                                                            ? inheritedForReqs
+                                                                            : inheritedForReqs.filter((u) => Number(u.userid) === currentUid);
+
+                                                                        return (
+                                                                            <CriteriaSection
+                                                                                key={node.criteriaid}
+                                                                                criteria={node}
+                                                                                isExpanded={expandedCriteria.has(node.criteriaid)}
+                                                                                onToggle={() => onToggleCriteria(node.criteriaid)}
+                                                                                loading={loadingRequirements.has(node.criteriaid)}
+                                                                                showCheckbox={deleteMode}
+                                                                                isChecked={selectedCriteriaIds.has(critId)}
+                                                                                onToggleSelect={(checked) => toggleCriteriaSelect(node, checked)}
+                                                                                onMenuClick={!canEdit ? undefined : (c) => { setEditCriteriaData(c); setIsEditCriteriaOpen(true); }}
+                                                                                onDeleteClick={!canEdit ? undefined : (c) => handleSingleDelete({ criteriaIds: [Number(c.criteriaid)] })}
+                                                                                onAssignClick={!canEdit ? undefined : (c) => setAssignModal({ open: true, targetType: 'criteria', target: c })}
+                                                                                assignedPersonnelCount={assignedCounts.criteria[critId] || 0}
+                                                                                assignedPersonnel={visibleCritAssignedUsers}
+                                                                                inheritedPersonnel={visibleInheritedFromArea}
+                                                                                childPersonnel={visibleCritChildUsers}
+                                                                                isAssigned={myAssignedScope.criteriaIds.has(critId) || myAssignedScope.areaIds.has(areaId)}
+                                                                            >
+                                                                                <div className="ml-6 space-y-2">
+                                                                                    {node.children && node.children.map(child => renderNode(child, depth + 1))}
+                                                                                    <RequirementsSection
+                                                                                        requirements={getFilteredRequirementsForCriteria(node.criteriaid)}
+                                                                                        isLoading={loadingRequirements.has(node.criteriaid)}
+                                                                                        showCheckbox={deleteMode}
+                                                                                        selectedRequirementIds={selectedRequirementIds}
+                                                                                        onToggleRequirement={toggleRequirementSelect}
+                                                                                        onMenuClick={!canEdit ? undefined : (req) => { setEditRequirementData(req); setIsEditRequirementOpen(true); }}
+                                                                                        onDeleteClick={!canEdit ? undefined : (req) => handleSingleDelete({ requirementIds: [Number(req.requirementid)] })}
+                                                                                        onAssignClick={!canEdit ? undefined : (req) => setAssignModal({ open: true, targetType: 'requirement', target: req })}
+                                                                                        assignedPersonnelCounts={assignedCounts.requirements}
+                                                                                        assignedPersonnelMap={(isAdmin || isAuditor) ? assignedPersonnelMap.requirements : Object.fromEntries(Object.entries(assignedPersonnelMap.requirements || {}).map(([k, v]) => [k, (v || []).filter(u => Number(u.userid) === currentUid)]))}
+                                                                                        inheritedPersonnel={visibleInheritedForReqs}
+                                                                                        myAssignedReqIds={myAssignedScope.requirementIds}
+                                                                                    />
+                                                                                </div>
+                                                                            </CriteriaSection>
+                                                                        );
+                                                                    };
 
                                                                     return roots.map(r => renderNode(r));
                                                                 })()}
@@ -810,7 +1036,7 @@ export default function EventPopup({
                                             >
                                                 <div>
                                                     <h3 className="font-semibold flex items-center gap-2">
-                                                        {expandedNoArea.has(selectedEvent.EventID) ? (
+                                                        {expandedNoArea.has(selectedEvent.eventid) ? (
                                                             <ChevronDown className="h-4 w-4 shrink-0 text-white" />
                                                         ) : (
                                                             <ChevronRight className="h-4 w-4 shrink-0 text-white" />
@@ -824,13 +1050,13 @@ export default function EventPopup({
                                                 </span>
                                             </div>
 
-                                            {expandedNoArea.has(selectedEvent.EventID) && loadingNoAreaCriteria.has(selectedEvent.EventID) ? (
+                                            {expandedNoArea.has(selectedEvent.eventid) && loadingNoAreaCriteria.has(selectedEvent.eventid) ? (
                                                 <p className="text-xs text-gray-500 ml-4 mt-2">Loading sub areas without area...</p>
-                                            ) : expandedNoArea.has(selectedEvent.EventID) && visibleNoAreaCriteria.length === 0 ? (
+                                            ) : expandedNoArea.has(selectedEvent.eventid) && visibleNoAreaCriteria.length === 0 ? (
                                                 <p className="text-xs text-gray-500 ml-4 mt-2">
                                                     {hasSearch ? 'No matching sub areas without area' : 'No sub areas without area'}
                                                 </p>
-                                            ) : expandedNoArea.has(selectedEvent.EventID) ? (
+                                            ) : expandedNoArea.has(selectedEvent.eventid) ? (
                                                 <div className="relative mt-3 ml-6 pl-5">
                                                     <span className="absolute left-0 top-0 bottom-0 w-1 bg-blue-300 rounded-full" />
                                                     <div className="space-y-2">
@@ -839,12 +1065,12 @@ export default function EventPopup({
                                                             const map = new Map();
                                                             const roots = [];
                                                             for (const c of list) {
-                                                                const id = String(c.CriteriaID);
+                                                                const id = String(c.criteriaid);
                                                                 map.set(id, { ...c, children: [] });
                                                             }
                                                             for (const c of list) {
-                                                                const parentId = c.ParentCriteriaID ?? c.ParentCriteriaID;
-                                                                const id = String(c.CriteriaID);
+                                                                const parentId = c.parentcriteriaid ?? c.parentcriteriaid;
+                                                                const id = String(c.criteriaid);
                                                                 if (parentId === null || parentId === undefined || String(parentId) === '' ) {
                                                                     roots.push(map.get(id));
                                                                 } else {
@@ -853,34 +1079,56 @@ export default function EventPopup({
                                                                     else roots.push(map.get(id));
                                                                 }
                                                             }
+                                                            const renderNode = (node) => {
+                                                                const critId = Number(node.criteriaid);
+                                                                const critAssignedUsers = assignedPersonnelMap.criteria[critId] || [];
+                                                                const critChildUsers = getChildPersonnelForCriteria(critId);
+                                                                const visibleCritAssignedUsers = (isAdmin || isAuditor)
+                                                                    ? critAssignedUsers
+                                                                    : critAssignedUsers.filter((u) => Number(u.userid) === currentUid);
+                                                                const visibleCritChildUsers = (isAdmin || isAuditor)
+                                                                    ? critChildUsers
+                                                                    : critChildUsers.filter((u) => Number(u.userid) === currentUid);
 
-                                                            const renderNode = (node) => (
-                                                                <CriteriaSection
-                                                                    key={node.CriteriaID}
-                                                                    criteria={node}
-                                                                    isExpanded={expandedCriteria.has(node.CriteriaID)}
-                                                                    onToggle={() => onToggleCriteria(node.CriteriaID)}
-                                                                    loading={loadingRequirements.has(node.CriteriaID)}
-                                                                    showCheckbox={deleteMode}
-                                                                    isChecked={selectedCriteriaIds.has(Number(node.CriteriaID))}
-                                                                    onToggleSelect={(checked) => toggleCriteriaSelect(node, checked)}
-                                                                    onMenuClick={!canEdit ? undefined : (c) => { setEditCriteriaData(c); setIsEditCriteriaOpen(true); }}
-                                                                    onDeleteClick={!canEdit ? undefined : (c) => handleSingleDelete({ criteriaIds: [Number(c.CriteriaID)] })}
-                                                                >
-                                                                    <div className="ml-6 space-y-2">
-                                                                        {node.children && node.children.map(child => renderNode(child))}
-                                                                        <RequirementsSection
-                                                                            requirements={getFilteredRequirementsForCriteria(node.CriteriaID)}
-                                                                            isLoading={loadingRequirements.has(node.CriteriaID)}
-                                                                            showCheckbox={deleteMode}
-                                                                            selectedRequirementIds={selectedRequirementIds}
-                                                                            onToggleRequirement={toggleRequirementSelect}
-                                                                            onMenuClick={!canEdit ? undefined : (req) => { setEditRequirementData(req); setIsEditRequirementOpen(true); }}
-                                                                            onDeleteClick={!canEdit ? undefined : (req) => handleSingleDelete({ requirementIds: [Number(req.RequirementID)] })}
-                                                                        />
-                                                                    </div>
-                                                                </CriteriaSection>
-                                                            );
+                                                                return (
+                                                                    <CriteriaSection
+                                                                        key={node.criteriaid}
+                                                                        criteria={node}
+                                                                        isExpanded={expandedCriteria.has(node.criteriaid)}
+                                                                        onToggle={() => onToggleCriteria(node.criteriaid)}
+                                                                        loading={loadingRequirements.has(node.criteriaid)}
+                                                                        showCheckbox={deleteMode}
+                                                                        isChecked={selectedCriteriaIds.has(critId)}
+                                                                        onToggleSelect={(checked) => toggleCriteriaSelect(node, checked)}
+                                                                        onMenuClick={!canEdit ? undefined : (c) => { setEditCriteriaData(c); setIsEditCriteriaOpen(true); }}
+                                                                        onDeleteClick={!canEdit ? undefined : (c) => handleSingleDelete({ criteriaIds: [Number(c.criteriaid)] })}
+                                                                        onAssignClick={!canEdit ? undefined : (c) => setAssignModal({ open: true, targetType: 'criteria', target: c })}
+                                                                        assignedPersonnelCount={assignedCounts.criteria[critId] || 0}
+                                                                        assignedPersonnel={visibleCritAssignedUsers}
+                                                                        inheritedPersonnel={[]}
+                                                                        childPersonnel={visibleCritChildUsers}
+                                                                        isAssigned={myAssignedScope.criteriaIds.has(critId)}
+                                                                    >
+                                                                        <div className="ml-6 space-y-2">
+                                                                            {node.children && node.children.map(child => renderNode(child))}
+                                                                            <RequirementsSection
+                                                                                requirements={getFilteredRequirementsForCriteria(node.criteriaid)}
+                                                                                isLoading={loadingRequirements.has(node.criteriaid)}
+                                                                                showCheckbox={deleteMode}
+                                                                                selectedRequirementIds={selectedRequirementIds}
+                                                                                onToggleRequirement={toggleRequirementSelect}
+                                                                                onMenuClick={!canEdit ? undefined : (req) => { setEditRequirementData(req); setIsEditRequirementOpen(true); }}
+                                                                                onDeleteClick={!canEdit ? undefined : (req) => handleSingleDelete({ requirementIds: [Number(req.requirementid)] })}
+                                                                                onAssignClick={!canEdit ? undefined : (req) => setAssignModal({ open: true, targetType: 'requirement', target: req })}
+                                                                                assignedPersonnelCounts={assignedCounts.requirements}
+                                                                                assignedPersonnelMap={(isAdmin || isAuditor) ? assignedPersonnelMap.requirements : Object.fromEntries(Object.entries(assignedPersonnelMap.requirements || {}).map(([k, v]) => [k, (v || []).filter(u => Number(u.userid) === currentUid)]))}
+                                                                                inheritedPersonnel={visibleCritAssignedUsers.map(u => ({ ...u, source: 'Sub-area' }))}
+                                                                                myAssignedReqIds={myAssignedScope.requirementIds}
+                                                                            />
+                                                                        </div>
+                                                                    </CriteriaSection>
+                                                                );
+                                                            };
 
                                                             return roots.map(r => renderNode(r));
                                                         })()}
@@ -900,7 +1148,7 @@ export default function EventPopup({
                 isOpen={isActionOpen}
                 onClose={() => setIsActionOpen(false)}
                 event={selectedEvent}
-                areas={areasData[selectedEvent.EventID] || []}
+                areas={areasData[selectedEvent.eventid] || []}
                 criteriaOptions={criteriaOptions}
                 onAddArea={onAddArea}
                 onAddNoAreaCriteria={onAddNoAreaCriteria}
@@ -915,10 +1163,10 @@ export default function EventPopup({
                     visible={isEditAreaOpen}
                     onClose={() => setIsEditAreaOpen(false)}
                     area={editAreaData}
-                    userRole={currentUser?.RoleID}
+                    userRole={currentUser?.roleid}
                     onSave={async (updated) => {
                         try {
-                            if (onEditArea) await onEditArea(updated.AreaID, updated);
+                            if (onEditArea) await onEditArea(updated.areaid, updated);
                         } catch (err) {
                             console.error('Edit area save error', err);
                         } finally {
@@ -933,14 +1181,16 @@ export default function EventPopup({
                     visible={isEditCriteriaOpen}
                     onClose={() => setIsEditCriteriaOpen(false)}
                     event={editCriteriaData}
-                    userRole={currentUser?.RoleID}
+                    userRole={currentUser?.roleid}
                     onSave={async (updated) => {
                         try {
                             if (typeof onEditCriteria === 'function') {
-                                await onEditCriteria(updated.CriteriaID || editCriteriaData.CriteriaID, updated);
+                                await onEditCriteria(updated.criteriaid || editCriteriaData.criteriaid, updated);
+                                await showAlert('Sub area updated successfully!');
                             }
                         } catch (err) {
                             console.error('Failed to save edited criteria', err);
+                            await showAlert(err?.message || 'Failed to save sub area');
                         } finally {
                             setIsEditCriteriaOpen(false);
                         }
@@ -952,17 +1202,17 @@ export default function EventPopup({
                     visible={isEditRequirementOpen}
                     onClose={() => setIsEditRequirementOpen(false)}
                     requirement={editRequirementData}
-                    userRole={currentUser?.RoleID}
+                    userRole={currentUser?.roleid}
                     onSave={async (updated) => {
                         try {
                             const { requirementsAPI } = await import('../../utils/api');
-                            const response = await requirementsAPI.updateRequirement(updated.RequirementID, updated);
+                            const response = await requirementsAPI.updateRequirement(updated.requirementid, updated);
                             if (response && response.success) {
-                                // Refresh requirements for the affected criteria (use provided prop if available)
-                                const criteriaId = updated.CriteriaID || editRequirementData.CriteriaID;
-                                if (typeof onLoadRequirementsByCriteria === 'function' && criteriaId) {
-                                    await onLoadRequirementsByCriteria(Number(criteriaId));
+                                const criteriaid = updated.criteriaid || editRequirementData.criteriaid;
+                                if (typeof onLoadRequirementsByCriteria === 'function' && criteriaid) {
+                                    await onLoadRequirementsByCriteria(Number(criteriaid));
                                 }
+                                await showAlert('Standard updated successfully!');
                             } else {
                                 await showAlert(response?.message || 'Failed to save requirement');
                             }
@@ -972,6 +1222,29 @@ export default function EventPopup({
                         } finally {
                             setIsEditRequirementOpen(false);
                         }
+                    }}
+                />
+            )}
+            {assignModal.open && assignModal.target && (
+                <AssignPersonnelModal
+                    isOpen={assignModal.open}
+                    onClose={() => setAssignModal({ open: false, targetType: null, target: null })}
+                    eventid={selectedEvent?.eventid}
+                    eventname={selectedEvent?.eventname}
+                    targetType={assignModal.targetType}
+                    target={assignModal.target}
+                    existingAssignments={personnelAssignments}
+                    onSuccess={fetchPersonnelAssignments}
+                />
+            )}
+            {isAssignScopeModalOpen && (
+                <AssignPersonnelScopeModal
+                    isOpen={isAssignScopeModalOpen}
+                    onClose={() => setIsAssignScopeModalOpen(false)}
+                    event={selectedEvent}
+                    onSuccess={() => {
+                        fetchPersonnelAssignments();
+                        fetchMyAssignments();
                     }}
                 />
             )}

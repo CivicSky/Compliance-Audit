@@ -4,7 +4,7 @@ import CustomSelect from '../UI/CustomSelect';
 export default function AddMasterListModal({ isOpen, onClose, onSubmit, departments = [] }) {
   const [name, setName] = useState('');
   const [type, setType] = useState('Academic Program');
-  const [departmentId, setDepartmentId] = useState('');
+  const [departmentid, setDepartmentId] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -25,7 +25,7 @@ export default function AddMasterListModal({ isOpen, onClose, onSubmit, departme
 
     if (!name.trim()) return;
 
-    if (isAcademic && !departmentId) return;
+    if (isAcademic && !departmentid) return;
 
     setLoading(true);
 
@@ -33,8 +33,8 @@ export default function AddMasterListModal({ isOpen, onClose, onSubmit, departme
       await onSubmit?.({
         name: name.trim(),
         type,
-        entityTypeId: isAcademic ? 1 : 2,
-        departmentId: isAcademic ? departmentId : null,
+        entitytypeid: isAcademic ? 1 : 2,
+        departmentid: isAcademic ? departmentid : null,
       });
       onClose?.();
     } finally {
@@ -97,7 +97,7 @@ export default function AddMasterListModal({ isOpen, onClose, onSubmit, departme
             <div>
               <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-600">Department *</label>
               <CustomSelect
-                value={departmentId}
+                value={departmentid}
                 onChange={(val) => setDepartmentId(val)}
                 placeholder="Select Department"
                 options={[

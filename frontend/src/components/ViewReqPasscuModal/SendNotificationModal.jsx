@@ -34,7 +34,7 @@ export default function SendNotificationModal({
                             <div>
                                 <h3 className="text-sm font-semibold text-slate-900">Send notification</h3>
                                 <p className="text-xs text-slate-500">
-                                    To: {showNotifForm.user.FirstName} {showNotifForm.user.LastName}
+                                    To: {showNotifForm.user.firstname} {showNotifForm.user.lastname}
                                 </p>
                             </div>
                         </div>

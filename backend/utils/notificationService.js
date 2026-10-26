@@ -33,20 +33,20 @@ const parseMetaFromMessage = (message) => {
 
 const createNotifications = async ({
   userIds = [],
-  adminId,
+  adminid,
   title,
   message,
   type = 'info',
-  relatedTable = null,
-  relatedId = null,
+  relatedtable = null,
+  relatedid = null,
   meta = null,
 }) => {
   const recipients = normalizeUserIds(userIds);
-  let senderId = Number(adminId);
+  let senderId = Number(adminid);
   if (!Number.isInteger(senderId) || senderId <= 0) {
     try {
-      const [adminRows] = await db.query(`SELECT UserID FROM users WHERE RoleID = 1 ORDER BY UserID ASC LIMIT 1`);
-      senderId = adminRows[0]?.UserID || null;
+      const [adminRows] = await db.query(`SELECT userid FROM users WHERE roleid = 1 ORDER BY userid ASC LIMIT 1`);
+      senderId = adminRows[0]?.userid || null;
     } catch (e) {
       senderId = null;
     }
@@ -59,16 +59,16 @@ const createNotifications = async ({
   const normalizedType = ALLOWED_TYPES.has(type) ? type : 'info';
   const finalMessage = appendMeta(message, meta);
 
-  for (const userId of recipients) {
+  for (const userid of recipients) {
     try {
       await db.query(
         `INSERT INTO notifications
-          (UserID, AdminID, Title, Message, Type, RelatedTable, RelatedID, IsRead, CreatedAt)
+          (userid, adminid, Title, Message, Type, relatedtable, relatedid, isread, createdat)
          VALUES (?, ?, ?, ?, ?, ?, ?, FALSE, NOW())`,
-        [userId, senderId, String(title).trim(), finalMessage, normalizedType, relatedTable || null, relatedId || null]
+        [userid, senderId, String(title).trim(), finalMessage, normalizedType, relatedtable || null, relatedid || null]
       );
     } catch (err) {
-      console.error(`Error inserting notification for user #${userId}:`, err.message);
+      console.error(`Error inserting notification for user #${userid}:`, err.message);
     }
   }
 
@@ -87,8 +87,8 @@ const createNotifications = async ({
 };
 
 const getAdminUserIds = async () => {
-  const [rows] = await db.query('SELECT UserID FROM users WHERE RoleID = 1');
-  return rows.map((row) => Number(row.UserID)).filter((id) => Number.isInteger(id) && id > 0);
+  const [rows] = await db.query('SELECT userid FROM users WHERE roleid = 1');
+  return rows.map((row) => Number(row.userid)).filter((id) => Number.isInteger(id) && id > 0);
 };
 
 module.exports = {

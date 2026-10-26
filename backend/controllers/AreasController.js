@@ -4,43 +4,49 @@ const { recordLog } = require('./logsController');
 // Add a new area
 exports.addArea = async (req, res) => {
     try {
-        const { EventChildID, EventID, AreaCode, AreaName, Description } = req.body;
-        const eventId = EventChildID || EventID;
+        const { EventChildID, areacode, areaname, Description } = req.body;
+        const description = req.body.description ?? Description ?? null;
+        const eventid = req.body.eventid || EventChildID;
 
-        if (!eventId || !AreaCode || !AreaName) {
+        if (!eventid || !areacode || !areaname) {
             return res.status(400).json({ success: false, message: 'Event, Area code, and Area name are required.' });
         }
 
         
         let result;
         try {
-            // Preferred query for schemas with CreatedAt/UpdatedAt columns
+            // Preferred query for schemas with createdat/updatedat columns
             [result] = await db.query(
-                `INSERT INTO areas (AreaCode, AreaName, EventID, Description, IsActive, CreatedAt, UpdatedAt)
+                `INSERT INTO areas (areacode, areaname, eventid, description, isactive, createdat, updatedat)
                  VALUES (?, ?, ?, ?, TRUE, NOW(), NOW())`,
-                [AreaCode, AreaName, eventId, Description || null]
+                [areacode, areaname, eventid, description]
             );
         } catch (insertErr) {
-            // Fallback query for schemas without CreatedAt/UpdatedAt columns
+            // Fallback query for schemas without createdat/updatedat columns
             [result] = await db.query(
-                `INSERT INTO areas (AreaCode, AreaName, EventID, Description, IsActive)
+                `INSERT INTO areas (areacode, areaname, eventid, description, isactive)
                  VALUES (?, ?, ?, ?, TRUE)`,
-                [AreaCode, AreaName, eventId, Description || null]
+                [areacode, areaname, eventid, description]
             );
         }
 
         const [areaRows] = await db.query(
-            `SELECT AreaID, AreaCode, AreaName, EventID, Description, SortOrder, CreatedAt, UpdatedAt FROM areas WHERE AreaID = ?`,
+            `SELECT areaid, areacode, areaname, eventid, description, sortorder, createdat, updatedat FROM areas WHERE areaid = ?`,
             [result.insertId]
         );
-        res.json({ success: true, data: areaRows[0] });
-                if (req.user && req.user.userId) {
-                    try { recordLog(req.user.userId, 'AreaAdded', { AreaID: areaRows[0].AreaID, AreaName: areaRows[0].AreaName, EventID: areaRows[0].EventID }); } catch (e) {}
+        const areaData = areaRows && areaRows[0] ? {
+            ...areaRows[0],
+            description: areaRows[0].description ?? description,
+            Description: areaRows[0].description ?? description
+        } : null;
+        res.json({ success: true, data: areaData });
+                if (req.user && req.user.userid) {
+                    try { recordLog(req.user.userid, 'AreaAdded', { areaid: areaRows[0].areaid, areaname: areaRows[0].areaname, eventid: areaRows[0].eventid }); } catch (e) {}
                 }
     } catch (error) {
         console.error('Error adding area:', error);
-        if (error && error.code === 'ER_DUP_ENTRY') {
-            return res.status(409).json({ success: false, message: 'Area code already exists.' });
+        if (error && (error.code === 'ER_DUP_ENTRY' || error.code === '23505' || String(error.code) === '23505')) {
+            return res.status(409).json({ success: false, message: 'An area with this Area Code already exists for this event.' });
         }
         res.status(500).json({ success: false, message: 'Failed to add area', error: error.message });
     }
@@ -58,16 +64,16 @@ exports.deleteAreas = async (req, res) => {
 
         // Clean up requirements & criteria under these areas
         try {
-          const [critRows] = await db.query(`SELECT CriteriaID FROM criteria WHERE AreaID IN (${placeholders})`, areaIds);
+          const [critRows] = await db.query(`SELECT criteriaid FROM criteria WHERE areaid IN (${placeholders})`, areaIds);
           if (critRows && critRows.length > 0) {
-            const critIds = critRows.map(c => c.CriteriaID ?? c.criteriaid).filter(Boolean);
+            const critIds = critRows.map(c => c.criteriaid ?? c.criteriaid).filter(Boolean);
             if (critIds.length > 0) {
               const critPlaceholders = critIds.map(() => '?').join(',');
-              await db.query(`DELETE FROM office_proof_documents WHERE requirement_id IN (SELECT RequirementID FROM requirements WHERE CriteriaID IN (${critPlaceholders}))`, critIds);
-              await db.query(`DELETE FROM requirement_user_assignments WHERE RequirementID IN (SELECT RequirementID FROM requirements WHERE CriteriaID IN (${critPlaceholders}))`, critIds);
-              await db.query(`DELETE FROM compliancestatusoffices WHERE RequirementID IN (SELECT RequirementID FROM requirements WHERE CriteriaID IN (${critPlaceholders}))`, critIds);
-              await db.query(`DELETE FROM requirements WHERE CriteriaID IN (${critPlaceholders})`, critIds);
-              await db.query(`DELETE FROM criteria WHERE CriteriaID IN (${critPlaceholders})`, critIds);
+              await db.query(`DELETE FROM officeproofdocuments WHERE requirementid IN (SELECT requirementid FROM requirements WHERE criteriaid IN (${critPlaceholders}))`, critIds);
+              await db.query(`DELETE FROM requirementuserassignments WHERE requirementid IN (SELECT requirementid FROM requirements WHERE criteriaid IN (${critPlaceholders}))`, critIds);
+              await db.query(`DELETE FROM compliancestatusoffices WHERE requirementid IN (SELECT requirementid FROM requirements WHERE criteriaid IN (${critPlaceholders}))`, critIds);
+              await db.query(`DELETE FROM requirements WHERE criteriaid IN (${critPlaceholders})`, critIds);
+              await db.query(`DELETE FROM criteria WHERE criteriaid IN (${critPlaceholders})`, critIds);
             }
           }
         } catch (cascadeErr) {
@@ -75,12 +81,12 @@ exports.deleteAreas = async (req, res) => {
         }
 
         const [result] = await db.query(
-            `DELETE FROM areas WHERE AreaID IN (${placeholders})`,
+            `DELETE FROM areas WHERE areaid IN (${placeholders})`,
             areaIds
         );
 
-                if (req.user && req.user.userId) {
-                    try { recordLog(req.user.userId, 'AreaDeleted', { areaIds }); } catch (e) {}
+                if (req.user && req.user.userid) {
+                    try { recordLog(req.user.userid, 'AreaDeleted', { areaIds }); } catch (e) {}
                 }
         return res.json({
             success: true,

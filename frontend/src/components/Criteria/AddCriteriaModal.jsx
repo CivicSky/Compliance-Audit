@@ -8,12 +8,12 @@ import StructureLivePreview from '../ALLC/AddAreaPop/StructureLivePreview';
 
 export default function AddCriteriaModal({ isOpen, onClose, onSuccess }) {
     const [formData, setFormData] = useState({
-        EventID: '',
-        AreaID: '',
-        CriteriaCode: '',
-        CriteriaName: '',
+        eventid: '',
+        areaid: '',
+        criteriacode: '',
+        criterianame: '',
         Description: '',
-        ParentCriteriaID: ''
+        parentcriteriaid: ''
     });
     const [eventsList, setEventsList] = useState([]);
     const [areasList, setAreasList] = useState([]);
@@ -30,14 +30,14 @@ export default function AddCriteriaModal({ isOpen, onClose, onSuccess }) {
     }, [isOpen]);
 
     useEffect(() => {
-        if (formData.EventID) {
-            fetchAreasByEvent(formData.EventID);
-            fetchCriteriaByEvent(formData.EventID);
+        if (formData.eventid) {
+            fetchAreasByEvent(formData.eventid);
+            fetchCriteriaByEvent(formData.eventid);
         } else {
             setAreasList([]);
             setCriteriaList([]);
         }
-    }, [formData.EventID]);
+    }, [formData.eventid]);
 
     const fetchEvents = async () => {
         try {
@@ -51,13 +51,13 @@ export default function AddCriteriaModal({ isOpen, onClose, onSuccess }) {
         }
     };
 
-    const fetchAreasByEvent = async (eventId) => {
+    const fetchAreasByEvent = async (eventid) => {
         setIsLoading(true);
         try {
-            const response = await fetch(`${API_BASE_URL}/api/areas/event/${eventId}`);
-            const data = await response.json();
-            if (data.success) {
-                setAreasList(data.data || []);
+            const { areasAPI } = await import('../../utils/api');
+            const response = await areasAPI.getByEvent(eventid);
+            if (response.success) {
+                setAreasList(response.data || []);
             } else {
                 setAreasList([]);
             }
@@ -68,10 +68,10 @@ export default function AddCriteriaModal({ isOpen, onClose, onSuccess }) {
         }
     };
 
-    const fetchCriteriaByEvent = async (eventId) => {
+    const fetchCriteriaByEvent = async (eventid) => {
         try {
             const { criteriaAPI } = await import('../../utils/api');
-            const response = await criteriaAPI.getByEvent(eventId);
+            const response = await criteriaAPI.getByEvent(eventid);
             if (response.success) {
                 setCriteriaList(response.data || []);
             } else {
@@ -84,17 +84,17 @@ export default function AddCriteriaModal({ isOpen, onClose, onSuccess }) {
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
-        // if AreaID is cleared, also clear ParentCriteriaID to prevent selecting a parent without an area
-        if (name === 'AreaID' && value === '') {
+        // if areaid is cleared, also clear parentcriteriaid to prevent selecting a parent without an area
+        if (name === 'areaid' && value === '') {
             setFormData(prev => ({
                 ...prev,
-                AreaID: value,
-                ParentCriteriaID: ''
+                areaid: value,
+                parentcriteriaid: ''
             }));
-        } else if (name === 'CriteriaCode') {
+        } else if (name === 'criteriacode') {
             // remove any leading dots and normalize to uppercase
             const sanitized = (value || '').replace(/^\.+/, '').toUpperCase();
-            setFormData(prev => ({ ...prev, CriteriaCode: sanitized }));
+            setFormData(prev => ({ ...prev, criteriacode: sanitized }));
         } else {
             setFormData(prev => ({
                 ...prev,
@@ -111,14 +111,14 @@ export default function AddCriteriaModal({ isOpen, onClose, onSuccess }) {
 
     const validateForm = () => {
         const newErrors = {};
-        if (!formData.EventID) newErrors.EventID = 'Event is required';
+        if (!formData.eventid) newErrors.eventid = 'Event is required';
         // Area is optional for top-level criteria (no parent)
-        // If ParentCriteriaID is not set, AreaID is optional
-        // If ParentCriteriaID is set, AreaID is also optional (criteria can be nested without area)
-        // So, AreaID is always optional
-        // If creating a child (ParentCriteriaID set), CriteriaCode is not required and will be null
-        if (!formData.ParentCriteriaID && !formData.CriteriaCode.trim()) newErrors.CriteriaCode = 'Sub area code is required';
-        if (!formData.CriteriaName.trim()) newErrors.CriteriaName = 'Sub area name is required';
+        // If parentcriteriaid is not set, areaid is optional
+        // If parentcriteriaid is set, areaid is also optional (criteria can be nested without area)
+        // So, areaid is always optional
+        // If creating a child (parentcriteriaid set), criteriacode is not required and will be null
+        if (!formData.parentcriteriaid && !formData.criteriacode.trim()) newErrors.criteriacode = 'Sub area code is required';
+        if (!formData.criterianame.trim()) newErrors.criterianame = 'Sub area name is required';
         if (!formData.Description.trim()) newErrors.Description = 'Description is required';
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
@@ -129,26 +129,24 @@ export default function AddCriteriaModal({ isOpen, onClose, onSuccess }) {
         if (!validateForm()) return;
         setIsSubmitting(true);
         try {
+            const { criteriaAPI } = await import('../../utils/api');
             const payload = {
                 ...formData,
-                CriteriaCode: formData.ParentCriteriaID ? null : (formData.CriteriaCode ? String(formData.CriteriaCode).replace(/^\.+/, '') : formData.CriteriaCode)
+                description: formData.Description,
+                Description: formData.Description,
+                criteriacode: formData.parentcriteriaid ? null : (formData.criteriacode ? String(formData.criteriacode).replace(/^\.+/, '') : formData.criteriacode)
             };
-            const response = await fetch(`${API_BASE_URL}/api/criteria/add`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            const data = await response.json();
+            const data = await criteriaAPI.addCriteria(payload);
             if (data.success) {
-                setFormData({ EventID: '', AreaID: '', CriteriaCode: '', CriteriaName: '', Description: '', ParentCriteriaID: '' });
+                setFormData({ eventid: '', areaid: '', criteriacode: '', criterianame: '', Description: '', parentcriteriaid: '' });
                 if (onSuccess) onSuccess(data.data);
                 onClose();
-                await showAlert('Sub area added successfully!');
             } else {
                 await showAlert(data.message || 'Failed to add sub area');
             }
         } catch (error) {
-            await showAlert('An error occurred while adding the sub area. Please try again.');
+            console.error('Error adding sub area:', error);
+            await showAlert(error?.response?.data?.message || error?.message || 'An error occurred while adding the sub area. Please try again.');
         } finally {
             setIsSubmitting(false);
         }
@@ -156,7 +154,7 @@ export default function AddCriteriaModal({ isOpen, onClose, onSuccess }) {
 
     const handleClose = () => {
         if (!isSubmitting) {
-            setFormData({ EventID: '', AreaID: '', CriteriaCode: '', CriteriaName: '', Description: '', ParentCriteriaID: '' });
+            setFormData({ eventid: '', areaid: '', criteriacode: '', criterianame: '', Description: '', parentcriteriaid: '' });
             setErrors({});
             setAreasList([]);
             setCriteriaList([]);
@@ -189,65 +187,65 @@ export default function AddCriteriaModal({ isOpen, onClose, onSuccess }) {
                         <form onSubmit={handleSubmit} className="space-y-4">
                             {/* Event Selection */}
                             <div>
-                                <label htmlFor="EventID" className="block text-xs font-semibold text-slate-700 mb-1.5">Event *</label>
+                                <label htmlFor="eventid" className="block text-xs font-semibold text-slate-700 mb-1.5">Event *</label>
                                 <CustomSelect
                                     size="md"
-                                    value={formData.EventID}
-                                    onChange={(val) => handleInputChange({ target: { name: 'EventID', value: val } })}
+                                    value={formData.eventid}
+                                    onChange={(val) => handleInputChange({ target: { name: 'eventid', value: val } })}
                                     disabled={isSubmitting}
                                     placeholder="Select an event"
                                     options={[
                                         { value: "", label: "Select an event" },
                                         ...eventsList.map((event) => ({
-                                            value: String(event.EventID),
-                                            label: `${event.EventCode} - ${event.EventName}`,
+                                            value: String(event.eventid),
+                                            label: `${event.eventcode} - ${event.eventname}`,
                                         })),
                                     ]}
                                 />
-                                {errors.EventID && <p className="text-red-500 text-[11px] mt-1">{errors.EventID}</p>}
+                                {errors.eventid && <p className="text-red-500 text-[11px] mt-1">{errors.eventid}</p>}
                             </div>
                             {/* Area Dropdown */}
                             <div>
-                                <label htmlFor="AreaID" className="block text-xs font-semibold text-slate-700 mb-1.5">Area *</label>
+                                <label htmlFor="areaid" className="block text-xs font-semibold text-slate-700 mb-1.5">Area *</label>
                                 <CustomSelect
                                     size="md"
-                                    value={formData.AreaID}
-                                    onChange={(val) => handleInputChange({ target: { name: 'AreaID', value: val } })}
-                                    disabled={isSubmitting || isLoading || !formData.EventID}
-                                    placeholder={!formData.EventID ? 'Select an event first' : 'Select an area'}
+                                    value={formData.areaid}
+                                    onChange={(val) => handleInputChange({ target: { name: 'areaid', value: val } })}
+                                    disabled={isSubmitting || isLoading || !formData.eventid}
+                                    placeholder={!formData.eventid ? 'Select an event first' : 'Select an area'}
                                     options={[
-                                        { value: "", label: !formData.EventID ? 'Select an event first' : 'Select an area' },
+                                        { value: "", label: !formData.eventid ? 'Select an event first' : 'Select an area' },
                                         ...areasList.map((area) => ({
-                                            value: String(area.AreaID),
-                                            label: `${area.AreaCode} - ${area.AreaName}`,
+                                            value: String(area.areaid),
+                                            label: `${area.areacode} - ${area.areaname}`,
                                         })),
                                     ]}
                                 />
-                                {errors.AreaID && <p className="text-red-500 text-[11px] mt-1">{errors.AreaID}</p>}
+                                {errors.areaid && <p className="text-red-500 text-[11px] mt-1">{errors.areaid}</p>}
                             </div>
                             {/* Parent Criteria Dropdown */}
                             <div>
-                                <label htmlFor="ParentCriteriaID" className="block text-xs font-semibold text-slate-700 mb-1.5">Parent Sub Area (Optional)</label>
+                                <label htmlFor="parentcriteriaid" className="block text-xs font-semibold text-slate-700 mb-1.5">Parent Sub Area (Optional)</label>
                                 <CustomSelect
                                     size="md"
-                                    value={formData.ParentCriteriaID}
-                                    onChange={(val) => handleInputChange({ target: { name: 'ParentCriteriaID', value: val } })}
-                                    disabled={isSubmitting || !formData.EventID || criteriaList.length === 0 || !formData.AreaID}
-                                    placeholder={!formData.AreaID ? 'Select an area first to choose a parent sub area' : 'None (Top-level sub area)'}
+                                    value={formData.parentcriteriaid}
+                                    onChange={(val) => handleInputChange({ target: { name: 'parentcriteriaid', value: val } })}
+                                    disabled={isSubmitting || !formData.eventid || criteriaList.length === 0 || !formData.areaid}
+                                    placeholder={!formData.areaid ? 'Select an area first to choose a parent sub area' : 'None (Top-level sub area)'}
                                     options={[
                                         { value: "", label: "None (Top-level sub area)" },
                                         ...criteriaList
                                             .filter(criteria =>
-                                                criteria.CriteriaCode !== formData.CriteriaCode &&
-                                                (!formData.AreaID || String(criteria.AreaID) === String(formData.AreaID))
+                                                criteria.criteriacode !== formData.criteriacode &&
+                                                (!formData.areaid || String(criteria.areaid) === String(formData.areaid))
                                             )
                                             .map(criteria => ({
-                                                value: String(criteria.CriteriaID),
-                                                label: `${criteria.CriteriaCode} - ${criteria.CriteriaName}`,
+                                                value: String(criteria.criteriaid),
+                                                label: `${criteria.criteriacode} - ${criteria.criterianame}`,
                                             })),
                                     ]}
                                 />
-                                {formData.EventID && (
+                                {formData.eventid && (
                                     <p className="text-emerald-600 text-[11px] mt-1">
                                         {criteriaList.length} existing sub areas in this accreditation
                                     </p>
@@ -255,33 +253,33 @@ export default function AddCriteriaModal({ isOpen, onClose, onSuccess }) {
                             </div>
                             {/* Criteria Code */}
                             <div>
-                                <label htmlFor="CriteriaCode" className="block text-xs font-semibold text-slate-700 mb-1.5">Sub Area Code *</label>
+                                <label htmlFor="criteriacode" className="block text-xs font-semibold text-slate-700 mb-1.5">Sub Area Code *</label>
                                 <input
                                     type="text"
-                                    id="CriteriaCode"
-                                    name="CriteriaCode"
-                                    value={formData.CriteriaCode}
+                                    id="criteriacode"
+                                    name="criteriacode"
+                                    value={formData.criteriacode}
                                     onChange={handleInputChange}
-                                    className={`w-full px-3 py-2 text-xs border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ${errors.CriteriaCode ? 'border-red-400' : 'border-slate-200'}`}
-                                    placeholder={formData.ParentCriteriaID ? 'No code required for child sub area' : 'e.g., A.1, B.2.1'}
-                                    disabled={isSubmitting || !!formData.ParentCriteriaID}
+                                    className={`w-full px-3 py-2 text-xs border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ${errors.criteriacode ? 'border-red-400' : 'border-slate-200'}`}
+                                    placeholder={formData.parentcriteriaid ? 'No code required for child sub area' : 'e.g., A.1, B.2.1'}
+                                    disabled={isSubmitting || !!formData.parentcriteriaid}
                                 />
-                                {errors.CriteriaCode && <p className="text-red-500 text-[11px] mt-1">{errors.CriteriaCode}</p>}
+                                {errors.criteriacode && <p className="text-red-500 text-[11px] mt-1">{errors.criteriacode}</p>}
                             </div>
                             {/* Criteria Name */}
                             <div>
-                                <label htmlFor="CriteriaName" className="block text-xs font-semibold text-slate-700 mb-1.5">Sub Area Name *</label>
+                                <label htmlFor="criterianame" className="block text-xs font-semibold text-slate-700 mb-1.5">Sub Area Name *</label>
                                 <input
                                     type="text"
-                                    id="CriteriaName"
-                                    name="CriteriaName"
-                                    value={formData.CriteriaName}
+                                    id="criterianame"
+                                    name="criterianame"
+                                    value={formData.criterianame}
                                     onChange={handleInputChange}
-                                    className={`w-full px-3 py-2 text-xs border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ${errors.CriteriaName ? 'border-red-400' : 'border-slate-200'}`}
+                                    className={`w-full px-3 py-2 text-xs border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ${errors.criterianame ? 'border-red-400' : 'border-slate-200'}`}
                                     placeholder="Enter sub area name"
                                     disabled={isSubmitting}
                                 />
-                                {errors.CriteriaName && <p className="text-red-500 text-[11px] mt-1">{errors.CriteriaName}</p>}
+                                {errors.criterianame && <p className="text-red-500 text-[11px] mt-1">{errors.criterianame}</p>}
                             </div>
                             {/* Description */}
                             <div>
@@ -310,7 +308,7 @@ export default function AddCriteriaModal({ isOpen, onClose, onSuccess }) {
                                 </button>
                                 <button
                                     type="submit"
-                                    disabled={isSubmitting || !formData.EventID}
+                                    disabled={isSubmitting || !formData.eventid}
                                     className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-4 text-xs font-semibold text-white shadow-2xs hover:bg-blue-700 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                                 >
                                     {isSubmitting && (
@@ -326,13 +324,13 @@ export default function AddCriteriaModal({ isOpen, onClose, onSuccess }) {
                     <div className="w-1/2 p-6 bg-slate-50 flex flex-col justify-start">
                         <StructureLivePreview
                             mode="add-criteria"
-                            areaData={areasList.find(a => String(a.AreaID) === String(formData.AreaID)) || null}
+                            areaData={areasList.find(a => String(a.areaid) === String(formData.areaid)) || null}
                             criteriaData={{
-                                CriteriaCode: formData.CriteriaCode,
-                                CriteriaName: formData.CriteriaName,
+                                criteriacode: formData.criteriacode,
+                                criterianame: formData.criterianame,
                                 Description: formData.Description
                             }}
-                            event={eventsList.find(e => String(e.EventID) === String(formData.EventID)) || null}
+                            event={eventsList.find(e => String(e.eventid) === String(formData.eventid)) || null}
                         />
                     </div>
                 </div>

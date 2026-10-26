@@ -29,7 +29,7 @@ export default function Requirements() {
     const { showAlert, showConfirm } = useModal();
 
     // Default to admin (show features) until we confirm otherwise
-    const isAdmin = !!(currentUser && (currentUser.RoleName === 'admin' || currentUser.RoleID === 1));
+    const isAdmin = !!(currentUser && (currentUser.rolename === 'admin' || currentUser.roleid === 1));
 
     // Fetch current user on mount
     useEffect(() => {
@@ -53,8 +53,8 @@ export default function Requirements() {
                     setEvents(allEvents.data);
                     if (allEvents.data.length > 0) {
                         const savedId = localStorage.getItem('acc_selected_event_id') || localStorage.getItem('selected_audit_event_id');
-                        const valid = allEvents.data.find(e => String(e.EventID || e.id) === String(savedId));
-                        setSelectedEventId(valid ? (valid.EventID || valid.id) : allEvents.data[0].EventID);
+                        const valid = allEvents.data.find(e => String(e.eventid || e.id) === String(savedId));
+                        setSelectedEventId(valid ? (valid.eventid || valid.id) : allEvents.data[0].eventid);
                     }
                 } else {
                     setEvents([]);
@@ -99,7 +99,7 @@ export default function Requirements() {
         try {
             const { requirementsAPI } = await import('../utils/api');
             const response = await requirementsAPI.updateRequirement(
-                updatedRequirement.RequirementID,
+                updatedRequirement.requirementid,
                 updatedRequirement
             );
 
@@ -198,8 +198,8 @@ export default function Requirements() {
                                 value={selectedEventId}
                                 onChange={(val) => setSelectedEventId(val)}
                                 options={events.map((event) => ({
-                                    value: String(event.EventID),
-                                    label: event.EventName || event.eventType,
+                                    value: String(event.eventid),
+                                    label: event.eventname || event.eventType,
                                 }))}
                             />
                         </div>
@@ -273,7 +273,7 @@ export default function Requirements() {
                 }}
                 requirement={selectedRequirement}
                 onSave={handleEditSave}
-                userRole={currentUser?.RoleID}
+                userRole={currentUser?.roleid}
             />
 
             {/* Requirements List */}
@@ -284,7 +284,7 @@ export default function Requirements() {
                 deleteMode={deleteMode}
                 onSelectionChange={handleSelectionChange}
                 onRequirementClick={handleRequirementClick}
-                eventId={selectedEventId}
+                eventid={selectedEventId}
             />
             </div>
         </div>

@@ -7,29 +7,29 @@ const fs = require('fs');
 const path = require('path');
 const MAX_HEADS_PER_OFFICE = 4;
 
-const normalizeComplianceStatus = (statusId, statusName) => {
-  const id = Number(statusId);
+const normalizeComplianceStatus = (statusid, statusname) => {
+  const id = Number(statusid);
   if (id === 5) return 'Compiled';
   if (id === 4) return 'Partially Compiled';
   if (id === 3) return 'Not Compiled';
 
-  const normalized = String(statusName || '').trim().toLowerCase();
+  const normalized = String(statusname || '').trim().toLowerCase();
   if (normalized.includes('partial')) return 'Partially Compiled';
   if (normalized.includes('not')) return 'Not Compiled';
   if (normalized.includes('comp')) return 'Compiled';
   return 'Not Compiled';
 };
 
-const normalizeHeadIds = (headIds, headId) => {
-  const source = Array.isArray(headIds) ? headIds : (headId != null ? [headId] : []);
+const normalizeHeadIds = (headIds, headid) => {
+  const source = Array.isArray(headIds) ? headIds : (headid != null ? [headid] : []);
   return [...new Set(source.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0))];
 };
 
 const formatUserName = (row) => {
   if (!row) return 'Unknown';
-  const first = String(row.FirstName || '').trim();
-  const middle = String(row.MiddleInitial || '').trim();
-  const last = String(row.LastName || '').trim();
+  const first = String(row.firstname || '').trim();
+  const middle = String(row.middleinitial || '').trim();
+  const last = String(row.lastname || '').trim();
   return `${first}${middle ? ` ${middle}.` : ''} ${last}`.replace(/\s+/g, ' ').trim() || 'Unknown';
 };
 
@@ -37,13 +37,13 @@ const getNamesByHeadIds = async (headIds = []) => {
   if (!Array.isArray(headIds) || headIds.length === 0) return [];
   const placeholders = headIds.map(() => '?').join(',');
   const [rows] = await db.query(
-    `SELECT h.HeadID, u.FirstName, u.MiddleInitial, u.LastName
+    `SELECT h.headid, u.firstname, u.middleinitial, u.lastname
      FROM headofoffice h
-     LEFT JOIN users u ON h.UserID = u.UserID
-     WHERE h.HeadID IN (${placeholders})`,
+     LEFT JOIN users u ON h.userid = u.userid
+     WHERE h.headid IN (${placeholders})`,
     headIds
   );
-  const map = new Map(rows.map((row) => [Number(row.HeadID), formatUserName(row)]));
+  const map = new Map(rows.map((row) => [Number(row.headid), formatUserName(row)]));
   return headIds.map((id) => map.get(Number(id)) || `Head #${id}`);
 };
 
@@ -51,66 +51,92 @@ const getHeadAssignmentDetailsByHeadIds = async (headIds = []) => {
   if (!Array.isArray(headIds) || headIds.length === 0) return [];
   const placeholders = headIds.map(() => '?').join(',');
   const [rows] = await db.query(
-    `SELECT h.HeadID, h.UserID, u.FirstName, u.MiddleInitial, u.LastName
+    `SELECT h.headid, h.userid, u.firstname, u.middleinitial, u.lastname
      FROM headofoffice h
-     LEFT JOIN users u ON h.UserID = u.UserID
-     WHERE h.HeadID IN (${placeholders})`,
+     LEFT JOIN users u ON h.userid = u.userid
+     WHERE h.headid IN (${placeholders})`,
     headIds
   );
 
   const byHeadId = new Map(
-    rows.map((row) => [Number(row.HeadID), {
-      headId: Number(row.HeadID),
-      userId: Number(row.UserID),
+    rows.map((row) => [Number(row.headid), {
+      headid: Number(row.headid),
+      userid: Number(row.userid),
       fullName: formatUserName(row),
     }])
   );
 
   return headIds
-    .map((headId) => byHeadId.get(Number(headId)))
-    .filter((row) => row && Number.isInteger(row.userId));
+    .map((headid) => byHeadId.get(Number(headid)))
+    .filter((row) => row && Number.isInteger(row.userid));
 };
 
-const getOfficeTypeName = async (officeTypeId) => {
-  if (!officeTypeId) return 'Unassigned';
-  const [rows] = await db.query('SELECT TypeName FROM officetypes WHERE OfficeTypeID = ? LIMIT 1', [officeTypeId]);
-  return rows[0]?.TypeName || 'Unknown Type';
+const getOfficeTypeName = async (officetypeid) => {
+  if (!officetypeid) return 'Unassigned';
+  const [rows] = await db.query('SELECT typename FROM officetypes WHERE officetypeid = ? LIMIT 1', [officetypeid]);
+  return rows[0]?.typename || 'Unknown Type';
 };
 
-const getEventName = async (eventId) => {
-  if (!eventId) return 'No event';
-  const [rows] = await db.query('SELECT EventName FROM events WHERE EventID = ? LIMIT 1', [eventId]);
-  return rows[0]?.EventName || `Event #${eventId}`;
+const getEventName = async (eventid) => {
+  if (!eventid) return 'No event';
+  const [rows] = await db.query('SELECT eventname FROM events WHERE eventid = ? LIMIT 1', [eventid]);
+  return rows[0]?.eventname || `Event #${eventid}`;
 };
 
-const getOfficeSnapshot = async (officeId) => {
+const getOfficeSnapshot = async (officeid) => {
   const [officeRows] = await db.query(
-    `SELECT o.OfficeID, o.OfficeName, o.OfficeTypeID, o.EventID,
-            ot.TypeName AS OfficeTypeName,
-            e.EventName
+    `SELECT o.officeid, o.officename, o.officetypeid, o.eventid,
+            ot.typename AS OfficeTypeName,
+            e.eventname
      FROM offices o
-     LEFT JOIN officetypes ot ON o.OfficeTypeID = ot.OfficeTypeID
-     LEFT JOIN events e ON o.EventID = e.EventID
-     WHERE o.OfficeID = ?
+     LEFT JOIN officetypes ot ON o.officetypeid = ot.officetypeid
+     LEFT JOIN events e ON o.eventid = e.eventid
+     WHERE o.officeid = ?
      LIMIT 1`,
-    [officeId]
+    [officeid]
   );
 
   if (officeRows.length === 0) return null;
 
   const [headRows] = await db.query(
-    `SELECT h.HeadID, u.FirstName, u.MiddleInitial, u.LastName
-     FROM office_head_assignments oha
-     INNER JOIN headofoffice h ON oha.HeadID = h.HeadID
-     LEFT JOIN users u ON h.UserID = u.UserID
-     WHERE oha.OfficeID = ?
-     ORDER BY u.LastName ASC, u.FirstName ASC`,
-    [officeId]
+    `SELECT DISTINCT
+       COALESCE(h.headid, u.userid) AS headid,
+       u.firstname,
+       u.middleinitial,
+       u.lastname
+     FROM (
+       SELECT officeid, h.userid
+       FROM officeheadassignments oha
+       INNER JOIN headofoffice h ON oha.headid = h.headid
+       WHERE oha.officeid = ?
+
+       UNION
+
+       SELECT officeid, userid
+       FROM requirementuserassignments
+       WHERE officeid = ? AND userid IS NOT NULL
+
+       UNION
+
+       SELECT cso.officeid, pa.userid
+       FROM personnelassignments pa
+       JOIN requirements r ON (
+         (pa.requirementid IS NOT NULL AND r.requirementid = pa.requirementid)
+         OR (pa.criteriaid IS NOT NULL AND r.criteriaid = pa.criteriaid)
+         OR (pa.areaid IS NOT NULL AND r.criteriaid IN (SELECT criteriaid FROM criteria WHERE areaid = pa.areaid))
+       )
+       JOIN compliancestatusoffices cso ON r.requirementid = cso.requirementid
+       WHERE cso.officeid = ? AND pa.userid IS NOT NULL
+     ) assigned
+     INNER JOIN users u ON assigned.userid = u.userid
+     LEFT JOIN headofoffice h ON u.userid = h.userid
+     ORDER BY u.lastname ASC, u.firstname ASC`,
+    [officeid, officeid, officeid]
   );
 
   return {
     ...officeRows[0],
-    HeadIDs: headRows.map((row) => Number(row.HeadID)),
+    HeadIDs: headRows.map((row) => Number(row.headid)),
     HeadNames: headRows.map((row) => formatUserName(row)),
   };
 };
@@ -121,15 +147,15 @@ const OfficesController = {
   // ================================
   getAll: async (req, res) => {
     try {
-      const roleId = Number(req.user?.roleId || 0);
-      const userId = Number(req.user?.userId || 0);
-      const isAuditor = roleId === 4;
+      const roleid = Number(req.user?.roleid || 0);
+      const userid = Number(req.user?.userid || 0);
+      const isAuditor = roleid === 4;
 
       // If auditor, check if they have any area assignments
       if (isAuditor) {
         const [assignments] = await db.query(
-          'SELECT area_id FROM auditor_area_assignments WHERE auditor_user_id = ?',
-          [userId]
+          'SELECT areaid FROM auditorareaassignments WHERE auditoruserid = ?',
+          [userid]
         );
         if (!assignments || assignments.length === 0) {
           return res.json({ success: true, data: [] });
@@ -137,13 +163,13 @@ const OfficesController = {
       }
 
       const officeWhere = isAuditor
-        ? `WHERE o.OfficeID IN (
-            SELECT DISTINCT cso.OfficeID
+        ? `WHERE o.officeid IN (
+            SELECT DISTINCT cso.officeid
             FROM compliancestatusoffices cso
-            JOIN requirements r ON cso.RequirementID = r.RequirementID
-            JOIN criteria c ON r.CriteriaID = c.CriteriaID
-            JOIN auditor_area_assignments aaa ON c.AreaID = aaa.area_id
-            WHERE aaa.auditor_user_id = ${Number(userId)}
+            JOIN requirements r ON cso.requirementid = r.requirementid
+            JOIN criteria c ON r.criteriaid = c.criteriaid
+            JOIN auditorareaassignments aaa ON c.areaid = aaa.areaid
+            WHERE aaa.auditoruserid = ${Number(userid)}
           )`
         : '';
 
@@ -151,47 +177,47 @@ const OfficesController = {
       // First get all offices with basic info
       const [officeRows] = await db.query(`
         SELECT 
-          o.OfficeID,
-          COALESCE(m.entity_name, o.OfficeName) AS OfficeName,
-          o.master_list_id,
-          o.OfficeTypeID,
-          o.EventID,
-          o.event_department_id,
-          COALESCE(o.accreditation_level, 'None') AS accreditation_level,
-          COALESCE(m.entity_type_id, CASE WHEN ot.TypeName ILIKE '%non%' THEN 2 WHEN ot.TypeName ILIKE '%academic%' THEN 1 ELSE NULL END) AS entity_type_id,
-          m.department_id,
-          COALESCE(o.created_at, m.created_at) AS created_at,
-          COALESCE(o.updated_at, m.updated_at, o.created_at, m.created_at) AS updated_at,
+          o.officeid,
+          COALESCE(m.entityname, o.officename) AS officename,
+          o.masterlistid,
+          o.officetypeid,
+          o.eventid,
+          o.eventdepartmentid,
+          COALESCE(o.accreditationlevel, 'None') AS accreditationlevel,
+          COALESCE(m.entitytypeid, CASE WHEN ot.typename ILIKE '%non%' THEN 2 WHEN ot.typename ILIKE '%academic%' THEN 1 ELSE NULL END) AS entitytypeid,
+          m.departmentid,
+          COALESCE(o.createdat, m.createdat) AS createdat,
+          COALESCE(o.updatedat, m.updatedat, o.createdat, m.createdat) AS updatedat,
           COALESCE(d.name, NULL) AS department_name,
           CASE 
-            WHEN m.entity_type_id = 1 THEN 'Academic Program'
-            WHEN m.entity_type_id = 2 THEN 'Non-Academic Office'
-            WHEN ot.TypeName ILIKE '%non%' THEN 'Non-Academic Office'
-            WHEN ot.TypeName ILIKE '%academic%' THEN 'Academic Program'
+            WHEN m.entitytypeid = 1 THEN 'Academic Program'
+            WHEN m.entitytypeid = 2 THEN 'Non-Academic Office'
+            WHEN ot.typename ILIKE '%non%' THEN 'Non-Academic Office'
+            WHEN ot.typename ILIKE '%academic%' THEN 'Academic Program'
             ELSE 'Unknown'
           END AS category_name,
-          e.EventName,
-          e.EventCode,
-          ot.TypeName,
-          os.OverallStatus,
-          os.CompliancePercent,
-          os.TotalRequirements,
-          os.CompliedCount,
-          os.PartiallyCompliedCount,
-          os.NotCompliedCount
+          e.eventname,
+          e.eventcode,
+          ot.typename,
+          os.overallstatus,
+          os.compliancepercent,
+          os.totalrequirements,
+          os.compliedcount,
+          os.partiallycompliedcount,
+          os.notcompliedcount
         FROM offices o
-        LEFT JOIN master_list m ON o.master_list_id = m.id
-        LEFT JOIN departments d ON m.department_id = d.id
-        LEFT JOIN event_departments ed ON o.event_department_id = ed.id
-        LEFT JOIN Events e ON o.EventID = e.EventID
-        LEFT JOIN officetypes ot ON o.OfficeTypeID = ot.OfficeTypeID
+        LEFT JOIN masterlist m ON o.masterlistid = m.id
+        LEFT JOIN departments d ON m.departmentid = d.id
+        LEFT JOIN eventdepartments ed ON o.eventdepartmentid = ed.id
+        LEFT JOIN Events e ON o.eventid = e.eventid
+        LEFT JOIN officetypes ot ON o.officetypeid = ot.officetypeid
         LEFT JOIN (
           SELECT
-            cso.OfficeID,
-            COUNT(*) AS TotalRequirements,
-            SUM(CASE WHEN cso.Status::text = '5' THEN 1 ELSE 0 END) AS CompliedCount,
-            SUM(CASE WHEN cso.Status::text = '4' THEN 1 ELSE 0 END) AS PartiallyCompliedCount,
-            SUM(CASE WHEN cso.Status::text = '3' THEN 1 ELSE 0 END) AS NotCompliedCount,
+            cso.officeid,
+            COUNT(*) AS totalrequirements,
+            SUM(CASE WHEN cso.Status::text = '5' THEN 1 ELSE 0 END) AS compliedcount,
+            SUM(CASE WHEN cso.Status::text = '4' THEN 1 ELSE 0 END) AS partiallycompliedcount,
+            SUM(CASE WHEN cso.Status::text = '3' THEN 1 ELSE 0 END) AS notcompliedcount,
             CASE
               WHEN COUNT(*) = 0 THEN 0
               ELSE ROUND(
@@ -200,150 +226,172 @@ const OfficesController = {
                 NULLIF(COUNT(*), 0))::numeric,
                 2
               )
-            END AS CompliancePercent,
+            END AS compliancepercent,
             CASE
-              WHEN COUNT(*) = 0 THEN 'Not Complied'
+              WHEN COUNT(*) = 0 THEN 'No Standards'
               WHEN SUM(CASE WHEN cso.Status::text = '5' THEN 1 ELSE 0 END) = COUNT(*) THEN 'Complied'
               WHEN SUM(CASE WHEN cso.Status::text = '3' THEN 1 ELSE 0 END) = COUNT(*) THEN 'Not Complied'
               ELSE 'Partially Complied'
-            END AS OverallStatus
+            END AS overallstatus
           FROM compliancestatusoffices cso
-          GROUP BY cso.OfficeID
-        ) os ON o.OfficeID = os.OfficeID
+          GROUP BY cso.officeid
+        ) os ON o.officeid = os.officeid
         ${officeWhere}
       `);
 
-      // Get all heads assigned to offices via assignment junction table
+      // Get all heads/personnel assigned to offices via officeheadassignments, requirementuserassignments, OR personnelassignments (area/subarea/standard)
       const [headRows] = await db.query(`
-        SELECT 
-          h.HeadID,
-          h.UserID,
-          oha.OfficeID,
-          h.Position,
-          u.FirstName,
-          u.MiddleInitial,
-          u.LastName,
-          u.ProfilePic
-        FROM office_head_assignments oha
-        INNER JOIN headofoffice h ON oha.HeadID = h.HeadID
-        LEFT JOIN users u ON h.UserID = u.UserID
-        WHERE oha.OfficeID IS NOT NULL
+        SELECT DISTINCT
+          assigned.officeid,
+          COALESCE(h.headid, u.userid) AS headid,
+          u.userid,
+          COALESCE(h.Position, 'Personnel') AS Position,
+          u.firstname,
+          u.middleinitial,
+          u.lastname,
+          u.profilepic
+        FROM (
+          SELECT officeid, h.userid
+          FROM officeheadassignments oha
+          INNER JOIN headofoffice h ON oha.headid = h.headid
+          WHERE oha.officeid IS NOT NULL
+
+          UNION
+
+          SELECT officeid, userid
+          FROM requirementuserassignments
+          WHERE officeid IS NOT NULL AND userid IS NOT NULL
+
+          UNION
+
+          SELECT cso.officeid, pa.userid
+          FROM personnelassignments pa
+          JOIN requirements r ON (
+            (pa.requirementid IS NOT NULL AND r.requirementid = pa.requirementid)
+            OR (pa.criteriaid IS NOT NULL AND r.criteriaid = pa.criteriaid)
+            OR (pa.areaid IS NOT NULL AND r.criteriaid IN (SELECT criteriaid FROM criteria WHERE areaid = pa.areaid))
+          )
+          JOIN compliancestatusoffices cso ON r.requirementid = cso.requirementid
+          WHERE pa.userid IS NOT NULL
+        ) assigned
+        INNER JOIN users u ON assigned.userid = u.userid
+        LEFT JOIN headofoffice h ON u.userid = h.userid
       `);
 
-      // Group heads by OfficeID
+      // Group heads by officeid
       const headsByOffice = {};
       const seenUsersByOffice = {};
       headRows.forEach(head => {
-        if (!headsByOffice[head.OfficeID]) {
-          headsByOffice[head.OfficeID] = [];
-          seenUsersByOffice[head.OfficeID] = new Set();
+        if (!headsByOffice[head.officeid]) {
+          headsByOffice[head.officeid] = [];
+          seenUsersByOffice[head.officeid] = new Set();
         }
 
-        const uniquePersonKey = head.UserID != null ? `user-${head.UserID}` : `head-${head.HeadID}`;
-        if (seenUsersByOffice[head.OfficeID].has(uniquePersonKey)) {
+        const uniquePersonKey = head.userid != null ? `user-${head.userid}` : `head-${head.headid}`;
+        if (seenUsersByOffice[head.officeid].has(uniquePersonKey)) {
           return;
         }
 
-        seenUsersByOffice[head.OfficeID].add(uniquePersonKey);
-        headsByOffice[head.OfficeID].push({
-          HeadID: head.HeadID,
-          UserID: head.UserID,
-          FirstName: head.FirstName,
-          MiddleInitial: head.MiddleInitial,
-          LastName: head.LastName,
+        seenUsersByOffice[head.officeid].add(uniquePersonKey);
+        headsByOffice[head.officeid].push({
+          headid: head.headid,
+          userid: head.userid,
+          firstname: head.firstname,
+          middleinitial: head.middleinitial,
+          lastname: head.lastname,
           Position: head.Position,
-          ProfilePic: head.ProfilePic,
-          full_name: head.FirstName ? `${head.FirstName} ${head.MiddleInitial ? head.MiddleInitial + '.' : ''} ${head.LastName}`.trim() : 'Unknown'
+          profilepic: head.profilepic,
+          full_name: head.firstname ? `${head.firstname} ${head.middleinitial ? head.middleinitial + '.' : ''} ${head.lastname}`.trim() : 'Unknown'
         });
       });
 
-      // Get all auditors assigned to offices via auditor_area_assignments junction
+      // Get all auditors assigned to offices via auditorareaassignments junction
       let auditorRows = [];
       try {
         const [auds] = await db.query(`
           SELECT DISTINCT 
-            cso.OfficeID,
-            u.UserID,
-            u.FirstName,
-            u.MiddleInitial,
-            u.LastName,
-            u.ProfilePic,
-            ar.AreaCode,
-            ar.AreaName
-          FROM auditor_area_assignments aaa
-          JOIN users u ON aaa.auditor_user_id = u.UserID
-          JOIN areas ar ON aaa.area_id = ar.AreaID
-          JOIN criteria c ON ar.AreaID = c.AreaID
-          JOIN requirements r ON c.CriteriaID = r.CriteriaID
-          JOIN compliancestatusoffices cso ON r.RequirementID = cso.RequirementID
+            cso.officeid,
+            u.userid,
+            u.firstname,
+            u.middleinitial,
+            u.lastname,
+            u.profilepic,
+            ar.areacode,
+            ar.areaname
+          FROM auditorareaassignments aaa
+          JOIN users u ON aaa.auditoruserid = u.userid
+          JOIN areas ar ON aaa.areaid = ar.areaid
+          JOIN criteria c ON ar.areaid = c.areaid
+          JOIN requirements r ON c.criteriaid = r.criteriaid
+          JOIN compliancestatusoffices cso ON r.requirementid = cso.requirementid
         `);
         auditorRows = auds;
       } catch (audErr) {
-        // auditor_area_assignments may not exist or be empty
+        // auditorareaassignments may not exist or be empty
       }
 
       const auditorsByOffice = {};
       const seenAuditorsByOffice = {};
       auditorRows.forEach(aud => {
-        if (!auditorsByOffice[aud.OfficeID]) {
-          auditorsByOffice[aud.OfficeID] = [];
-          seenAuditorsByOffice[aud.OfficeID] = new Set();
+        if (!auditorsByOffice[aud.officeid]) {
+          auditorsByOffice[aud.officeid] = [];
+          seenAuditorsByOffice[aud.officeid] = new Set();
         }
-        if (seenAuditorsByOffice[aud.OfficeID].has(aud.UserID)) return;
-        seenAuditorsByOffice[aud.OfficeID].add(aud.UserID);
-        auditorsByOffice[aud.OfficeID].push({
-          UserID: aud.UserID,
-          FirstName: aud.FirstName,
-          MiddleInitial: aud.MiddleInitial,
-          LastName: aud.LastName,
-          ProfilePic: aud.ProfilePic,
-          full_name: aud.FirstName ? `${aud.FirstName} ${aud.MiddleInitial ? aud.MiddleInitial + '.' : ''} ${aud.LastName}`.trim() : 'Auditor'
+        if (seenAuditorsByOffice[aud.officeid].has(aud.userid)) return;
+        seenAuditorsByOffice[aud.officeid].add(aud.userid);
+        auditorsByOffice[aud.officeid].push({
+          userid: aud.userid,
+          firstname: aud.firstname,
+          middleinitial: aud.middleinitial,
+          lastname: aud.lastname,
+          profilepic: aud.profilepic,
+          full_name: aud.firstname ? `${aud.firstname} ${aud.middleinitial ? aud.middleinitial + '.' : ''} ${aud.lastname}`.trim() : 'Auditor'
         });
       });
 
       const formatted = officeRows.map(r => {
-        const officeHeads = headsByOffice[r.OfficeID] || [];
-        const officeAuditors = auditorsByOffice[r.OfficeID] || [];
+        const officeHeads = headsByOffice[r.officeid] || [];
+        const officeAuditors = auditorsByOffice[r.officeid] || [];
         // For backward compatibility, also include primary head info
         const primaryHead = officeHeads[0] || null;
         
         return {
-          id: r.OfficeID,
-          office_name: r.OfficeName,
-          OfficeName: r.OfficeName,
-          master_list_id: r.master_list_id || null,
-          created_at: r.created_at || null,
-          updated_at: r.updated_at || null,
-          office_type_id: r.OfficeTypeID,
-          office_type_name: r.TypeName || "Unknown Type",
-          department_id: r.department_id || null,
+          id: r.officeid,
+          officename: r.officename,
+          officename: r.officename,
+          masterlistid: r.masterlistid || null,
+          createdat: r.createdat || null,
+          updatedat: r.updatedat || null,
+          officetypeid: r.officetypeid,
+          office_type_name: r.typename || "Unknown Type",
+          departmentid: r.departmentid || null,
           department_name: r.department_name || null,
-          event_department_id: r.event_department_id || null,
-          accreditation_level: r.accreditation_level || null,
-          entity_type_id: r.entity_type_id || null,
+          eventdepartmentid: r.eventdepartmentid || null,
+          accreditationlevel: r.accreditationlevel || 'None',
+          entitytypeid: r.entitytypeid || null,
           category_name: r.category_name || null,
-          head_id: primaryHead?.HeadID || null,
-          head_ids: officeHeads.map(h => h.HeadID), // Array of head IDs
+          headid: primaryHead?.headid || null,
+          head_ids: officeHeads.map(h => h.headid), // Array of head IDs
           heads: officeHeads, // Full head objects
           head_name: officeHeads.length > 0 
             ? officeHeads.map(h => h.full_name).join(', ')
             : "Unassigned",
-          head_profile_pic: primaryHead?.ProfilePic || null,
+          head_profile_pic: primaryHead?.profilepic || null,
           auditors: officeAuditors,
           auditor_name: officeAuditors.length > 0
             ? officeAuditors.map(a => a.full_name).join(', ')
             : null,
-          event_id: r.EventID,
-          event_name: r.EventName || null,
-          EventName: r.EventName || null,
-          event_code: r.EventCode || r.EventName || null,
-          EventCode: r.EventCode || r.EventName || null,
-          overall_status: r.OverallStatus || 'Not Complied',
-          compliance_percent: r.CompliancePercent || 0,
-          total_requirements: r.TotalRequirements || 0,
-          complied_count: r.CompliedCount || 0,
-          partially_complied_count: r.PartiallyCompliedCount || 0,
-          not_complied_count: r.NotCompliedCount || 0
+          eventid: r.eventid,
+          eventname: r.eventname || null,
+          eventname: r.eventname || null,
+          eventcode: r.eventcode || r.eventname || null,
+          eventcode: r.eventcode || r.eventname || null,
+          overallstatus: (Number(r.totalrequirements || 0) === 0 ? 'No Standards' : (r.overallstatus || 'Not Complied')),
+          compliancepercent: r.compliancepercent || 0,
+          totalrequirements: r.totalrequirements || 0,
+          compliedcount: r.compliedcount || 0,
+          partiallycompliedcount: r.partiallycompliedcount || 0,
+          notcompliedcount: r.notcompliedcount || 0
         };
 
       });
@@ -362,21 +410,21 @@ const OfficesController = {
   // ================================
   getById: async (req, res) => {
     const id = req.params.id;
-    const roleId = Number(req.user?.roleId || 0);
-    const userId = Number(req.user?.userId || 0);
-    const isAuditor = roleId === 4;
+    const roleid = Number(req.user?.roleid || 0);
+    const userid = Number(req.user?.userid || 0);
+    const isAuditor = roleid === 4;
 
     try {
       if (isAuditor) {
         const [accessCheck] = await db.query(`
           SELECT 1
           FROM compliancestatusoffices cso
-          JOIN requirements r ON cso.RequirementID = r.RequirementID
-          JOIN criteria c ON r.CriteriaID = c.CriteriaID
-          JOIN auditor_area_assignments aaa ON c.AreaID = aaa.area_id
-          WHERE cso.OfficeID = ? AND aaa.auditor_user_id = ?
+          JOIN requirements r ON cso.requirementid = r.requirementid
+          JOIN criteria c ON r.criteriaid = c.criteriaid
+          JOIN auditorareaassignments aaa ON c.areaid = aaa.areaid
+          WHERE cso.officeid = ? AND aaa.auditoruserid = ?
           LIMIT 1
-        `, [id, userId]);
+        `, [id, userid]);
 
         if (!accessCheck || accessCheck.length === 0) {
           return res.status(403).json({
@@ -389,41 +437,41 @@ const OfficesController = {
 
       const [rows] = await db.query(`
         SELECT 
-          o.OfficeID,
-          COALESCE(m.entity_name, o.OfficeName) AS OfficeName,
-          o.master_list_id,
-          o.OfficeTypeID,
-          o.EventID,
-          COALESCE(o.accreditation_level, 'None') AS accreditation_level,
-          COALESCE(m.entity_type_id, CASE WHEN t.TypeName ILIKE '%non%' THEN 2 WHEN t.TypeName ILIKE '%academic%' THEN 1 ELSE NULL END) AS entity_type_id,
-          m.department_id,
-          COALESCE(o.created_at, m.created_at) AS created_at,
-          COALESCE(o.updated_at, m.updated_at, o.created_at, m.created_at) AS updated_at,
+          o.officeid,
+          COALESCE(m.entityname, o.officename) AS officename,
+          o.masterlistid,
+          o.officetypeid,
+          o.eventid,
+          COALESCE(o.accreditationlevel, 'None') AS accreditationlevel,
+          COALESCE(m.entitytypeid, CASE WHEN t.typename ILIKE '%non%' THEN 2 WHEN t.typename ILIKE '%academic%' THEN 1 ELSE NULL END) AS entitytypeid,
+          m.departmentid,
+          COALESCE(o.createdat, m.createdat) AS createdat,
+          COALESCE(o.updatedat, m.updatedat, o.createdat, m.createdat) AS updatedat,
           COALESCE(d.name, NULL) AS department_name,
           CASE 
-            WHEN m.entity_type_id = 1 THEN 'Academic Program'
-            WHEN m.entity_type_id = 2 THEN 'Non-Academic Office'
-            WHEN t.TypeName ILIKE '%non%' THEN 'Non-Academic Office'
-            WHEN t.TypeName ILIKE '%academic%' THEN 'Academic Program'
+            WHEN m.entitytypeid = 1 THEN 'Academic Program'
+            WHEN m.entitytypeid = 2 THEN 'Non-Academic Office'
+            WHEN t.typename ILIKE '%non%' THEN 'Non-Academic Office'
+            WHEN t.typename ILIKE '%academic%' THEN 'Academic Program'
             ELSE 'Unknown'
           END AS category_name,
-          t.TypeName,
-          os.OverallStatus,
-          os.CompliancePercent,
-          os.TotalRequirements,
-          e.EventName,
-          e.EventCode
+          t.typename,
+          os.overallstatus,
+          os.compliancepercent,
+          os.totalrequirements,
+          e.eventname,
+          e.eventcode
         FROM offices o
-        LEFT JOIN master_list m ON o.master_list_id = m.id
-        LEFT JOIN departments d ON m.department_id = d.id
-        LEFT JOIN officetypes t ON o.OfficeTypeID = t.OfficeTypeID
+        LEFT JOIN masterlist m ON o.masterlistid = m.id
+        LEFT JOIN departments d ON m.departmentid = d.id
+        LEFT JOIN officetypes t ON o.officetypeid = t.officetypeid
         LEFT JOIN (
           SELECT
-            cso.OfficeID,
-            COUNT(*) AS TotalRequirements,
-            SUM(CASE WHEN cso.Status::text = '5' THEN 1 ELSE 0 END) AS CompliedCount,
-            SUM(CASE WHEN cso.Status::text = '4' THEN 1 ELSE 0 END) AS PartiallyCompliedCount,
-            SUM(CASE WHEN cso.Status::text = '3' THEN 1 ELSE 0 END) AS NotCompliedCount,
+            cso.officeid,
+            COUNT(*) AS totalrequirements,
+            SUM(CASE WHEN cso.Status::text = '5' THEN 1 ELSE 0 END) AS compliedcount,
+            SUM(CASE WHEN cso.Status::text = '4' THEN 1 ELSE 0 END) AS partiallycompliedcount,
+            SUM(CASE WHEN cso.Status::text = '3' THEN 1 ELSE 0 END) AS notcompliedcount,
             CASE
               WHEN COUNT(*) = 0 THEN 0
               ELSE ROUND(
@@ -432,18 +480,18 @@ const OfficesController = {
                 NULLIF(COUNT(*), 0))::numeric,
                 2
               )
-            END AS CompliancePercent,
+            END AS compliancepercent,
             CASE
-              WHEN COUNT(*) = 0 THEN 'Not Complied'
+              WHEN COUNT(*) = 0 THEN 'No Standards'
               WHEN SUM(CASE WHEN cso.Status::text = '5' THEN 1 ELSE 0 END) = COUNT(*) THEN 'Complied'
               WHEN SUM(CASE WHEN cso.Status::text = '3' THEN 1 ELSE 0 END) = COUNT(*) THEN 'Not Complied'
               ELSE 'Partially Complied'
-            END AS OverallStatus
+            END AS overallstatus
           FROM compliancestatusoffices cso
-          GROUP BY cso.OfficeID
-        ) os ON o.OfficeID = os.OfficeID
-        LEFT JOIN Events e ON o.EventID = e.EventID
-        WHERE o.OfficeID = ?
+          GROUP BY cso.officeid
+        ) os ON o.officeid = os.officeid
+        LEFT JOIN Events e ON o.eventid = e.eventid
+        WHERE o.officeid = ?
       `, [id]);
 
       if (rows.length === 0) {
@@ -452,63 +500,85 @@ const OfficesController = {
 
       const r = rows[0];
       const [headRows] = await db.query(`
-        SELECT
-          h.HeadID,
-          h.UserID,
-          h.Position,
-          u.FirstName,
-          u.MiddleInitial,
-          u.LastName,
-          u.ProfilePic
-        FROM office_head_assignments oha
-        INNER JOIN headofoffice h ON oha.HeadID = h.HeadID
-        LEFT JOIN users u ON h.UserID = u.UserID
-        WHERE oha.OfficeID = ?
-      `, [id]);
+        SELECT DISTINCT
+          COALESCE(h.headid, u.userid) AS headid,
+          u.userid,
+          COALESCE(h.Position, 'Personnel') AS Position,
+          u.firstname,
+          u.middleinitial,
+          u.lastname,
+          u.profilepic
+        FROM (
+          SELECT officeid, h.userid
+          FROM officeheadassignments oha
+          INNER JOIN headofoffice h ON oha.headid = h.headid
+          WHERE oha.officeid = ?
+
+          UNION
+
+          SELECT officeid, userid
+          FROM requirementuserassignments
+          WHERE officeid = ? AND userid IS NOT NULL
+
+          UNION
+
+          SELECT cso.officeid, pa.userid
+          FROM personnelassignments pa
+          JOIN requirements r ON (
+            (pa.requirementid IS NOT NULL AND r.requirementid = pa.requirementid)
+            OR (pa.criteriaid IS NOT NULL AND r.criteriaid = pa.criteriaid)
+            OR (pa.areaid IS NOT NULL AND r.criteriaid IN (SELECT criteriaid FROM criteria WHERE areaid = pa.areaid))
+          )
+          JOIN compliancestatusoffices cso ON r.requirementid = cso.requirementid
+          WHERE cso.officeid = ? AND pa.userid IS NOT NULL
+        ) assigned
+        INNER JOIN users u ON assigned.userid = u.userid
+        LEFT JOIN headofoffice h ON u.userid = h.userid
+      `, [id, id, id]);
 
       const seenUsers = new Set();
       const officeHeads = headRows.filter((head) => {
-        const uniquePersonKey = head.UserID != null ? `user-${head.UserID}` : `head-${head.HeadID}`;
+        const uniquePersonKey = head.userid != null ? `user-${head.userid}` : `head-${head.headid}`;
         if (seenUsers.has(uniquePersonKey)) {
           return false;
         }
         seenUsers.add(uniquePersonKey);
         return true;
       }).map((head) => ({
-        HeadID: head.HeadID,
-        UserID: head.UserID,
+        headid: head.headid,
+        userid: head.userid,
         Position: head.Position,
-        FirstName: head.FirstName,
-        MiddleInitial: head.MiddleInitial,
-        LastName: head.LastName,
-        ProfilePic: head.ProfilePic,
-        full_name: head.FirstName ? `${head.FirstName} ${head.MiddleInitial ? `${head.MiddleInitial}.` : ''} ${head.LastName}`.trim() : 'Unknown'
+        firstname: head.firstname,
+        middleinitial: head.middleinitial,
+        lastname: head.lastname,
+        profilepic: head.profilepic,
+        full_name: head.firstname ? `${head.firstname} ${head.middleinitial ? `${head.middleinitial}.` : ''} ${head.lastname}`.trim() : 'Unknown'
       }));
       const primaryHead = officeHeads[0] || null;
 
       res.json({
-        OfficeID: r.OfficeID,
-        OfficeName: r.OfficeName,
-        master_list_id: r.master_list_id || null,
-        created_at: r.created_at || null,
-        updated_at: r.updated_at || null,
-        OfficeTypeID: r.OfficeTypeID,
-        TypeName: r.TypeName || "Unknown Type",
-        DepartmentID: r.department_id || null,
+        officeid: r.officeid,
+        officename: r.officename,
+        masterlistid: r.masterlistid || null,
+        createdat: r.createdat || null,
+        updatedat: r.updatedat || null,
+        officetypeid: r.officetypeid,
+        typename: r.typename || "Unknown Type",
+        DepartmentID: r.departmentid || null,
         DepartmentName: r.department_name || null,
-        entity_type_id: r.entity_type_id || null,
+        entitytypeid: r.entitytypeid || null,
         category_name: r.category_name || null,
-        HeadID: primaryHead?.HeadID || null,
-        HeadIDs: officeHeads.map((head) => head.HeadID),
+        headid: primaryHead?.headid || null,
+        HeadIDs: officeHeads.map((head) => head.headid),
         Heads: officeHeads,
         HeadName: officeHeads.length > 0 ? officeHeads.map((head) => head.full_name).join(', ') : "Unknown Head",
-        accreditation_level: r.accreditation_level || 'None',
-        EventID: r.EventID,
-        EventName: r.EventName || null,
-        EventCode: r.EventCode || null,
-        OverallStatus: r.OverallStatus || 'Not Complied',
-        CompliancePercent: r.CompliancePercent || 0,
-        TotalRequirements: r.TotalRequirements || 0
+        accreditationlevel: r.accreditationlevel || 'None',
+        eventid: r.eventid,
+        eventname: r.eventname || null,
+        eventcode: r.eventcode || null,
+        overallstatus: (Number(r.totalrequirements || 0) === 0 ? 'No Standards' : (r.overallstatus || 'Not Complied')),
+        compliancepercent: r.compliancepercent || 0,
+        totalrequirements: r.totalrequirements || 0
       });
 
     } catch (err) {
@@ -521,10 +591,10 @@ const OfficesController = {
   // CREATE NEW OFFICE (SUPPORTS MULTIPLE HEADS & MASTER LIST LINK)
   // ================================
   create: async (req, res) => {
-    const { master_list_id, OfficeName, OfficeTypeID, HeadID, HeadIDs, EventID } = req.body;
+    const { masterlistid, officename, officetypeid, headid, HeadIDs, eventid } = req.body;
 
-    // Support both single HeadID (legacy) and HeadIDs array (new)
-    const headIdArray = normalizeHeadIds(HeadIDs, HeadID);
+    // Support both single headid (legacy) and HeadIDs array (new)
+    const headIdArray = normalizeHeadIds(HeadIDs, headid);
 
     if (headIdArray.length > MAX_HEADS_PER_OFFICE) {
       return res.status(400).json({
@@ -533,36 +603,36 @@ const OfficesController = {
       });
     }
 
-    let nameToSave = OfficeName;
-    let typeIdToSave = OfficeTypeID;
-    let eventDeptId = req.body.event_department_id ? Number(req.body.event_department_id) : null;
+    let nameToSave = officename;
+    let typeIdToSave = officetypeid;
+    let eventDeptId = req.body.eventdepartmentid ? Number(req.body.eventdepartmentid) : null;
 
-    if (master_list_id) {
-      const [mlRows] = await db.query('SELECT entity_type_id, entity_name, department_id FROM master_list WHERE id = ?', [master_list_id]);
+    if (masterlistid) {
+      const [mlRows] = await db.query('SELECT entitytypeid, entityname, departmentid FROM masterlist WHERE id = ?', [masterlistid]);
       if (mlRows.length > 0) {
-        nameToSave = mlRows[0].entity_name;
+        nameToSave = mlRows[0].entityname;
         if (!typeIdToSave) {
-          const isAcademic = mlRows[0].entity_type_id === 1;
+          const isAcademic = mlRows[0].entitytypeid === 1;
           const [typeRows] = await db.query(
-            'SELECT OfficeTypeID FROM officetypes WHERE LOWER(TypeName) LIKE ? LIMIT 1',
+            'SELECT officetypeid FROM officetypes WHERE LOWER(typename) LIKE ? LIMIT 1',
             [isAcademic ? '%academic%' : '%non%']
           );
-          typeIdToSave = typeRows[0]?.OfficeTypeID || (isAcademic ? 2 : 1);
+          typeIdToSave = typeRows[0]?.officetypeid || (isAcademic ? 2 : 1);
         }
 
-        // Link academic program to event_departments
-        if (mlRows[0].entity_type_id === 1 && mlRows[0].department_id && EventID) {
+        // Link academic program to eventdepartments
+        if (mlRows[0].entitytypeid === 1 && mlRows[0].departmentid && eventid) {
           if (!eventDeptId) {
             const [existingEd] = await db.query(
-              'SELECT id FROM event_departments WHERE event_id = ? AND department_id = ? LIMIT 1',
-              [EventID, mlRows[0].department_id]
+              'SELECT id FROM eventdepartments WHERE eventid = ? AND departmentid = ? LIMIT 1',
+              [eventid, mlRows[0].departmentid]
             );
             if (existingEd.length > 0) {
               eventDeptId = existingEd[0].id;
             } else {
               const [newEd] = await db.query(
-                'INSERT INTO event_departments (event_id, department_id) VALUES (?, ?) RETURNING id',
-                [EventID, mlRows[0].department_id]
+                'INSERT INTO eventdepartments (eventid, departmentid) VALUES (?, ?) RETURNING id',
+                [eventid, mlRows[0].departmentid]
               );
               eventDeptId = newEd[0]?.id || newEd.insertId;
             }
@@ -571,19 +641,19 @@ const OfficesController = {
       }
     }
 
-    console.log('Received create office request:', { master_list_id, OfficeName: nameToSave, OfficeTypeID: typeIdToSave, headIdArray, EventID, eventDeptId });
+    console.log('Received create office request:', { masterlistid, officename: nameToSave, officetypeid: typeIdToSave, headIdArray, eventid, eventDeptId });
 
     try {
       const [result] = await db.query(
-        `INSERT INTO offices (OfficeName, master_list_id, OfficeTypeID, EventID, event_department_id, accreditation_level)
+        `INSERT INTO offices (officename, masterlistid, officetypeid, eventid, eventdepartmentid, accreditationlevel)
          VALUES (?, ?, ?, ?, ?, ?)`,
         [
           nameToSave || '',
-          master_list_id ? Number(master_list_id) : null,
+          masterlistid ? Number(masterlistid) : null,
           typeIdToSave || null,
-          EventID || null,
+          eventid || null,
           eventDeptId || null,
-          req.body.accreditation_level || 'None'
+          req.body.accreditationlevel || 'None'
         ]
       );
 
@@ -594,7 +664,7 @@ const OfficesController = {
       if (headIdArray.length > 0) {
         for (const hid of headIdArray) {
           await db.query(
-            `INSERT INTO office_head_assignments (HeadID, OfficeID) VALUES (?, ?) ON CONFLICT DO NOTHING`,
+            `INSERT INTO officeheadassignments (headid, officeid) VALUES (?, ?) ON CONFLICT DO NOTHING`,
             [hid, newOfficeId]
           );
         }
@@ -607,28 +677,28 @@ const OfficesController = {
         success: true,
         message: 'Office created successfully',
         data: {
-          OfficeID: newOfficeId,
-          OfficeName: nameToSave,
-          master_list_id: master_list_id ? Number(master_list_id) : null,
-          OfficeTypeID,
+          officeid: newOfficeId,
+          officename: nameToSave,
+          masterlistid: masterlistid ? Number(masterlistid) : null,
+          officetypeid,
           HeadIDs: headIdArray,
-          EventID
+          eventid
         }
       });
       // Audit log
       try {
-        const actorId = req.user && req.user.userId;
+        const actorId = req.user && req.user.userid;
         if (actorId) {
-          const [officeTypeName, eventName, headNames] = await Promise.all([
-            getOfficeTypeName(OfficeTypeID),
-            getEventName(EventID),
+          const [officeTypeName, eventname, headNames] = await Promise.all([
+            getOfficeTypeName(officetypeid),
+            getEventName(eventid),
             getNamesByHeadIds(headIdArray),
           ]);
 
           await recordLog(actorId, 'OfficeAdded', {
-            OfficeName: nameToSave,
+            officename: nameToSave,
             OfficeType: officeTypeName,
-            EventName: eventName,
+            eventname: eventname,
             HeadNames: headNames,
             HeadCount: headNames.length
           });
@@ -637,19 +707,19 @@ const OfficesController = {
             const assignedHeadDetails = await getHeadAssignmentDetailsByHeadIds(headIdArray);
             if (assignedHeadDetails.length > 0) {
               await createNotifications({
-                userIds: assignedHeadDetails.map((item) => item.userId),
-                adminId: actorId,
+                userIds: assignedHeadDetails.map((item) => item.userid),
+                adminid: actorId,
                 title: 'Assigned As Office Personnel',
-                message: `You were assigned to office ${nameToSave} under event ${eventName}.`,
+                message: `You were assigned to office ${nameToSave} under event ${eventname}.`,
                 type: 'info',
-                relatedTable: 'office_personnel',
-                relatedId: Number(newOfficeId),
-                meta: { officeId: Number(newOfficeId) },
+                relatedtable: 'office_personnel',
+                relatedid: Number(newOfficeId),
+                meta: { officeid: Number(newOfficeId) },
               });
             }
             try {
-              const [reqRows] = await db.query('SELECT RequirementID FROM compliancestatusoffices WHERE OfficeID = ?', [newOfficeId]);
-              const reqIds = reqRows.map(r => Number(r.RequirementID)).filter(id => Number.isInteger(id) && id > 0);
+              const [reqRows] = await db.query('SELECT requirementid FROM compliancestatusoffices WHERE officeid = ?', [newOfficeId]);
+              const reqIds = reqRows.map(r => Number(r.requirementid)).filter(id => Number.isInteger(id) && id > 0);
               if (reqIds.length > 0) {
                 await autoAssignHeadsToRequirementsForOffice(newOfficeId, reqIds, actorId);
               }
@@ -676,9 +746,9 @@ const OfficesController = {
   // ================================
   update: async (req, res) => {
     const id = req.params.id;
-    const { master_list_id, OfficeName, OfficeTypeID, HeadID, HeadIDs, EventID } = req.body;
+    const { masterlistid, officename, officetypeid, headid, HeadIDs, eventid } = req.body;
 
-    const headIdArray = normalizeHeadIds(HeadIDs, HeadID);
+    const headIdArray = normalizeHeadIds(HeadIDs, headid);
 
     if (headIdArray.length > MAX_HEADS_PER_OFFICE) {
       return res.status(400).json({
@@ -693,37 +763,37 @@ const OfficesController = {
         return res.status(404).json({ success: false, message: "Office not found" });
       }
 
-      let nameToSave = OfficeName;
-      if (!nameToSave && master_list_id) {
-        const [mlRows] = await db.query('SELECT entity_name FROM master_list WHERE id = ?', [master_list_id]);
+      let nameToSave = officename;
+      if (!nameToSave && masterlistid) {
+        const [mlRows] = await db.query('SELECT entityname FROM masterlist WHERE id = ?', [masterlistid]);
         if (mlRows.length > 0) {
-          nameToSave = mlRows[0].entity_name;
+          nameToSave = mlRows[0].entityname;
         }
       }
 
-      if (nameToSave && master_list_id) {
-        await db.query('UPDATE master_list SET entity_name = ? WHERE id = ?', [nameToSave, master_list_id]);
+      if (nameToSave && masterlistid) {
+        await db.query('UPDATE masterlist SET entityname = ? WHERE id = ?', [nameToSave, masterlistid]);
       }
 
-      const hasLevel = req.body.accreditation_level !== undefined;
+      const hasLevel = req.body.accreditationlevel !== undefined;
       const [result] = await db.query(
         `UPDATE offices 
-         SET OfficeName = ?, master_list_id = ?, OfficeTypeID = ?, EventID = ?${hasLevel ? ', accreditation_level = ?' : ''}
-         WHERE OfficeID = ?`,
+         SET officename = ?, masterlistid = ?, officetypeid = ?, eventid = ?${hasLevel ? ', accreditationlevel = ?' : ''}
+         WHERE officeid = ?`,
         hasLevel
           ? [
-              nameToSave || previousOffice.OfficeName || '',
-              master_list_id ? Number(master_list_id) : null,
-              OfficeTypeID,
-              EventID,
-              req.body.accreditation_level,
+              nameToSave || previousOffice.officename || '',
+              masterlistid ? Number(masterlistid) : null,
+              officetypeid,
+              eventid,
+              req.body.accreditationlevel,
               id
             ]
           : [
-              nameToSave || previousOffice.OfficeName || '',
-              master_list_id ? Number(master_list_id) : null,
-              OfficeTypeID,
-              EventID,
+              nameToSave || previousOffice.officename || '',
+              masterlistid ? Number(masterlistid) : null,
+              officetypeid,
+              eventid,
               id
             ]
       );
@@ -731,7 +801,7 @@ const OfficesController = {
 
       // Remove all existing assignments for this office
       await db.query(
-        `DELETE FROM office_head_assignments WHERE OfficeID = ?`,
+        `DELETE FROM officeheadassignments WHERE officeid = ?`,
         [id]
       );
 
@@ -739,7 +809,7 @@ const OfficesController = {
       if (headIdArray.length > 0) {
         for (const hid of headIdArray) {
           await db.query(
-            `INSERT INTO office_head_assignments (HeadID, OfficeID) VALUES (?, ?) ON CONFLICT DO NOTHING`,
+            `INSERT INTO officeheadassignments (headid, officeid) VALUES (?, ?) ON CONFLICT DO NOTHING`,
             [hid, id]
           );
         }
@@ -748,19 +818,19 @@ const OfficesController = {
 
       // Audit log: record who updated the office (if authenticated)
       try {
-        const actorId = req.user && req.user.userId;
+        const actorId = req.user && req.user.userid;
         if (actorId) {
-          const [officeTypeName, eventName, currentHeadNames] = await Promise.all([
-            getOfficeTypeName(OfficeTypeID),
-            getEventName(EventID),
+          const [officeTypeName, eventname, currentHeadNames] = await Promise.all([
+            getOfficeTypeName(officetypeid),
+            getEventName(eventid),
             getNamesByHeadIds(headIdArray),
           ]);
 
           const previousHeadIdSet = new Set((previousOffice.HeadIDs || []).map((value) => Number(value)));
           const currentHeadIdSet = new Set((headIdArray || []).map((value) => Number(value)));
 
-          const addedHeadIds = [...currentHeadIdSet].filter((headId) => !previousHeadIdSet.has(headId));
-          const removedHeadIds = [...previousHeadIdSet].filter((headId) => !currentHeadIdSet.has(headId));
+          const addedHeadIds = [...currentHeadIdSet].filter((headid) => !previousHeadIdSet.has(headid));
+          const removedHeadIds = [...previousHeadIdSet].filter((headid) => !currentHeadIdSet.has(headid));
           const [addedHeadNames, removedHeadNames] = await Promise.all([
             getNamesByHeadIds(addedHeadIds),
             getNamesByHeadIds(removedHeadIds),
@@ -772,39 +842,39 @@ const OfficesController = {
             try {
               const placeholders = removedHeadIds.map(() => '?').join(',');
               const [headRows] = await db.query(
-                `SELECT HeadID, UserID FROM headofoffice WHERE HeadID IN (${placeholders})`,
+                `SELECT headid, userid FROM headofoffice WHERE headid IN (${placeholders})`,
                 removedHeadIds
               );
 
-              const userIds = headRows.map(r => r.UserID).filter(id => Number.isInteger(Number(id)));
+              const userIds = headRows.map(r => r.userid).filter(id => Number.isInteger(Number(id)));
               if (userIds.length > 0) {
                 const userPlaceholders = userIds.map(() => '?').join(',');
-                // Delete any requirement_user_assignments scoped to this office for those users
+                // Delete any requirementuserassignments scoped to this office for those users
                 await db.query(
-                  `DELETE FROM requirement_user_assignments WHERE UserID IN (${userPlaceholders}) AND OfficeID = ?`,
+                  `DELETE FROM requirementuserassignments WHERE userid IN (${userPlaceholders}) AND officeid = ?`,
                   [...userIds, id]
                 );
               }
             } catch (cleanupErr) {
-              console.error('Failed to cleanup requirement_user_assignments for removed office heads:', cleanupErr);
+              console.error('Failed to cleanup requirementuserassignments for removed office heads:', cleanupErr);
             }
           }
 
           const changes = {};
-          if ((previousOffice.OfficeName || '') !== (OfficeName || '')) {
-            changes.OfficeName = { from: previousOffice.OfficeName || '', to: OfficeName || '' };
+          if ((previousOffice.officename || '') !== (officename || '')) {
+            changes.officename = { from: previousOffice.officename || '', to: officename || '' };
           }
           if ((previousOffice.OfficeTypeName || 'Unassigned') !== (officeTypeName || 'Unassigned')) {
             changes.OfficeType = { from: previousOffice.OfficeTypeName || 'Unassigned', to: officeTypeName || 'Unassigned' };
           }
-          if ((previousOffice.EventName || 'No event') !== (eventName || 'No event')) {
-            changes.EventName = { from: previousOffice.EventName || 'No event', to: eventName || 'No event' };
+          if ((previousOffice.eventname || 'No event') !== (eventname || 'No event')) {
+            changes.eventname = { from: previousOffice.eventname || 'No event', to: eventname || 'No event' };
           }
 
           await recordLog(actorId, 'OfficeUpdated', {
-            OfficeName,
+            officename,
             OfficeType: officeTypeName,
-            EventName: eventName,
+            eventname: eventname,
             HeadNames: currentHeadNames,
             changes,
             headChanges: {
@@ -817,20 +887,20 @@ const OfficesController = {
             const addedHeadDetails = await getHeadAssignmentDetailsByHeadIds(addedHeadIds);
             if (addedHeadDetails.length > 0) {
               await createNotifications({
-                userIds: addedHeadDetails.map((item) => item.userId),
-                adminId: actorId,
+                userIds: addedHeadDetails.map((item) => item.userid),
+                adminid: actorId,
                 title: 'Assigned As Office Personnel',
-                message: `You were assigned to office ${OfficeName} under event ${eventName}.`,
+                message: `You were assigned to office ${officename} under event ${eventname}.`,
                 type: 'info',
-                relatedTable: 'office_personnel',
-                relatedId: Number(id),
-                meta: { officeId: Number(id) },
+                relatedtable: 'office_personnel',
+                relatedid: Number(id),
+                meta: { officeid: Number(id) },
               });
             }
             // Auto-assign newly added heads to existing requirements for this office
             try {
-              const [reqRows] = await db.query('SELECT RequirementID FROM compliancestatusoffices WHERE OfficeID = ?', [id]);
-              const reqIds = reqRows.map(r => Number(r.RequirementID)).filter(id2 => Number.isInteger(id2) && id2 > 0);
+              const [reqRows] = await db.query('SELECT requirementid FROM compliancestatusoffices WHERE officeid = ?', [id]);
+              const reqIds = reqRows.map(r => Number(r.requirementid)).filter(id2 => Number.isInteger(id2) && id2 > 0);
               if (reqIds.length > 0) {
                 await autoAssignHeadsToRequirementsForOffice(id, reqIds, actorId);
               }
@@ -856,17 +926,17 @@ const OfficesController = {
   updateLevel: async (req, res) => {
     try {
       const { id } = req.params;
-      const { accreditation_level } = req.body;
-      if (!accreditation_level) {
-        return res.status(400).json({ success: false, message: 'accreditation_level is required' });
+      const { accreditationlevel } = req.body;
+      if (!accreditationlevel) {
+        return res.status(400).json({ success: false, message: 'accreditationlevel is required' });
       }
       await db.query(
         `UPDATE offices 
-         SET accreditation_level = ?, updated_at = CURRENT_TIMESTAMP 
-         WHERE OfficeID = ?`,
-        [accreditation_level, Number(id)]
+         SET accreditationlevel = ?, updatedat = CURRENT_TIMESTAMP 
+         WHERE officeid = ?`,
+        [accreditationlevel, Number(id)]
       );
-      res.json({ success: true, message: 'Program accreditation level updated successfully', newLevel: accreditation_level });
+      res.json({ success: true, message: 'Program accreditation level updated successfully', newLevel: accreditationlevel });
     } catch (err) {
       console.error('Error updating program level:', err);
       res.status(500).json({ success: false, message: 'Failed to update program accreditation level' });
@@ -888,9 +958,9 @@ const OfficesController = {
       // Before deleting requirements, cleanup uploaded files related to this office
       try {
         // 1) Find requirement IDs linked to this office
-        const [reqRows] = await db.query('SELECT RequirementID FROM compliancestatusoffices WHERE OfficeID = ?', [id]);
-        console.log('Office delete: found requirement IDs for office', id, reqRows.map(r => r.RequirementID));
-        const requirementIds = Array.isArray(reqRows) ? reqRows.map(r => Number(r.RequirementID)).filter(n => Number.isInteger(n)) : [];
+        const [reqRows] = await db.query('SELECT requirementid FROM compliancestatusoffices WHERE officeid = ?', [id]);
+        console.log('Office delete: found requirement IDs for office', id, reqRows.map(r => r.requirementid));
+        const requirementIds = Array.isArray(reqRows) ? reqRows.map(r => Number(r.requirementid)).filter(n => Number.isInteger(n)) : [];
 
         if (requirementIds.length > 0) {
           const placeholders = requirementIds.map(() => '?').join(',');
@@ -898,14 +968,14 @@ const OfficesController = {
           // Delete any proof documents attached to these requirements (disk + DB)
           try {
             const [proofFiles] = await db.query(
-              `SELECT id, file_path FROM office_proof_documents WHERE requirement_id IN (${placeholders})`,
+              `SELECT id, filepath FROM officeproofdocuments WHERE requirementid IN (${placeholders})`,
               requirementIds
             );
             console.log('Office delete: found proofFiles for requirements:', (proofFiles || []).length);
             if (proofFiles && proofFiles.length > 0) {
               for (const f of proofFiles) {
                 try {
-                  const absPath = path.join(__dirname, '..', (f.file_path || '').replace(/^\//, ''));
+                  const absPath = path.join(__dirname, '..', (f.filepath || '').replace(/^\//, ''));
                   const exists = fs.existsSync(absPath);
                   console.log('Attempting delete proof file:', absPath, 'exists=', exists);
                   if (exists) {
@@ -918,7 +988,7 @@ const OfficesController = {
                   console.warn('Failed to delete office proof file during office deletion:', fsErr);
                 }
               }
-              const [delRes] = await db.query(`DELETE FROM office_proof_documents WHERE requirement_id IN (${placeholders})`, requirementIds);
+              const [delRes] = await db.query(`DELETE FROM officeproofdocuments WHERE requirementid IN (${placeholders})`, requirementIds);
               console.log('Deleted proof DB rows count:', delRes.affectedRows || 0);
             }
           } catch (e) {
@@ -928,14 +998,14 @@ const OfficesController = {
           // Delete any user-uploaded requirement files (disk + DB)
           try {
             const [userFiles] = await db.query(
-              `SELECT id, file_path FROM requirement_user_uploads WHERE requirement_id IN (${placeholders})`,
+              `SELECT id, filepath FROM requirement_user_uploads WHERE requirementid IN (${placeholders})`,
               requirementIds
             );
             console.log('Office delete: found requirement_user_uploads count:', (userFiles || []).length);
             if (userFiles && userFiles.length > 0) {
               for (const uf of userFiles) {
                 try {
-                  const absPath = path.join(__dirname, '..', (uf.file_path || '').replace(/^\//, ''));
+                  const absPath = path.join(__dirname, '..', (uf.filepath || '').replace(/^\//, ''));
                   const exists = fs.existsSync(absPath);
                   console.log('Attempting delete user upload:', absPath, 'exists=', exists);
                   if (exists) {
@@ -948,37 +1018,37 @@ const OfficesController = {
                   console.warn('Failed to delete user requirement upload during office deletion:', fsErr);
                 }
               }
-              const [delUserRes] = await db.query(`DELETE FROM requirement_user_uploads WHERE requirement_id IN (${placeholders})`, requirementIds);
+              const [delUserRes] = await db.query(`DELETE FROM requirement_user_uploads WHERE requirementid IN (${placeholders})`, requirementIds);
               console.log('Deleted requirement_user_uploads DB rows count:', delUserRes.affectedRows || 0);
             }
           } catch (e) {
             console.error('Error cleaning up requirement_user_uploads during office delete:', e);
           }
 
-          // Remove any requirement_user_assignments for these requirements scoped to this office
+          // Remove any requirementuserassignments for these requirements scoped to this office
           try {
             await db.query(
-              `DELETE FROM requirement_user_assignments WHERE RequirementID IN (${placeholders}) AND OfficeID = ?`,
+              `DELETE FROM requirementuserassignments WHERE requirementid IN (${placeholders}) AND officeid = ?`,
               [...requirementIds, id]
             );
           } catch (e) {
-            console.error('Error cleaning up requirement_user_assignments during office delete:', e);
+            console.error('Error cleaning up requirementuserassignments during office delete:', e);
           }
         }
 
-        // 2) Remove any office-level proof documents (requirement_id IS NULL) for this office (disk + DB)
+        // 2) Remove any office-level proof documents (requirementid IS NULL) for this office (disk + DB)
         try {
-          const [officeProofs] = await db.query('SELECT id, file_path FROM office_proof_documents WHERE office_id = ? AND requirement_id IS NULL', [id]);
+          const [officeProofs] = await db.query('SELECT id, filepath FROM officeproofdocuments WHERE officeid = ? AND requirementid IS NULL', [id]);
           if (officeProofs && officeProofs.length > 0) {
             for (const f of officeProofs) {
               try {
-                const absPath = path.join(__dirname, '..', (f.file_path || '').replace(/^\//, ''));
+                const absPath = path.join(__dirname, '..', (f.filepath || '').replace(/^\//, ''));
                 if (fs.existsSync(absPath)) fs.unlinkSync(absPath);
               } catch (fsErr) {
                 console.warn('Failed to delete office-level proof file during office deletion:', fsErr);
               }
             }
-            await db.query('DELETE FROM office_proof_documents WHERE office_id = ? AND requirement_id IS NULL', [id]);
+            await db.query('DELETE FROM officeproofdocuments WHERE officeid = ? AND requirementid IS NULL', [id]);
           }
         } catch (e) {
           console.error('Error cleaning up office-level proof documents during office delete:', e);
@@ -988,22 +1058,22 @@ const OfficesController = {
       }
 
       // Then delete all requirements associated with this office
-      await db.query("DELETE FROM compliancestatusoffices WHERE OfficeID = ?", [id]);
+      await db.query("DELETE FROM compliancestatusoffices WHERE officeid = ?", [id]);
 
       // Remove office-head assignments for this office
-      await db.query("DELETE FROM office_head_assignments WHERE OfficeID = ?", [id]);
+      await db.query("DELETE FROM officeheadassignments WHERE officeid = ?", [id]);
 
       // Then delete the office
-      const [result] = await db.query("DELETE FROM offices WHERE OfficeID = ?", [id]);
+      const [result] = await db.query("DELETE FROM offices WHERE officeid = ?", [id]);
 
       // Audit log: record who deleted the office (if authenticated)
       try {
-        const actorId = req.user && req.user.userId;
+        const actorId = req.user && req.user.userid;
         if (actorId) {
           await recordLog(actorId, 'OfficeDeleted', {
-            OfficeName: officeToDelete.OfficeName,
+            officename: officeToDelete.officename,
             OfficeType: officeToDelete.OfficeTypeName || 'Unknown Type',
-            EventName: officeToDelete.EventName || 'No event',
+            eventname: officeToDelete.eventname || 'No event',
             HeadNames: officeToDelete.HeadNames || [],
           });
         }
@@ -1011,7 +1081,11 @@ const OfficesController = {
         console.error('Failed to record office deletion log:', e);
       }
 
-      res.json({ message: "Office deleted successfully" });
+      const isAcademic = officeToDelete.officetypeid === 2 || 
+        (/academic/i.test(officeToDelete.OfficeTypeName || '') && !/non/i.test(officeToDelete.OfficeTypeName || ''));
+      const entityLabel = isAcademic ? "Program" : "Office";
+
+      res.json({ message: `${entityLabel} deleted successfully`, entityType: entityLabel.toLowerCase() });
     } catch (err) {
       console.error("Error deleting office:", err);
       res.status(500).json({ error: "Database error" });
@@ -1029,21 +1103,21 @@ const OfficesController = {
       const placeholders = ids.map(() => '?').join(',');
 
       try {
-        await db.query(`DELETE FROM requirement_user_uploads WHERE requirement_id IN (SELECT RequirementID FROM compliancestatusoffices WHERE OfficeID IN (${placeholders}))`, ids);
-        await db.query(`DELETE FROM office_proof_documents WHERE office_id IN (${placeholders})`, ids);
-        await db.query(`DELETE FROM requirement_user_assignments WHERE OfficeID IN (${placeholders})`, ids);
-        await db.query(`DELETE FROM compliancestatusoffices WHERE OfficeID IN (${placeholders})`, ids);
-        await db.query(`DELETE FROM office_head_assignments WHERE OfficeID IN (${placeholders})`, ids);
-        await db.query(`DELETE FROM OverallOfficeStatus WHERE OfficeID IN (${placeholders})`, ids);
+        await db.query(`DELETE FROM requirement_user_uploads WHERE requirementid IN (SELECT requirementid FROM compliancestatusoffices WHERE officeid IN (${placeholders}))`, ids);
+        await db.query(`DELETE FROM officeproofdocuments WHERE officeid IN (${placeholders})`, ids);
+        await db.query(`DELETE FROM requirementuserassignments WHERE officeid IN (${placeholders})`, ids);
+        await db.query(`DELETE FROM compliancestatusoffices WHERE officeid IN (${placeholders})`, ids);
+        await db.query(`DELETE FROM officeheadassignments WHERE officeid IN (${placeholders})`, ids);
+        await db.query(`DELETE FROM OverallOfficeStatus WHERE officeid IN (${placeholders})`, ids);
       } catch (e) {
         console.warn('Cleanup child records warning during bulk office delete:', e.message);
       }
 
-      const [result] = await db.query(`DELETE FROM offices WHERE OfficeID IN (${placeholders})`, ids);
+      const [result] = await db.query(`DELETE FROM offices WHERE officeid IN (${placeholders})`, ids);
 
       return res.json({
         success: true,
-        message: `Successfully deleted ${result.affectedRows || ids.length} office(s)`,
+        message: `Successfully deleted ${result.affectedRows || ids.length} item(s)`,
         deletedCount: result.affectedRows || ids.length
       });
     } catch (err) {
@@ -1058,37 +1132,45 @@ const OfficesController = {
   getOfficeRequirements: async (req, res) => {
     try {
         const { id } = req.params;
-        const roleId = Number(req.user?.roleId || 0);
-        const userId = Number(req.user?.userId || 0);
+        const roleid = Number(req.user?.roleid || 0);
+        const userid = Number(req.user?.userid || 0);
 
         const query = `
         SELECT 
-          r.RequirementID,
-          r.RequirementCode,
+          r.requirementid,
+          r.requirementcode,
           r.Description,
-          r.CriteriaID,
-          c.ParentCriteriaID,
-          c.CriteriaName,
-          c.CriteriaCode,
-          pc.CriteriaName AS ParentCriteriaName,
-          pc.CriteriaCode AS ParentCriteriaCode,
-          c.AreaID,
-          a.AreaCode,
-          a.AreaName,
-          cso.Status as ComplianceStatusID,
-          cst.StatusName as ComplianceStatus,
+          r.criteriaid,
+          c.parentcriteriaid,
+          c.criterianame,
+          c.criteriacode,
+          pc.criterianame AS ParentCriteriaName,
+          pc.criteriacode AS ParentCriteriaCode,
+          c.areaid,
+          c.eventid,
+          a.areacode,
+          a.areaname,
+          cso.status as "ComplianceStatusID",
+          cst.statusname as "ComplianceStatus",
           cso.comments
         FROM compliancestatusoffices cso
-        INNER JOIN requirements r ON cso.RequirementID = r.RequirementID
-        LEFT JOIN criteria c ON r.CriteriaID = c.CriteriaID
-        LEFT JOIN criteria pc ON c.ParentCriteriaID = pc.CriteriaID
-        LEFT JOIN areas a ON c.AreaID = a.AreaID
-        LEFT JOIN compliancestatustypes cst ON cso.Status = cst.StatusID
-        WHERE cso.OfficeID = ?
-        ORDER BY a.SortOrder ASC, COALESCE(pc.CriteriaCode, c.CriteriaCode) ASC, c.CriteriaCode ASC, r.RequirementCode ASC
+        INNER JOIN requirements r ON cso.requirementid = r.requirementid
+        LEFT JOIN criteria c ON r.criteriaid = c.criteriaid
+        LEFT JOIN criteria pc ON c.parentcriteriaid = pc.criteriaid
+        LEFT JOIN areas a ON c.areaid = a.areaid
+        LEFT JOIN compliancestatustypes cst ON cso.Status = cst.statusid
+        WHERE cso.officeid = ?
+        ORDER BY a.sortorder ASC, COALESCE(pc.criteriacode, c.criteriacode) ASC, c.criteriacode ASC, r.requirementcode ASC
       `;
 
         const [results] = await db.query(query, [id]);
+
+        if (req.user && (req.user.roleid === 4 || Number(req.user.roleid) === 4)) {
+            (results || []).forEach(r => {
+                r.comments = '';
+                r.Comments = '';
+            });
+        }
 
         res.json({
             success: true,
@@ -1109,59 +1191,59 @@ const OfficesController = {
   // EXPORT OFFICE REQUIREMENTS (EXCEL TABLE FORMAT)
   // ================================
   exportOfficeExcel: async (req, res) => {
-    const officeId = Number(req.params.id);
+    const officeid = Number(req.params.id);
 
-    if (!Number.isInteger(officeId) || officeId <= 0) {
+    if (!Number.isInteger(officeid) || officeid <= 0) {
       return res.status(400).json({ success: false, message: 'Invalid office id' });
     }
 
     try {
       const [officeRows] = await db.query(
-        `SELECT o.OfficeID, o.OfficeName
+        `SELECT o.officeid, o.officename
          FROM offices o
-         WHERE o.OfficeID = ?
+         WHERE o.officeid = ?
          LIMIT 1`,
-        [officeId]
+        [officeid]
       );
 
       if (!officeRows.length) {
         return res.status(404).json({ success: false, message: 'Office not found' });
       }
 
-      const officeName = officeRows[0].OfficeName || `Office ${officeId}`;
+      const officename = officeRows[0].officename || `Office ${officeid}`;
 
       const [requirementsRows] = await db.query(
         `SELECT
-          r.RequirementID,
-          r.RequirementCode,
+          r.requirementid,
+          r.requirementcode,
           r.Description,
-          c.CriteriaID,
-          c.ParentCriteriaID,
-          c.CriteriaCode,
-          c.CriteriaName,
-          pc.CriteriaCode AS ParentCriteriaCode,
-          pc.CriteriaName AS ParentCriteriaName,
-          a.AreaID,
-          a.AreaCode,
-          a.AreaName,
-          cso.Status AS ComplianceStatusID,
-          cst.StatusName AS ComplianceStatusName,
-          cso.comments AS Comments
+          c.criteriaid,
+          c.parentcriteriaid,
+          c.criteriacode,
+          c.criterianame,
+          pc.criteriacode AS "ParentCriteriaCode",
+          pc.criterianame AS "ParentCriteriaName",
+          a.areaid,
+          a.areacode,
+          a.areaname,
+          cso.status AS "ComplianceStatusID",
+          cst.statusname AS "ComplianceStatusName",
+          cso.comments AS "Comments"
         FROM compliancestatusoffices cso
-        INNER JOIN requirements r ON cso.RequirementID = r.RequirementID
-        LEFT JOIN criteria c ON r.CriteriaID = c.CriteriaID
-        LEFT JOIN criteria pc ON c.ParentCriteriaID = pc.CriteriaID
-        LEFT JOIN areas a ON c.AreaID = a.AreaID
-        LEFT JOIN compliancestatustypes cst ON cso.Status = cst.StatusID
-        WHERE cso.OfficeID = ?
+        INNER JOIN requirements r ON cso.requirementid = r.requirementid
+        LEFT JOIN criteria c ON r.criteriaid = c.criteriaid
+        LEFT JOIN criteria pc ON c.parentcriteriaid = pc.criteriaid
+        LEFT JOIN areas a ON c.areaid = a.areaid
+        LEFT JOIN compliancestatustypes cst ON cso.Status = cst.statusid
+        WHERE cso.officeid = ?
         ORDER BY
-          COALESCE(a.AreaCode, 'ZZZ') ASC,
-          COALESCE(a.AreaName, 'ZZZ') ASC,
-          COALESCE(COALESCE(pc.CriteriaCode, c.CriteriaCode), 'ZZZ') ASC,
-          COALESCE(c.CriteriaCode, 'ZZZ') ASC,
-          COALESCE(r.RequirementCode, 'ZZZ') ASC,
-          r.RequirementID ASC`,
-        [officeId]
+          COALESCE(a.areacode, 'ZZZ') ASC,
+          COALESCE(a.areaname, 'ZZZ') ASC,
+          COALESCE(COALESCE(pc.criteriacode, c.criteriacode), 'ZZZ') ASC,
+          COALESCE(c.criteriacode, 'ZZZ') ASC,
+          COALESCE(r.requirementcode, 'ZZZ') ASC,
+          r.requirementid ASC`,
+        [officeid]
       );
 
       const workbook = new ExcelJS.Workbook();
@@ -1201,7 +1283,7 @@ const OfficesController = {
       // Header: OFFICE NAME (merged and bordered)
       sheet.mergeCells(`A${rowIndex}:C${rowIndex}`);
       const officeCell = sheet.getCell(`A${rowIndex}`);
-      officeCell.value = String(officeName).toUpperCase();
+      officeCell.value = String(officename).toUpperCase();
       officeCell.font = { bold: true, size: 14 };
       officeCell.alignment = { horizontal: 'center', vertical: 'middle' };
       officeCell.border = thinBorder;
@@ -1221,28 +1303,28 @@ const OfficesController = {
 
         // Build criteria nodes with parent relationships per area
         requirementsRows.forEach((row) => {
-          const areaCode = row.AreaCode || 'N/A';
-          const areaName = row.AreaName || 'No Area';
-          const areaKey = `${areaCode}__${areaName}`;
+          const areacode = row.areacode || 'N/A';
+          const areaname = row.areaname || 'No Area';
+          const areaKey = `${areacode}__${areaname}`;
 
           if (!areasMap.has(areaKey)) {
             areasMap.set(areaKey, {
-              areaCode,
-              areaName,
+              areacode,
+              areaname,
               criteriaMap: new Map(),
             });
           }
 
           const areaEntry = areasMap.get(areaKey);
 
-          const critId = row.CriteriaID != null ? Number(row.CriteriaID) : `req_${row.RequirementID}`;
-          const parentId = row.ParentCriteriaID != null ? Number(row.ParentCriteriaID) : null;
+          const critId = row.criteriaid != null ? Number(row.criteriaid) : `req_${row.requirementid}`;
+          const parentId = row.parentcriteriaid != null ? Number(row.parentcriteriaid) : null;
 
           if (!areaEntry.criteriaMap.has(critId)) {
             areaEntry.criteriaMap.set(critId, {
               id: critId,
-              code: row.CriteriaCode || '',
-              name: row.CriteriaName || '',
+              code: row.criteriacode || '',
+              name: row.criterianame || '',
               parentId: parentId,
               children: [],
               requirements: [],
@@ -1253,8 +1335,8 @@ const OfficesController = {
           if (parentId && !areaEntry.criteriaMap.has(parentId)) {
             areaEntry.criteriaMap.set(parentId, {
               id: parentId,
-              code: row.ParentCriteriaCode || '',
-              name: row.ParentCriteriaName || '',
+              code: row.ParentCriteriaCode || row.parentcriteriacode || '',
+              name: row.ParentCriteriaName || row.parentcriterianame || '',
               parentId: null,
               children: [],
               requirements: [],
@@ -1263,7 +1345,7 @@ const OfficesController = {
 
           areaEntry.criteriaMap.get(critId).requirements.push({
             status: normalizeComplianceStatus(row.ComplianceStatusID, row.ComplianceStatusName),
-            requirementCode: row.RequirementCode || 'N/A',
+            requirementcode: row.requirementcode || 'N/A',
             description: row.Description || '',
             comments: row.Comments || ''
           });
@@ -1283,7 +1365,7 @@ const OfficesController = {
           // Area title row merged across three columns
           sheet.mergeCells(`A${rowIndex}:C${rowIndex}`);
           const areaTitleCell = sheet.getCell(`A${rowIndex}`);
-          areaTitleCell.value = `${area.areaCode} - ${area.areaName}`;
+          areaTitleCell.value = `${area.areacode} - ${area.areaname}`;
           areaTitleCell.font = areaHeaderStyle.font;
           areaTitleCell.alignment = areaHeaderStyle.alignment;
           areaTitleCell.border = thinBorder;
@@ -1314,7 +1396,7 @@ const OfficesController = {
             // Write requirements directly under root (if any)
             for (const req of root.requirements) {
               sheet.getCell(`A${rowIndex}`).value = req.status;
-              sheet.getCell(`B${rowIndex}`).value = `${req.requirementCode} - ${req.description}`;
+              sheet.getCell(`B${rowIndex}`).value = `${req.requirementcode} - ${req.description}`;
               sheet.getCell(`C${rowIndex}`).value = req.comments || '';
               sheet.getCell(`A${rowIndex}`).alignment = { horizontal: 'left', vertical: 'middle' };
               sheet.getCell(`B${rowIndex}`).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
@@ -1342,7 +1424,7 @@ const OfficesController = {
 
               for (const req of child.requirements) {
                 sheet.getCell(`A${rowIndex}`).value = req.status;
-                sheet.getCell(`B${rowIndex}`).value = `${req.requirementCode} - ${req.description}`;
+                sheet.getCell(`B${rowIndex}`).value = `${req.requirementcode} - ${req.description}`;
                 sheet.getCell(`C${rowIndex}`).value = req.comments || '';
                 sheet.getCell(`A${rowIndex}`).alignment = { horizontal: 'left', vertical: 'middle' };
                 sheet.getCell(`B${rowIndex}`).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
@@ -1357,15 +1439,15 @@ const OfficesController = {
         }
       }
 
-      const safeName = String(officeName)
+      const safeName = String(officename)
         .replace(/[\\/:*?"<>|]+/g, '_')
         .replace(/\s+/g, '_')
         .trim();
 
-      const fileName = `${safeName || `office_${officeId}`}_export.xlsx`;
+      const filename = `${safeName || `office_${officeid}`}_export.xlsx`;
 
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
 
       await workbook.xlsx.write(res);
       return res.end();
@@ -1379,7 +1461,7 @@ const OfficesController = {
   // ADD REQUIREMENTS TO OFFICE
   // ================================
   addOfficeRequirements: async (req, res) => {
-    const officeId = req.params.id;
+    const officeid = req.params.id;
     const { requirementIds } = req.body;
 
     if (!Array.isArray(requirementIds) || requirementIds.length === 0) {
@@ -1404,7 +1486,7 @@ const OfficesController = {
 
     try {
       // Check if office exists
-      const [office] = await db.query("SELECT OfficeID FROM offices WHERE OfficeID = ?", [officeId]);
+      const [office] = await db.query("SELECT officeid FROM offices WHERE officeid = ?", [officeid]);
       if (office.length === 0) {
         return res.status(404).json({ 
           success: false, 
@@ -1414,31 +1496,31 @@ const OfficesController = {
 
       // Detect already-assigned requirements for this office so we can report duplicate skips.
       const [existingRows] = await db.query(
-        `SELECT RequirementID FROM compliancestatusoffices WHERE OfficeID = ? AND RequirementID IN (${normalizedRequirementIds.join(',')})`,
-        [officeId]
+        `SELECT requirementid FROM compliancestatusoffices WHERE officeid = ? AND requirementid IN (${normalizedRequirementIds.join(',')})`,
+        [officeid]
       );
 
-      const existingSet = new Set(existingRows.map((row) => Number(row.RequirementID ?? row.requirementid)));
+      const existingSet = new Set(existingRows.map((row) => Number(row.requirementid ?? row.requirementid)));
       const newRequirementIds = normalizedRequirementIds.filter((id) => !existingSet.has(id));
       const duplicateCount = normalizedRequirementIds.length - newRequirementIds.length;
 
       if (newRequirementIds.length > 0) {
-        const valuesSql = newRequirementIds.map((reqId) => `(${Number(officeId)}, ${Number(reqId)}, 3)`).join(',');
+        const valuesSql = newRequirementIds.map((reqId) => `(${Number(officeid)}, ${Number(reqId)}, 3)`).join(',');
         await db.query(
-          `INSERT INTO compliancestatusoffices (OfficeID, RequirementID, Status) VALUES ${valuesSql}`
+          `INSERT INTO compliancestatusoffices (officeid, requirementid, Status) VALUES ${valuesSql}`
         );
 
         // Auto-assign current office heads to the newly-added requirements
         try {
-          const actorId = req.user && req.user.userId;
-          await autoAssignHeadsToRequirementsForOffice(officeId, newRequirementIds, actorId);
+          const actorId = req.user && req.user.userid;
+          await autoAssignHeadsToRequirementsForOffice(officeid, newRequirementIds, actorId);
         } catch (e) {
           console.error('Auto-assign heads on addOfficeRequirements failed:', e);
         }
       }
 
       // Update the overall office status
-      await updateOverallOfficeStatus(officeId);
+      await updateOverallOfficeStatus(officeid);
 
       const addedCount = newRequirementIds.length;
       const message = `${duplicateCount} duplicate(s) already assigned, ${addedCount} new requirement(s) added.`;
@@ -1469,12 +1551,12 @@ const OfficesController = {
   // REMOVE REQUIREMENT FROM OFFICE
   // ================================
   removeOfficeRequirement: async (req, res) => {
-    const { id: officeId, requirementId } = req.params;
+    const { id: officeid, requirementid } = req.params;
 
     try {
       const [result] = await db.query(
-        "DELETE FROM compliancestatusoffices WHERE OfficeID = ? AND RequirementID = ?",
-        [officeId, requirementId]
+        "DELETE FROM compliancestatusoffices WHERE officeid = ? AND requirementid = ?",
+        [officeid, requirementid]
       );
 
       if (result.affectedRows === 0) {
@@ -1485,26 +1567,26 @@ const OfficesController = {
       }
 
       // Update the overall office status after removal
-      await updateOverallOfficeStatus(officeId);
+      await updateOverallOfficeStatus(officeid);
 
       // Remove any user assignments for this requirement in this office
       try {
-        await db.execute('DELETE FROM requirement_user_assignments WHERE RequirementID = ? AND OfficeID = ?', [requirementId, officeId]);
+        await db.execute('DELETE FROM requirementuserassignments WHERE requirementid = ? AND officeid = ?', [requirementid, officeid]);
       } catch (cleanupErr) {
-        console.error('Failed to cleanup requirement_user_assignments after removing office requirement:', cleanupErr);
+        console.error('Failed to cleanup requirementuserassignments after removing office requirement:', cleanupErr);
       }
 
       // Also remove any uploaded proof documents (disk + DB) related to this requirement for the office
       try {
         const [files] = await db.query(
-          'SELECT id, file_path FROM office_proof_documents WHERE requirement_id = ? AND office_id = ?',
-          [requirementId, officeId]
+          'SELECT id, filepath FROM officeproofdocuments WHERE requirementid = ? AND officeid = ?',
+          [requirementid, officeid]
         );
 
         if (files && files.length > 0) {
           for (const f of files) {
             try {
-              const absPath = path.join(__dirname, '..', (f.file_path || '').replace(/^\//, ''));
+              const absPath = path.join(__dirname, '..', (f.filepath || '').replace(/^\//, ''));
               if (fs.existsSync(absPath)) {
                 fs.unlinkSync(absPath);
               }
@@ -1513,11 +1595,27 @@ const OfficesController = {
             }
           }
 
-          await db.query('DELETE FROM office_proof_documents WHERE requirement_id = ? AND office_id = ?', [requirementId, officeId]);
+          await db.query('DELETE FROM officeproofdocuments WHERE requirementid = ? AND officeid = ?', [requirementid, officeid]);
         }
       } catch (docErr) {
-        console.error('Failed to cleanup office_proof_documents after removing office requirement:', docErr);
+        console.error('Failed to cleanup officeproofdocuments after removing office requirement:', docErr);
       }
+
+      const actorId = req.user?.userid || req.user?.id;
+      try {
+        const [ctx] = await db.query(
+          `SELECT o.officename, r.requirementcode FROM offices o, requirements r WHERE o.officeid = ? AND r.requirementid = ?`,
+          [officeid, requirementid]
+        );
+        if (actorId) {
+          await recordLog(actorId, 'OfficeRequirementRemoved', {
+            officeid: Number(officeid),
+            officename: ctx[0]?.officename || null,
+            requirementid: Number(requirementid),
+            requirementcode: ctx[0]?.requirementcode || null
+          });
+        }
+      } catch (logErr) {}
 
       res.json({ 
         success: true, 
@@ -1537,9 +1635,9 @@ const OfficesController = {
   // UPDATE REQUIREMENT STATUS
   // ================================
   updateRequirementStatus: async (req, res) => {
-    const { id: officeId, requirementId } = req.params;
-    const { statusId, comments } = req.body;
-    const nextStatusId = Number(statusId);
+    const { id: officeid, requirementid } = req.params;
+    const { statusid, comments } = req.body;
+    const nextStatusId = Number(statusid);
 
     if (!nextStatusId || ![3, 4, 5].includes(nextStatusId)) {
       return res.status(400).json({
@@ -1549,24 +1647,25 @@ const OfficesController = {
     }
 
     try {
-      // Check existing status to see if statusId is changing or being set
+      // Check existing status to see if statusid is changing
       const [existingStatusRows] = await db.query(
-        `SELECT Status FROM compliancestatusoffices WHERE OfficeID = ? AND RequirementID = ?`,
-        [officeId, requirementId]
+        `SELECT status AS "Status" FROM compliancestatusoffices WHERE officeid = ? AND requirementid = ?`,
+        [officeid, requirementid]
       );
-      const currentStatus = existingStatusRows[0]?.Status;
+      const rawCurrentStatus = existingStatusRows[0]?.Status;
+      const currentStatus = rawCurrentStatus != null ? Number(rawCurrentStatus) : 3;
 
-      // If status is being set or changed, ensure evidence exists
-      if (nextStatusId && nextStatusId !== Number(currentStatus)) {
+      // If compliance status is actually being elevated to Partially Complied (4) or Complied (5), ensure evidence exists
+      if (nextStatusId !== 3 && nextStatusId !== currentStatus) {
         const [userUploads] = await db.query(
-          `SELECT COUNT(*) as cnt FROM requirement_user_assignments 
-           WHERE OfficeID = ? AND RequirementID = ? AND HasUploaded = TRUE`,
-          [officeId, requirementId]
+          `SELECT COUNT(*) as cnt FROM requirementuserassignments 
+           WHERE officeid = ? AND requirementid = ? AND hasuploaded = TRUE`,
+          [officeid, requirementid]
         );
         const [proofDocs] = await db.query(
-          `SELECT COUNT(*) as cnt FROM office_proof_documents 
-           WHERE office_id = ? AND (requirement_id = ? OR requirement_id IS NULL)`,
-          [officeId, requirementId]
+          `SELECT COUNT(*) as cnt FROM officeproofdocuments 
+           WHERE officeid = ? AND (requirementid = ? OR requirementid IS NULL)`,
+          [officeid, requirementid]
         );
 
         const hasEvidence = (userUploads[0]?.cnt > 0) || (proofDocs[0]?.cnt > 0);
@@ -1574,34 +1673,139 @@ const OfficesController = {
         if (!hasEvidence) {
           return res.status(400).json({
             success: false,
-            message: "Cannot change compliance status: No evidence or proof document has been uploaded for this requirement yet."
+            message: "Cannot set compliance status to Partially Complied or Complied: No evidence or proof document has been uploaded for this requirement yet."
           });
         }
       }
 
       const hasCommentPayload = Object.prototype.hasOwnProperty.call(req.body, 'comments');
+      if (hasCommentPayload) {
+        let userRoleId = Number(req.user?.roleid || 0);
+        if (!userRoleId && req.user?.userid) {
+          const [[userRow]] = await db.query("SELECT roleid FROM users WHERE userid = ?", [req.user.userid]);
+          if (userRow) userRoleId = Number(userRow.roleid);
+        }
+        if (userRoleId !== 1) {
+          return res.status(403).json({
+            success: false,
+            message: "Forbidden: Only Administrators are permitted to add or edit comments on standards."
+          });
+        }
+      }
+
       const updateSql = hasCommentPayload
         ? `UPDATE compliancestatusoffices
-           SET Status = ?, comments = ?, LastUpdated = CURRENT_TIMESTAMP
-           WHERE OfficeID = ? AND RequirementID = ?`
+           SET Status = ?, comments = ?, lastupdated = CURRENT_TIMESTAMP
+           WHERE officeid = ? AND requirementid = ?`
         : `UPDATE compliancestatusoffices
-           SET Status = ?, LastUpdated = CURRENT_TIMESTAMP
-           WHERE OfficeID = ? AND RequirementID = ?`;
+           SET Status = ?, lastupdated = CURRENT_TIMESTAMP
+           WHERE officeid = ? AND requirementid = ?`;
       const updateParams = hasCommentPayload
-        ? [nextStatusId, comments || null, officeId, requirementId]
-        : [nextStatusId, officeId, requirementId];
+        ? [nextStatusId, comments || null, officeid, requirementid]
+        : [nextStatusId, officeid, requirementid];
       const [updateResult] = await db.query(updateSql, updateParams);
 
       if (!updateResult?.affectedRows) {
         await db.query(
-          `INSERT INTO compliancestatusoffices (OfficeID, RequirementID, Status, comments)
+          `INSERT INTO compliancestatusoffices (officeid, requirementid, Status, comments)
            VALUES (?, ?, ?, ?)`,
-          [officeId, requirementId, nextStatusId, hasCommentPayload ? (comments || null) : null]
+          [officeid, requirementid, nextStatusId, hasCommentPayload ? (comments || null) : null]
         );
       }
 
       // Update the overall office status
-      await updateOverallOfficeStatus(officeId);
+      await updateOverallOfficeStatus(officeid);
+
+      const actorId = req.user?.userid || req.user?.id;
+      const statusName = nextStatusId === 5 ? 'Complied' : (nextStatusId === 4 ? 'Partially Complied' : 'Not Complied');
+
+      // Context info for log and notifications
+      try {
+        const [contextRows] = await db.query(`
+          SELECT r.requirementcode, r.description, o.officename, e.eventname
+          FROM requirements r
+          JOIN offices o ON o.officeid = ?
+          LEFT JOIN events e ON e.eventid = o.eventid
+          WHERE r.requirementid = ?
+        `, [officeid, requirementid]);
+
+        const reqCode = contextRows[0]?.requirementcode || `REQ-${requirementid}`;
+        const officeName = contextRows[0]?.officename || `Office #${officeid}`;
+        const eventName = contextRows[0]?.eventname || null;
+
+        // Record Audit Log
+        if (actorId) {
+          await recordLog(actorId, 'ComplianceStatusUpdated', {
+            officeid: Number(officeid),
+            officename: officeName,
+            eventname: eventName,
+            requirementid: Number(requirementid),
+            requirementcode: reqCode,
+            previousStatus: currentStatus ? Number(currentStatus) : null,
+            newStatus: nextStatusId,
+            statusName,
+            comments: hasCommentPayload ? comments : undefined
+          });
+        }
+
+        // Send notifications to assigned personnel and office heads
+        const [assignedUsers] = await db.query(
+          `SELECT userid FROM requirementuserassignments WHERE officeid = ? AND requirementid = ?`,
+          [officeid, requirementid]
+        );
+        const [headUsers] = await db.query(
+          `SELECT u.userid FROM users u
+           JOIN headofoffice h ON u.userid = h.userid
+           JOIN officeheadassignments oha ON h.headid = oha.headid
+           WHERE oha.officeid = ?`,
+          [officeid]
+        );
+
+        const recipientIds = [...new Set([
+          ...(assignedUsers || []).map(u => Number(u.userid)),
+          ...(headUsers || []).map(u => Number(u.userid))
+        ])].filter(id => id !== actorId && id > 0);
+
+        if (recipientIds.length > 0) {
+          const commentNote = hasCommentPayload && comments ? ` Comment: "${comments.slice(0, 80)}${comments.length > 80 ? '...' : ''}"` : '';
+          await createNotifications({
+            userIds: recipientIds,
+            adminid: actorId,
+            title: 'Compliance Status Updated',
+            message: `Compliance status for standard "${reqCode}" in "${officeName}" was updated to "${statusName}".${commentNote}`,
+            type: nextStatusId === 5 ? 'success' : (nextStatusId === 4 ? 'info' : 'warning'),
+            relatedtable: 'compliancestatusoffices',
+            relatedid: Number(officeid),
+            meta: {
+              officeid: Number(officeid),
+              requirementid: Number(requirementid),
+              openSubmission: true
+            }
+          });
+        }
+      } catch (logOrNotifErr) {
+        console.warn('Notice: Error in logging or notifying for status update:', logOrNotifErr.message);
+      }
+
+      try {
+        const { emitDataChange } = require('../socket');
+        emitDataChange('compliance', {
+          action: 'status_updated',
+          officeid: Number(officeid),
+          requirementid: Number(requirementid),
+          statusid: nextStatusId,
+          statusName,
+          comments: hasCommentPayload ? comments : undefined
+        });
+        emitDataChange('requirements', {
+          action: 'status_updated',
+          officeid: Number(officeid),
+          requirementid: Number(requirementid),
+          statusid: nextStatusId,
+          statusName,
+          comments: hasCommentPayload ? comments : undefined
+        });
+      } catch (sErr) {}
 
       res.json({
         success: true,
@@ -1621,54 +1825,54 @@ const OfficesController = {
   // EXPORT OFFICE REQUIREMENTS (EXCEL TABLE FORMAT)
   // ================================
   exportOfficeExcel: async (req, res) => {
-    const officeId = Number(req.params.id);
+    const officeid = Number(req.params.id);
 
-    if (!Number.isInteger(officeId) || officeId <= 0) {
+    if (!Number.isInteger(officeid) || officeid <= 0) {
       return res.status(400).json({ success: false, message: 'Invalid office id' });
     }
 
     try {
       const [officeRows] = await db.query(
-        `SELECT o.OfficeID, o.OfficeName
+        `SELECT o.officeid, o.officename
          FROM offices o
-         WHERE o.OfficeID = ?
+         WHERE o.officeid = ?
          LIMIT 1`,
-        [officeId]
+        [officeid]
       );
 
       if (!officeRows.length) {
         return res.status(404).json({ success: false, message: 'Office not found' });
       }
 
-      const officeName = officeRows[0].OfficeName || `Office ${officeId}`;
+      const officename = officeRows[0].officename || `Office ${officeid}`;
 
       const [requirementsRows] = await db.query(
         `SELECT
-          r.RequirementID,
-          r.RequirementCode,
+          r.requirementid,
+          r.requirementcode,
           r.Description,
-          c.CriteriaID,
-          c.ParentCriteriaID,
-          c.CriteriaCode,
-          c.CriteriaName,
-          pc.CriteriaCode AS ParentCriteriaCode,
-          pc.CriteriaName AS ParentCriteriaName,
-          r.AreaID AS AreaID,
-          a.AreaCode,
-          a.AreaName,
-          cso.Status AS ComplianceStatusID,
-          cst.StatusName AS ComplianceStatusName,
-          cso.comments AS Comments
+          c.criteriaid,
+          c.parentcriteriaid,
+          c.criteriacode,
+          c.criterianame,
+          pc.criteriacode AS "ParentCriteriaCode",
+          pc.criterianame AS "ParentCriteriaName",
+          r.areaid AS areaid,
+          a.areacode,
+          a.areaname,
+          cso.status AS "ComplianceStatusID",
+          cst.statusname AS "ComplianceStatusName",
+          cso.comments AS "Comments"
         FROM compliancestatusoffices cso
-        INNER JOIN requirements r ON cso.RequirementID = r.RequirementID
-        LEFT JOIN criteria c ON r.CriteriaID = c.CriteriaID
-        LEFT JOIN criteria pc ON c.ParentCriteriaID = pc.CriteriaID
-        LEFT JOIN areas a ON r.AreaID = a.AreaID
-        LEFT JOIN compliancestatustypes cst ON cso.Status = cst.StatusID
-        WHERE cso.OfficeID = ?
+        INNER JOIN requirements r ON cso.requirementid = r.requirementid
+        LEFT JOIN criteria c ON r.criteriaid = c.criteriaid
+        LEFT JOIN criteria pc ON c.parentcriteriaid = pc.criteriaid
+        LEFT JOIN areas a ON r.areaid = a.areaid
+        LEFT JOIN compliancestatustypes cst ON cso.Status = cst.statusid
+        WHERE cso.officeid = ?
         ORDER BY
-          r.RequirementID ASC`,
-        [officeId]
+          r.requirementid ASC`,
+        [officeid]
       );
 
       const workbook = new ExcelJS.Workbook();
@@ -1703,7 +1907,7 @@ const OfficesController = {
 
       sheet.mergeCells(`A${rowIndex}:C${rowIndex}`);
       const officeCell = sheet.getCell(`A${rowIndex}`);
-      officeCell.value = String(officeName).toUpperCase();
+      officeCell.value = String(officename).toUpperCase();
       officeCell.font = { bold: true, size: 14 };
       officeCell.alignment = { horizontal: 'center', vertical: 'middle' };
       officeCell.border = thinBorder;
@@ -1722,27 +1926,27 @@ const OfficesController = {
         const areasMap = new Map();
 
         requirementsRows.forEach((row) => {
-          const areaCode = row.AreaCode || 'N/A';
-          const areaName = row.AreaName || 'No Area';
-          const areaKey = `${areaCode}__${areaName}`;
+          const areacode = row.areacode || 'N/A';
+          const areaname = row.areaname || 'No Area';
+          const areaKey = `${areacode}__${areaname}`;
 
           if (!areasMap.has(areaKey)) {
             areasMap.set(areaKey, {
-              areaCode,
-              areaName,
+              areacode,
+              areaname,
               criteriaMap: new Map(),
             });
           }
 
           const areaEntry = areasMap.get(areaKey);
-          const critId = row.CriteriaID != null ? Number(row.CriteriaID) : `req_${row.RequirementID}`;
-          const parentId = row.ParentCriteriaID != null ? Number(row.ParentCriteriaID) : null;
+          const critId = row.criteriaid != null ? Number(row.criteriaid) : `req_${row.requirementid}`;
+          const parentId = row.parentcriteriaid != null ? Number(row.parentcriteriaid) : null;
 
           if (!areaEntry.criteriaMap.has(critId)) {
             areaEntry.criteriaMap.set(critId, {
               id: critId,
-              code: row.CriteriaCode || '',
-              name: row.CriteriaName || '',
+              code: row.criteriacode || '',
+              name: row.criterianame || '',
               parentId: parentId,
               children: [],
               requirements: [],
@@ -1752,8 +1956,8 @@ const OfficesController = {
           if (parentId && !areaEntry.criteriaMap.has(parentId)) {
             areaEntry.criteriaMap.set(parentId, {
               id: parentId,
-              code: row.ParentCriteriaCode || '',
-              name: row.ParentCriteriaName || '',
+              code: row.ParentCriteriaCode || row.parentcriteriacode || '',
+              name: row.ParentCriteriaName || row.parentcriterianame || '',
               parentId: null,
               children: [],
               requirements: [],
@@ -1762,7 +1966,7 @@ const OfficesController = {
 
           areaEntry.criteriaMap.get(critId).requirements.push({
             status: normalizeComplianceStatus(row.ComplianceStatusID, row.ComplianceStatusName),
-            requirementCode: row.RequirementCode || 'N/A',
+            requirementcode: row.requirementcode || 'N/A',
             description: row.Description || '',
             comments: row.Comments || ''
           });
@@ -1779,7 +1983,7 @@ const OfficesController = {
         for (const area of areasMap.values()) {
           sheet.mergeCells(`A${rowIndex}:C${rowIndex}`);
           const areaTitleCell = sheet.getCell(`A${rowIndex}`);
-          areaTitleCell.value = `${area.areaCode} - ${area.areaName}`;
+          areaTitleCell.value = `${area.areacode} - ${area.areaname}`;
           areaTitleCell.font = areaHeaderStyle.font;
           areaTitleCell.alignment = areaHeaderStyle.alignment;
           areaTitleCell.border = thinBorder;
@@ -1805,7 +2009,7 @@ const OfficesController = {
 
             for (const req of root.requirements) {
               sheet.getCell(`A${rowIndex}`).value = req.status;
-              sheet.getCell(`B${rowIndex}`).value = `${req.requirementCode} - ${req.description}`;
+              sheet.getCell(`B${rowIndex}`).value = `${req.requirementcode} - ${req.description}`;
               sheet.getCell(`C${rowIndex}`).value = req.comments || '';
               sheet.getCell(`A${rowIndex}`).alignment = { horizontal: 'left', vertical: 'middle' };
               sheet.getCell(`B${rowIndex}`).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
@@ -1831,7 +2035,7 @@ const OfficesController = {
 
               for (const req of child.requirements) {
                 sheet.getCell(`A${rowIndex}`).value = req.status;
-                sheet.getCell(`B${rowIndex}`).value = `${req.requirementCode} - ${req.description}`;
+                sheet.getCell(`B${rowIndex}`).value = `${req.requirementcode} - ${req.description}`;
                 sheet.getCell(`C${rowIndex}`).value = req.comments || '';
                 sheet.getCell(`A${rowIndex}`).alignment = { horizontal: 'left', vertical: 'middle' };
                 sheet.getCell(`B${rowIndex}`).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
@@ -1846,15 +2050,15 @@ const OfficesController = {
         }
       }
 
-      const safeName = String(officeName)
+      const safeName = String(officename)
         .replace(/[\\/:*?"<>|]+/g, '_')
         .replace(/\s+/g, '_')
         .trim();
 
-      const fileName = `${safeName || `office_${officeId}`}_export.xlsx`;
+      const filename = `${safeName || `office_${officeid}`}_export.xlsx`;
 
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
 
       await workbook.xlsx.write(res);
       return res.end();
@@ -1864,8 +2068,8 @@ const OfficesController = {
     }
     try {
       const [result] = await db.query(
-        "DELETE FROM compliancestatusoffices WHERE OfficeID = ? AND RequirementID = ?",
-        [officeId, requirementId]
+        "DELETE FROM compliancestatusoffices WHERE officeid = ? AND requirementid = ?",
+        [officeid, requirementid]
       );
 
       if (result.affectedRows === 0) {
@@ -1876,26 +2080,26 @@ const OfficesController = {
       }
 
       // Update the overall office status after removal
-      await updateOverallOfficeStatus(officeId);
+      await updateOverallOfficeStatus(officeid);
 
       // Remove any user assignments for this requirement in this office
       try {
-        await db.execute('DELETE FROM requirement_user_assignments WHERE RequirementID = ? AND OfficeID = ?', [requirementId, officeId]);
+        await db.execute('DELETE FROM requirementuserassignments WHERE requirementid = ? AND officeid = ?', [requirementid, officeid]);
       } catch (cleanupErr) {
-        console.error('Failed to cleanup requirement_user_assignments after removing office requirement:', cleanupErr);
+        console.error('Failed to cleanup requirementuserassignments after removing office requirement:', cleanupErr);
       }
 
       // Also remove any uploaded proof documents (disk + DB) related to this requirement for the office
       try {
         const [files] = await db.query(
-          'SELECT id, file_path FROM office_proof_documents WHERE requirement_id = ? AND office_id = ?',
-          [requirementId, officeId]
+          'SELECT id, filepath FROM officeproofdocuments WHERE requirementid = ? AND officeid = ?',
+          [requirementid, officeid]
         );
 
         if (files && files.length > 0) {
           for (const f of files) {
             try {
-              const absPath = path.join(__dirname, '..', (f.file_path || '').replace(/^\//, ''));
+              const absPath = path.join(__dirname, '..', (f.filepath || '').replace(/^\//, ''));
               if (fs.existsSync(absPath)) {
                 fs.unlinkSync(absPath);
               }
@@ -1904,10 +2108,10 @@ const OfficesController = {
             }
           }
 
-          await db.query('DELETE FROM office_proof_documents WHERE requirement_id = ? AND office_id = ?', [requirementId, officeId]);
+          await db.query('DELETE FROM officeproofdocuments WHERE requirementid = ? AND officeid = ?', [requirementid, officeid]);
         }
       } catch (docErr) {
-        console.error('Failed to cleanup office_proof_documents after removing office requirement:', docErr);
+        console.error('Failed to cleanup officeproofdocuments after removing office requirement:', docErr);
       }
 
       res.json({ 
@@ -1928,9 +2132,9 @@ const OfficesController = {
   // UPDATE REQUIREMENT STATUS
   // ================================
   updateRequirementStatus: async (req, res) => {
-    const { id: officeId, requirementId } = req.params;
-    const { statusId, comments } = req.body;
-    const nextStatusId = Number(statusId);
+    const { id: officeid, requirementid } = req.params;
+    const { statusid, comments } = req.body;
+    const nextStatusId = Number(statusid);
 
     if (!nextStatusId || ![3, 4, 5].includes(nextStatusId)) {
       return res.status(400).json({
@@ -1940,24 +2144,25 @@ const OfficesController = {
     }
 
     try {
-      // Check existing status to see if statusId is changing or being set
+      // Check existing status to see if statusid is changing
       const [existingStatusRows] = await db.query(
-        `SELECT Status FROM compliancestatusoffices WHERE OfficeID = ? AND RequirementID = ?`,
-        [officeId, requirementId]
+        `SELECT status AS "Status" FROM compliancestatusoffices WHERE officeid = ? AND requirementid = ?`,
+        [officeid, requirementid]
       );
-      const currentStatus = existingStatusRows[0]?.Status;
+      const rawCurrentStatus = existingStatusRows[0]?.Status;
+      const currentStatus = rawCurrentStatus != null ? Number(rawCurrentStatus) : 3;
 
-      // If status is being set or changed, ensure evidence exists
-      if (nextStatusId && nextStatusId !== Number(currentStatus)) {
+      // If compliance status is actually being elevated to Partially Complied (4) or Complied (5), ensure evidence exists
+      if (nextStatusId !== 3 && nextStatusId !== currentStatus) {
         const [userUploads] = await db.query(
-          `SELECT COUNT(*) as cnt FROM requirement_user_assignments 
-           WHERE OfficeID = ? AND RequirementID = ? AND HasUploaded = TRUE`,
-          [officeId, requirementId]
+          `SELECT COUNT(*) as cnt FROM requirementuserassignments 
+           WHERE officeid = ? AND requirementid = ? AND hasuploaded = TRUE`,
+          [officeid, requirementid]
         );
         const [proofDocs] = await db.query(
-          `SELECT COUNT(*) as cnt FROM office_proof_documents 
-           WHERE office_id = ? AND (requirement_id = ? OR requirement_id IS NULL)`,
-          [officeId, requirementId]
+          `SELECT COUNT(*) as cnt FROM officeproofdocuments 
+           WHERE officeid = ? AND (requirementid = ? OR requirementid IS NULL)`,
+          [officeid, requirementid]
         );
 
         const hasEvidence = (userUploads[0]?.cnt > 0) || (proofDocs[0]?.cnt > 0);
@@ -1965,34 +2170,69 @@ const OfficesController = {
         if (!hasEvidence) {
           return res.status(400).json({
             success: false,
-            message: "Cannot change compliance status: No evidence or proof document has been uploaded for this requirement yet."
+            message: "Cannot set compliance status to Partially Complied or Complied: No evidence or proof document has been uploaded for this requirement yet."
           });
         }
       }
 
       const hasCommentPayload = Object.prototype.hasOwnProperty.call(req.body, 'comments');
+      if (hasCommentPayload) {
+        let userRoleId = Number(req.user?.roleid || 0);
+        if (!userRoleId && req.user?.userid) {
+          const [[userRow]] = await db.query("SELECT roleid FROM users WHERE userid = ?", [req.user.userid]);
+          if (userRow) userRoleId = Number(userRow.roleid);
+        }
+        if (userRoleId !== 1) {
+          return res.status(403).json({
+            success: false,
+            message: "Forbidden: Only Administrators are permitted to add or edit comments on standards."
+          });
+        }
+      }
+
       const updateSql = hasCommentPayload
         ? `UPDATE compliancestatusoffices
-           SET Status = ?, comments = ?, LastUpdated = CURRENT_TIMESTAMP
-           WHERE OfficeID = ? AND RequirementID = ?`
+           SET Status = ?, comments = ?, lastupdated = CURRENT_TIMESTAMP
+           WHERE officeid = ? AND requirementid = ?`
         : `UPDATE compliancestatusoffices
-           SET Status = ?, LastUpdated = CURRENT_TIMESTAMP
-           WHERE OfficeID = ? AND RequirementID = ?`;
+           SET Status = ?, lastupdated = CURRENT_TIMESTAMP
+           WHERE officeid = ? AND requirementid = ?`;
       const updateParams = hasCommentPayload
-        ? [nextStatusId, comments || null, officeId, requirementId]
-        : [nextStatusId, officeId, requirementId];
+        ? [nextStatusId, comments || null, officeid, requirementid]
+        : [nextStatusId, officeid, requirementid];
       const [updateResult] = await db.query(updateSql, updateParams);
 
       if (!updateResult?.affectedRows) {
         await db.query(
-          `INSERT INTO compliancestatusoffices (OfficeID, RequirementID, Status, comments)
+          `INSERT INTO compliancestatusoffices (officeid, requirementid, Status, comments)
            VALUES (?, ?, ?, ?)`,
-          [officeId, requirementId, nextStatusId, hasCommentPayload ? (comments || null) : null]
+          [officeid, requirementid, nextStatusId, hasCommentPayload ? (comments || null) : null]
         );
       }
 
       // Update the overall office status
-      await updateOverallOfficeStatus(officeId);
+      await updateOverallOfficeStatus(officeid);
+
+      const statusName = nextStatusId === 5 ? 'Complied' : (nextStatusId === 4 ? 'Partially Complied' : 'Not Complied');
+      try {
+        const { emitDataChange } = require('../socket');
+        emitDataChange('compliance', {
+          action: 'status_updated',
+          officeid: Number(officeid),
+          requirementid: Number(requirementid),
+          statusid: nextStatusId,
+          statusName,
+          comments: hasCommentPayload ? comments : undefined
+        });
+        emitDataChange('requirements', {
+          action: 'status_updated',
+          officeid: Number(officeid),
+          requirementid: Number(requirementid),
+          statusid: nextStatusId,
+          statusName,
+          comments: hasCommentPayload ? comments : undefined
+        });
+      } catch (sErr) {}
 
       res.json({
         success: true,
@@ -2012,56 +2252,56 @@ const OfficesController = {
 // ================================
 // HELPER FUNCTION: UPDATE OVERALL OFFICE STATUS
 // ================================
-async function updateOverallOfficeStatus(officeId) {
+async function updateOverallOfficeStatus(officeid) {
   try {
     // Get counts for each status
     const [counts] = await db.query(`
       SELECT 
-        COUNT(*) as TotalRequirements,
-        SUM(CASE WHEN Status::text = '5' THEN 1 ELSE 0 END) as CompliedCount,
-        SUM(CASE WHEN Status::text = '4' THEN 1 ELSE 0 END) as PartiallyCompliedCount,
-        SUM(CASE WHEN Status::text = '3' THEN 1 ELSE 0 END) as NotCompliedCount
+        COUNT(*) as totalrequirements,
+        SUM(CASE WHEN Status::text = '5' THEN 1 ELSE 0 END) as compliedcount,
+        SUM(CASE WHEN Status::text = '4' THEN 1 ELSE 0 END) as partiallycompliedcount,
+        SUM(CASE WHEN Status::text = '3' THEN 1 ELSE 0 END) as notcompliedcount
       FROM compliancestatusoffices
-      WHERE OfficeID = ?
-    `, [officeId]);
+      WHERE officeid = ?
+    `, [officeid]);
 
-    const total = Number(counts[0]?.TotalRequirements || 0);
-    const complied = Number(counts[0]?.CompliedCount || 0);
-    const partially = Number(counts[0]?.PartiallyCompliedCount || 0);
-    const notComplied = Number(counts[0]?.NotCompliedCount || 0);
+    const total = Number(counts[0]?.totalrequirements || 0);
+    const complied = Number(counts[0]?.compliedcount || 0);
+    const partially = Number(counts[0]?.partiallycompliedcount || 0);
+    const notComplied = Number(counts[0]?.notcompliedcount || 0);
 
     // Calculate percentage: Complied = 100%, Partially = 50%, Not Complied = 0%
-    let compliancePercent = 0;
+    let compliancepercent = 0;
     if (total > 0) {
       const weightedScore = (complied * 100) + (partially * 50);
       const maxScore = total * 100;
-      compliancePercent = (weightedScore / maxScore) * 100;
+      compliancepercent = (weightedScore / maxScore) * 100;
     }
 
     // Determine overall status based on requirement composition (same rule as dashboard cards)
-    let overallStatus = 'Not Complied';
+    let overallstatus = 'Not Complied';
     if (total > 0 && complied === total) {
-      overallStatus = 'Complied';
+      overallstatus = 'Complied';
     } else if (total > 0 && notComplied === total) {
-      overallStatus = 'Not Complied';
+      overallstatus = 'Not Complied';
     } else if (total > 0) {
-      overallStatus = 'Partially Complied';
+      overallstatus = 'Partially Complied';
     }
 
     // Insert or update the overall status in PostgreSQL
     await db.query(
       `INSERT INTO OverallOfficeStatus 
-        (OfficeID, CompliedCount, PartiallyCompliedCount, NotCompliedCount, TotalRequirements, CompliancePercent, OverallStatus)
+        (officeid, compliedcount, partiallycompliedcount, notcompliedcount, totalrequirements, compliancepercent, overallstatus)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT (OfficeID) DO UPDATE SET
-        CompliedCount = EXCLUDED.CompliedCount,
-        PartiallyCompliedCount = EXCLUDED.PartiallyCompliedCount,
-        NotCompliedCount = EXCLUDED.NotCompliedCount,
-        TotalRequirements = EXCLUDED.TotalRequirements,
-        CompliancePercent = EXCLUDED.CompliancePercent,
-        OverallStatus = EXCLUDED.OverallStatus,
-        LastUpdated = CURRENT_TIMESTAMP`,
-      [officeId, complied, partially, notComplied, total, compliancePercent.toFixed(2), overallStatus]
+      ON CONFLICT (officeid) DO UPDATE SET
+        compliedcount = EXCLUDED.compliedcount,
+        partiallycompliedcount = EXCLUDED.partiallycompliedcount,
+        notcompliedcount = EXCLUDED.notcompliedcount,
+        totalrequirements = EXCLUDED.totalrequirements,
+        compliancepercent = EXCLUDED.compliancepercent,
+        overallstatus = EXCLUDED.overallstatus,
+        lastupdated = CURRENT_TIMESTAMP`,
+      [officeid, complied, partially, notComplied, total, compliancepercent.toFixed(2), overallstatus]
     );
 
   } catch (err) {

@@ -21,8 +21,8 @@ const stripEmojis = (val) => {
   return val;
 };
 
-async function recordLog(userId, action, details = null) {
-  if (!action || !userId) return;
+async function recordLog(userid, action, details = null) {
+  if (!action || !userid) return;
   try {
     const cleanAction = stripEmojis(action).slice(0, 100);
     const cleanDetails = stripEmojis(details);
@@ -31,8 +31,8 @@ async function recordLog(userId, action, details = null) {
       : cleanDetails ? String(cleanDetails) : null;
 
     await db.query(
-      'INSERT INTO logs (UserID, Action, Details) VALUES (?, ?, ?)',
-      [userId, cleanAction, detailsStr ? String(detailsStr).slice(0, 5000) : null]
+      'INSERT INTO logs (userid, Action, Details) VALUES (?, ?, ?)',
+      [userid, cleanAction, detailsStr ? String(detailsStr).slice(0, 5000) : null]
     );
   } catch (err) {
     console.error('recordLog insert failed:', err.message);
@@ -104,53 +104,58 @@ exports.getLogs = async (req, res) => {
     const totalPages = Math.ceil(totalCount / limit) || 1;
 
     let sql = `SELECT
-        l.LogID,
-        l.UserID,
+        l.logid,
+        l.userid,
         l.Action,
         (l.Timestamp AT TIME ZONE 'UTC') AS Timestamp,
         l.Details,
-        u.FirstName,
-        u.MiddleInitial,
-        u.LastName,
+        u.firstname,
+        u.middleinitial,
+        u.lastname,
         u.Email,
-        u.RoleID,
-        r.RoleName
+        u.roleid,
+        r.rolename
       FROM logs l
-      LEFT JOIN users u ON l.UserID = u.UserID
-      LEFT JOIN roles r ON u.RoleID = r.RoleID`;
+      LEFT JOIN users u ON l.userid = u.userid
+      LEFT JOIN roles r ON u.roleid = r.roleid`;
 
     // By default exclude low-value HTTP middleware logs like "POST /api/..." so the feed remains readable
     if (!includeHttp) {
       sql += ` WHERE l.Action !~ '^(GET|POST|PUT|PATCH|DELETE)\\s+'`;
     }
 
-    sql += ` ORDER BY l.Timestamp DESC, l.LogID DESC LIMIT ? OFFSET ?`;
+    sql += ` ORDER BY l.Timestamp DESC, l.logid DESC LIMIT ? OFFSET ?`;
 
     const [rows] = await db.query(sql, [limit, offset]);
 
     const logs = rows.map((row) => {
-      const mid = row.MiddleInitial ? ` ${row.MiddleInitial}.` : '';
-      let displayName = `${row.FirstName || ''}${mid} ${row.LastName || ''}`.replace(/\s+/g, ' ').trim();
-      if (!displayName) displayName = row.Email || `Deleted user #${row.UserID}`;
-      const actorKind = row.RoleID === 1 ? 'Admin' : 'User';
+      const rawAction = row.Action || row.action || '';
+      const rawDetails = row.Details || row.details || null;
+      const rawTimestamp = row.Timestamp || row.timestamp || null;
+      const rawEmail = row.Email || row.email || '';
+
+      const mid = row.middleinitial ? ` ${row.middleinitial}.` : '';
+      let displayname = `${row.firstname || ''}${mid} ${row.lastname || ''}`.replace(/\s+/g, ' ').trim();
+      if (!displayname) displayname = rawEmail || `Deleted user #${row.userid}`;
+      const actorKind = row.roleid === 1 ? 'Admin' : 'User';
       // Parse Details JSON when possible and build a short summary for UI
       let detailsSummary = null;
       let detailsParsed = null;
       try {
-        if (row.Details) {
-          detailsParsed = JSON.parse(row.Details);
+        if (rawDetails) {
+          detailsParsed = typeof rawDetails === 'string' ? JSON.parse(rawDetails) : rawDetails;
           // If middleware style {status:..., body: {...}}
           const body = detailsParsed.body || detailsParsed;
           if (body) {
             // Common shapes: copy, add, update, delete
             if (body.newEventName || body.newEventCode || body.sourceEventId) {
               const src = body.sourceEventId || body.sourceEventID || '';
-              const name = body.newEventName || body.EventName || '';
+              const name = body.newEventName || body.eventname || '';
               detailsSummary = src ? `Copied event ${src} -> ${name}` : `${name}`;
-            } else if (body.RequirementID || body.RequirementCode) {
-              detailsSummary = `Requirement ${body.RequirementCode || body.RequirementID}`;
-            } else if (body.CriteriaID || body.CriteriaCode) {
-              detailsSummary = `Criteria ${body.CriteriaCode || body.CriteriaID}`;
+            } else if (body.requirementid || body.requirementcode) {
+              detailsSummary = `Requirement ${body.requirementcode || body.requirementid}`;
+            } else if (body.criteriaid || body.criteriacode) {
+              detailsSummary = `Criteria ${body.criteriacode || body.criteriaid}`;
             } else if (body.areaids || body.areaIds || body.deletedCount) {
               detailsSummary = `Deleted areas: ${body.areaids || body.areaIds || body.deletedCount}`;
             } else if (typeof body === 'object') {
@@ -174,33 +179,33 @@ exports.getLogs = async (req, res) => {
 
       // Build a friendly message preferring semantic controller actions
       let message = null;
-      const action = String(row.Action || '').trim();
+      const action = String(rawAction || '').trim();
       const body = detailsParsed && detailsParsed.body ? detailsParsed.body : detailsParsed;
 
       const prettifyFieldName = (field) => {
         const aliases = {
-          EventName: 'Name',
-          EventCode: 'Code',
-          CriteriaName: 'Name',
-          CriteriaCode: 'Code',
-          AreaName: 'Name',
-          AreaCode: 'Code',
-          RequirementCode: 'Code',
-          OfficeName: 'Name',
+          eventname: 'Name',
+          eventcode: 'Code',
+          criterianame: 'Name',
+          criteriacode: 'Code',
+          areaname: 'Name',
+          areacode: 'Code',
+          requirementcode: 'Code',
+          officename: 'Name',
           Description: 'Description',
-          EventID: 'Event',
-          CriteriaID: 'Criteria',
-          AreaID: 'Area',
-          OfficeTypeID: 'Office Type',
-          ParentCriteriaID: 'Parent Criteria',
-          ParentRequirementCode: 'Parent Requirement',
-          ParentRequirementID: 'Parent Requirement ID',
+          eventid: 'Event',
+          criteriaid: 'Criteria',
+          areaid: 'Area',
+          officetypeid: 'Office Type',
+          parentcriteriaid: 'Parent Criteria',
+          parentrequirementcode: 'Parent Requirement',
+          parentrequirementid: 'Parent Requirement ID',
           HeadIDs: 'Office Heads',
           Email: 'Email',
-          FirstName: 'First Name',
-          LastName: 'Last Name',
-          MiddleInitial: 'Middle Initial',
-          RoleID: 'Role'
+          firstname: 'First Name',
+          lastname: 'Last Name',
+          middleinitial: 'Middle Initial',
+          roleid: 'Role'
         };
         if (aliases[field]) return aliases[field];
         return String(field || '')
@@ -244,7 +249,7 @@ exports.getLogs = async (req, res) => {
         case 'EventCopied':
           if (body) {
             const srcName = body.sourceEventName || body.sourceEventId || body.sourceEventID || '';
-            const newName = body.newEventName || body.EventName || body.newEventId || body.newEventID || body.newEventId || '';
+            const newName = body.newEventName || body.eventname || body.newEventId || body.newEventID || body.newEventId || '';
             if (srcName || newName) {
               message = `Copied event ${srcName} -> ${newName}`.trim();
             } else {
@@ -255,50 +260,50 @@ exports.getLogs = async (req, res) => {
           }
           break;
         case 'EventAdded':
-          message = `Created event ${body?.EventName || detailsSummary || ''}`.trim();
+          message = `Created event ${body?.eventname || detailsSummary || ''}`.trim();
           break;
         case 'EventUpdated':
           message = buildUpdatedMessage(
-            body?.EventName ? `Event ${body.EventName}` : 'Event',
-            body?.EventID || body?.EventName || detailsSummary || ''
+            body?.eventname ? `Event ${body.eventname}` : 'Event',
+            body?.eventid || body?.eventname || detailsSummary || ''
           );
           break;
         case 'EventDeleted':
           message = `Deleted events ${body?.deletedCount || detailsSummary || ''}`.trim();
           break;
         case 'AreaAdded':
-          message = `Added area ${body?.AreaName || detailsSummary || ''}`.trim();
+          message = `Added area ${body?.areaname || detailsSummary || ''}`.trim();
           break;
         case 'AreaDeleted':
           message = `Deleted areas ${body?.areaids || body?.areaIds || detailsSummary || ''}`.trim();
           break;
         case 'AreaUpdated':
           message = buildUpdatedMessage(
-            body?.AreaName ? `Area ${body.AreaName}` : 'Area',
-            body?.AreaID || body?.AreaName || detailsSummary || ''
+            body?.areaname ? `Area ${body.areaname}` : 'Area',
+            body?.areaid || body?.areaname || detailsSummary || ''
           );
           break;
         case 'RequirementAdded':
-          message = `Added requirement ${body?.RequirementCode || body?.RequirementID || detailsSummary || ''}`.trim();
+          message = `Added requirement ${body?.requirementcode || body?.requirementid || detailsSummary || ''}`.trim();
           break;
         case 'RequirementUpdated':
           message = buildUpdatedMessage(
-            body?.RequirementCode ? `Requirement ${body.RequirementCode}` : 'Requirement',
-            body?.RequirementID || body?.RequirementCode || detailsSummary || ''
+            body?.requirementcode ? `Requirement ${body.requirementcode}` : 'Requirement',
+            body?.requirementid || body?.requirementcode || detailsSummary || ''
           );
           break;
         case 'RequirementFileUploaded': {
-          const requirementLabel = body?.RequirementCode || body?.RequirementDescription || `Requirement #${body?.RequirementID || ''}`;
-          const officeLabel = body?.OfficeName || 'Unknown office';
-          const eventLabel = body?.EventName || 'Unknown event';
+          const requirementLabel = body?.requirementcode || body?.RequirementDescription || `Requirement #${body?.requirementid || ''}`;
+          const officeLabel = body?.officename || 'Unknown office';
+          const eventLabel = body?.eventname || 'Unknown event';
           const fileLabel = body?.FileName ? ` (${body.FileName})` : '';
           message = `Uploaded proof for ${requirementLabel} in office ${officeLabel} under event ${eventLabel}${fileLabel}.`;
           break;
         }
         case 'RequirementFileUnsubmitted': {
-          const requirementLabel = body?.RequirementCode || body?.RequirementDescription || `Requirement #${body?.RequirementID || ''}`;
-          const officeLabel = body?.OfficeName || 'Unknown office';
-          const eventLabel = body?.EventName || 'Unknown event';
+          const requirementLabel = body?.requirementcode || body?.RequirementDescription || `Requirement #${body?.requirementid || ''}`;
+          const officeLabel = body?.officename || 'Unknown office';
+          const eventLabel = body?.eventname || 'Unknown event';
           const fileLabel = body?.FileName ? ` (${body.FileName})` : '';
           message = `Unsubmitted proof for ${requirementLabel} in office ${officeLabel} under event ${eventLabel}${fileLabel}.`;
           break;
@@ -307,23 +312,23 @@ exports.getLogs = async (req, res) => {
           message = `Deleted requirements ${body?.deletedCount || detailsSummary || ''}`.trim();
           break;
         case 'OfficeAdded': {
-          const officeName = body?.OfficeName || 'Office';
+          const officename = body?.officename || 'Office';
           const officeType = body?.OfficeType ? ` (${body.OfficeType})` : '';
-          const eventName = body?.EventName ? ` under ${body.EventName}` : '';
+          const eventname = body?.eventname ? ` under ${body.eventname}` : '';
           const headNames = formatList(body?.HeadNames);
-          message = `Created office ${officeName}${officeType}${eventName}.`;
+          message = `Created office ${officename}${officeType}${eventname}.`;
           if (headNames) {
             message += ` Assigned head(s): ${headNames}.`;
           }
           break;
         }
         case 'OfficeUpdated': {
-          const officeName = body?.OfficeName ? `Office ${body.OfficeName}` : 'Office';
+          const officename = body?.officename ? `Office ${body.officename}` : 'Office';
           const changesText = formatChangesList(body?.changes);
           const addedHeads = formatList(body?.headChanges?.added);
           const removedHeads = formatList(body?.headChanges?.removed);
 
-          const parts = [`${officeName} updated.`];
+          const parts = [`${officename} updated.`];
           if (changesText) parts.push(changesText);
           if (addedHeads) parts.push(`Added head(s): ${addedHeads}`);
           if (removedHeads) parts.push(`Removed head(s): ${removedHeads}`);
@@ -331,10 +336,30 @@ exports.getLogs = async (req, res) => {
           break;
         }
         case 'OfficeDeleted': {
-          const officeName = body?.OfficeName || 'Office';
+          const officename = body?.officename || 'Office';
           const officeType = body?.OfficeType ? ` (${body.OfficeType})` : '';
-          const eventName = body?.EventName ? ` from ${body.EventName}` : '';
-          message = `Deleted office ${officeName}${officeType}${eventName}.`;
+          const eventname = body?.eventname ? ` from ${body.eventname}` : '';
+          const isAcademic = /academic/i.test(body?.OfficeType || '') && !/non/i.test(body?.OfficeType || '');
+          const label = isAcademic ? 'program' : 'office';
+          message = `Deleted ${label} ${officename}${officeType}${eventname}.`;
+          break;
+        }
+        case 'MasterListItemAdded':
+        case 'MasterListAdded': {
+          const itemName = body?.name || body?.masterlistname || body?.ItemName || (body?.id ? `Item #${body.id}` : 'Item');
+          message = `Added Master List item "${itemName}".`;
+          break;
+        }
+        case 'MasterListItemUpdated':
+        case 'MasterListUpdated': {
+          const itemName = body?.name || body?.masterlistname || body?.ItemName || (body?.id ? `Item #${body.id}` : 'Item');
+          message = `Updated Master List item "${itemName}".`;
+          break;
+        }
+        case 'MasterListItemDeleted':
+        case 'MasterListDeleted': {
+          const itemName = body?.name || body?.masterlistname || body?.ItemName || (body?.id ? `Item #${body.id}` : 'Item');
+          message = `Deleted Master List item "${itemName}".`;
           break;
         }
         case 'OfficeHeadAdded': {
@@ -364,7 +389,7 @@ exports.getLogs = async (req, res) => {
           const auditorName = body?.AuditorName || (body?.AuditorUserID ? `Auditor #${body.AuditorUserID}` : 'External Auditor');
           const count = body?.AssignedAreaCount ?? (Array.isArray(body?.Areas) ? body.Areas.length : 0);
           const areaNames = Array.isArray(body?.Areas)
-            ? body.Areas.map(a => a.AreaCode ? (a.AreaName ? `${a.AreaCode} (${a.AreaName})` : a.AreaCode) : a.AreaName).filter(Boolean).join(', ')
+            ? body.Areas.map(a => a.areacode ? (a.areaname ? `${a.areacode} (${a.areaname})` : a.areacode) : a.areaname).filter(Boolean).join(', ')
             : '';
           if (count === 0) {
             message = `Updated assignments for ${auditorName} (cleared assigned areas).`;
@@ -374,23 +399,23 @@ exports.getLogs = async (req, res) => {
           break;
         }
         case 'CriteriaAdded':
-          message = `Added criteria ${body?.CriteriaCode || body?.CriteriaID || detailsSummary || ''}`.trim();
+          message = `Added criteria ${body?.criteriacode || body?.criteriaid || detailsSummary || ''}`.trim();
           break;
         case 'CriteriaUpdated':
         case 'Criteria updated':
           message = buildUpdatedMessage(
-            body?.CriteriaCode ? `Criteria ${body.CriteriaCode}` : 'Criteria',
-            body?.CriteriaID || body?.CriteriaCode || detailsSummary || ''
+            body?.criteriacode ? `Criteria ${body.criteriacode}` : 'Criteria',
+            body?.criteriaid || body?.criteriacode || detailsSummary || ''
           );
           break;
         case 'Criteria deleted':
           message = `Deleted criteria ${detailsSummary || ''}`.trim();
           break;
         case 'Login':
-          message = `User logged in (${displayName || `#${row.UserID}`})`;
+          message = `User logged in (${displayname || `#${row.userid}`})`;
           break;
         case 'Logout':
-          message = `User logged out (${displayName || `#${row.UserID}`})`;
+          message = `User logged out (${displayname || `#${row.userid}`})`;
           break;
         case 'UserRegistered':
           message = `New user registered (${body?.email || detailsSummary || ''})`;
@@ -398,27 +423,27 @@ exports.getLogs = async (req, res) => {
         case 'UserApprovalUpdated':
           if (body?.changes) {
             message = buildUpdatedMessage(
-              body?.userId ? `User ${body.userId}` : 'User',
+              body?.userid ? `User ${body.userid}` : 'User',
               detailsSummary || ''
             );
           } else {
-            message = (row.Details && String(row.Details).trim()) || `User ${body?.userId || ''} approval updated`.trim();
+            message = (row.Details && String(row.Details).trim()) || `User ${body?.userid || ''} approval updated`.trim();
           }
           break;
         case 'UserRoleUpdated':
           if (body?.changes) {
             message = buildUpdatedMessage(
-              body?.userId ? `User ${body.userId}` : 'User',
+              body?.userid ? `User ${body.userid}` : 'User',
               detailsSummary || ''
             );
           } else {
-            message = (row.Details && String(row.Details).trim()) || `User ${body?.userId || ''} role updated`.trim();
+            message = (row.Details && String(row.Details).trim()) || `User ${body?.userid || ''} role updated`.trim();
           }
           break;
         case 'UserUpdated':
           if (body?.changes) {
             message = buildUpdatedMessage(
-              body?.userId ? `User ${body.userId}` : 'User',
+              body?.userid ? `User ${body.userid}` : 'User',
               detailsSummary || ''
             );
           } else {
@@ -438,17 +463,17 @@ exports.getLogs = async (req, res) => {
       }
 
       return {
-        LogID: row.LogID,
-        UserID: row.UserID,
-        Action: stripEmojis(row.Action),
-        Timestamp: row.Timestamp,
-        Details: stripEmojis(row.Details),
+        logid: row.logid,
+        userid: row.userid,
+        Action: stripEmojis(rawAction),
+        Timestamp: rawTimestamp,
+        Details: stripEmojis(rawDetails),
         DetailsSummary: stripEmojis(detailsSummary),
         DetailsParsed: stripEmojis(detailsParsed),
         Message: stripEmojis(message),
-        displayName: stripEmojis(displayName) || `Deleted user #${row.UserID}`,
-        RoleName: stripEmojis(row.RoleName) || 'Deleted User',
-        actorKind: stripEmojis(row.RoleName) || 'Deleted User',
+        displayname: stripEmojis(displayname) || `Deleted user #${row.userid}`,
+        rolename: stripEmojis(row.rolename) || 'Deleted User',
+        actorKind: stripEmojis(row.rolename) || 'Deleted User',
       };
     });
 

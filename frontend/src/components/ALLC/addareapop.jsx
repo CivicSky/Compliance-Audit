@@ -34,27 +34,27 @@ export default function AddAreaPop({
 	const [toastVisible, setToastVisible] = useState(false);
 	const toastTimerRef = useRef(null);
 
-	const [areaForm, setAreaForm] = useState({ AreaCode: '', AreaName: '', Description: '' });
-	const [criteriaForm, setCriteriaForm] = useState({ CriteriaCode: '', CriteriaName: '', Description: '', AreaID: '', ParentCriteriaID: '' });
-	const [requirementForm, setRequirementForm] = useState({ RequirementCode: '', Description: '', CriteriaID: '', ParentRequirementCode: '', AreaFilter: '', ChildCriteriaID: '' });
+	const [areaForm, setAreaForm] = useState({ areacode: '', areaname: '', Description: '' });
+	const [criteriaForm, setCriteriaForm] = useState({ criteriacode: '', criterianame: '', Description: '', areaid: '', parentcriteriaid: '' });
+	const [requirementForm, setRequirementForm] = useState({ requirementcode: '', Description: '', criteriaid: '', parentrequirementcode: '', AreaFilter: '', ChildCriteriaID: '' });
 	const [parentRequirementOptions, setParentRequirementOptions] = useState([]);
 	const parentCriteriaOptions = useMemo(() => {
 		const list = criteriaOptions || [];
 		if (!event) return [];
 		// only criteria for this event
-		const byEvent = list.filter(c => Number(c.EventID) === Number(event.EventID) || Number(c.event_id) === Number(event.EventID));
+		const byEvent = list.filter(c => Number(c.eventid) === Number(event.eventid) || Number(c.eventid) === Number(event.eventid));
 		// only top-level criteria (exclude children)
-		const topLevel = byEvent.filter((c) => c.ParentCriteriaID === null || c.ParentCriteriaID === undefined || String(c.ParentCriteriaID) === '');
-		// if AreaID selected, filter by same area; empty means show all
-		if (!criteriaForm.AreaID) return topLevel;
-		if (criteriaForm.AreaID === '__no_area__') {
+		const topLevel = byEvent.filter((c) => c.parentcriteriaid === null || c.parentcriteriaid === undefined || String(c.parentcriteriaid) === '');
+		// if areaid selected, filter by same area; empty means show all
+		if (!criteriaForm.areaid) return topLevel;
+		if (criteriaForm.areaid === '__no_area__') {
 			return topLevel.filter((c) => {
-				const noArea = c.AreaID === null || c.AreaID === undefined || c.AreaID === '' || Number(c.AreaID) === 0;
+				const noArea = c.areaid === null || c.areaid === undefined || c.areaid === '' || Number(c.areaid) === 0;
 				return noArea;
 			});
 		}
-		return topLevel.filter(c => String(c.AreaID) === String(criteriaForm.AreaID));
-	}, [criteriaOptions, criteriaForm.AreaID, event]);
+		return topLevel.filter(c => String(c.areaid) === String(criteriaForm.areaid));
+	}, [criteriaOptions, criteriaForm.areaid, event]);
 	const [eventOffices, setEventOffices] = useState([]);
 	const [assignmentCriteriaByArea, setAssignmentCriteriaByArea] = useState({});
 	const [assignmentRequirementsByCriteria, setAssignmentRequirementsByCriteria] = useState({});
@@ -69,44 +69,44 @@ export default function AddAreaPop({
 	const filteredCriteriaOptions = useMemo(() => {
 		const list = criteriaOptions || [];
 		// Only show top-level criteria here (exclude children)
-		const topLevel = list.filter((crit) => crit.ParentCriteriaID === null || crit.ParentCriteriaID === undefined || String(crit.ParentCriteriaID) === '');
+		const topLevel = list.filter((crit) => crit.parentcriteriaid === null || crit.parentcriteriaid === undefined || String(crit.parentcriteriaid) === '');
 		const af = requirementForm.AreaFilter;
 		if (!af) return [];
 
 		if (af === '__no_area__') {
 			return topLevel.filter((crit) => {
-				const noArea = crit.AreaID === null || crit.AreaID === undefined || crit.AreaID === '' || Number(crit.AreaID) === 0;
-				const sameEvent = event && (Number(crit.EventID) === Number(event.EventID) || Number(crit.event_id) === Number(event.EventID));
+				const noArea = crit.areaid === null || crit.areaid === undefined || crit.areaid === '' || Number(crit.areaid) === 0;
+				const sameEvent = event && (Number(crit.eventid) === Number(event.eventid) || Number(crit.eventid) === Number(event.eventid));
 				return noArea && (event ? sameEvent : true);
 			});
 		}
 
-		return topLevel.filter(crit => Number(crit.AreaID) === Number(af));
+		return topLevel.filter(crit => Number(crit.areaid) === Number(af));
 	}, [criteriaOptions, requirementForm.AreaFilter, event]);
 
 	// child criteria options for the selected criteria (only direct children)
 	const childCriteriaOptions = useMemo(() => {
-		if (!requirementForm.CriteriaID) return [];
+		if (!requirementForm.criteriaid) return [];
 		return (criteriaOptions || []).filter(c => {
-			const isChild = c.ParentCriteriaID !== undefined && c.ParentCriteriaID !== null && String(c.ParentCriteriaID) !== '' && String(c.ParentCriteriaID) === String(requirementForm.CriteriaID);
-			const sameEvent = event ? (Number(c.EventID) === Number(event.EventID) || Number(c.event_id) === Number(event.EventID)) : true;
+			const isChild = c.parentcriteriaid !== undefined && c.parentcriteriaid !== null && String(c.parentcriteriaid) !== '' && String(c.parentcriteriaid) === String(requirementForm.criteriaid);
+			const sameEvent = event ? (Number(c.eventid) === Number(event.eventid) || Number(c.eventid) === Number(event.eventid)) : true;
 			return isChild && sameEvent;
 		});
-	}, [criteriaOptions, requirementForm.CriteriaID, event]);
+	}, [criteriaOptions, requirementForm.criteriaid, event]);
 
-	// helper: get the effective base CriteriaCode for a target criteria id
-	const getBaseCriteriaCode = (criteriaId) => {
-		if (!criteriaId) return '';
+	// helper: get the effective base criteriacode for a target criteria id
+	const getBaseCriteriaCode = (criteriaid) => {
+		if (!criteriaid) return '';
 		const list = criteriaOptions || [];
-		const crit = list.find(c => String(c.CriteriaID) === String(criteriaId) || Number(c.CriteriaID) === Number(criteriaId));
+		const crit = list.find(c => String(c.criteriaid) === String(criteriaid) || Number(c.criteriaid) === Number(criteriaid));
 		if (!crit) return '';
-		const code = crit.CriteriaCode ?? crit.criteria_code ?? '';
+		const code = crit.criteriacode ?? crit.criteriacode ?? '';
 		if (code) return code;
 		// if this crit has no code but has a parent, use parent's code
-		const parentId = crit.ParentCriteriaID ?? crit.parent_criteria_id ?? null;
+		const parentId = crit.parentcriteriaid ?? crit.parentcriteriaid ?? null;
 		if (parentId) {
-			const parent = list.find(c => String(c.CriteriaID) === String(parentId) || Number(c.CriteriaID) === Number(parentId));
-			return parent?.CriteriaCode ?? parent?.criteria_code ?? '';
+			const parent = list.find(c => String(c.criteriaid) === String(parentId) || Number(c.criteriaid) === Number(parentId));
+			return parent?.criteriacode ?? parent?.criteriacode ?? '';
 		}
 		return '';
 	};
@@ -116,14 +116,14 @@ export default function AddAreaPop({
 			return areaForm;
 		}
 		if (mode === 'add-criteria') {
-			return (areas || []).find((a) => String(a.AreaID) === String(criteriaForm.AreaID)) || null;
+			return (areas || []).find((a) => String(a.areaid) === String(criteriaForm.areaid)) || null;
 		}
 		if (mode === 'add-requirement') {
 			if (requirementForm.AreaFilter === '__no_area__') return null;
-			return (areas || []).find((a) => String(a.AreaID) === String(requirementForm.AreaFilter)) || null;
+			return (areas || []).find((a) => String(a.areaid) === String(requirementForm.AreaFilter)) || null;
 		}
 		return null;
-	}, [mode, areaForm, criteriaForm.AreaID, requirementForm.AreaFilter, areas]);
+	}, [mode, areaForm, criteriaForm.areaid, requirementForm.AreaFilter, areas]);
 
 	const resolvedPreviewCriteria = useMemo(() => {
 		if (mode === 'add-area') return null;
@@ -131,10 +131,10 @@ export default function AddAreaPop({
 			return criteriaForm;
 		}
 		if (mode === 'add-requirement') {
-			return (criteriaOptions || []).find((c) => String(c.CriteriaID) === String(requirementForm.CriteriaID)) || null;
+			return (criteriaOptions || []).find((c) => String(c.criteriaid) === String(requirementForm.criteriaid)) || null;
 		}
 		return null;
-	}, [mode, criteriaForm, requirementForm.CriteriaID, criteriaOptions]);
+	}, [mode, criteriaForm, requirementForm.criteriaid, criteriaOptions]);
 
 	const resolvedPreviewRequirement = useMemo(() => {
 		if (mode !== 'add-requirement') return null;
@@ -143,39 +143,39 @@ export default function AddAreaPop({
 
 	const requirementTree = useMemo(() => {
 		const eventAreas = (areas || [])
-			.filter((area) => !event?.EventID || Number(area.EventID ?? area.EventChildID ?? event.EventID) === Number(event.EventID))
+			.filter((area) => !event?.eventid || Number(area.eventid ?? area.EventChildID ?? event.eventid) === Number(event.eventid))
 			.slice()
-			.sort((a, b) => String(a.AreaCode || a.AreaName || '').localeCompare(String(b.AreaCode || b.AreaName || ''), undefined, { numeric: true, sensitivity: 'base' }));
+			.sort((a, b) => String(a.areacode || a.areaname || '').localeCompare(String(b.areacode || b.areaname || ''), undefined, { numeric: true, sensitivity: 'base' }));
 
 		return eventAreas.map((area) => {
-			const areaId = Number(area.AreaID);
-			const criteria = (assignmentCriteriaByArea[areaId] || []).map((crit) => {
-				const criteriaId = Number(crit.CriteriaID);
-				const code = crit.CriteriaCode ?? crit.criteria_code ?? '';
-				const name = crit.CriteriaName ?? crit.criteria_name ?? '';
-				const requirementsLoaded = Object.prototype.hasOwnProperty.call(assignmentRequirementsByCriteria, criteriaId);
+			const areaid = Number(area.areaid);
+			const criteria = (assignmentCriteriaByArea[areaid] || []).map((crit) => {
+				const criteriaid = Number(crit.criteriaid);
+				const code = crit.criteriacode ?? crit.criteriacode ?? '';
+				const name = crit.criterianame ?? crit.criterianame ?? '';
+				const requirementsLoaded = Object.prototype.hasOwnProperty.call(assignmentRequirementsByCriteria, criteriaid);
 				return {
 					...crit,
-					id: criteriaId,
-					key: `criteria-${criteriaId}`,
+					id: criteriaid,
+					key: `criteria-${criteriaid}`,
 					label: code ? `${code} - ${name}` : name,
-					requirements: requirementsLoaded ? assignmentRequirementsByCriteria[criteriaId] || [] : [],
+					requirements: requirementsLoaded ? assignmentRequirementsByCriteria[criteriaid] || [] : [],
 					requirementsLoaded,
 				};
 			});
 
-			const areaCode = area.AreaCode ?? area.area_code ?? '';
-			const areaName = area.AreaName ?? area.area_name ?? '';
+			const areacode = area.areacode ?? area.areacode ?? '';
+			const areaname = area.areaname ?? area.areaname ?? '';
 			return {
 				...area,
-				id: areaId,
-				key: `area-${areaId}`,
-				label: areaCode ? `${areaCode} - ${areaName}` : areaName,
+				id: areaid,
+				key: `area-${areaid}`,
+				label: areacode ? `${areacode} - ${areaname}` : areaname,
 				criteria,
-				criteriaLoaded: Object.prototype.hasOwnProperty.call(assignmentCriteriaByArea, areaId),
+				criteriaLoaded: Object.prototype.hasOwnProperty.call(assignmentCriteriaByArea, areaid),
 			};
 		});
-	}, [areas, assignmentCriteriaByArea, assignmentRequirementsByCriteria, event?.EventID]);
+	}, [areas, assignmentCriteriaByArea, assignmentRequirementsByCriteria, event?.eventid]);
 
 	const selectedRequirementIdSet = useMemo(() => {
 		return new Set(selectedRequirementIds.map((id) => Number(id)));
@@ -186,10 +186,10 @@ export default function AddAreaPop({
 		if (!query) return eventOffices;
 
 		return eventOffices.filter((office) => {
-			const label = String(office.office_name || office.OfficeName || '').toLowerCase();
-			const typeName = String(office.office_type_name || office.TypeName || '').toLowerCase();
+			const label = String(office.officename || office.officename || '').toLowerCase();
+			const typename = String(office.office_type_name || office.typename || '').toLowerCase();
 			const headName = String(office.head_name || '').toLowerCase();
-			return label.includes(query) || typeName.includes(query) || headName.includes(query);
+			return label.includes(query) || typename.includes(query) || headName.includes(query);
 		});
 	}, [eventOffices, officeSearchTerm]);
 
@@ -208,7 +208,7 @@ export default function AddAreaPop({
 			const nextCriteria = area.criteria.reduce((criteriaAcc, criteria) => {
 				const criteriaMatches = String(criteria.label || '').toLowerCase().includes(query);
 				const nextRequirements = criteria.requirements.filter((req) => {
-					const requirementText = `${req.RequirementCode || ''} ${req.Description || ''}`.toLowerCase();
+					const requirementText = `${req.requirementcode || ''} ${req.Description || ''}`.toLowerCase();
 					return criteriaMatches || requirementText.includes(query);
 				});
 
@@ -234,22 +234,22 @@ export default function AddAreaPop({
 	}, [requirementTree, requirementSearchTerm]);
 
 	const allOfficeIds = useMemo(() => {
-		return filteredEventOffices.map((office) => Number(office.id || office.OfficeID)).filter(Boolean);
+		return filteredEventOffices.map((office) => Number(office.id || office.officeid)).filter(Boolean);
 	}, [filteredEventOffices]);
 
 	const allRequirementIds = useMemo(() => {
 		return filteredRequirementTree
 			.flatMap((area) => area.criteria)
 			.flatMap((criteria) => criteria.requirements)
-			.map((req) => Number(req.RequirementID))
+			.map((req) => Number(req.requirementid))
 			.filter(Boolean);
 	}, [filteredRequirementTree]);
 
 	const allOfficesSelected = allOfficeIds.length > 0 && allOfficeIds.every((id) => selectedOfficeIds.includes(id));
 	const allRequirementsSelected = allRequirementIds.length > 0 && allRequirementIds.every((id) => selectedRequirementIdSet.has(id));
 
-	const loadAssignmentCriteriaForArea = async (areaId, force = false) => {
-		const normalizedAreaId = Number(areaId);
+	const loadAssignmentCriteriaForArea = async (areaid, force = false) => {
+		const normalizedAreaId = Number(areaid);
 		if (!Number.isInteger(normalizedAreaId) || normalizedAreaId <= 0) return [];
 		if (!force && Object.prototype.hasOwnProperty.call(assignmentCriteriaByArea, normalizedAreaId)) {
 			return assignmentCriteriaByArea[normalizedAreaId] || [];
@@ -274,8 +274,8 @@ export default function AddAreaPop({
 		}
 	};
 
-	const loadAssignmentRequirementsForCriteria = async (criteriaId, force = false) => {
-		const normalizedCriteriaId = Number(criteriaId);
+	const loadAssignmentRequirementsForCriteria = async (criteriaid, force = false) => {
+		const normalizedCriteriaId = Number(criteriaid);
 		if (!Number.isInteger(normalizedCriteriaId) || normalizedCriteriaId <= 0) return [];
 		if (!force && Object.prototype.hasOwnProperty.call(assignmentRequirementsByCriteria, normalizedCriteriaId)) {
 			return assignmentRequirementsByCriteria[normalizedCriteriaId] || [];
@@ -301,7 +301,7 @@ export default function AddAreaPop({
 	};
 
 	useEffect(() => {
-		if (!isOpen || !event?.EventID || mainMode !== 'assign') return;
+		if (!isOpen || !event?.eventid || mainMode !== 'assign') return;
 
 		const loadAssignmentData = async () => {
 			setLoadingAssignmentData(true);
@@ -317,8 +317,8 @@ export default function AddAreaPop({
 						: [];
 
 				const filteredOffices = officesList.filter((office) => {
-					const officeEventId = office.event_id ?? office.EventID ?? office.eventId;
-					return Number(officeEventId) === Number(event.EventID);
+					const officeEventId = office.eventid ?? office.eventid ?? office.eventid;
+					return Number(officeEventId) === Number(event.eventid);
 				});
 
 				setEventOffices(filteredOffices);
@@ -328,8 +328,8 @@ export default function AddAreaPop({
 				let eventRequirements = [];
 				try {
 					const [critRes, reqRes] = await Promise.all([
-						criteriaAPI.getByEvent(event.EventID).catch(() => []),
-						requirementsAPI.getAllRequirements({ eventId: event.EventID }).catch(() => ({ data: [] })),
+						criteriaAPI.getByEvent(event.eventid).catch(() => []),
+						requirementsAPI.getAllRequirements({ eventid: event.eventid }).catch(() => ({ data: [] })),
 					]);
 					eventCriteria = Array.isArray(critRes) ? critRes : Array.isArray(critRes?.data) ? critRes.data : [];
 					eventRequirements = Array.isArray(reqRes) ? reqRes : Array.isArray(reqRes?.data) ? reqRes.data : [];
@@ -340,7 +340,7 @@ export default function AddAreaPop({
 				// Organize criteria by area
 				const critByArea = {};
 				eventCriteria.forEach((c) => {
-					const aId = Number(c.AreaID || c.area_id);
+					const aId = Number(c.areaid || c.areaid);
 					if (aId) {
 						if (!critByArea[aId]) critByArea[aId] = [];
 						critByArea[aId].push(c);
@@ -350,7 +350,7 @@ export default function AddAreaPop({
 				// Organize requirements by criteria
 				const reqsByCrit = {};
 				eventRequirements.forEach((r) => {
-					const cId = Number(r.CriteriaID || r.criteria_id);
+					const cId = Number(r.criteriaid || r.criteriaid);
 					if (cId) {
 						if (!reqsByCrit[cId]) reqsByCrit[cId] = [];
 						reqsByCrit[cId].push(r);
@@ -359,7 +359,7 @@ export default function AddAreaPop({
 
 				// Ensure all criteria have a requirements entry so requirementsLoaded is true
 				eventCriteria.forEach((c) => {
-					const cId = Number(c.CriteriaID || c.id);
+					const cId = Number(c.criteriaid || c.id);
 					if (cId && !reqsByCrit[cId]) {
 						reqsByCrit[cId] = [];
 					}
@@ -381,7 +381,7 @@ export default function AddAreaPop({
 		};
 
 		loadAssignmentData();
-	}, [isOpen, event?.EventID, mainMode]);
+	}, [isOpen, event?.eventid, mainMode]);
 
 	const fieldClass =
 		'w-full rounded-lg border border-blue-100 bg-app-surface px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors';
@@ -402,8 +402,8 @@ export default function AddAreaPop({
 		setAssignmentRequirementsByCriteria({});
 		setLoadingAssignmentCriteria(new Set());
 		setLoadingAssignmentRequirements(new Set());
-		setCriteriaForm({ CriteriaCode: '', CriteriaName: '', Description: '', AreaID: '' });
-		setAreaForm({ AreaCode: '', AreaName: '', Description: '' });
+		setCriteriaForm({ criteriacode: '', criterianame: '', Description: '', areaid: '' });
+		setAreaForm({ areacode: '', areaname: '', Description: '' });
 		setSelectedOfficeIds([]);
 		setSelectedRequirementIds([]);
 		setOfficeSearchTerm('');
@@ -460,14 +460,14 @@ export default function AddAreaPop({
 		e.preventDefault();
 		setError('');
 		setSuccess('');
-		if (!areaForm.AreaCode.trim() || !areaForm.AreaName.trim()) {
+		if (!areaForm.areacode.trim() || !areaForm.areaname.trim()) {
 			showError('Area code and area name are required.');
 			return;
 		}
 		try {
 			setSaving(true);
-			await onAddArea(event.EventID, { ...areaForm, Description: areaForm.Description?.trim() ? areaForm.Description : null });
-			setAreaForm({ AreaCode: '', AreaName: '', Description: '' });
+			await onAddArea(event.eventid, { ...areaForm, Description: areaForm.Description?.trim() ? areaForm.Description : null });
+			setAreaForm({ areacode: '', areaname: '', Description: '' });
 			setMessage('Area added successfully.');
 		} catch (err) {
 			showError(err?.message || 'Failed to add area.');
@@ -480,21 +480,21 @@ export default function AddAreaPop({
 		e.preventDefault();
 		setError('');
 		setSuccess('');
-		// If a parent criteria is selected, child criteria do not require a CriteriaCode
-		if (!criteriaForm.CriteriaName.trim()) {
+		// If a parent criteria is selected, child criteria do not require a criteriacode
+		if (!criteriaForm.criterianame.trim()) {
 			showError('Sub area name is required.');
 			return;
 		}
-		if (!criteriaForm.ParentCriteriaID && !criteriaForm.CriteriaCode.trim()) {
+		if (!criteriaForm.parentcriteriaid && !criteriaForm.criteriacode.trim()) {
 			showError('Sub area code is required for top-level sub areas.');
 			return;
 		}
 		try {
 			setSaving(true);
 			// ensure criteria code uniqueness within this event (case-insensitive)
-			const newCode = String(criteriaForm.CriteriaCode || '').trim().toLowerCase();
+			const newCode = String(criteriaForm.criteriacode || '').trim().toLowerCase();
 			if (newCode) {
-				const duplicate = (criteriaOptions || []).find((c) => String(c.CriteriaCode || '').trim().toLowerCase() === newCode && Number(c.EventID) === Number(event.EventID));
+				const duplicate = (criteriaOptions || []).find((c) => String(c.criteriacode || '').trim().toLowerCase() === newCode && Number(c.eventid) === Number(event.eventid));
 				if (duplicate) {
 					showError('A sub area with this code already exists for this event.');
 					setSaving(false);
@@ -502,18 +502,18 @@ export default function AddAreaPop({
 				}
 			}
 
-					const selectedArea = criteriaForm.AreaID;
-					const selectedParent = criteriaForm.ParentCriteriaID || '';
-					await onAddCriteria(event.EventID, {
-						// explicitly send CriteriaCode as null when creating a child criteria
-						CriteriaCode: criteriaForm.ParentCriteriaID ? null : criteriaForm.CriteriaCode,
+					const selectedArea = criteriaForm.areaid;
+					const selectedParent = criteriaForm.parentcriteriaid || '';
+					await onAddCriteria(event.eventid, {
+						// explicitly send criteriacode as null when creating a child criteria
+						criteriacode: criteriaForm.parentcriteriaid ? null : criteriaForm.criteriacode,
 						...criteriaForm,
-						AreaID: criteriaForm.AreaID ? Number(criteriaForm.AreaID) : null,
-						ParentCriteriaID: criteriaForm.ParentCriteriaID === '' ? null : criteriaForm.ParentCriteriaID,
+						areaid: criteriaForm.areaid ? Number(criteriaForm.areaid) : null,
+						parentcriteriaid: criteriaForm.parentcriteriaid === '' ? null : criteriaForm.parentcriteriaid,
 						Description: criteriaForm.Description?.trim() ? criteriaForm.Description : null,
 					});
-			// keep last chosen AreaID and ParentCriteriaID after saving; clear other fields
-			setCriteriaForm({ CriteriaCode: '', CriteriaName: '', Description: '', AreaID: selectedArea || '', ParentCriteriaID: selectedParent || '' });
+			// keep last chosen areaid and parentcriteriaid after saving; clear other fields
+			setCriteriaForm({ criteriacode: '', criterianame: '', Description: '', areaid: selectedArea || '', parentcriteriaid: selectedParent || '' });
 			setMessage('Sub area added successfully.');
 		} catch (err) {
 			showError(err?.message || 'Failed to add sub area.');
@@ -526,7 +526,7 @@ export default function AddAreaPop({
 		e.preventDefault();
 		setError('');
 		setSuccess('');
-		if (!requirementForm.Description.trim() || !requirementForm.CriteriaID) {
+		if (!requirementForm.Description.trim() || !requirementForm.criteriaid) {
 			showError('Standard description and sub area are required.');
 			return;
 		}
@@ -534,17 +534,17 @@ export default function AddAreaPop({
 		try {
 			setSaving(true);
 			const selectedArea = requirementForm.AreaFilter;
-			const selectedCriteria = requirementForm.CriteriaID;
+			const selectedCriteria = requirementForm.criteriaid;
 			const selectedChild = requirementForm.ChildCriteriaID || '';
-			const selectedParent = requirementForm.ParentRequirementCode || '';
+			const selectedParent = requirementForm.parentrequirementcode || '';
 			await onAddRequirement({
-				RequirementCode: requirementForm.RequirementCode || null,
+				requirementcode: requirementForm.requirementcode || null,
 				Description: requirementForm.Description,
-				CriteriaID: Number(selectedChild || requirementForm.CriteriaID),
-				ParentRequirementCode: requirementForm.ParentRequirementCode || null
+				criteriaid: Number(selectedChild || requirementForm.criteriaid),
+				parentrequirementcode: requirementForm.parentrequirementcode || null
 			});
 			// keep selected Area, Criteria, Child and Parent after saving; clear other fields except preserved selections
-			setRequirementForm({ RequirementCode: '', Description: '', CriteriaID: selectedCriteria || '', ChildCriteriaID: selectedChild || '', ParentRequirementCode: selectedParent || '', AreaFilter: selectedArea || '' });
+			setRequirementForm({ requirementcode: '', Description: '', criteriaid: selectedCriteria || '', ChildCriteriaID: selectedChild || '', parentrequirementcode: selectedParent || '', AreaFilter: selectedArea || '' });
 			// reload parent options and regenerate next requirement code for the preserved criteria (preserve parent)
 			if (selectedChild) {
 				// if we added under a child, reload parent options for that child so the parent list updates immediately
@@ -554,7 +554,7 @@ export default function AddAreaPop({
 			} else {
 				setParentRequirementOptions([]);
 			}
-			setMessage('Requirement added successfully.');
+			setMessage('Standard added successfully.');
 		} catch (err) {
 			showError(err?.message || 'Failed to add requirement.');
 		} finally {
@@ -562,36 +562,36 @@ export default function AddAreaPop({
 		}
 	};
 
-	const handleRequirementCriteriaChange = async (criteriaId, preserveParent = false, areaFilter = null) => {
+	const handleRequirementCriteriaChange = async (criteriaid, preserveParent = false, areaFilter = null) => {
 		setRequirementForm(prev => ({
 			...prev,
-			CriteriaID: criteriaId,
-			ParentRequirementCode: preserveParent ? prev.ParentRequirementCode : '',
+			criteriaid: criteriaid,
+			parentrequirementcode: preserveParent ? prev.parentrequirementcode : '',
 			ChildCriteriaID: preserveParent ? prev.ChildCriteriaID : ''
 		}));
 
-		if (!criteriaId) {
+		if (!criteriaid) {
 			setParentRequirementOptions([]);
 			return;
 		}
 
 		try {
 			setLoadingParents(true);
-			const options = await onLoadRequirementsByCriteria(Number(criteriaId));
-			// DEBUG: log criteriaId and API response for troubleshooting empty parent list
-			console.log('[DEBUG] handleRequirementCriteriaChange criteriaId=', criteriaId, 'options=', options);
+			const options = await onLoadRequirementsByCriteria(Number(criteriaid));
+			// DEBUG: log criteriaid and API response for troubleshooting empty parent list
+			console.log('[DEBUG] handleRequirementCriteriaChange criteriaid=', criteriaid, 'options=', options);
 			let list = Array.isArray(options) ? options : [];
 			// if an area filter is provided (or set in form), filter parent requirement options by area
 			// do not filter by area here — parent requirements for a chosen child should come from that child directly
 			setParentRequirementOptions(list);
 
 			// auto-generate next requirement code based on criteria code and existing requirements
-			const baseCode = getBaseCriteriaCode(criteriaId);
+			const baseCode = getBaseCriteriaCode(criteriaid);
 			let nextCode = '';
 			if (baseCode) {
 				const escapedBase = baseCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 				const nums = list.map(o => {
-					const rc = String(o.RequirementCode || '');
+					const rc = String(o.requirementcode || '');
 					const m = rc.match(new RegExp(`^${escapedBase}\\.(\\d+)$`));
 					return m ? Number(m[1]) : null;
 				}).filter(n => n !== null);
@@ -599,38 +599,38 @@ export default function AddAreaPop({
 				nextCode = `${baseCode}.${next}`;
 			}
 
-			setRequirementForm(prev => ({ ...prev, RequirementCode: nextCode }));
+			setRequirementForm(prev => ({ ...prev, requirementcode: nextCode }));
 		} catch {
 			setParentRequirementOptions([]);
-			setRequirementForm(prev => ({ ...prev, RequirementCode: '' }));
+			setRequirementForm(prev => ({ ...prev, requirementcode: '' }));
 		} finally {
 			setLoadingParents(false);
 		}
 	};
 
-	// Load parent requirement options for a given criteria id without changing the selected CriteriaID
-	const loadParentRequirementsFor = async (criteriaId, preserveParent = false, areaFilter = null) => {
-		if (!criteriaId) {
+	// Load parent requirement options for a given criteria id without changing the selected criteriaid
+	const loadParentRequirementsFor = async (criteriaid, preserveParent = false, areaFilter = null) => {
+		if (!criteriaid) {
 			setParentRequirementOptions([]);
-			setRequirementForm(prev => ({ ...prev, RequirementCode: '' }));
+			setRequirementForm(prev => ({ ...prev, requirementcode: '' }));
 			return;
 		}
 		try {
 			setLoadingParents(true);
-			const options = await onLoadRequirementsByCriteria(Number(criteriaId));
-			// DEBUG: log criteriaId and API response for troubleshooting empty parent list
-			console.log('[DEBUG] loadParentRequirementsFor criteriaId=', criteriaId, 'options=', options);
+			const options = await onLoadRequirementsByCriteria(Number(criteriaid));
+			// DEBUG: log criteriaid and API response for troubleshooting empty parent list
+			console.log('[DEBUG] loadParentRequirementsFor criteriaid=', criteriaid, 'options=', options);
 			let list = Array.isArray(options) ? options : [];
 			// Do not filter by area here; show requirements belonging to the chosen criteria (child or parent)
 			setParentRequirementOptions(list);
 
 			// auto-generate next requirement code based on the target criteria code and existing requirements
-			const baseCode = getBaseCriteriaCode(criteriaId);
+			const baseCode = getBaseCriteriaCode(criteriaid);
 			let nextCode = '';
 			if (baseCode) {
 				const escapedBase = baseCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 				const nums = list.map(o => {
-					const rc = String(o.RequirementCode || '');
+					const rc = String(o.requirementcode || '');
 					const m = rc.match(new RegExp(`^${escapedBase}\\.(\\d+)$`));
 					return m ? Number(m[1]) : null;
 				}).filter(n => n !== null);
@@ -638,95 +638,95 @@ export default function AddAreaPop({
 				nextCode = `${baseCode}.${next}`;
 			}
 
-			setRequirementForm(prev => ({ ...prev, RequirementCode: nextCode }));
+			setRequirementForm(prev => ({ ...prev, requirementcode: nextCode }));
 		} catch {
 			setParentRequirementOptions([]);
-			setRequirementForm(prev => ({ ...prev, RequirementCode: '' }));
+			setRequirementForm(prev => ({ ...prev, requirementcode: '' }));
 		} finally {
 			setLoadingParents(false);
 		}
 	};
 
 	const handleParentRequirementChange = (parentCode) => {
-		setRequirementForm(prev => ({ ...prev, ParentRequirementCode: parentCode }));
+		setRequirementForm(prev => ({ ...prev, parentrequirementcode: parentCode }));
 
 		if (!parentCode) {
 			// if no parent selected, regenerate top-level code based on criteria
-			const crit = (criteriaOptions || []).find(c => Number(c.CriteriaID) === Number(requirementForm.CriteriaID));
-			const baseCode = crit?.CriteriaCode || '';
+			const crit = (criteriaOptions || []).find(c => Number(c.criteriaid) === Number(requirementForm.criteriaid));
+			const baseCode = crit?.criteriacode || '';
 			if (!baseCode) {
-				setRequirementForm(prev => ({ ...prev, RequirementCode: '' }));
+				setRequirementForm(prev => ({ ...prev, requirementcode: '' }));
 				return;
 			}
 			const escapedBase = baseCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 			const nums = parentRequirementOptions.map(o => {
-				const rc = String(o.RequirementCode || '');
+				const rc = String(o.requirementcode || '');
 				const m = rc.match(new RegExp(`^${escapedBase}\\.(\\d+)$`));
 				return m ? Number(m[1]) : null;
 			}).filter(n => n !== null);
 			const next = nums.length ? Math.max(...nums) + 1 : 1;
-			setRequirementForm(prev => ({ ...prev, RequirementCode: `${baseCode}.${next}` }));
+			setRequirementForm(prev => ({ ...prev, requirementcode: `${baseCode}.${next}` }));
 			return;
 		}
 
 		// generate child code under selected parent (e.g., parentCode.1, parentCode.2)
 		const escapedParent = parentCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 		const nums = parentRequirementOptions.map(o => {
-			const rc = String(o.RequirementCode || '');
+			const rc = String(o.requirementcode || '');
 			const m = rc.match(new RegExp(`^${escapedParent}\\.(\\d+)$`));
 			return m ? Number(m[1]) : null;
 		}).filter(n => n !== null);
 		const next = nums.length ? Math.max(...nums) + 1 : 1;
-		setRequirementForm(prev => ({ ...prev, RequirementCode: `${parentCode}.${next}` }));
+		setRequirementForm(prev => ({ ...prev, requirementcode: `${parentCode}.${next}` }));
 	};
 
-	// regenerate RequirementCode whenever relevant selection changes
+	// regenerate requirementcode whenever relevant selection changes
 	useEffect(() => {
-		const targetCriteriaId = requirementForm.ChildCriteriaID || requirementForm.CriteriaID;
-		const baseCode = getBaseCriteriaCode(targetCriteriaId || requirementForm.CriteriaID);
+		const targetCriteriaId = requirementForm.ChildCriteriaID || requirementForm.criteriaid;
+		const baseCode = getBaseCriteriaCode(targetCriteriaId || requirementForm.criteriaid);
 		if (!baseCode) {
-			setRequirementForm(prev => ({ ...prev, RequirementCode: '' }));
+			setRequirementForm(prev => ({ ...prev, requirementcode: '' }));
 			return;
 		}
 
-		if (requirementForm.ParentRequirementCode) {
+		if (requirementForm.parentrequirementcode) {
 			// generate child code under selected parent
-			const escapedParent = requirementForm.ParentRequirementCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+			const escapedParent = requirementForm.parentrequirementcode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 			const nums = (parentRequirementOptions || []).map(o => {
-				const rc = String(o.RequirementCode || '');
+				const rc = String(o.requirementcode || '');
 				const m = rc.match(new RegExp(`^${escapedParent}\\.(\\d+)$`));
 				return m ? Number(m[1]) : null;
 			}).filter(n => n !== null);
 			const next = nums.length ? Math.max(...nums) + 1 : 1;
-			setRequirementForm(prev => ({ ...prev, RequirementCode: `${requirementForm.ParentRequirementCode}.${next}` }));
+			setRequirementForm(prev => ({ ...prev, requirementcode: `${requirementForm.parentrequirementcode}.${next}` }));
 			return;
 		}
 
 		// otherwise generate top-level code under the target criteria
 		const escapedBase = baseCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 		const nums = (parentRequirementOptions || []).map(o => {
-			const rc = String(o.RequirementCode || '');
+			const rc = String(o.requirementcode || '');
 			const m = rc.match(new RegExp(`^${escapedBase}\\.(\\d+)$`));
 			return m ? Number(m[1]) : null;
 		}).filter(n => n !== null);
 		const next = nums.length ? Math.max(...nums) + 1 : 1;
-		setRequirementForm(prev => ({ ...prev, RequirementCode: `${baseCode}.${next}` }));
-	}, [requirementForm.ParentRequirementCode, requirementForm.ChildCriteriaID, requirementForm.CriteriaID, parentRequirementOptions]);
+		setRequirementForm(prev => ({ ...prev, requirementcode: `${baseCode}.${next}` }));
+	}, [requirementForm.parentrequirementcode, requirementForm.ChildCriteriaID, requirementForm.criteriaid, parentRequirementOptions]);
 
-	const toggleOffice = (officeId, checked) => {
+	const toggleOffice = (officeid, checked) => {
 		setSelectedOfficeIds((prev) => {
 			const next = new Set(prev);
-			if (checked) next.add(Number(officeId));
-			else next.delete(Number(officeId));
+			if (checked) next.add(Number(officeid));
+			else next.delete(Number(officeid));
 			return Array.from(next);
 		});
 	};
 
-	const toggleRequirement = (requirementId, checked) => {
+	const toggleRequirement = (requirementid, checked) => {
 		setSelectedRequirementIds((prev) => {
 			const next = new Set(prev.map((id) => Number(id)));
-			if (checked) next.add(Number(requirementId));
-			else next.delete(Number(requirementId));
+			if (checked) next.add(Number(requirementid));
+			else next.delete(Number(requirementid));
 			return Array.from(next);
 		});
 	};
@@ -766,16 +766,16 @@ export default function AddAreaPop({
 		try {
 			setSaving(true);
 			const results = await Promise.all(
-				selectedOfficeIds.map(async (officeId) => {
+				selectedOfficeIds.map(async (officeid) => {
 					let fallbackAdded = 0;
 					let fallbackDuplicates = 0;
 
 					try {
-						const existingResponse = await officesAPI.getOfficeRequirements(officeId);
+						const existingResponse = await officesAPI.getOfficeRequirements(officeid);
 						const existingList = Array.isArray(existingResponse?.data) ? existingResponse.data : [];
 						const existingSet = new Set(
 							existingList
-								.map((row) => Number(row.RequirementID))
+								.map((row) => Number(row.requirementid))
 								.filter((id) => Number.isInteger(id) && id > 0)
 						);
 
@@ -786,7 +786,7 @@ export default function AddAreaPop({
 						fallbackAdded = normalizedRequirementIds.length;
 					}
 
-					const result = await officesAPI.addOfficeRequirements(officeId, normalizedRequirementIds);
+					const result = await officesAPI.addOfficeRequirements(officeid, normalizedRequirementIds);
 					const addedRaw = result?.addedCount ?? result?.data?.addedCount;
 					const duplicateRaw = result?.duplicateCount ?? result?.data?.duplicateCount;
 
@@ -904,8 +904,8 @@ export default function AddAreaPop({
 												handleRequirementCriteriaChange={handleRequirementCriteriaChange}
 												onChildCriteriaChange={(val) => {
 													if (val) loadParentRequirementsFor(val, false, requirementForm.AreaFilter);
-													else if (requirementForm.CriteriaID)
-														loadParentRequirementsFor(requirementForm.CriteriaID, false, requirementForm.AreaFilter);
+													else if (requirementForm.criteriaid)
+														loadParentRequirementsFor(requirementForm.criteriaid, false, requirementForm.AreaFilter);
 												}}
 												childCriteriaOptions={childCriteriaOptions}
 												parentRequirementOptions={parentRequirementOptions}

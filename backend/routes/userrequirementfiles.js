@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const UserRequirementFilesController = require('../controllers/UserRequirementFilesController');
 
-// DELETE /api/requirements/:requirementId/file/:userId
-router.delete('/api/requirements/:requirementId/file/:userId', UserRequirementFilesController.deleteUserRequirementFile);
+// DELETE /api/requirements/:requirementid/file/:userid
+router.delete('/api/requirements/:requirementid/file/:userid', UserRequirementFilesController.deleteUserRequirementFile);
 
 module.exports = router;

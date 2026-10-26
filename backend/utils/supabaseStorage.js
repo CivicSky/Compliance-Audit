@@ -4,7 +4,7 @@ const fs = require('fs');
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '';
 
-async function uploadToSupabaseBucket(fileSource, fileName, mimeType, bucket = 'proof-documents') {
+async function uploadToSupabaseBucket(fileSource, filename, mimeType, bucket = 'proof-documents') {
   const currentKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '';
   if (!currentKey) {
     throw new Error('Supabase Storage key missing in backend/.env! Please add SUPABASE_ANON_KEY or SUPABASE_SERVICE_ROLE_KEY.');
@@ -23,7 +23,7 @@ async function uploadToSupabaseBucket(fileSource, fileName, mimeType, bucket = '
   }
 
   // 3. Upload
-  const cleanPath = fileName.replace(/^\//, '');
+  const cleanPath = filename.replace(/^\//, '');
   const { data, error } = await client.storage.from(bucket).upload(cleanPath, fileBuffer, {
     contentType: mimeType || 'application/octet-stream',
     upsert: true
@@ -48,11 +48,11 @@ async function uploadToSupabaseBucket(fileSource, fileName, mimeType, bucket = '
 /**
  * Deletes a file from Supabase Storage Bucket.
  */
-async function deleteFromSupabaseBucket(filePath, bucket = 'proof-documents') {
+async function deleteFromSupabaseBucket(filepath, bucket = 'proof-documents') {
   const currentKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '';
-  if (!currentKey || !filePath) return;
+  if (!currentKey || !filepath) return;
   const client = createClient(supabaseUrl, currentKey);
-  const cleanPath = filePath.replace(/^\//, '').replace(/^.*\/storage\/v1\/object\/public\/[^\/]+\//, '');
+  const cleanPath = filepath.replace(/^\//, '').replace(/^.*\/storage\/v1\/object\/public\/[^\/]+\//, '');
   try {
     await client.storage.from(bucket).remove([cleanPath]);
   } catch (err) {

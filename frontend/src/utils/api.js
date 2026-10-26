@@ -68,24 +68,26 @@ export const complianceStatusOfficesAPI = {
 // ========================
 export const criteriaAPI = {
   getAll: async () => (await api.get('/api/criteria')).data,
-  getByEvent: async (eventId) => (await api.get(`/api/criteria/event/${eventId}`)).data,
-  getByArea: async (areaId) => (await api.get(`/api/criteria/area/${areaId}`)).data,
+  getByEvent: async (eventid) => (await api.get(`/api/criteria/event/${eventid}`)).data,
+  getByArea: async (areaid) => (await api.get(`/api/criteria/area/${areaid}`)).data,
   deleteCriteria: async (ids) => (await api.delete('/api/criteria/delete', { data: { criteriaIds: ids } })).data,
   addCriteria: async (data) => (await api.post('/api/criteria/add', data)).data,
+  updateCriteria: async (id, data) => (await api.put(`/api/criteria/${id}`, data)).data,
 };
 // ========================
 // Areas API
 // ========================
 export const areasAPI = {
   getAll: async () => (await api.get('/api/areas')).data,
-  getByEvent: async (eventId) => (await api.get(`/api/areas/event/${eventId}`)).data,
+  getByEvent: async (eventid) => (await api.get(`/api/areas/event/${eventid}`)).data,
   addArea: async (areaData) => (await api.post('/api/areas/add', areaData)).data,
+  updateArea: async (id, data) => (await api.put(`/api/areas/${id}`, data)).data,
   deleteAreas: async (areaIds) => (await api.post('/api/areas/delete', { areaIds })).data,
 };
 
 export const masterlistAPI = {
   getAll: async () => (await api.get('/api/masterlist')).data,
-  getAvailableForEvent: async (eventId) => (await api.get(`/api/masterlist/available/${eventId}`)).data,
+  getAvailableForEvent: async (eventid) => (await api.get(`/api/masterlist/available/${eventid}`)).data,
   addItem: async (item) => (await api.post('/api/masterlist/add', item)).data,
   updateItem: async (id, item) => (await api.put(`/api/masterlist/${id}`, item)).data,
   deleteItem: async (id) => (await api.delete(`/api/masterlist/${id}`)).data,
@@ -99,9 +101,9 @@ export const departmentsAPI = {
 };
 
 export const eventDepartmentsAPI = {
-  getByEvent: async (eventId) => (await api.get(`/api/event-departments/event/${eventId}`)).data,
+  getByEvent: async (eventid) => (await api.get(`/api/event-departments/event/${eventid}`)).data,
   assignDepartment: async (payload) => (await api.post('/api/event-departments', payload)).data,
-  updateLevel: async (id, accreditation_level) => (await api.put(`/api/event-departments/${id}/level`, { accreditation_level })).data,
+  updateLevel: async (id, accreditationlevel) => (await api.put(`/api/event-departments/${id}/level`, { accreditationlevel })).data,
   deleteDepartment: async (id) => (await api.delete(`/api/event-departments/${id}`)).data,
 };
 
@@ -168,17 +170,19 @@ export const usersAPI = {
   validateRegistrationInvite: async (token) => (
     await api.get(`/api/user/registration-invite/${encodeURIComponent(token)}`)
   ).data,
+  sendChangePasswordOtp: async (data = {}) => (await api.post('/api/user/change-password/send-otp', data)).data,
+  verifyAndChangePassword: async (data) => (await api.post('/api/user/change-password/verify-and-change', data)).data,
   getLoggedInUser: async () => (await api.get('/api/user/me')).data, // JWT required
   getAllUsers: async () => (await api.get('/api/user')).data,
   getCurrentUser: async (email) => (await api.get(`/user/current/${email}`)).data,
-  updateUser: async (userId, data) => {
-    if (!userId) throw new Error("updateUser: userId is required");
+  updateUser: async (userid, data) => {
+    if (!userid) throw new Error("updateUser: userid is required");
 
     const token = localStorage.getItem("token");
     if (!token) throw new Error("updateUser: JWT token not found");
 
     // data should be a FormData instance if uploading a file
-    const response = await api.put(`/api/user/${userId}`, data, {
+    const response = await api.put(`/api/user/${userid}`, data, {
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "multipart/form-data", // required for file upload
@@ -187,15 +191,15 @@ export const usersAPI = {
 
     return response.data;
   },
-  updateApprovalStatus: async (userId, approvalStatus) => {
-    const response = await api.put(`/api/user/${userId}/approval-status`, {
-      approval_status: approvalStatus
+  updateApprovalStatus: async (userid, approvalstatus) => {
+    const response = await api.put(`/api/user/${userid}/approval-status`, {
+      approvalstatus: approvalstatus
     });
     return response.data;
   },
-  updateUserRole: async (userId, roleId) => {
-    const response = await api.put(`/api/user/${userId}/role`, {
-      roleId: roleId
+  updateUserRole: async (userid, roleid) => {
+    const response = await api.put(`/api/user/${userid}/role`, {
+      roleid: roleid
     });
     return response.data;
   },
@@ -215,12 +219,12 @@ export const eventsAPI = {
   getAll: async () => (await api.get('/api/events')).data,
   getAccreditationLevels: async () => (await api.get('/api/events/accreditation-levels')).data,
   addEvent: async (eventData) => (await api.post('/api/events/add', eventData)).data,
-  updateEvent: async (eventId, eventData) => (await api.put(`/api/events/update/${eventId}`, eventData)).data,
+  updateEvent: async (eventid, eventData) => (await api.put(`/api/events/update/${eventid}`, eventData)).data,
   deleteEvents: async (eventIds) => (await api.post('/api/events/delete', { eventIds })).data,
   getDownloadableFolders: async () => (await api.get('/api/events/downloadable-folders')).data,
-  downloadEventZip: async (eventName) => {
+  downloadEventZip: async (eventname) => {
     try {
-      const response = await api.get(`/api/events/download/${encodeURIComponent(eventName)}`, {
+      const response = await api.get(`/api/events/download/${encodeURIComponent(eventname)}`, {
         responseType: 'blob'
       });
       // response.data is already a Blob when responseType is 'blob'
@@ -252,33 +256,33 @@ export const eventsAPI = {
 // ========================
 export const requirementsAPI = {
   getAllRequirements: async (params) => (await api.get('/api/requirements/all', { params })).data,
-  getRequirementsByEvent: async (eventId) => (await api.get(`/api/requirements/event/${eventId}`)).data,
-  getRequirementsByCriteria: async (criteriaId) => (await api.get(`/api/requirements/criteria/${criteriaId}`)).data,
+  getRequirementsByEvent: async (eventid) => (await api.get(`/api/requirements/event/${eventid}`)).data,
+  getRequirementsByCriteria: async (criteriaid) => (await api.get(`/api/requirements/criteria/${criteriaid}`)).data,
   addRequirement: async (data) => (await api.post('/api/requirements/add', data)).data,
   updateRequirement: async (id, data) => (await api.put(`/api/requirements/update/${id}`, data)).data,
   deleteRequirements: async (ids) => (await api.post('/api/requirements/delete', { requirementIds: ids })).data,
   // User assignment functions
-  assignUsersToRequirement: async (requirementId, officeId, userIds, assignedBy) => 
-    (await api.post('/api/requirements/assign-users', { requirementId, officeId, userIds, assignedBy })).data,
-  getAssignedUsers: async (requirementId, officeId) => {
-    const params = officeId ? `?officeId=${officeId}` : '';
-    return (await api.get(`/api/requirements/assigned-users/${requirementId}${params}`)).data;
+  assignUsersToRequirement: async (requirementid, officeid, userIds, assignedby) => 
+    (await api.post('/api/requirements/assign-users', { requirementid, officeid, userIds, assignedby })).data,
+  getAssignedUsers: async (requirementid, officeid) => {
+    const params = officeid ? `?officeid=${officeid}` : '';
+    return (await api.get(`/api/requirements/assigned-users/${requirementid}${params}`)).data;
   },
   getMyAssignments: async () => (await api.get('/api/requirements/my-assignments')).data,
-  removeUserAssignment: async (assignmentId) => 
-    (await api.delete(`/api/requirements/assignment/${assignmentId}`)).data,
-  getUserAssignmentCount: async (userId) => 
-    (await api.get(`/api/requirements/user-assignment-count/${userId}`)).data,
-  getAvailableUsersForAssignment: async (requirementId, officeId) => {
+  removeUserAssignment: async (assignmentid) => 
+    (await api.delete(`/api/requirements/assignment/${assignmentid}`)).data,
+  getUserAssignmentCount: async (userid) => 
+    (await api.get(`/api/requirements/user-assignment-count/${userid}`)).data,
+  getAvailableUsersForAssignment: async (requirementid, officeid) => {
     const params = new URLSearchParams();
-    if (requirementId) params.append('requirementId', requirementId);
-    if (officeId) params.append('officeId', officeId);
+    if (requirementid) params.append('requirementid', requirementid);
+    if (officeid) params.append('officeid', officeid);
     return (await api.get(`/api/requirements/available-users?${params.toString()}`)).data;
   },
-  updateUserUploadStatus: async (assignmentId, hasUploaded) => 
-    (await api.put(`/api/requirements/assignment/${assignmentId}/upload-status`, { hasUploaded })).data,
-  markUserAsUploaded: async (requirementId, userId) => 
-    (await api.post('/api/requirements/mark-uploaded', { requirementId, userId })).data,
+  updateUserUploadStatus: async (assignmentid, hasuploaded) => 
+    (await api.put(`/api/requirements/assignment/${assignmentid}/upload-status`, { hasuploaded })).data,
+  markUserAsUploaded: async (requirementid, userid) => 
+    (await api.post('/api/requirements/mark-uploaded', { requirementid, userid })).data,
 };
 
 // ========================
@@ -291,26 +295,26 @@ export const officesAPI = {
   },
   createOffice: async (data) => (await api.post('/api/offices', data)).data,
   updateOffice: async (id, data) => (await api.put(`/api/offices/${id}`, data)).data,
-  updateLevel: async (id, accreditation_level) => (await api.put(`/api/offices/${id}/level`, { accreditation_level })).data,
+  updateLevel: async (id, accreditationlevel) => (await api.put(`/api/offices/${id}/level`, { accreditationlevel })).data,
   deleteOffice: async (id) => (await api.delete(`/api/offices/${id}`)).data,
   deleteMultipleOffices: async (ids) => (await api.post('/api/offices/delete-multiple', { ids })).data,
   getById: async (id) => (await api.get(`/api/offices/${id}`)).data,
-  getOfficeRequirements: async (officeId) => (await api.get(`/api/offices/${officeId}/requirements`)).data,
-  addOfficeRequirements: async (officeId, requirementIds) =>
-    (await api.post(`/api/offices/${officeId}/requirements`, { requirementIds })).data,
-  exportOfficeExcel: async (officeId, officeName = 'office') => {
-    const response = await api.get(`/api/offices/${officeId}/export`, { responseType: 'blob' });
+  getOfficeRequirements: async (officeid) => (await api.get(`/api/offices/${officeid}/requirements`)).data,
+  addOfficeRequirements: async (officeid, requirementIds) =>
+    (await api.post(`/api/offices/${officeid}/requirements`, { requirementIds })).data,
+  exportOfficeExcel: async (officeid, officename = 'office') => {
+    const response = await api.get(`/api/offices/${officeid}/export`, { responseType: 'blob' });
     const blobUrl = window.URL.createObjectURL(response.data);
     const disposition = response.headers?.['content-disposition'] || '';
     const nameMatch = disposition.match(/filename="?([^";]+)"?/i);
-    const safeOfficeName = String(officeName || 'office')
+    const safeOfficeName = String(officename || 'office')
       .replace(/[\\/:*?"<>|]+/g, '_')
       .replace(/\s+/g, '_')
       .trim();
 
     return {
       url: blobUrl,
-      fileName: nameMatch?.[1] || `${safeOfficeName || 'office'}_export.xlsx`
+      filename: nameMatch?.[1] || `${safeOfficeName || 'office'}_export.xlsx`
     };
   },
 };
@@ -324,6 +328,25 @@ export const officetypesAPI = {
   create: async (data) => (await api.post('/api/officestypes', data)).data,
   update: async (id, data) => (await api.put(`/api/officestypes/${id}`, data)).data,
   delete: async (id) => (await api.delete(`/api/officestypes/${id}`)).data,
+};
+
+// ========================
+// Personnel Assignments API (Area / Sub-area / Standard hierarchy)
+// ========================
+export const personnelAssignmentsAPI = {
+  getByEvent: async (eventid) => (await api.get(`/api/personnel-assignments/event/${eventid}`)).data,
+  getByUser: async (userid, eventid) => {
+    const params = eventid ? `?eventid=${eventid}` : '';
+    return (await api.get(`/api/personnel-assignments/user/${userid}${params}`)).data;
+  },
+  getMyAssignments: async () => (await api.get('/api/personnel-assignments/my-assignments')).data,
+  assign: async ({ eventid, userIds, areaid, criteriaid, requirementid }) =>
+    (await api.post('/api/personnel-assignments/assign', { eventid, userIds, areaid, criteriaid, requirementid })).data,
+  syncScope: async ({ userid, eventid, areaIds, criteriaIds, requirementIds }) =>
+    (await api.post('/api/personnel-assignments/sync-scope', { userid, eventid, areaIds, criteriaIds, requirementIds })).data,
+  remove: async (id) => (await api.delete(`/api/personnel-assignments/${id}`)).data,
+  unassign: async ({ eventid, userid, areaid, criteriaid, requirementid }) =>
+    (await api.post('/api/personnel-assignments/unassign', { eventid, userid, areaid, criteriaid, requirementid })).data,
 };
 
 export default api;

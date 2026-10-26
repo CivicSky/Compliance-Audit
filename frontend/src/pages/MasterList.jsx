@@ -72,7 +72,7 @@ export default function MasterList() {
     fetchCurrentUser();
   }, []);
 
-  const isAdmin = currentUser?.RoleName === 'admin' || currentUser?.RoleID === 1;
+  const isAdmin = currentUser?.rolename === 'admin' || currentUser?.roleid === 1;
 
   // Close context menu on outside click
   useEffect(() => {
@@ -149,24 +149,26 @@ export default function MasterList() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, typeFilter, departmentFilter]);
+  }, [searchTerm, typeFilter, departmentFilter, viewMode]);
 
   const filteredItems = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
     const filtered = items.filter((item) => {
       const matchesSearch = !term || item.name.toLowerCase().includes(term) || item.type.toLowerCase().includes(term) || (item.description || '').toLowerCase().includes(term);
       const matchesType = typeFilter === 'all' || item.type === typeFilter;
-      const matchesDepartment = departmentFilter === 'all' || String(item.departmentId ?? '') === departmentFilter;
+      const matchesDepartment = departmentFilter === 'all' || String(item.departmentid ?? '') === departmentFilter;
       return matchesSearch && matchesType && matchesDepartment;
     });
 
     return filtered.sort((a, b) => a.name.localeCompare(b.name));
   }, [items, departmentFilter, searchTerm, typeFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredItems.length / ITEMS_PER_PAGE));
+  const itemsPerPage = 12; // 4x3 grid for card view
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / itemsPerPage));
   const safePage = Math.min(currentPage, totalPages);
-  const startIndex = (safePage - 1) * ITEMS_PER_PAGE;
-  const paginatedItems = filteredItems.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  const startIndex = (safePage - 1) * itemsPerPage;
+  const paginatedItems = filteredItems.slice(startIndex, startIndex + itemsPerPage);
+  const visibleItems = viewMode === 'list' ? filteredItems : paginatedItems;
 
   const renderItemIcon = (itemOrType) => {
     const isAcademic = typeof itemOrType === 'object' && itemOrType !== null
@@ -280,11 +282,11 @@ export default function MasterList() {
   ];
 
   return (
-    <div className="w-full flex-1 flex flex-col min-w-0 bg-slate-50/50 overflow-hidden">
+    <div className="w-full flex-1 min-h-0 flex flex-col min-w-0 bg-slate-50/50 overflow-hidden">
       <NotificationToast title="Notice" message={notice} visible={isNoticeVisible} onDismiss={() => setNotice('')} />
 
       {/* Top Header Card */}
-      <div className="px-4 sm:px-6 pt-4 pb-3.5 shrink-0 border-b border-slate-200/70 bg-white shadow-2xs">
+      <div className="px-4 sm:px-6 pt-3 pb-2.5 shrink-0 border-b border-slate-200/70 bg-white shadow-2xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-600 to-blue-700 text-white shadow-md shadow-cyan-500/20 shrink-0">
@@ -311,9 +313,7 @@ export default function MasterList() {
                       : 'border-red-600 bg-red-600 text-white hover:bg-red-700 active:scale-95 shadow-red-500/20 cursor-pointer'
                   }`}
                 >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
+                  <Trash2 className="w-3.5 h-3.5" />
                   {deleteLoading ? 'Deleting...' : `Delete Selected (${selectedIds.length})`}
                 </button>
               )}
@@ -334,9 +334,11 @@ export default function MasterList() {
                     : 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100 hover:border-red-300'
                 }`}
               >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={deleteMode ? "M6 18L18 6M6 6l12 12" : "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"} />
-                </svg>
+                {deleteMode ? <X className="w-3.5 h-3.5" /> : (
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                )}
                 {deleteMode ? 'Cancel' : 'Delete Mode'}
               </button>
               <button
@@ -352,7 +354,7 @@ export default function MasterList() {
         </div>
 
         {/* Search, Filters & View Mode Toolbar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mt-3 pt-3 border-t border-slate-100">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mt-2 pt-2 border-t border-slate-100">
           <div className="relative w-full sm:w-72 md:w-80">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
@@ -395,10 +397,13 @@ export default function MasterList() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden px-4 sm:px-6 pt-3 pb-8 flex flex-col min-h-0">
+      <div className="flex-1 px-4 sm:px-6 pt-1 pb-3.5 flex flex-col">
 
         {/* Content Area */}
-        <div className={`flex-1 min-h-0 ${viewMode === 'list' && !serverError && filteredItems.length > 0 ? 'overflow-y-auto pr-0.5' : 'flex flex-col h-full'}`}>
+        <div 
+          className={`flex-1 ${viewMode === 'list' && !serverError && filteredItems.length > 0 ? 'app-list-scroll overflow-x-auto pr-1' : 'flex flex-col h-full overflow-hidden'}`}
+          style={viewMode === 'list' ? { height: '548px', minHeight: '548px', maxHeight: '548px' } : undefined}
+        >
           {loadingItems ? (
             <MasterListSkeleton count={9} />
           ) : serverError ? (
@@ -444,19 +449,19 @@ export default function MasterList() {
               ) : null}
             </div>
           ) : viewMode === 'list' ? (
-            <div className="flex flex-col min-w-[760px] pb-6">
+            <div className="flex flex-col min-w-[760px] pb-1">
               {/* Sticky Header Row matching Programs & Offices */}
-              <div className="grid grid-cols-[minmax(220px,1fr)_160px_160px_120px_80px] gap-6 px-6 py-3 bg-white border border-slate-200 rounded-xl shadow-xs text-xs font-semibold text-slate-700 sticky top-0 z-20 mb-2">
+              <div className="grid grid-cols-[minmax(220px,1fr)_160px_160px_120px_80px] gap-6 px-6 py-2 bg-white border border-slate-200 rounded-xl shadow-xs text-xs font-semibold text-slate-700 sticky top-0 z-20 mb-1.5">
                 <div className="flex items-center">Office Name</div>
-                <div className="flex items-center justify-center">Office Type</div>
-                <div className="flex items-center justify-center">Department</div>
-                <div className="flex items-center justify-center">Status</div>
+                <div className="flex items-center">Office Type</div>
+                <div className="flex items-center">Department</div>
+                <div className="flex items-center">Status</div>
                 <div className="flex items-center justify-end">Actions</div>
               </div>
 
               {/* Rows List */}
-              <div className="space-y-2">
-                {paginatedItems.map((item) => {
+              <div className="space-y-1.5">
+                {visibleItems.map((item) => {
                   const isSelected = selectedIds.includes(item.id);
                   const isAcademic = isAcademicEntity(item);
 
@@ -472,7 +477,7 @@ export default function MasterList() {
                             : 'border border-slate-200/90 app-card-hover cursor-pointer'
                       }`}
                     >
-                      <div className="grid grid-cols-[minmax(220px,1fr)_160px_160px_120px_80px] items-center gap-6 px-6 py-3.5">
+                      <div className="grid grid-cols-[minmax(220px,1fr)_160px_160px_120px_80px] items-center gap-6 px-6 py-2.5">
                         {/* Office / Program Name & Detailed Metadata */}
                         <div className="flex items-center gap-3 min-w-0">
                           {deleteMode && (
@@ -492,15 +497,15 @@ export default function MasterList() {
                             <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-slate-400 font-medium truncate">
                               <span className="font-semibold text-slate-500 uppercase">{item.department || 'INSTITUTION-WIDE'}</span>
                               <span className="text-slate-300">•</span>
-                              <span><span className="font-semibold text-slate-400 uppercase">CREATED:</span> {formatDateTime(item.created_at)}</span>
+                              <span><span className="font-semibold text-slate-400 uppercase">CREATED:</span> {formatDateTime(item.createdat)}</span>
                               <span className="text-slate-300">•</span>
-                              <span><span className="font-semibold text-slate-400 uppercase">UPDATED:</span> {formatDateTime(item.updated_at || item.created_at)}</span>
+                              <span><span className="font-semibold text-slate-400 uppercase">UPDATED:</span> {formatDateTime(item.updatedat || item.createdat)}</span>
                             </div>
                           </div>
                         </div>
 
                         {/* Office Type */}
-                        <div className="flex items-center justify-center">
+                        <div className="flex items-center">
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
                             isAcademic
                               ? 'bg-blue-50 text-blue-700 border-blue-100'
@@ -511,7 +516,7 @@ export default function MasterList() {
                         </div>
 
                         {/* Department */}
-                        <div className="flex items-center justify-center text-xs font-bold text-slate-700">
+                        <div className="flex items-center text-xs font-bold text-slate-700">
                           {item.department ? (
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200/80">
                               {item.department}
@@ -522,7 +527,7 @@ export default function MasterList() {
                         </div>
 
                         {/* Status */}
-                        <div className="flex items-center justify-center">
+                        <div className="flex items-center">
                           <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 border border-emerald-200/60">
                             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
                             Active
@@ -584,7 +589,7 @@ export default function MasterList() {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 grid-rows-3 gap-2 sm:gap-2.5 lg:gap-3 flex-1 min-h-0 h-full p-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 grid-rows-3 gap-2 sm:gap-2.5 lg:gap-3 flex-1 min-h-0 h-full p-1 overflow-hidden">
               {paginatedItems.map((item) => {
                 const isSelected = selectedIds.includes(item.id);
                 const isAcademic = isAcademicEntity(item);
@@ -677,11 +682,11 @@ export default function MasterList() {
                     <div className="my-2 border-t border-slate-100 pt-2 flex flex-col gap-1 text-[10px] text-slate-500">
                       <div className="flex justify-between items-center">
                         <span className="font-semibold text-slate-400 uppercase tracking-wider">Created</span>
-                        <span className="font-medium text-slate-600 truncate ml-2">{formatDateTime(item.created_at)}</span>
+                        <span className="font-medium text-slate-600 truncate ml-2">{formatDateTime(item.createdat)}</span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="font-semibold text-slate-400 uppercase tracking-wider">Updated</span>
-                        <span className="font-medium text-slate-600 truncate ml-2">{formatDateTime(item.updated_at || item.created_at)}</span>
+                        <span className="font-medium text-slate-600 truncate ml-2">{formatDateTime(item.updatedat || item.createdat)}</span>
                       </div>
                     </div>
 
@@ -705,8 +710,8 @@ export default function MasterList() {
           )}
         </div>
 
-        {/* Bottom Pagination */}
-        {!loadingItems && !serverError && filteredItems.length > 0 && (
+        {/* Bottom Pagination (Grid/Card mode only - removed in list mode per request) */}
+        {viewMode === 'grid' && !loadingItems && !serverError && filteredItems.length > 0 && (
           <div className="mt-1 shrink-0">
             <Pagination
               currentPage={currentPage}

@@ -3,7 +3,7 @@ const db = require('../db');
 /**
  * Automatically create notification records for target user IDs or system users.
  */
-async function notifyUsers({ userIds, adminId = null, title, message, type = 'info', relatedTable = null, relatedId = null }) {
+async function notifyUsers({ userIds, adminid = null, title, message, type = 'info', relatedtable = null, relatedid = null }) {
     if (!title || !message) return;
     const safeType = ['info', 'success', 'warning', 'error', 'announcement'].includes(type) ? type : 'info';
     
@@ -12,8 +12,8 @@ async function notifyUsers({ userIds, adminId = null, title, message, type = 'in
     // If targetIds is empty, default to notifying admin users
     if (targetIds.length === 0) {
         try {
-            const [admins] = await db.query(`SELECT UserID FROM users WHERE RoleID = 1 OR LOWER(RoleName) = 'admin'`);
-            targetIds = admins.map(a => a.UserID);
+            const [admins] = await db.query(`SELECT userid FROM users WHERE roleid = 1 OR LOWER(rolename) = 'admin'`);
+            targetIds = admins.map(a => a.userid);
         } catch (e) {
             console.error('Failed to resolve default admin notification recipients:', e.message);
         }
@@ -23,9 +23,9 @@ async function notifyUsers({ userIds, adminId = null, title, message, type = 'in
     for (const uid of uniqueIds) {
         try {
             await db.query(`
-                INSERT INTO notifications (UserID, AdminID, Title, Message, Type, RelatedTable, RelatedID, IsRead, CreatedAt)
+                INSERT INTO notifications (userid, adminid, Title, Message, Type, relatedtable, relatedid, isread, createdat)
                 VALUES (?, ?, ?, ?, ?, ?, ?, FALSE, NOW())
-            `, [uid, adminId || null, String(title).slice(0, 255), String(message).slice(0, 1000), safeType, relatedTable || null, relatedId || null]);
+            `, [uid, adminid || null, String(title).slice(0, 255), String(message).slice(0, 1000), safeType, relatedtable || null, relatedid || null]);
         } catch (err) {
             console.error(`Failed to insert notification for user #${uid}:`, err.message);
         }

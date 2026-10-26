@@ -28,15 +28,15 @@ const upload = multer({
   }
 });
 
-exports.uploadProfilePic = upload.single('profilePic');
+exports.uploadProfilePic = upload.single('profilepic');
 
-// Add a new office head - now requires UserID since names come from users table
+// Add a new office head - now requires userid since names come from users table
 exports.addHead = async (req, res) => {
   try {
-    const { userId, position, contactInfo } = req.body;
+    const { userid, position, contactinfo } = req.body;
     
     // Validate required fields
-    if (!userId || !position) {
+    if (!userid || !position) {
       return res.status(400).json({
         success: false,
         message: 'User ID and position are required'
@@ -44,7 +44,7 @@ exports.addHead = async (req, res) => {
     }
 
     // Check if user exists
-    const [userCheck] = await db.execute('SELECT UserID, FirstName, LastName FROM users WHERE UserID = ?', [userId]);
+    const [userCheck] = await db.execute('SELECT userid, firstname, lastname FROM users WHERE userid = ?', [userid]);
     if (userCheck.length === 0) {
       return res.status(404).json({
         success: false,
@@ -53,27 +53,27 @@ exports.addHead = async (req, res) => {
     }
 
     // Prevent duplicate office-head records for the same user
-    const [existingHead] = await db.execute('SELECT HeadID FROM headofoffice WHERE UserID = ? LIMIT 1', [userId]);
+    const [existingHead] = await db.execute('SELECT headid FROM headofoffice WHERE userid = ? LIMIT 1', [userid]);
     if (existingHead.length > 0) {
       return res.status(409).json({
         success: false,
-        message: `${userCheck[0].FirstName} ${userCheck[0].LastName} is already an office head`
+        message: `${userCheck[0].firstname} ${userCheck[0].lastname} is already an office head`
       });
     }
 
     // Create the SQL query to insert the new office head
     const query = `
       INSERT INTO headofoffice (
-        UserID,
+        userid,
         Position,
-        ContactInfo
+        contactinfo
       ) VALUES (?, ?, ?)
     `;
 
     const values = [
-      userId,
+      userid,
       position.trim(),
-      contactInfo ? contactInfo.trim() : null
+      contactinfo ? contactinfo.trim() : null
     ];
 
     // Execute the query
@@ -81,9 +81,9 @@ exports.addHead = async (req, res) => {
 
     // Attempt to set the user's role to Personnel (but do not downgrade Admin)
     try {
-      const [roleRows] = await db.execute('SELECT RoleID FROM roles WHERE RoleName = ? LIMIT 1', ['Personnel']);
-      const personnelRoleId = roleRows && roleRows.length > 0 ? roleRows[0].RoleID : 3;
-      await db.execute('UPDATE users SET RoleID = ? WHERE UserID = ? AND RoleID != 1', [personnelRoleId, userId]);
+      const [roleRows] = await db.execute('SELECT roleid FROM roles WHERE rolename = ? LIMIT 1', ['Personnel']);
+      const personnelRoleId = roleRows && roleRows.length > 0 ? roleRows[0].roleid : 3;
+      await db.execute('UPDATE users SET roleid = ? WHERE userid = ? AND roleid != 1', [personnelRoleId, userid]);
     } catch (roleErr) {
       console.error('Failed to set Personnel role for user:', roleErr);
     }
@@ -93,34 +93,34 @@ exports.addHead = async (req, res) => {
       success: true,
       message: 'Office head added successfully',
       data: {
-        HeadID: result.insertId,
-        UserID: userId,
-        FirstName: userCheck[0].FirstName,
-        LastName: userCheck[0].LastName,
+        headid: result.insertId,
+        userid: userid,
+        firstname: userCheck[0].firstname,
+        lastname: userCheck[0].lastname,
         Position: position.trim(),
-        ContactInfo: contactInfo ? contactInfo.trim() : null,
-        OfficeID: null,
+        contactinfo: contactinfo ? contactinfo.trim() : null,
+        officeid: null,
         OfficeIDs: []
       }
     });
 
     try {
-      const actorId = req.user && req.user.userId;
+      const actorId = req.user && req.user.userid;
       if (actorId) {
-        const fullName = `${userCheck[0].FirstName} ${userCheck[0].LastName}`.trim();
+        const fullName = `${userCheck[0].firstname} ${userCheck[0].lastname}`.trim();
         await recordLog(actorId, 'OfficeHeadAdded', {
           HeadName: fullName,
           Position: position.trim(),
         });
 
         await createNotifications({
-          userIds: [Number(userId)],
-          adminId: actorId,
+          userIds: [Number(userid)],
+          adminid: actorId,
           title: 'Added As Personnel',
           message: `You were added as office personnel with position ${position.trim()}.`,
           type: 'info',
-          relatedTable: 'office_head',
-          relatedId: Number(result.insertId),
+          relatedtable: 'office_head',
+          relatedid: Number(result.insertId),
         });
       }
     } catch (logErr) {
@@ -169,48 +169,48 @@ exports.addMultipleHeads = async (req, res) => {
     const addedHeads = [];
     const errors = [];
 
-    for (const userId of userIds) {
+    for (const userid of userIds) {
       try {
         // Check if user exists
-        const [userCheck] = await db.execute('SELECT UserID, FirstName, LastName, Email FROM users WHERE UserID = ?', [userId]);
+        const [userCheck] = await db.execute('SELECT userid, firstname, lastname, Email FROM users WHERE userid = ?', [userid]);
         if (userCheck.length === 0) {
-          errors.push({ userId, error: 'User not found' });
+          errors.push({ userid, error: 'User not found' });
           continue;
         }
 
         // Check if user is already an office head
-        const [existingHead] = await db.execute('SELECT HeadID FROM headofoffice WHERE UserID = ?', [userId]);
+        const [existingHead] = await db.execute('SELECT headid FROM headofoffice WHERE userid = ?', [userid]);
         if (existingHead.length > 0) {
-          errors.push({ userId, error: `${userCheck[0].FirstName} ${userCheck[0].LastName} is already an office head` });
+          errors.push({ userid, error: `${userCheck[0].firstname} ${userCheck[0].lastname} is already an office head` });
           continue;
         }
 
         // Insert new office head
         const query = `
-          INSERT INTO headofoffice (UserID, Position, ContactInfo)
+          INSERT INTO headofoffice (userid, Position, contactinfo)
           VALUES (?, ?, ?)
         `;
-        const values = [userId, position.trim(), userCheck[0].Email || null];
+        const values = [userid, position.trim(), userCheck[0].Email || null];
         const [result] = await db.execute(query, values);
 
         // Attempt to set the user's role to Personnel (but do not downgrade Admin)
         try {
-          const [roleRows] = await db.execute('SELECT RoleID FROM roles WHERE RoleName = ? LIMIT 1', ['Personnel']);
-          const personnelRoleId = roleRows && roleRows.length > 0 ? roleRows[0].RoleID : 3;
-          await db.execute('UPDATE users SET RoleID = ? WHERE UserID = ? AND RoleID != 1', [personnelRoleId, userId]);
+          const [roleRows] = await db.execute('SELECT roleid FROM roles WHERE rolename = ? LIMIT 1', ['Personnel']);
+          const personnelRoleId = roleRows && roleRows.length > 0 ? roleRows[0].roleid : 3;
+          await db.execute('UPDATE users SET roleid = ? WHERE userid = ? AND roleid != 1', [personnelRoleId, userid]);
         } catch (roleErr) {
-          console.error(`Failed to set Personnel role for user ${userId}:`, roleErr);
+          console.error(`Failed to set Personnel role for user ${userid}:`, roleErr);
         }
 
         addedHeads.push({
-          HeadID: result.insertId,
-          UserID: userId,
-          FirstName: userCheck[0].FirstName,
-          LastName: userCheck[0].LastName,
+          headid: result.insertId,
+          userid: userid,
+          firstname: userCheck[0].firstname,
+          lastname: userCheck[0].lastname,
           Position: position.trim()
         });
       } catch (err) {
-        errors.push({ userId, error: err.message });
+        errors.push({ userid, error: err.message });
       }
     }
 
@@ -222,22 +222,22 @@ exports.addMultipleHeads = async (req, res) => {
     });
 
     try {
-      const actorId = req.user && req.user.userId;
+      const actorId = req.user && req.user.userid;
       if (actorId && addedHeads.length > 0) {
         await recordLog(actorId, 'OfficeHeadAdded', {
-          HeadNames: addedHeads.map((head) => `${head.FirstName} ${head.LastName}`.trim()),
+          HeadNames: addedHeads.map((head) => `${head.firstname} ${head.lastname}`.trim()),
           Position: position.trim(),
           AddedCount: addedHeads.length,
         });
 
         await createNotifications({
-          userIds: addedHeads.map((head) => Number(head.UserID)),
-          adminId: actorId,
+          userIds: addedHeads.map((head) => Number(head.userid)),
+          adminid: actorId,
           title: 'Added As Personnel',
           message: `You were added as office personnel with position ${position.trim()}.`,
           type: 'info',
-          relatedTable: 'office_head',
-          relatedId: null,
+          relatedtable: 'office_head',
+          relatedid: null,
         });
       }
     } catch (logErr) {
@@ -257,15 +257,15 @@ exports.addMultipleHeads = async (req, res) => {
 // Get all office heads with user information from users table
 exports.getAllHeads = async (req, res) => {
   try {
-    // Auto-sync approved Personnel (RoleID 3) into headofoffice if missing
+    // Auto-sync approved Personnel (roleid 3) into headofoffice if missing
     try {
       await db.execute(`
-        INSERT INTO headofoffice (UserID, Position)
-        SELECT u.UserID, 'Personnel'
+        INSERT INTO headofoffice (userid, Position)
+        SELECT u.userid, 'Personnel'
         FROM users u
-        WHERE u.RoleID = 3 
-          AND (u.approval_status = 'approved' OR u.approval_status IS NULL)
-          AND NOT EXISTS (SELECT 1 FROM headofoffice h WHERE h.UserID = u.UserID)
+        WHERE u.roleid = 3 
+          AND (u.approvalstatus = 'approved' OR u.approvalstatus IS NULL)
+          AND NOT EXISTS (SELECT 1 FROM headofoffice h WHERE h.userid = u.userid)
       `);
     } catch (syncErr) {
       console.warn('Auto-sync headofoffice warning:', syncErr.message);
@@ -273,28 +273,28 @@ exports.getAllHeads = async (req, res) => {
 
     const query = `
       SELECT 
-        h.HeadID,
-        h.UserID,
-        u.FirstName,
-        u.MiddleInitial,
-        u.LastName,
+        h.headid,
+        h.userid,
+        u.firstname,
+        u.middleinitial,
+        u.lastname,
         u.Email,
         h.Position,
-        h.ContactInfo,
-        u.ProfilePic,
-        MIN(oha.OfficeID) AS OfficeID,
-        string_agg(DISTINCT oha.OfficeID::text, ',' ORDER BY oha.OfficeID::text) AS OfficeIDs
+        h.contactinfo,
+        u.profilepic,
+        MIN(oha.officeid) AS officeid,
+        string_agg(DISTINCT oha.officeid::text, ',' ORDER BY oha.officeid::text) AS OfficeIDs
       FROM headofoffice h
-      LEFT JOIN users u ON h.UserID = u.UserID
-      LEFT JOIN office_head_assignments oha ON oha.HeadID = h.HeadID
-      GROUP BY h.HeadID, h.UserID, u.FirstName, u.MiddleInitial, u.LastName, u.Email, h.Position, h.ContactInfo, u.ProfilePic
-      ORDER BY u.LastName, u.FirstName
+      LEFT JOIN users u ON h.userid = u.userid
+      LEFT JOIN officeheadassignments oha ON oha.headid = h.headid
+      GROUP BY h.headid, h.userid, u.firstname, u.middleinitial, u.lastname, u.Email, h.Position, h.contactinfo, u.profilepic
+      ORDER BY u.lastname, u.firstname
     `;
 
     const [rows] = await db.execute(query);
     const normalizedRows = rows.map((row) => ({
       ...row,
-      OfficeID: row.OfficeID || null,
+      officeid: row.officeid || null,
       OfficeIDs: row.OfficeIDs ? String(row.OfficeIDs).split(',').map((id) => Number(id)).filter((id) => Number.isInteger(id)) : []
     }));
     console.log('DEBUG: getAllHeads DB rows count:', rows.length);
@@ -322,22 +322,22 @@ exports.getHeadById = async (req, res) => {
 
     const query = `
       SELECT 
-        h.HeadID,
-        h.UserID,
-        u.FirstName,
-        u.MiddleInitial,
-        u.LastName,
+        h.headid,
+        h.userid,
+        u.firstname,
+        u.middleinitial,
+        u.lastname,
         u.Email,
         h.Position,
-        h.ContactInfo,
-        u.ProfilePic,
-        MIN(oha.OfficeID) AS OfficeID,
-        string_agg(DISTINCT oha.OfficeID::text, ',' ORDER BY oha.OfficeID::text) AS OfficeIDs
+        h.contactinfo,
+        u.profilepic,
+        MIN(oha.officeid) AS officeid,
+        string_agg(DISTINCT oha.officeid::text, ',' ORDER BY oha.officeid::text) AS OfficeIDs
       FROM headofoffice h
-      LEFT JOIN users u ON h.UserID = u.UserID
-      LEFT JOIN office_head_assignments oha ON oha.HeadID = h.HeadID
-      WHERE h.HeadID = ?
-      GROUP BY h.HeadID, h.UserID, u.FirstName, u.MiddleInitial, u.LastName, u.Email, h.Position, h.ContactInfo, u.ProfilePic
+      LEFT JOIN users u ON h.userid = u.userid
+      LEFT JOIN officeheadassignments oha ON oha.headid = h.headid
+      WHERE h.headid = ?
+      GROUP BY h.headid, h.userid, u.firstname, u.middleinitial, u.lastname, u.Email, h.Position, h.contactinfo, u.profilepic
     `;
 
     const [rows] = await db.execute(query, [id]);
@@ -353,8 +353,8 @@ exports.getHeadById = async (req, res) => {
       success: true,
       data: {
         ...rows[0],
-        OfficeID: rows[0].OfficeID || null,
-        OfficeIDs: rows[0].OfficeIDs ? String(rows[0].OfficeIDs).split(',').map((officeId) => Number(officeId)).filter((officeId) => Number.isInteger(officeId)) : []
+        officeid: rows[0].officeid || null,
+        OfficeIDs: rows[0].OfficeIDs ? String(rows[0].OfficeIDs).split(',').map((officeid) => Number(officeid)).filter((officeid) => Number.isInteger(officeid)) : []
       }
     });
 
@@ -371,14 +371,14 @@ exports.getHeadById = async (req, res) => {
 exports.updateHead = async (req, res) => {
   try {
     const { id } = req.params;
-    const { FirstName, MiddleInitial, LastName, Position, ContactInfo } = req.body;
+    const { firstname, middleinitial, lastname, Position, contactinfo } = req.body;
 
     const [rows] = await db.execute(
-      `SELECT h.HeadID, h.UserID, h.Position, h.ContactInfo,
-              u.FirstName, u.MiddleInitial, u.LastName, u.ProfilePic
+      `SELECT h.headid, h.userid, h.Position, h.contactinfo,
+              u.firstname, u.middleinitial, u.lastname, u.profilepic
        FROM headofoffice h
-       LEFT JOIN users u ON h.UserID = u.UserID
-       WHERE h.HeadID = ?
+       LEFT JOIN users u ON h.userid = u.userid
+       WHERE h.headid = ?
        LIMIT 1`,
       [id]
     );
@@ -392,22 +392,22 @@ exports.updateHead = async (req, res) => {
 
     const current = rows[0];
 
-    const trimmedFirst = typeof FirstName === 'string' ? FirstName.trim() : '';
-    const trimmedLast = typeof LastName === 'string' ? LastName.trim() : '';
+    const trimmedFirst = typeof firstname === 'string' ? firstname.trim() : '';
+    const trimmedLast = typeof lastname === 'string' ? lastname.trim() : '';
     const trimmedPosition = typeof Position === 'string' ? Position.trim() : '';
 
-    const nextFirstName = trimmedFirst || (current.FirstName || '').trim();
-    const nextLastName = trimmedLast || (current.LastName || '').trim();
-    const nextMiddleInitialRaw = MiddleInitial !== undefined
-      ? String(MiddleInitial || '').trim()
-      : String(current.MiddleInitial || '').trim();
+    const nextFirstName = trimmedFirst || (current.firstname || '').trim();
+    const nextLastName = trimmedLast || (current.lastname || '').trim();
+    const nextMiddleInitialRaw = middleinitial !== undefined
+      ? String(middleinitial || '').trim()
+      : String(current.middleinitial || '').trim();
     const nextMiddleInitial = nextMiddleInitialRaw ? nextMiddleInitialRaw.charAt(0) : null;
     const nextPosition = trimmedPosition || (current.Position || '').trim();
-    const nextContactInfoRaw = ContactInfo !== undefined
-      ? String(ContactInfo ?? '').trim()
-      : String(current.ContactInfo ?? '').trim();
+    const nextContactInfoRaw = contactinfo !== undefined
+      ? String(contactinfo ?? '').trim()
+      : String(current.contactinfo ?? '').trim();
     const nextContactInfo = nextContactInfoRaw || null;
-    const nextProfilePic = req.file ? req.file.filename : current.ProfilePic;
+    const nextProfilePic = req.file ? req.file.filename : current.profilepic;
 
     if (!nextFirstName || !nextLastName || !nextPosition) {
       return res.status(400).json({
@@ -416,19 +416,19 @@ exports.updateHead = async (req, res) => {
       });
     }
 
-    if (current.UserID) {
+    if (current.userid) {
       await db.execute(
         `UPDATE users
-         SET FirstName = ?, MiddleInitial = ?, LastName = ?, ProfilePic = ?
-         WHERE UserID = ?`,
-        [nextFirstName, nextMiddleInitial, nextLastName, nextProfilePic, current.UserID]
+         SET firstname = ?, middleinitial = ?, lastname = ?, profilepic = ?
+         WHERE userid = ?`,
+        [nextFirstName, nextMiddleInitial, nextLastName, nextProfilePic, current.userid]
       );
     }
 
     await db.execute(
       `UPDATE headofoffice
-       SET Position = ?, ContactInfo = ?
-       WHERE HeadID = ?`,
+       SET Position = ?, contactinfo = ?
+       WHERE headid = ?`,
       [nextPosition, nextContactInfo, id]
     );
 
@@ -436,35 +436,35 @@ exports.updateHead = async (req, res) => {
       success: true,
       message: 'Office personnel updated successfully',
       data: {
-        HeadID: Number(id),
-        UserID: current.UserID,
-        FirstName: nextFirstName,
-        MiddleInitial: nextMiddleInitial,
-        LastName: nextLastName,
+        headid: Number(id),
+        userid: current.userid,
+        firstname: nextFirstName,
+        middleinitial: nextMiddleInitial,
+        lastname: nextLastName,
         Position: nextPosition,
-        ContactInfo: nextContactInfo,
-        ProfilePic: nextProfilePic,
+        contactinfo: nextContactInfo,
+        profilepic: nextProfilePic,
       }
     });
 
     try {
-      const actorId = req.user && req.user.userId;
+      const actorId = req.user && req.user.userid;
       if (actorId) {
-        const previousFullName = `${current.FirstName || ''} ${current.LastName || ''}`.replace(/\s+/g, ' ').trim();
+        const previousFullName = `${current.firstname || ''} ${current.lastname || ''}`.replace(/\s+/g, ' ').trim();
         const nextFullName = `${nextFirstName} ${nextLastName}`.replace(/\s+/g, ' ').trim();
         const changes = {};
 
-        if ((current.FirstName || '') !== nextFirstName || (current.LastName || '') !== nextLastName || (current.MiddleInitial || '') !== (nextMiddleInitial || '')) {
+        if ((current.firstname || '') !== nextFirstName || (current.lastname || '') !== nextLastName || (current.middleinitial || '') !== (nextMiddleInitial || '')) {
           changes.Name = { from: previousFullName || 'Unknown', to: nextFullName || 'Unknown' };
         }
         if ((current.Position || '') !== nextPosition) {
           changes.Position = { from: current.Position || 'N/A', to: nextPosition };
         }
-        if ((current.ContactInfo || '') !== (nextContactInfo || '')) {
-          changes.ContactInfo = { from: current.ContactInfo || 'N/A', to: nextContactInfo || 'N/A' };
+        if ((current.contactinfo || '') !== (nextContactInfo || '')) {
+          changes.contactinfo = { from: current.contactinfo || 'N/A', to: nextContactInfo || 'N/A' };
         }
         if (req.file) {
-          changes.ProfilePic = 'Updated';
+          changes.profilepic = 'Updated';
         }
 
         await recordLog(actorId, 'OfficeHeadUpdated', {
@@ -474,17 +474,17 @@ exports.updateHead = async (req, res) => {
       }
 
       // Notify the personnel if their position was changed
-      if ((current.Position || '') !== nextPosition && current.UserID) {
+      if ((current.Position || '') !== nextPosition && current.userid) {
         await createNotifications({
-          userIds: [Number(current.UserID)],
-          adminId: actorId || null,
+          userIds: [Number(current.userid)],
+          adminid: actorId || null,
           title: 'Position Updated',
           message: `Your position has been updated from "${current.Position || 'N/A'}" to "${nextPosition}".`,
           type: 'info',
-          relatedTable: 'office_head',
-          relatedId: Number(id),
+          relatedtable: 'office_head',
+          relatedid: Number(id),
           meta: {
-            headId: Number(id),
+            headid: Number(id),
             previousPosition: current.Position || null,
             newPosition: nextPosition,
           },
@@ -542,10 +542,10 @@ exports.deleteHeads = async (req, res) => {
     // Collect names and user IDs before deletion for readable audit logs and cascading cleanup
     const placeholders = validIds.map(() => '?').join(',');
     const [headsToDelete] = await db.execute(
-      `SELECT h.HeadID, h.UserID, u.FirstName, u.LastName, u.Email
+      `SELECT h.headid, h.userid, u.firstname, u.lastname, u.Email
        FROM headofoffice h
-       LEFT JOIN users u ON h.UserID = u.UserID
-       WHERE h.HeadID IN (${placeholders})`,
+       LEFT JOIN users u ON h.userid = u.userid
+       WHERE h.headid IN (${placeholders})`,
       validIds
     );
 
@@ -556,40 +556,40 @@ exports.deleteHeads = async (req, res) => {
       });
     }
 
-    const userIds = headsToDelete.map(r => r.UserID).filter(id => Number.isInteger(Number(id)) && id > 0);
+    const userIds = headsToDelete.map(r => r.userid).filter(id => Number.isInteger(Number(id)) && id > 0);
 
     // 1. Remove office head assignments
     try {
-      await db.execute(`DELETE FROM office_head_assignments WHERE HeadID IN (${placeholders})`, validIds);
+      await db.execute(`DELETE FROM officeheadassignments WHERE headid IN (${placeholders})`, validIds);
     } catch (e) {
-      console.warn('Cleanup office_head_assignments warning:', e.message);
+      console.warn('Cleanup officeheadassignments warning:', e.message);
     }
 
     // 2. Remove requirement user assignments
     if (userIds.length > 0) {
       const userPlaceholders = userIds.map(() => '?').join(',');
       try {
-        await db.execute(`DELETE FROM requirement_user_assignments WHERE UserID IN (${userPlaceholders})`, userIds);
+        await db.execute(`DELETE FROM requirementuserassignments WHERE userid IN (${userPlaceholders})`, userIds);
       } catch (e) {
-        console.warn('Cleanup requirement_user_assignments warning:', e.message);
+        console.warn('Cleanup requirementuserassignments warning:', e.message);
       }
 
       // 3. Remove notifications
       try {
-        await db.execute(`DELETE FROM notifications WHERE UserID IN (${userPlaceholders})`, userIds);
+        await db.execute(`DELETE FROM notifications WHERE userid IN (${userPlaceholders})`, userIds);
       } catch (e) {
         console.warn('Cleanup notifications warning:', e.message);
       }
     }
 
     // 4. Delete from headofoffice
-    const [result] = await db.execute(`DELETE FROM headofoffice WHERE HeadID IN (${placeholders})`, validIds);
+    const [result] = await db.execute(`DELETE FROM headofoffice WHERE headid IN (${placeholders})`, validIds);
 
     // 5. Delete corresponding non-admin user accounts from users table so they don't resurrect
     if (userIds.length > 0) {
       const userPlaceholders = userIds.map(() => '?').join(',');
       try {
-        await db.execute(`DELETE FROM users WHERE UserID IN (${userPlaceholders}) AND RoleID != 1`, userIds);
+        await db.execute(`DELETE FROM users WHERE userid IN (${userPlaceholders}) AND roleid != 1`, userIds);
       } catch (e) {
         console.warn('Cleanup users table warning:', e.message);
       }
@@ -602,10 +602,10 @@ exports.deleteHeads = async (req, res) => {
     });
 
     try {
-      const actorId = req.user && req.user.userId;
+      const actorId = req.user && req.user.userid;
       if (actorId && result.affectedRows > 0) {
         await recordLog(actorId, 'OfficeHeadDeleted', {
-          HeadNames: headsToDelete.map((row) => `${row.FirstName || ''} ${row.LastName || ''}`.replace(/\s+/g, ' ').trim() || `Head #${row.HeadID}`),
+          HeadNames: headsToDelete.map((row) => `${row.firstname || ''} ${row.lastname || ''}`.replace(/\s+/g, ' ').trim() || `Head #${row.headid}`),
           DeletedCount: result.affectedRows,
         });
       }

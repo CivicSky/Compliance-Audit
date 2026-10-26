@@ -2,8 +2,10 @@ import React from 'react';
 import { officesAPI } from '../../utils/api';
 import { useModal } from '../UI/ModalProvider';
 import { Award } from 'lucide-react';
+import { isAcademicEntity } from '../../utils/entityHelpers';
 
 const ACCREDITATION_LEVELS = [
+    'None',
     'Candidate',
     'Level I',
     'Level II',
@@ -24,14 +26,14 @@ export default function ModalHeader({
     onUpdateLevel,
 }) {
     const { showAlert } = useModal();
-    const currentLevel = officeData?.accreditation_level || office?.accreditation_level || 'Candidate';
+    const currentLevel = officeData?.accreditationlevel || office?.accreditationlevel || 'None';
     const [localLevel, setLocalLevel] = React.useState(currentLevel);
     const [updatingLevel, setUpdatingLevel] = React.useState(false);
 
     React.useEffect(() => {
-        const lvl = officeData?.accreditation_level || office?.accreditation_level || 'Candidate';
+        const lvl = officeData?.accreditationlevel || office?.accreditationlevel || 'None';
         setLocalLevel(lvl);
-    }, [officeData?.accreditation_level, office?.accreditation_level]);
+    }, [officeData?.accreditationlevel, office?.accreditationlevel]);
 
     const handleLevelSelect = async (newLevel) => {
         setLocalLevel(newLevel);
@@ -45,15 +47,15 @@ export default function ModalHeader({
         }
     };
     const isAcademicProgram = (() => {
-        const typeId = Number(officeData?.entity_type_id || officeData?.OfficeTypeID || officeData?.type_id);
+        const typeId = Number(officeData?.entitytypeid || officeData?.officetypeid || officeData?.type_id);
         if (typeId === 1) return true;
         if (typeId === 2) return false;
 
-        const typeName = String(officeData?.office_type_name || officeData?.TypeName || officeData?.category_name || officeData?.CategoryName || '').toLowerCase();
-        if (typeName.includes('non academic') || typeName.includes('non-academic') || typeName.includes('office') || typeName.includes('administrative')) {
+        const typename = String(officeData?.office_type_name || officeData?.typename || officeData?.category_name || officeData?.CategoryName || '').toLowerCase();
+        if (typename.includes('non academic') || typename.includes('non-academic') || typename.includes('office') || typename.includes('administrative')) {
             return false;
         }
-        return typeName.includes('academic') || typeName.includes('program');
+        return typename.includes('academic') || typename.includes('program');
     })();
 
     return (
@@ -83,13 +85,13 @@ export default function ModalHeader({
 
                     {/* Name + meta */}
                     <div className="min-w-0">
-                        <h2 className="truncate text-lg font-bold tracking-tight text-slate-900">{officeData.office_name}</h2>
+                        <h2 className="truncate text-lg font-bold tracking-tight text-slate-900">{officeData.officename}</h2>
                         <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
                             {officeData.office_type_name && (
                                 <span className="text-xs font-medium text-slate-500">{officeData.office_type_name}</span>
                             )}
                             {(() => {
-                                const eventDisplay = String(officeData.event_code || officeData.EventCode || officeData.event_name || officeData.EventName || '').trim();
+                                const eventDisplay = String(officeData.eventcode || officeData.eventcode || officeData.eventname || officeData.eventname || '').trim();
                                 if (!eventDisplay) return null;
                                 return (
                                     <>
@@ -184,13 +186,13 @@ export default function ModalHeader({
                                             onClick={async () => {
                                                 try {
                                                     setShowMenu(false);
-                                                    const officeId = office?.id || office?.OfficeID;
-                                                    if (!officeId) return;
-                                                    const officeName = office?.office_name || office?.OfficeName || `office-${officeId}`;
-                                                    const { url, fileName } = await officesAPI.exportOfficeExcel(officeId, officeName);
+                                                    const officeid = office?.id || office?.officeid;
+                                                    if (!officeid) return;
+                                                    const officename = office?.officename || office?.officename || `office-${officeid}`;
+                                                    const { url, filename } = await officesAPI.exportOfficeExcel(officeid, officename);
                                                     const link = document.createElement('a');
                                                     link.href = url;
-                                                    link.download = fileName;
+                                                    link.download = filename;
                                                     document.body.appendChild(link);
                                                     link.click();
                                                     document.body.removeChild(link);
@@ -216,7 +218,7 @@ export default function ModalHeader({
                                             <svg className="h-4 w-4 text-rose-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
                                             </svg>
-                                            <span>Delete Office</span>
+                                            <span>Delete {isAcademicEntity(officeData || office) ? 'Program' : 'Office'}</span>
                                         </button>
                                     </div>
                                 </>

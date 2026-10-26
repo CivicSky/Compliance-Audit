@@ -3,25 +3,43 @@ import StatusBadge from './StatusBadge';
 import { API_BASE_URL } from '../../utils/apiBase';
 import SmartUserAvatar from './SmartUserAvatar';
 
-export default function OfficeInfoBar({ officeData, isAssignedInCurrentOffice, assignedRequirementCount, requirements = [] }) {
+export default function OfficeInfoBar({
+    officeData,
+    isAssignedInCurrentOffice,
+    assignedRequirementCount,
+    requirements = [],
+    isAdmin = false,
+    isAuditor = false,
+    currentUser = null
+}) {
     const [auditors, setAuditors] = useState([]);
     const [fetchedHeads, setFetchedHeads] = useState([]);
 
-    const { complianceNum, compliance, statusId } = React.useMemo(() => {
-        const totalOfficeReqs = Number(officeData?.total_requirements ?? officeData?.TotalRequirements ?? 0);
-        const rawPct = officeData?.compliance_percent ?? officeData?.CompliancePercent ?? officeData?.compliance_percentage ?? officeData?.compliancePercentage;
+    const { complianceNum, compliance, statusid } = React.useMemo(() => {
+        const totalOfficeReqs = Number(officeData?.totalrequirements ?? officeData?.totalrequirements ?? 0);
+        const rawPct = officeData?.compliancepercent ?? officeData?.compliancepercent ?? officeData?.compliance_percentage ?? officeData?.compliancePercentage;
+
+        // If no requirements exist at all (empty office)
+        const hasReqs = (Array.isArray(requirements) && requirements.length > 0) || totalOfficeReqs > 0;
+        if (!hasReqs) {
+            return {
+                complianceNum: 0,
+                compliance: 'N/A',
+                statusid: 0
+            };
+        }
 
         // If officeData provides the comprehensive compliance percent across all areas and total requirements exceed the loaded array
         if (rawPct !== undefined && rawPct !== null && !isNaN(Number(rawPct)) && totalOfficeReqs > 0 && Array.isArray(requirements) && totalOfficeReqs > requirements.length) {
             const score = Number(rawPct);
             const status =
-                officeData?.overall_status === 'Complied' || officeData?.OverallStatus === 'Complied' ? 5 :
-                officeData?.overall_status === 'Partially Complied' || officeData?.OverallStatus === 'Partially Complied' ? 4 : 3;
+                officeData?.overallstatus === 'Complied' ? 5 :
+                officeData?.overallstatus === 'Partially Complied' ? 4 : 3;
 
             return {
                 complianceNum: score,
-                compliance: score.toFixed(1),
-                statusId: status
+                compliance: `${score.toFixed(1)}%`,
+                statusid: status
             };
         }
 
@@ -53,38 +71,38 @@ export default function OfficeInfoBar({ officeData, isAssignedInCurrentOffice, a
 
             return {
                 complianceNum: score,
-                compliance: score.toFixed(1),
-                statusId: status
+                compliance: `${score.toFixed(1)}%`,
+                statusid: status
             };
         }
 
         const score = rawPct !== undefined && rawPct !== null && !isNaN(Number(rawPct)) ? Number(rawPct) : 0;
         const status =
-            officeData?.overall_status === 'Complied' || officeData?.OverallStatus === 'Complied' ? 5 :
-            officeData?.overall_status === 'Partially Complied' || officeData?.OverallStatus === 'Partially Complied' ? 4 : 3;
+            officeData?.overallstatus === 'Complied' ? 5 :
+            officeData?.overallstatus === 'Partially Complied' ? 4 : 3;
 
         return {
             complianceNum: score,
-            compliance: score.toFixed(1),
-            statusId: status
+            compliance: `${score.toFixed(1)}%`,
+            statusid: status
         };
     }, [requirements, officeData]);
 
     useEffect(() => {
-        const officeId = officeData?.office_id || officeData?.OfficeID || officeData?.id;
-        if (!officeId) return;
+        const officeid = officeData?.officeid || officeData?.officeid || officeData?.id;
+        if (!officeid) return;
         let mounted = true;
 
         const token = localStorage.getItem('token');
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
         // Fetch auditors
-        fetch(`${API_BASE_URL}/api/areas/auditors/office/${officeId}`, { headers })
+        fetch(`${API_BASE_URL}/api/areas/auditors/office/${officeid}`, { headers })
             .then(res => res.json())
             .then(data => {
                 if (mounted && data.success) {
                     const list = data.auditors || [];
-                    const unique = Array.from(new Map(list.map(a => [a.UserID ?? a.id, a])).values());
+                    const unique = Array.from(new Map(list.map(a => [a.userid ?? a.id, a])).values());
                     setAuditors(unique);
                 }
             })
@@ -99,9 +117,9 @@ export default function OfficeInfoBar({ officeData, isAssignedInCurrentOffice, a
                     if (!mounted) return;
                     const allHeads = Array.isArray(data) ? data : (data.data || []);
                     const matching = allHeads.filter(h => {
-                        if (Number(h.OfficeID) === Number(officeId)) return true;
+                        if (Number(h.officeid) === Number(officeid)) return true;
                         if (Array.isArray(h.assigned_offices)) {
-                            return h.assigned_offices.some(o => Number(o.id || o.OfficeID || o.office_id) === Number(officeId));
+                            return h.assigned_offices.some(o => Number(o.id || o.officeid || o.officeid) === Number(officeid));
                         }
                         return false;
                     });
@@ -116,7 +134,9 @@ export default function OfficeInfoBar({ officeData, isAssignedInCurrentOffice, a
     }, [officeData]);
 
     // Compliance color
-    const complianceColor = complianceNum >= 80
+    const complianceColor = statusid === 0
+        ? 'text-slate-400'
+        : complianceNum >= 80
         ? 'text-emerald-600'
         : complianceNum >= 50
             ? 'text-amber-600'
@@ -137,13 +157,56 @@ export default function OfficeInfoBar({ officeData, isAssignedInCurrentOffice, a
         const name = officeData.head_name || officeData.HeadName;
         if (name && name !== 'Unassigned' && name !== 'Unknown Head') {
             officeHeads = [{
-                HeadID: officeData.head_id || officeData.HeadID || 1,
+                headid: officeData.headid || officeData.headid || 1,
                 full_name: name,
-                FirstName: name,
-                ProfilePic: officeData.head_profile_pic || officeData.HeadProfilePic || null
+                firstname: name,
+                profilepic: officeData.head_profile_pic || officeData.HeadProfilePic || null
             }];
         }
     }
+
+    const currentUid = Number(currentUser?.userid ?? currentUser?.id ?? 0);
+    const resolvedIsAdmin = Boolean(
+        isAdmin ||
+        ((currentUser?.roleid === 1 || currentUser?.rolename?.toLowerCase() === 'admin') &&
+         !currentUser?.rolename?.toLowerCase()?.includes('auditor') &&
+         currentUser?.roleid !== 4)
+    );
+    const resolvedIsAuditor = Boolean(
+        isAuditor ||
+        currentUser?.roleid === 4 ||
+        currentUser?.rolename?.toLowerCase()?.includes('auditor') ||
+        currentUser?.isExternalAuditor
+    );
+
+    // Compute visible heads (Personnel)
+    let visibleHeads = [];
+    if (resolvedIsAdmin) {
+        visibleHeads = officeHeads;
+    } else if (resolvedIsAuditor) {
+        visibleHeads = [];
+    } else {
+        visibleHeads = officeHeads.filter(h => {
+            const hId = Number(h.headid || h.userid || h.id);
+            return hId === currentUid;
+        });
+    }
+
+    // Compute visible auditors (External Auditor)
+    let visibleAuditors = [];
+    if (resolvedIsAdmin) {
+        visibleAuditors = auditors;
+    } else if (resolvedIsAuditor) {
+        visibleAuditors = auditors.filter(a => {
+            const aId = Number(a.userid ?? a.id);
+            return aId === currentUid;
+        });
+    } else {
+        visibleAuditors = [];
+    }
+
+    const showPersonnelSection = resolvedIsAdmin || (!resolvedIsAuditor && visibleHeads.length > 0);
+    const showAuditorSection = resolvedIsAdmin || (resolvedIsAuditor && visibleAuditors.length > 0);
 
     return (
         <div className="border-b border-slate-200/70 bg-gradient-to-r from-slate-50 via-white to-slate-50 px-5 py-3">
@@ -151,8 +214,8 @@ export default function OfficeInfoBar({ officeData, isAssignedInCurrentOffice, a
                 {/* Left: Personnel + Auditor */}
                 <div className="flex min-w-0 flex-wrap items-center gap-4">
                     {/* Personnel */}
-                    {(() => {
-                        if (officeHeads.length === 0) {
+                    {showPersonnelSection && (() => {
+                        if (visibleHeads.length === 0) {
                             return (
                                 <div className="flex items-center gap-2.5">
                                     <div className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-slate-100 text-slate-400 shadow-xs">
@@ -168,13 +231,13 @@ export default function OfficeInfoBar({ officeData, isAssignedInCurrentOffice, a
                             );
                         }
 
-                        if (officeHeads.length > 1) {
+                        if (visibleHeads.length > 1) {
                             return (
                                 <div className="flex items-center gap-2.5">
                                     <div className="flex -space-x-2 overflow-hidden">
-                                        {officeHeads.map((head) => (
+                                        {visibleHeads.map((head) => (
                                             <SmartUserAvatar
-                                                key={head.HeadID || head.UserID || head.id || Math.random()}
+                                                key={head.headid || head.userid || head.id || Math.random()}
                                                 user={head}
                                                 size="h-8 w-8"
                                                 ring="border-2 border-white"
@@ -184,15 +247,15 @@ export default function OfficeInfoBar({ officeData, isAssignedInCurrentOffice, a
                                     <div>
                                         <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Personnel</p>
                                         <p className="text-xs font-semibold text-slate-700">
-                                            {officeHeads.map(h => h.FirstName || h.full_name).filter(Boolean).join(', ') || `${officeHeads.length} members`}
+                                            {visibleHeads.map(h => h.firstname || h.full_name).filter(Boolean).join(', ') || `${visibleHeads.length} members`}
                                         </p>
                                     </div>
                                 </div>
                             );
                         }
 
-                        const primaryHead = officeHeads[0];
-                        const headDisplayName = primaryHead?.full_name || `${primaryHead?.FirstName || ''} ${primaryHead?.LastName || ''}`.trim() || primaryHead?.FirstName || 'Assigned';
+                        const primaryHead = visibleHeads[0];
+                        const headDisplayName = primaryHead?.full_name || `${primaryHead?.firstname || ''} ${primaryHead?.lastname || ''}`.trim() || primaryHead?.firstname || 'Assigned';
                         return (
                             <div className="flex items-center gap-2.5">
                                 <SmartUserAvatar
@@ -209,38 +272,42 @@ export default function OfficeInfoBar({ officeData, isAssignedInCurrentOffice, a
                     })()}
 
                     {/* Divider */}
-                    <span className="h-8 w-px bg-slate-200" />
+                    {showPersonnelSection && showAuditorSection && (
+                        <span className="h-8 w-px bg-slate-200" />
+                    )}
 
                     {/* External Auditor */}
-                    <div className="flex items-center gap-2.5">
-                        {auditors.length > 0 ? (
-                            <>
-                                <div className="flex -space-x-2 overflow-hidden">
-                                    {auditors.map(aud => (
-                                        <SmartUserAvatar
-                                            key={aud.UserID ?? aud.id}
-                                            user={aud}
-                                            size="h-8 w-8"
-                                            ring="border-2 border-white ring-1 ring-sky-300"
-                                        />
-                                    ))}
-                                </div>
+                    {showAuditorSection && (
+                        <div className="flex items-center gap-2.5">
+                            {visibleAuditors.length > 0 ? (
+                                <>
+                                    <div className="flex -space-x-2 overflow-hidden">
+                                        {visibleAuditors.map(aud => (
+                                            <SmartUserAvatar
+                                                key={aud.userid ?? aud.id}
+                                                user={aud}
+                                                size="h-8 w-8"
+                                                ring="border-2 border-white ring-1 ring-sky-300"
+                                            />
+                                        ))}
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-bold uppercase tracking-wider text-sky-600">External Auditor</p>
+                                        <p className="text-xs font-semibold text-sky-800">
+                                            {visibleAuditors.length === 1
+                                                ? `${visibleAuditors[0].firstname || ''} ${visibleAuditors[0].lastname || ''}`.trim() || visibleAuditors[0].firstname || 'Auditor'
+                                                : `${visibleAuditors.length} assigned`}
+                                        </p>
+                                    </div>
+                                </>
+                            ) : (
                                 <div>
-                                    <p className="text-[10px] font-bold uppercase tracking-wider text-sky-600">External Auditor</p>
-                                    <p className="text-xs font-semibold text-sky-800">
-                                        {auditors.length === 1
-                                            ? `${auditors[0].FirstName || ''} ${auditors[0].LastName || ''}`.trim() || auditors[0].FirstName || 'Auditor'
-                                            : `${auditors.length} assigned`}
-                                    </p>
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">External Auditor</p>
+                                    <p className="text-xs font-medium text-slate-400 italic">None assigned</p>
                                 </div>
-                            </>
-                        ) : (
-                            <div>
-                                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">External Auditor</p>
-                                <p className="text-xs font-medium text-slate-400 italic">None assigned</p>
-                            </div>
-                        )}
-                    </div>
+                            )}
+                        </div>
+                    )}
 
                     {isAssignedInCurrentOffice && (
                         <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-[11px] font-semibold text-cyan-700 shadow-sm">
@@ -254,10 +321,10 @@ export default function OfficeInfoBar({ officeData, isAssignedInCurrentOffice, a
                 <div className="flex items-center gap-3">
                     <div className="text-right">
                         <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Compliance</p>
-                        <p className={`text-2xl font-black tabular-nums tracking-tight ${complianceColor}`}>{compliance}%</p>
+                        <p className={`text-2xl font-black tabular-nums tracking-tight ${complianceColor}`}>{compliance}</p>
                     </div>
                     <div className="h-8 w-px bg-slate-200" />
-                    <StatusBadge statusId={statusId} />
+                    <StatusBadge statusid={statusid} />
                 </div>
             </div>
         </div>

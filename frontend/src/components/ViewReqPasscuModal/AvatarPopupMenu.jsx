@@ -13,7 +13,7 @@ export default function AvatarPopupMenu({
 }) {
     if ((!isAdmin && !isOfficeHead && !isAuditor) || !avatarPopup || !avatarPopup.rect) return null;
 
-    const hasUploaded = avatarPopup.user.HasUploaded === 1 || avatarPopup.user.HasUploaded === true;
+    const hasuploaded = avatarPopup.user.hasuploaded === 1 || avatarPopup.user.hasuploaded === true;
 
     return createPortal(
         <div className="fixed inset-0 z-[9999]" onClick={onClose}>
@@ -28,17 +28,17 @@ export default function AvatarPopupMenu({
             >
                 <div className="border-b border-slate-100 px-3.5 py-2.5">
                     <p className="truncate text-xs font-semibold text-slate-900">
-                        {avatarPopup.user.FirstName} {avatarPopup.user.LastName}
+                        {avatarPopup.user.firstname} {avatarPopup.user.lastname}
                     </p>
-                    <p className={`mt-0.5 text-[10px] font-medium ${hasUploaded ? 'text-emerald-600' : 'text-rose-500'}`}>
-                        {hasUploaded ? 'Uploaded' : 'Not uploaded'}
+                    <p className={`mt-0.5 text-[10px] font-medium ${hasuploaded ? 'text-emerald-600' : 'text-rose-500'}`}>
+                        {hasuploaded ? 'Uploaded' : 'Not uploaded'}
                     </p>
                 </div>
 
-                {hasUploaded && (
+                {hasuploaded && (
                     <button
                         type="button"
-                        onClick={() => onViewUserFile(avatarPopup.user, avatarPopup.requirementId)}
+                        onClick={() => onViewUserFile(avatarPopup.user, avatarPopup.requirementid)}
                         className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-[11px] text-slate-700 transition hover:bg-indigo-50"
                     >
                         <svg className="h-3.5 w-3.5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -49,10 +49,10 @@ export default function AvatarPopupMenu({
                     </button>
                 )}
 
-                {hasUploaded && !isAuditor && (
+                {hasuploaded && !isAuditor && (
                     <button
                         type="button"
-                        onClick={() => onDownloadUserFile(avatarPopup.user, avatarPopup.requirementId)}
+                        onClick={() => onDownloadUserFile(avatarPopup.user, avatarPopup.requirementid)}
                         className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-[11px] text-slate-700 transition hover:bg-indigo-50"
                     >
                         <svg className="h-3.5 w-3.5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -65,7 +65,7 @@ export default function AvatarPopupMenu({
                 {isAdmin && (
                     <button
                         type="button"
-                        onClick={() => onOpenNotifForm(avatarPopup.user, avatarPopup.requirementId)}
+                        onClick={() => onOpenNotifForm(avatarPopup.user, avatarPopup.requirementid)}
                         className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-[11px] text-slate-700 transition hover:bg-amber-50"
                     >
                         <svg className="h-3.5 w-3.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">

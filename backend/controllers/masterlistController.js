@@ -3,7 +3,7 @@ const path = require('path');
 const db = require('../db');
 const { recordLog } = require('./logsController');
 
-const TABLE_NAME = 'master_list';
+const TABLE_NAME = 'masterlist';
 const ENTITY_TYPE_MAP = {
   1: 'Academic Program',
   2: 'Non-Academic Office',
@@ -11,14 +11,14 @@ const ENTITY_TYPE_MAP = {
 
 const formatMasterListRow = (row) => ({
   id: row.id,
-  name: row.entity_name,
-  type: ENTITY_TYPE_MAP[row.entity_type_id] || row.entity_type || `Type ${row.entity_type_id}`,
-  entityTypeId: row.entity_type_id,
+  name: row.entityname,
+  type: ENTITY_TYPE_MAP[row.entitytypeid] || row.entity_type || `Type ${row.entitytypeid}`,
+  entitytypeid: row.entitytypeid,
   department: row.department_name || null,
-  departmentId: row.department_id || null,
+  departmentid: row.departmentid || null,
   status: 'Active',
-  created_at: row.created_at ? (row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at)) : null,
-  updated_at: row.updated_at ? (row.updated_at instanceof Date ? row.updated_at.toISOString() : String(row.updated_at)) : null,
+  createdat: row.createdat ? (row.createdat instanceof Date ? row.createdat.toISOString() : String(row.createdat)) : null,
+  updatedat: row.updatedat ? (row.updatedat instanceof Date ? row.updatedat.toISOString() : String(row.updatedat)) : null,
 });
 
 /**
@@ -36,27 +36,27 @@ async function deleteLinkedOffices(masterListIds = [], itemNames = []) {
 
   if (ids.length === 0 && names.length === 0) return [];
 
-  let query = 'SELECT OfficeID FROM offices WHERE ';
+  let query = 'SELECT officeid FROM offices WHERE ';
   const params = [];
 
   if (ids.length > 0 && names.length > 0) {
     const idPlaceholders = ids.map(() => '?').join(',');
     const namePlaceholders = names.map(() => '?').join(',');
-    query += `master_list_id IN (${idPlaceholders}) OR (master_list_id IS NULL AND OfficeName IN (${namePlaceholders}))`;
+    query += `masterlistid IN (${idPlaceholders}) OR (masterlistid IS NULL AND officename IN (${namePlaceholders}))`;
     params.push(...ids, ...names);
   } else if (ids.length > 0) {
     const idPlaceholders = ids.map(() => '?').join(',');
-    query += `master_list_id IN (${idPlaceholders})`;
+    query += `masterlistid IN (${idPlaceholders})`;
     params.push(...ids);
   } else {
     const namePlaceholders = names.map(() => '?').join(',');
-    query += `OfficeName IN (${namePlaceholders})`;
+    query += `officename IN (${namePlaceholders})`;
     params.push(...names);
   }
 
   const [officeRows] = await db.query(query, params);
   const officeIds = Array.isArray(officeRows)
-    ? officeRows.map((r) => Number(r.OfficeID ?? r.officeid)).filter((n) => Number.isInteger(n) && n > 0)
+    ? officeRows.map((r) => Number(r.officeid ?? r.officeid)).filter((n) => Number.isInteger(n) && n > 0)
     : [];
 
   if (officeIds.length === 0) return [];
@@ -66,11 +66,11 @@ async function deleteLinkedOffices(masterListIds = [], itemNames = []) {
   try {
     // 1) Find requirement IDs associated with these offices
     const [reqRows] = await db.query(
-      `SELECT RequirementID FROM compliancestatusoffices WHERE OfficeID IN (${placeholders})`,
+      `SELECT requirementid FROM compliancestatusoffices WHERE officeid IN (${placeholders})`,
       officeIds
     );
     const requirementIds = Array.isArray(reqRows)
-      ? reqRows.map((r) => Number(r.RequirementID ?? r.requirementid)).filter((n) => Number.isInteger(n) && n > 0)
+      ? reqRows.map((r) => Number(r.requirementid ?? r.requirementid)).filter((n) => Number.isInteger(n) && n > 0)
       : [];
 
     if (requirementIds.length > 0) {
@@ -79,19 +79,19 @@ async function deleteLinkedOffices(masterListIds = [], itemNames = []) {
       // Delete requirement proof documents from disk and DB
       try {
         const [proofFiles] = await db.query(
-          `SELECT id, file_path FROM office_proof_documents WHERE requirement_id IN (${reqPlaceholders})`,
+          `SELECT id, filepath FROM officeproofdocuments WHERE requirementid IN (${reqPlaceholders})`,
           requirementIds
         );
         if (proofFiles && proofFiles.length > 0) {
           for (const f of proofFiles) {
             try {
-              const absPath = path.join(__dirname, '..', (f.file_path || '').replace(/^\//, ''));
+              const absPath = path.join(__dirname, '..', (f.filepath || '').replace(/^\//, ''));
               if (fs.existsSync(absPath)) fs.unlinkSync(absPath);
             } catch (fsErr) {
               console.warn('Failed to delete proof file from disk:', fsErr);
             }
           }
-          await db.query(`DELETE FROM office_proof_documents WHERE requirement_id IN (${reqPlaceholders})`, requirementIds);
+          await db.query(`DELETE FROM officeproofdocuments WHERE requirementid IN (${reqPlaceholders})`, requirementIds);
         }
       } catch (e) {
         console.error('Error cleaning up proof documents during master list office delete:', e);
@@ -100,19 +100,19 @@ async function deleteLinkedOffices(masterListIds = [], itemNames = []) {
       // Delete user requirement uploads from disk and DB
       try {
         const [userFiles] = await db.query(
-          `SELECT id, file_path FROM requirement_user_uploads WHERE requirement_id IN (${reqPlaceholders})`,
+          `SELECT id, filepath FROM requirement_user_uploads WHERE requirementid IN (${reqPlaceholders})`,
           requirementIds
         );
         if (userFiles && userFiles.length > 0) {
           for (const uf of userFiles) {
             try {
-              const absPath = path.join(__dirname, '..', (uf.file_path || '').replace(/^\//, ''));
+              const absPath = path.join(__dirname, '..', (uf.filepath || '').replace(/^\//, ''));
               if (fs.existsSync(absPath)) fs.unlinkSync(absPath);
             } catch (fsErr) {
               console.warn('Failed to delete user upload from disk:', fsErr);
             }
           }
-          await db.query(`DELETE FROM requirement_user_uploads WHERE requirement_id IN (${reqPlaceholders})`, requirementIds);
+          await db.query(`DELETE FROM requirement_user_uploads WHERE requirementid IN (${reqPlaceholders})`, requirementIds);
         }
       } catch (e) {
         console.error('Error cleaning up user uploads during master list office delete:', e);
@@ -121,29 +121,29 @@ async function deleteLinkedOffices(masterListIds = [], itemNames = []) {
       // Remove requirement user assignments
       try {
         await db.query(
-          `DELETE FROM requirement_user_assignments WHERE OfficeID IN (${placeholders})`,
+          `DELETE FROM requirementuserassignments WHERE officeid IN (${placeholders})`,
           officeIds
         );
       } catch (e) {
-        console.error('Error cleaning up requirement_user_assignments during master list office delete:', e);
+        console.error('Error cleaning up requirementuserassignments during master list office delete:', e);
       }
     }
 
     // 2) Delete office-level proof documents from disk and DB
     try {
       const [officeProofs] = await db.query(
-        `SELECT id, file_path FROM office_proof_documents WHERE office_id IN (${placeholders})`,
+        `SELECT id, filepath FROM officeproofdocuments WHERE officeid IN (${placeholders})`,
         officeIds
       );
       if (officeProofs && officeProofs.length > 0) {
         for (const f of officeProofs) {
           try {
-            const absPath = path.join(__dirname, '..', (f.file_path || '').replace(/^\//, ''));
+            const absPath = path.join(__dirname, '..', (f.filepath || '').replace(/^\//, ''));
             if (fs.existsSync(absPath)) fs.unlinkSync(absPath);
           } catch (fsErr) {}
         }
         await db.query(
-          `DELETE FROM office_proof_documents WHERE office_id IN (${placeholders})`,
+          `DELETE FROM officeproofdocuments WHERE officeid IN (${placeholders})`,
           officeIds
         );
       }
@@ -152,12 +152,12 @@ async function deleteLinkedOffices(masterListIds = [], itemNames = []) {
     }
 
     // 3) Delete compliance records, head assignments, and overall office status
-    await db.query(`DELETE FROM compliancestatusoffices WHERE OfficeID IN (${placeholders})`, officeIds);
-    await db.query(`DELETE FROM office_head_assignments WHERE OfficeID IN (${placeholders})`, officeIds);
-    await db.query(`DELETE FROM OverallOfficeStatus WHERE OfficeID IN (${placeholders})`, officeIds);
+    await db.query(`DELETE FROM compliancestatusoffices WHERE officeid IN (${placeholders})`, officeIds);
+    await db.query(`DELETE FROM officeheadassignments WHERE officeid IN (${placeholders})`, officeIds);
+    await db.query(`DELETE FROM OverallOfficeStatus WHERE officeid IN (${placeholders})`, officeIds);
 
     // 4) Delete the office records from offices table
-    await db.query(`DELETE FROM offices WHERE OfficeID IN (${placeholders})`, officeIds);
+    await db.query(`DELETE FROM offices WHERE officeid IN (${placeholders})`, officeIds);
 
     return officeIds;
   } catch (err) {
@@ -172,19 +172,19 @@ exports.getAll = async (req, res) => {
       `
       SELECT
         m.id,
-        m.entity_name,
-        m.entity_type_id,
-        m.department_id,
-        m.created_at,
-        m.updated_at,
+        m.entityname,
+        m.entitytypeid,
+        m.departmentid,
+        m.createdat,
+        m.updatedat,
         d.name AS department_name,
-        CASE m.entity_type_id
+        CASE m.entitytypeid
           WHEN 1 THEN 'Academic Program'
           WHEN 2 THEN 'Non-Academic Office'
           ELSE 'Unknown'
         END AS entity_type
       FROM ${TABLE_NAME} m
-      LEFT JOIN departments d ON m.department_id = d.id
+      LEFT JOIN departments d ON m.departmentid = d.id
       ORDER BY m.id ASC
       `
     );
@@ -197,30 +197,30 @@ exports.getAll = async (req, res) => {
 
 exports.getAvailableForEvent = async (req, res) => {
   try {
-    const { eventId } = req.params;
+    const { eventid } = req.params;
     const [rows] = await db.query(
       `
       SELECT
         m.id,
-        m.entity_name,
-        m.entity_type_id,
-        m.department_id,
-        m.created_at,
-        m.updated_at,
+        m.entityname,
+        m.entitytypeid,
+        m.departmentid,
+        m.createdat,
+        m.updatedat,
         d.name AS department_name,
-        CASE m.entity_type_id
+        CASE m.entitytypeid
           WHEN 1 THEN 'Academic Program'
           WHEN 2 THEN 'Non-Academic Office'
           ELSE 'Unknown'
         END AS entity_type
       FROM ${TABLE_NAME} m
-      LEFT JOIN departments d ON m.department_id = d.id
+      LEFT JOIN departments d ON m.departmentid = d.id
       WHERE m.id NOT IN (
-        SELECT master_list_id FROM offices WHERE EventID = ? AND master_list_id IS NOT NULL
+        SELECT masterlistid FROM offices WHERE eventid = ? AND masterlistid IS NOT NULL
       )
-      ORDER BY m.entity_name ASC
+      ORDER BY m.entityname ASC
       `,
-      [eventId]
+      [eventid]
     );
     return res.json({ success: true, data: rows.map(formatMasterListRow) });
   } catch (error) {
@@ -231,9 +231,9 @@ exports.getAvailableForEvent = async (req, res) => {
 
 exports.addItem = async (req, res) => {
   try {
-    const { name, entityTypeId, type, departmentId, department } = req.body;
+    const { name, entitytypeid, type, departmentid, department } = req.body;
     const trimmedName = typeof name === 'string' ? name.trim() : '';
-    let parsedTypeId = Number(entityTypeId) || 0;
+    let parsedTypeId = Number(entitytypeid) || 0;
 
     if (!parsedTypeId && typeof type === 'string') {
       if (type === 'Academic Program') parsedTypeId = 1;
@@ -245,8 +245,8 @@ exports.addItem = async (req, res) => {
     }
 
     let parsedDepartmentId = null;
-    if (departmentId) {
-      parsedDepartmentId = Number(departmentId) || null;
+    if (departmentid) {
+      parsedDepartmentId = Number(departmentid) || null;
     } else if (department && typeof department === 'string') {
       const [rows] = await db.query('SELECT id FROM departments WHERE name = ? LIMIT 1', [department.trim()]);
       parsedDepartmentId = rows[0]?.id || null;
@@ -257,7 +257,7 @@ exports.addItem = async (req, res) => {
     }
 
     const [result] = await db.query(
-      `INSERT INTO ${TABLE_NAME} (entity_name, entity_type_id, department_id) VALUES (?, ?, ?)`,
+      `INSERT INTO ${TABLE_NAME} (entityname, entitytypeid, departmentid) VALUES (?, ?, ?)`,
       [trimmedName, parsedTypeId, parsedDepartmentId]
     );
 
@@ -265,19 +265,19 @@ exports.addItem = async (req, res) => {
       `
       SELECT
         m.id,
-        m.entity_name,
-        m.entity_type_id,
-        m.department_id,
-        m.created_at,
-        m.updated_at,
+        m.entityname,
+        m.entitytypeid,
+        m.departmentid,
+        m.createdat,
+        m.updatedat,
         d.name AS department_name,
-        CASE m.entity_type_id
+        CASE m.entitytypeid
           WHEN 1 THEN 'Academic Program'
           WHEN 2 THEN 'Non-Academic Office'
           ELSE 'Unknown'
         END AS entity_type
       FROM ${TABLE_NAME} m
-      LEFT JOIN departments d ON m.department_id = d.id
+      LEFT JOIN departments d ON m.departmentid = d.id
       WHERE m.id = ?
       `,
       [result.insertId]
@@ -289,9 +289,9 @@ exports.addItem = async (req, res) => {
     }
 
     const data = formatMasterListRow(inserted);
-    if (req.user && req.user.userId) {
+    if (req.user && req.user.userid) {
       try {
-        recordLog(req.user.userId, 'MasterListItemAdded', { id: data.id, name: data.name });
+        recordLog(req.user.userid, 'MasterListItemAdded', { id: data.id, name: data.name });
       } catch (e) {
         console.error('Failed to record log for master list add:', e);
       }
@@ -307,9 +307,9 @@ exports.addItem = async (req, res) => {
 exports.updateItem = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, entityTypeId, type, departmentId } = req.body;
+    const { name, entitytypeid, type, departmentid } = req.body;
     const trimmedName = typeof name === 'string' ? name.trim() : '';
-    let parsedTypeId = Number(entityTypeId) || 0;
+    let parsedTypeId = Number(entitytypeid) || 0;
 
     if (!parsedTypeId && typeof type === 'string') {
       if (type === 'Academic Program') parsedTypeId = 1;
@@ -320,20 +320,20 @@ exports.updateItem = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Name and valid entity type are required.' });
     }
 
-    let parsedDepartmentId = departmentId ? Number(departmentId) || null : null;
+    let parsedDepartmentId = departmentid ? Number(departmentid) || null : null;
 
     if (parsedTypeId === 1 && !parsedDepartmentId) {
       return res.status(400).json({ success: false, message: 'Department is required for an academic program.' });
     }
 
     await db.query(
-      `UPDATE ${TABLE_NAME} SET entity_name = ?, entity_type_id = ?, department_id = ? WHERE id = ?`,
+      `UPDATE ${TABLE_NAME} SET entityname = ?, entitytypeid = ?, departmentid = ? WHERE id = ?`,
       [trimmedName, parsedTypeId, parsedDepartmentId, id]
     );
 
     // Keep linked offices names in sync if updated
     await db.query(
-      `UPDATE offices SET OfficeName = ? WHERE master_list_id = ?`,
+      `UPDATE offices SET officename = ? WHERE masterlistid = ?`,
       [trimmedName, id]
     );
 
@@ -341,19 +341,19 @@ exports.updateItem = async (req, res) => {
       `
       SELECT
         m.id,
-        m.entity_name,
-        m.entity_type_id,
-        m.department_id,
-        m.created_at,
-        m.updated_at,
+        m.entityname,
+        m.entitytypeid,
+        m.departmentid,
+        m.createdat,
+        m.updatedat,
         d.name AS department_name,
-        CASE m.entity_type_id
+        CASE m.entitytypeid
           WHEN 1 THEN 'Academic Program'
           WHEN 2 THEN 'Non-Academic Office'
           ELSE 'Unknown'
         END AS entity_type
       FROM ${TABLE_NAME} m
-      LEFT JOIN departments d ON m.department_id = d.id
+      LEFT JOIN departments d ON m.departmentid = d.id
       WHERE m.id = ?
       `,
       [id]
@@ -365,9 +365,9 @@ exports.updateItem = async (req, res) => {
     }
 
     const data = formatMasterListRow(updated);
-    if (req.user && req.user.userId) {
+    if (req.user && req.user.userid) {
       try {
-        recordLog(req.user.userId, 'MasterListItemUpdated', { id: data.id, name: data.name });
+        recordLog(req.user.userid, 'MasterListItemUpdated', { id: data.id, name: data.name });
       } catch (e) {
         console.error('Failed to record log for master list update:', e);
       }
@@ -383,21 +383,21 @@ exports.updateItem = async (req, res) => {
 exports.deleteItem = async (req, res) => {
   try {
     const { id } = req.params;
-    const [rows] = await db.query(`SELECT entity_name FROM ${TABLE_NAME} WHERE id = ?`, [id]);
+    const [rows] = await db.query(`SELECT entityname FROM ${TABLE_NAME} WHERE id = ?`, [id]);
     if (!rows[0]) {
       return res.status(404).json({ success: false, message: 'Item not found.' });
     }
-    const itemName = rows[0].entity_name;
+    const itemName = rows[0].entityname;
 
     // Cascade delete any linked offices in ACC / audit events
     const deletedOfficeIds = await deleteLinkedOffices([Number(id)], [itemName]);
 
-    // Delete item from master_list
+    // Delete item from masterlist
     await db.query(`DELETE FROM ${TABLE_NAME} WHERE id = ?`, [id]);
 
-    if (req.user && req.user.userId) {
+    if (req.user && req.user.userid) {
       try {
-        recordLog(req.user.userId, 'MasterListItemDeleted', {
+        recordLog(req.user.userid, 'MasterListItemDeleted', {
           id,
           name: itemName,
           deletedOfficesCount: deletedOfficeIds.length,
@@ -427,18 +427,18 @@ exports.deleteMultiple = async (req, res) => {
     const placeholders = ids.map(() => '?').join(',');
 
     // Fetch entity names of items to be deleted
-    const [itemRows] = await db.query(`SELECT id, entity_name FROM ${TABLE_NAME} WHERE id IN (${placeholders})`, ids);
-    const itemNames = (itemRows || []).map((r) => r.entity_name).filter(Boolean);
+    const [itemRows] = await db.query(`SELECT id, entityname FROM ${TABLE_NAME} WHERE id IN (${placeholders})`, ids);
+    const itemNames = (itemRows || []).map((r) => r.entityname).filter(Boolean);
 
     // Cascade delete any linked offices in ACC / audit events
     const deletedOfficeIds = await deleteLinkedOffices(ids, itemNames);
 
-    // Delete items from master_list
+    // Delete items from masterlist
     await db.query(`DELETE FROM ${TABLE_NAME} WHERE id IN (${placeholders})`, ids);
 
-    if (req.user && req.user.userId) {
+    if (req.user && req.user.userid) {
       try {
-        recordLog(req.user.userId, 'MasterListItemsDeleted', {
+        recordLog(req.user.userid, 'MasterListItemsDeleted', {
           ids,
           deletedOfficesCount: deletedOfficeIds.length,
         });

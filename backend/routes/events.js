@@ -23,7 +23,7 @@ router.put('/update/:id', auth, restrictAuditor, eventsController.updateEvent);
 router.get('/downloadable-folders', auth, restrictAuditorDownloads, eventsController.getDownloadableFolders);
 
 // Download event folder as zip (blocked for Auditors)
-router.get('/download/:eventName', auth, restrictAuditorDownloads, eventsController.downloadEventZip);
+router.get('/download/:eventname', auth, restrictAuditorDownloads, eventsController.downloadEventZip);
 
 // Copy event
 router.post('/copy', auth, restrictAuditor, eventsController.copyEvent);

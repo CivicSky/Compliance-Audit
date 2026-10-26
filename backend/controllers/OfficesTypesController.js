@@ -14,7 +14,7 @@ const OfficeTypesController = {
   getById: async (req, res) => {
     const id = req.params.id;
     try {
-      const [results] = await db.query("SELECT * FROM officetypes WHERE OfficeTypeID = ?", [id]);
+      const [results] = await db.query("SELECT * FROM officetypes WHERE officetypeid = ?", [id]);
       if (results.length === 0) return res.status(404).json({ message: "Office type not found" });
       res.json(results[0]);
     } catch (err) {
@@ -24,12 +24,12 @@ const OfficeTypesController = {
   },
 
   create: async (req, res) => {
-    const { TypeName } = req.body;
-    if (!TypeName) return res.status(400).json({ error: "TypeName is required" });
+    const { typename } = req.body;
+    if (!typename) return res.status(400).json({ error: "typename is required" });
 
     try {
-      const [result] = await db.query("INSERT INTO officetypes (TypeName) VALUES (?)", [TypeName]);
-      res.status(201).json({ OfficeTypeID: result.insertId, TypeName });
+      const [result] = await db.query("INSERT INTO officetypes (typename) VALUES (?)", [typename]);
+      res.status(201).json({ officetypeid: result.insertId, typename });
     } catch (err) {
       console.error("Error creating office type:", err);
       res.status(500).json({ error: "Database error" });
@@ -38,11 +38,11 @@ const OfficeTypesController = {
 
   update: async (req, res) => {
     const id = req.params.id;
-    const { TypeName } = req.body;
-    if (!TypeName) return res.status(400).json({ error: "TypeName is required" });
+    const { typename } = req.body;
+    if (!typename) return res.status(400).json({ error: "typename is required" });
 
     try {
-      const [result] = await db.query("UPDATE officetypes SET TypeName = ? WHERE OfficeTypeID = ?", [TypeName, id]);
+      const [result] = await db.query("UPDATE officetypes SET typename = ? WHERE officetypeid = ?", [typename, id]);
       if (result.affectedRows === 0) return res.status(404).json({ message: "Office type not found" });
       res.json({ message: "Office type updated successfully" });
     } catch (err) {
@@ -54,7 +54,7 @@ const OfficeTypesController = {
   delete: async (req, res) => {
     const id = req.params.id;
     try {
-      const [result] = await db.query("DELETE FROM officetypes WHERE OfficeTypeID = ?", [id]);
+      const [result] = await db.query("DELETE FROM officetypes WHERE officetypeid = ?", [id]);
       if (result.affectedRows === 0) return res.status(404).json({ message: "Office type not found" });
       res.json({ message: "Office type deleted successfully" });
     } catch (err) {

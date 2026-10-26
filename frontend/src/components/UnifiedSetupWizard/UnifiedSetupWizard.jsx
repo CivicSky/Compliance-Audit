@@ -19,29 +19,29 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
     const [availableRequirements, setAvailableRequirements] = useState([]);
     
     const [eventData, setEventData] = useState({
-        EventCode: '',
-        EventName: '',
+        eventcode: '',
+        eventname: '',
         Description: ''
     });
     
     const [areaData, setAreaData] = useState({
-        AreaCode: '',
-        AreaName: '',
+        areacode: '',
+        areaname: '',
         Description: ''
     });
     
     const [criteriaData, setCriteriaData] = useState({
-        AreaID: '',
-        CriteriaCode: '',
-        CriteriaName: '',
+        areaid: '',
+        criteriacode: '',
+        criterianame: '',
         Description: '',
-        ParentCriteriaID: ''
+        parentcriteriaid: ''
     });
     
     const [requirementData, setRequirementData] = useState({
-        RequirementCode: '',
+        requirementcode: '',
         Description: '',
-        ParentRequirementCode: ''
+        parentrequirementcode: ''
     });
     
     const [criteriaList, setCriteriaList] = useState([]);
@@ -51,10 +51,10 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
     const [errors, setErrors] = useState({});
     
     const [createdIds, setCreatedIds] = useState({
-        eventId: null,
-        areaId: null,
-        criteriaId: null,
-        requirementId: null
+        eventid: null,
+        areaid: null,
+        criteriaid: null,
+        requirementid: null
     });
 
     useEffect(() => {
@@ -70,13 +70,13 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
         setAreaMode(null);
         setCriteriaMode(null);
         setRequirementMode(null);
-        setEventData({ EventCode: '', EventName: '', Description: '' });
-        setAreaData({ AreaCode: '', AreaName: '', Description: '' });
-        setCriteriaData({ AreaID: '', CriteriaCode: '', CriteriaName: '', Description: '', ParentCriteriaID: '' });
-        setRequirementData({ RequirementCode: '', Description: '', ParentRequirementCode: '' });
+        setEventData({ eventcode: '', eventname: '', Description: '' });
+        setAreaData({ areacode: '', areaname: '', Description: '' });
+        setCriteriaData({ areaid: '', criteriacode: '', criterianame: '', Description: '', parentcriteriaid: '' });
+        setRequirementData({ requirementcode: '', Description: '', parentrequirementcode: '' });
         setErrors({});
         setSuccessMessage('');
-        setCreatedIds({ eventId: null, areaId: null, criteriaId: null, requirementId: null });
+        setCreatedIds({ eventid: null, areaid: null, criteriaid: null, requirementid: null });
         setCriteriaList([]);
         setParentCriteria([]);
         setAvailableCriteria([]);
@@ -97,9 +97,9 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
         }
     };
 
-    const fetchAvailableAreas = async (eventId) => {
+    const fetchAvailableAreas = async (eventid) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/areas/event/${eventId}`);
+            const response = await fetch(`${API_BASE_URL}/api/areas/event/${eventid}`);
             const data = await response.json();
             if (data.success) setAvailableAreas(data.data || []);
         } catch (error) {
@@ -107,9 +107,9 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
         }
     };
 
-    const fetchAreasByEvent = async (eventId) => {
+    const fetchAreasByEvent = async (eventid) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/areas/event/${eventId}`);
+            const response = await fetch(`${API_BASE_URL}/api/areas/event/${eventid}`);
             const data = await response.json();
             if (data.success) setAreasList(data.data || []);
         } catch (error) {
@@ -117,30 +117,30 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
         }
     };
 
-    const fetchCriteriaForEvent = async (eventId) => {
+    const fetchCriteriaForEvent = async (eventid) => {
         try {
             const { criteriaAPI } = await import('../../utils/api');
-            const response = await criteriaAPI.getByEvent(eventId);
+            const response = await criteriaAPI.getByEvent(eventid);
             if (response.success) setParentCriteria(response.data || []);
         } catch (error) {
             console.error('Error fetching criteria:', error);
         }
     };
 
-    const fetchAvailableCriteria = async (eventId) => {
+    const fetchAvailableCriteria = async (eventid) => {
         try {
             const { criteriaAPI } = await import('../../utils/api');
-            const response = await criteriaAPI.getByEvent(eventId);
+            const response = await criteriaAPI.getByEvent(eventid);
             if (response.success) setAvailableCriteria(response.data || []);
         } catch (error) {
             console.error('Error fetching criteria:', error);
         }
     };
 
-    const fetchAvailableRequirements = async (eventId) => {
+    const fetchAvailableRequirements = async (eventid) => {
         try {
             const { requirementsAPI } = await import('../../utils/api');
-            const response = await requirementsAPI.getRequirementsByEvent(eventId);
+            const response = await requirementsAPI.getRequirementsByEvent(eventid);
             if (response.success) setAvailableRequirements(response.data || []);
         } catch (error) {
             console.error('Error fetching requirements:', error);
@@ -148,27 +148,27 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
     };
 
     useEffect(() => {
-        if (currentStep === 2 && createdIds.eventId) {
+        if (currentStep === 2 && createdIds.eventid) {
             setAreaMode(null);
-            fetchAvailableAreas(createdIds.eventId);
+            fetchAvailableAreas(createdIds.eventid);
         }
-    }, [currentStep, createdIds.eventId]);
+    }, [currentStep, createdIds.eventid]);
 
     useEffect(() => {
-        if (currentStep === 3 && createdIds.eventId) {
+        if (currentStep === 3 && createdIds.eventid) {
             setCriteriaMode(null);
-            fetchAvailableCriteria(createdIds.eventId);
-            fetchAreasByEvent(createdIds.eventId);
-            fetchCriteriaForEvent(createdIds.eventId);
+            fetchAvailableCriteria(createdIds.eventid);
+            fetchAreasByEvent(createdIds.eventid);
+            fetchCriteriaForEvent(createdIds.eventid);
         }
     }, [currentStep]);
 
     useEffect(() => {
-        if (currentStep === 4 && createdIds.eventId) {
+        if (currentStep === 4 && createdIds.eventid) {
             setRequirementMode(null);
-            fetchAvailableRequirements(createdIds.eventId);
+            fetchAvailableRequirements(createdIds.eventid);
         }
-    }, [currentStep, createdIds.eventId]);
+    }, [currentStep, createdIds.eventid]);
 
     const handleEventChange = (e) => {
         const { name, value } = e.target;
@@ -216,31 +216,31 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
 
     const validateEvent = () => {
         const newErrors = {};
-        if (!eventData.EventCode.trim()) newErrors.EventCode = 'Required';
-        if (!eventData.EventName.trim()) newErrors.EventName = 'Required';
+        if (!eventData.eventcode.trim()) newErrors.eventcode = 'Required';
+        if (!eventData.eventname.trim()) newErrors.eventname = 'Required';
         setErrors({ eventData: newErrors });
         return Object.keys(newErrors).length === 0;
     };
 
     const validateArea = () => {
         const newErrors = {};
-        if (!areaData.AreaCode.trim()) newErrors.AreaCode = 'Required';
-        if (!areaData.AreaName.trim()) newErrors.AreaName = 'Required';
+        if (!areaData.areacode.trim()) newErrors.areacode = 'Required';
+        if (!areaData.areaname.trim()) newErrors.areaname = 'Required';
         setErrors({ areaData: newErrors });
         return Object.keys(newErrors).length === 0;
     };
 
     const validateCriteria = () => {
         const newErrors = {};
-        if (!criteriaData.CriteriaCode.trim()) newErrors.CriteriaCode = 'Required';
-        if (!criteriaData.CriteriaName.trim()) newErrors.CriteriaName = 'Required';
+        if (!criteriaData.criteriacode.trim()) newErrors.criteriacode = 'Required';
+        if (!criteriaData.criterianame.trim()) newErrors.criterianame = 'Required';
         setErrors({ criteriaData: newErrors });
         return Object.keys(newErrors).length === 0;
     };
 
     const validateRequirement = () => {
         const newErrors = {};
-        if (!requirementData.RequirementCode.trim()) newErrors.RequirementCode = 'Required';
+        if (!requirementData.requirementcode.trim()) newErrors.requirementcode = 'Required';
         setErrors({ requirementData: newErrors });
         return Object.keys(newErrors).length === 0;
     };
@@ -252,13 +252,13 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
         try {
             const { eventsAPI } = await import('../../utils/api');
             const response = await eventsAPI.addEvent({
-                EventCode: eventData.EventCode,
-                EventName: eventData.EventName,
+                eventcode: eventData.eventcode,
+                eventname: eventData.eventname,
                 Description: eventData.Description || null
             });
 
             if (response.success) {
-                setCreatedIds(prev => ({ ...prev, eventId: response.data.id || response.data.EventID }));
+                setCreatedIds(prev => ({ ...prev, eventid: response.data.id || response.data.eventid }));
                 toast({ title: 'Success', description: 'Accreditation created successfully', variant: 'success' });
                 setSuccessMessage('Accreditation created');
                 setTimeout(() => {
@@ -283,16 +283,16 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
         try {
             const { areasAPI } = await import('../../utils/api');
             const response = await areasAPI.addArea({
-                EventChildID: createdIds.eventId,
-                AreaCode: areaData.AreaCode,
-                AreaName: areaData.AreaName,
+                EventChildID: createdIds.eventid,
+                areacode: areaData.areacode,
+                areaname: areaData.areaname,
                 Description: areaData.Description || null
             });
 
             if (response.success) {
-                const areaId = response.data.id || response.data.AreaID;
-                setCreatedIds(prev => ({ ...prev, areaId }));
-                setCriteriaData(prev => ({ ...prev, AreaID: areaId }));
+                const areaid = response.data.id || response.data.areaid;
+                setCreatedIds(prev => ({ ...prev, areaid }));
+                setCriteriaData(prev => ({ ...prev, areaid: areaid }));
                 toast({ title: 'Success', description: 'Area created successfully', variant: 'success' });
                 setSuccessMessage('Area created');
                 setTimeout(() => {
@@ -317,16 +317,16 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
         try {
             const { criteriaAPI } = await import('../../utils/api');
             const response = await criteriaAPI.addCriteria({
-                EventID: createdIds.eventId,
-                AreaID: criteriaData.AreaID || null,
-                CriteriaCode: criteriaData.CriteriaCode,
-                CriteriaName: criteriaData.CriteriaName,
+                eventid: createdIds.eventid,
+                areaid: criteriaData.areaid || null,
+                criteriacode: criteriaData.criteriacode,
+                criterianame: criteriaData.criterianame,
                 Description: criteriaData.Description || null,
-                ParentCriteriaID: criteriaData.ParentCriteriaID || null
+                parentcriteriaid: criteriaData.parentcriteriaid || null
             });
 
             if (response.success) {
-                setCreatedIds(prev => ({ ...prev, criteriaId: response.data.id || response.data.CriteriaID }));
+                setCreatedIds(prev => ({ ...prev, criteriaid: response.data.id || response.data.criteriaid }));
                 toast({ title: 'Success', description: 'Sub area created successfully', variant: 'success' });
                 setSuccessMessage('Sub area created');
                 setTimeout(() => {
@@ -347,7 +347,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
     const handleAddRequirement = async () => {
         if (!validateRequirement()) return;
 
-        if (!createdIds.criteriaId && !criteriaData.CriteriaID) {
+        if (!createdIds.criteriaid && !criteriaData.criteriaid) {
             toast({ title: 'Warning', description: 'Please select a sub area first', variant: 'warning' });
             return;
         }
@@ -361,15 +361,15 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
         try {
             const { requirementsAPI } = await import('../../utils/api');
             const response = await requirementsAPI.addRequirement({
-                EventID: createdIds.eventId,
-                RequirementCode: requirementData.RequirementCode,
+                eventid: createdIds.eventid,
+                requirementcode: requirementData.requirementcode,
                 Description: requirementData.Description,
-                CriteriaID: createdIds.criteriaId || criteriaData.CriteriaID,
-                ParentRequirementCode: requirementData.ParentRequirementCode || null
+                criteriaid: createdIds.criteriaid || criteriaData.criteriaid,
+                parentrequirementcode: requirementData.parentrequirementcode || null
             });
 
             if (response.success) {
-                setCreatedIds(prev => ({ ...prev, requirementId: response.data.id || response.data.RequirementID }));
+                setCreatedIds(prev => ({ ...prev, requirementid: response.data.id || response.data.requirementid }));
                 toast({ title: 'Success', description: 'Standard created successfully', variant: 'success' });
                 setSuccessMessage('Standard created');
                 setTimeout(() => {
@@ -392,7 +392,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
             if (eventMode === 'create') {
                 handleAddEvent();
             } else if (eventMode === 'select') {
-                if (!createdIds.eventId) {
+                if (!createdIds.eventid) {
                     toast({ title: 'Warning', description: 'Please select an accreditation', variant: 'warning' });
                     return;
                 }
@@ -402,7 +402,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
             if (areaMode === 'create') {
                 handleAddArea();
             } else if (areaMode === 'select') {
-                if (!createdIds.areaId) {
+                if (!createdIds.areaid) {
                     toast({ title: 'Warning', description: 'Please select an area', variant: 'warning' });
                     return;
                 }
@@ -414,11 +414,11 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
             if (criteriaMode === 'create') {
                 handleAddCriteria();
             } else if (criteriaMode === 'select') {
-                if (!criteriaData.CriteriaCode) {
+                if (!criteriaData.criteriacode) {
                     toast({ title: 'Warning', description: 'Please select a sub area', variant: 'warning' });
                     return;
                 }
-                setCreatedIds(prev => ({ ...prev, criteriaId: criteriaData.CriteriaID }));
+                setCreatedIds(prev => ({ ...prev, criteriaid: criteriaData.criteriaid }));
                 setCurrentStep(4);
             }
         } else if (currentStep === 4) {
@@ -591,21 +591,21 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                         <CustomSelect
                                             value={eventData.EventId || ''}
                                             onChange={(val) => {
-                                                const selected = availableEvents.find(ev => ev.EventID === parseInt(val));
+                                                const selected = availableEvents.find(ev => ev.eventid === parseInt(val));
                                                 if (selected) {
                                                     setEventData({
                                                         ...eventData,
-                                                        EventId: selected.EventID,
-                                                        EventName: selected.EventName,
-                                                        EventCode: selected.EventCode,
+                                                        EventId: selected.eventid,
+                                                        eventname: selected.eventname,
+                                                        eventcode: selected.eventcode,
                                                         Description: selected.Description || ''
                                                     });
-                                                    setCreatedIds(prev => ({ ...prev, eventId: selected.EventID }));
+                                                    setCreatedIds(prev => ({ ...prev, eventid: selected.eventid }));
                                                 }
                                             }}
                                             options={availableEvents.map((event) => ({
-                                                value: String(event.EventID),
-                                                label: `${event.EventCode} - ${event.EventName}`
+                                                value: String(event.eventid),
+                                                label: `${event.eventcode} - ${event.eventname}`
                                             }))}
                                             placeholder="Select an event"
                                             size="md"
@@ -627,20 +627,20 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                             </label>
                                             <input
                                                 type="text"
-                                                name="EventCode"
-                                                value={eventData.EventCode}
+                                                name="eventcode"
+                                                value={eventData.eventcode}
                                                 onChange={handleEventChange}
                                                 placeholder="AUD-2024-001"
                                                 className={`
                                                     w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2
-                                                    ${errors.eventData?.EventCode
+                                                    ${errors.eventData?.eventcode
                                                         ? 'border-rose-300 focus:ring-rose-500/20 focus:border-rose-500'
                                                         : 'border-gray-200 focus:ring-blue-500/20 focus:border-blue-500'
                                                     }
                                                 `}
                                             />
-                                            {errors.eventData?.EventCode && (
-                                                <p className="text-xs text-rose-500 mt-1">{errors.eventData.EventCode}</p>
+                                            {errors.eventData?.eventcode && (
+                                                <p className="text-xs text-rose-500 mt-1">{errors.eventData.eventcode}</p>
                                             )}
                                         </div>
                                         <div>
@@ -649,20 +649,20 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                             </label>
                                             <input
                                                 type="text"
-                                                name="EventName"
-                                                value={eventData.EventName}
+                                                name="eventname"
+                                                value={eventData.eventname}
                                                 onChange={handleEventChange}
                                                 placeholder="Annual Compliance Audit"
                                                 className={`
                                                     w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2
-                                                    ${errors.eventData?.EventName
+                                                    ${errors.eventData?.eventname
                                                         ? 'border-rose-300 focus:ring-rose-500/20 focus:border-rose-500'
                                                         : 'border-gray-200 focus:ring-blue-500/20 focus:border-blue-500'
                                                     }
                                                 `}
                                             />
-                                            {errors.eventData?.EventName && (
-                                                <p className="text-xs text-rose-500 mt-1">{errors.eventData.EventName}</p>
+                                            {errors.eventData?.eventname && (
+                                                <p className="text-xs text-rose-500 mt-1">{errors.eventData.eventname}</p>
                                             )}
                                         </div>
                                     </div>
@@ -703,9 +703,9 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                         onClick={() => {
                                             setAreaMode(mode);
                                             if (mode === 'skip') {
-                                                setAreaData({ AreaCode: '', AreaName: '', Description: '' });
-                                                setCreatedIds(prev => ({ ...prev, areaId: null }));
-                                                setCriteriaData(prev => ({ ...prev, AreaID: '' }));
+                                                setAreaData({ areacode: '', areaname: '', Description: '' });
+                                                setCreatedIds(prev => ({ ...prev, areaid: null }));
+                                                setCriteriaData(prev => ({ ...prev, areaid: '' }));
                                             }
                                         }}
                                         className={`
@@ -736,23 +736,23 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                     </label>
                                     {availableAreas.length > 0 ? (
                                         <CustomSelect
-                                            value={areaData.AreaCode || ''}
+                                            value={areaData.areacode || ''}
                                             onChange={(val) => {
-                                                const selected = availableAreas.find(ar => ar.AreaCode === val);
+                                                const selected = availableAreas.find(ar => ar.areacode === val);
                                                 if (selected) {
                                                     setAreaData({
                                                         ...areaData,
-                                                        AreaCode: selected.AreaCode,
-                                                        AreaName: selected.AreaName,
+                                                        areacode: selected.areacode,
+                                                        areaname: selected.areaname,
                                                         Description: selected.Description || ''
                                                     });
-                                                    setCreatedIds(prev => ({ ...prev, areaId: selected.AreaID }));
-                                                    setCriteriaData(prev => ({ ...prev, AreaID: selected.AreaID }));
+                                                    setCreatedIds(prev => ({ ...prev, areaid: selected.areaid }));
+                                                    setCriteriaData(prev => ({ ...prev, areaid: selected.areaid }));
                                                 }
                                             }}
                                             options={availableAreas.map((area) => ({
-                                                value: area.AreaCode,
-                                                label: `${area.AreaName} (${area.AreaCode})`
+                                                value: area.areacode,
+                                                label: `${area.areaname} (${area.areacode})`
                                             }))}
                                             placeholder="Select an area"
                                             size="md"
@@ -774,20 +774,20 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                             </label>
                                             <input
                                                 type="text"
-                                                name="AreaCode"
-                                                value={areaData.AreaCode}
+                                                name="areacode"
+                                                value={areaData.areacode}
                                                 onChange={handleAreaChange}
                                                 placeholder="AREA-001"
                                                 className={`
                                                     w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2
-                                                    ${errors.areaData?.AreaCode
+                                                    ${errors.areaData?.areacode
                                                         ? 'border-rose-300 focus:ring-rose-500/20 focus:border-rose-500'
                                                         : 'border-gray-200 focus:ring-blue-500/20 focus:border-blue-500'
                                                     }
                                                 `}
                                             />
-                                            {errors.areaData?.AreaCode && (
-                                                <p className="text-xs text-rose-500 mt-1">{errors.areaData.AreaCode}</p>
+                                            {errors.areaData?.areacode && (
+                                                <p className="text-xs text-rose-500 mt-1">{errors.areaData.areacode}</p>
                                             )}
                                         </div>
                                         <div>
@@ -796,20 +796,20 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                             </label>
                                             <input
                                                 type="text"
-                                                name="AreaName"
-                                                value={areaData.AreaName}
+                                                name="areaname"
+                                                value={areaData.areaname}
                                                 onChange={handleAreaChange}
                                                 placeholder="Financial Controls"
                                                 className={`
                                                     w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2
-                                                    ${errors.areaData?.AreaName
+                                                    ${errors.areaData?.areaname
                                                         ? 'border-rose-300 focus:ring-rose-500/20 focus:border-rose-500'
                                                         : 'border-gray-200 focus:ring-blue-500/20 focus:border-blue-500'
                                                     }
                                                 `}
                                             />
-                                            {errors.areaData?.AreaName && (
-                                                <p className="text-xs text-rose-500 mt-1">{errors.areaData.AreaName}</p>
+                                            {errors.areaData?.areaname && (
+                                                <p className="text-xs text-rose-500 mt-1">{errors.areaData.areaname}</p>
                                             )}
                                         </div>
                                     </div>
@@ -868,10 +868,10 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                 ))}
                             </div>
 
-                            {criteriaData.AreaID && (
+                            {criteriaData.areaid && (
                                 <div className="p-3 bg-blue-50/50 border border-blue-100 rounded-lg">
                                     <p className="text-xs text-gray-600">
-                                        <span className="font-medium">Selected Area:</span> {areasList.find(a => a.AreaID == criteriaData.AreaID)?.AreaName || 'Area'}
+                                        <span className="font-medium">Selected Area:</span> {areasList.find(a => a.areaid == criteriaData.areaid)?.areaname || 'Area'}
                                     </p>
                                 </div>
                             )}
@@ -881,28 +881,28 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                     <label className="block text-sm font-medium text-gray-700">
                                         Select Sub Area
                                     </label>
-                                    {criteriaData.AreaID ? (
-                                        availableCriteria.filter(c => String(c.AreaID) === String(criteriaData.AreaID)).length > 0 ? (
+                                    {criteriaData.areaid ? (
+                                        availableCriteria.filter(c => String(c.areaid) === String(criteriaData.areaid)).length > 0 ? (
                                             <CustomSelect
-                                                value={criteriaData.CriteriaCode || ''}
+                                                value={criteriaData.criteriacode || ''}
                                                 onChange={(val) => {
-                                                    const selected = availableCriteria.find(c => c.CriteriaCode === val);
+                                                    const selected = availableCriteria.find(c => c.criteriacode === val);
                                                     if (selected) {
                                                         setCriteriaData({
                                                             ...criteriaData,
-                                                            CriteriaID: selected.CriteriaID,
-                                                            CriteriaCode: selected.CriteriaCode,
-                                                            CriteriaName: selected.CriteriaName,
+                                                            criteriaid: selected.criteriaid,
+                                                            criteriacode: selected.criteriacode,
+                                                            criterianame: selected.criterianame,
                                                             Description: selected.Description || '',
-                                                            ParentCriteriaID: selected.ParentCriteriaID || ''
+                                                            parentcriteriaid: selected.parentcriteriaid || ''
                                                         });
                                                     }
                                                 }}
                                                 options={availableCriteria
-                                                    .filter(c => String(c.AreaID) === String(criteriaData.AreaID))
+                                                    .filter(c => String(c.areaid) === String(criteriaData.areaid))
                                                     .map((crit) => ({
-                                                        value: crit.CriteriaCode,
-                                                        label: `${crit.CriteriaCode} - ${crit.CriteriaName}`
+                                                        value: crit.criteriacode,
+                                                        label: `${crit.criteriacode} - ${crit.criterianame}`
                                                     }))}
                                                 placeholder="Select a sub area"
                                                 size="md"
@@ -929,20 +929,20 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                             </label>
                                             <input
                                                 type="text"
-                                                name="CriteriaCode"
-                                                value={criteriaData.CriteriaCode}
+                                                name="criteriacode"
+                                                value={criteriaData.criteriacode}
                                                 onChange={handleCriteriaChange}
                                                 placeholder="CRIT-001"
                                                 className={`
                                                     w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2
-                                                    ${errors.criteriaData?.CriteriaCode
+                                                    ${errors.criteriaData?.criteriacode
                                                         ? 'border-rose-300 focus:ring-rose-500/20 focus:border-rose-500'
                                                         : 'border-gray-200 focus:ring-blue-500/20 focus:border-blue-500'
                                                     }
                                                 `}
                                             />
-                                            {errors.criteriaData?.CriteriaCode && (
-                                                <p className="text-xs text-rose-500 mt-1">{errors.criteriaData.CriteriaCode}</p>
+                                            {errors.criteriaData?.criteriacode && (
+                                                <p className="text-xs text-rose-500 mt-1">{errors.criteriaData.criteriacode}</p>
                                             )}
                                         </div>
                                         <div>
@@ -951,39 +951,39 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                             </label>
                                             <input
                                                 type="text"
-                                                name="CriteriaName"
-                                                value={criteriaData.CriteriaName}
+                                                name="criterianame"
+                                                value={criteriaData.criterianame}
                                                 onChange={handleCriteriaChange}
                                                 placeholder="Payment Controls"
                                                 className={`
                                                     w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2
-                                                    ${errors.criteriaData?.CriteriaName
+                                                    ${errors.criteriaData?.criterianame
                                                         ? 'border-rose-300 focus:ring-rose-500/20 focus:border-rose-500'
                                                         : 'border-gray-200 focus:ring-blue-500/20 focus:border-blue-500'
                                                     }
                                                 `}
                                             />
-                                            {errors.criteriaData?.CriteriaName && (
-                                                <p className="text-xs text-rose-500 mt-1">{errors.criteriaData.CriteriaName}</p>
+                                            {errors.criteriaData?.criterianame && (
+                                                <p className="text-xs text-rose-500 mt-1">{errors.criteriaData.criterianame}</p>
                                             )}
                                         </div>
                                     </div>
 
-                                    {criteriaData.AreaID && parentCriteria.length > 0 && (
+                                    {criteriaData.areaid && parentCriteria.length > 0 && (
                                         <div>
                                             <label className="block text-xs font-medium text-gray-700 mb-1.5">
                                                 Parent Sub Area <span className="text-gray-400">(optional)</span>
                                             </label>
                                             <CustomSelect
-                                                value={criteriaData.ParentCriteriaID}
-                                                onChange={(val) => handleCriteriaChange({ target: { name: 'ParentCriteriaID', value: val } })}
+                                                value={criteriaData.parentcriteriaid}
+                                                onChange={(val) => handleCriteriaChange({ target: { name: 'parentcriteriaid', value: val } })}
                                                 options={[
                                                     { value: '', label: 'None (Top-level)' },
                                                     ...parentCriteria
-                                                        .filter(c => String(c.AreaID) === String(criteriaData.AreaID))
+                                                        .filter(c => String(c.areaid) === String(criteriaData.areaid))
                                                         .map(c => ({
-                                                            value: String(c.CriteriaID),
-                                                            label: `${c.CriteriaCode} - ${c.CriteriaName}`
+                                                            value: String(c.criteriaid),
+                                                            label: `${c.criteriacode} - ${c.criterianame}`
                                                         }))
                                                 ]}
                                                 placeholder="None (Top-level)"
@@ -1057,18 +1057,18 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                             </label>
                                             {(() => {
                                                 const criteriaRequirements = availableRequirements.filter(
-                                                    req => req.CriteriaID === criteriaData.CriteriaID
+                                                    req => req.criteriaid === criteriaData.criteriaid
                                                 );
                                                 
                                                 return criteriaRequirements.length > 0 ? (
                                                     <CustomSelect
-                                                        value={requirementData.ParentRequirementCode || ''}
-                                                        onChange={(val) => setRequirementData(prev => ({ ...prev, ParentRequirementCode: val }))}
+                                                        value={requirementData.parentrequirementcode || ''}
+                                                        onChange={(val) => setRequirementData(prev => ({ ...prev, parentrequirementcode: val }))}
                                                         options={[
                                                             { value: '', label: '-- Select a parent --' },
                                                             ...criteriaRequirements.map((req) => ({
-                                                                value: req.RequirementCode,
-                                                                label: req.RequirementCode
+                                                                value: req.requirementcode,
+                                                                label: req.requirementcode
                                                             }))
                                                         ]}
                                                         placeholder="Select a parent"
@@ -1089,20 +1089,20 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                         </label>
                                         <input
                                             type="text"
-                                            name="RequirementCode"
-                                            value={requirementData.RequirementCode}
+                                            name="requirementcode"
+                                            value={requirementData.requirementcode}
                                             onChange={handleRequirementChange}
                                             placeholder="REQ-001"
                                             className={`
                                                 w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2
-                                                ${errors.requirementData?.RequirementCode
+                                                ${errors.requirementData?.requirementcode
                                                     ? 'border-rose-300 focus:ring-rose-500/20 focus:border-rose-500'
                                                     : 'border-gray-200 focus:ring-blue-500/20 focus:border-blue-500'
                                                 }
                                             `}
                                         />
-                                        {errors.requirementData?.RequirementCode && (
-                                            <p className="text-xs text-rose-500 mt-1">{errors.requirementData.RequirementCode}</p>
+                                        {errors.requirementData?.requirementcode && (
+                                            <p className="text-xs text-rose-500 mt-1">{errors.requirementData.requirementcode}</p>
                                         )}
                                     </div>
 
@@ -1137,23 +1137,23 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                             <div className="bg-gray-50 rounded-xl p-4 text-left space-y-2 text-sm border border-gray-100">
                                 <p className="flex items-center gap-2">
                                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                    <strong>Accreditation:</strong> {eventData.EventName}
+                                    <strong>Accreditation:</strong> {eventData.eventname}
                                 </p>
-                                {areaData.AreaName && (
+                                {areaData.areaname && (
                                     <p className="flex items-center gap-2">
                                         <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-                                        <strong>Area:</strong> {areaData.AreaName}
+                                        <strong>Area:</strong> {areaData.areaname}
                                     </p>
                                 )}
-                                {criteriaData.CriteriaName && (
+                                {criteriaData.criterianame && (
                                     <p className="flex items-center gap-2">
                                         <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                                        <strong>Sub Area:</strong> {criteriaData.CriteriaName}
+                                        <strong>Sub Area:</strong> {criteriaData.criterianame}
                                     </p>
                                 )}
                                 <p className="flex items-center gap-2">
                                     <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-                                    <strong>Standard:</strong> {requirementData.RequirementCode}
+                                    <strong>Standard:</strong> {requirementData.requirementcode}
                                 </p>
                             </div>
                         </div>
@@ -1172,13 +1172,13 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                     Structure Preview
                                 </h4>
                                 <p className="text-xs text-slate-500 mt-1">
-                                    {(eventData.EventName ? 1 : 0) + (areaData.AreaName ? 1 : 0) + (criteriaData.CriteriaName ? 1 : 0) + (requirementData.RequirementCode ? 1 : 0)}/4 items configured
+                                    {(eventData.eventname ? 1 : 0) + (areaData.areaname ? 1 : 0) + (criteriaData.criterianame ? 1 : 0) + (requirementData.requirementcode ? 1 : 0)}/4 items configured
                                 </p>
                             </div>
 
                             {/* Hierarchical Preview Content */}
                             <div className="flex-1 overflow-y-auto p-4">
-                                {!eventData.EventName ? (
+                                {!eventData.eventname ? (
                                     <div className="text-center py-8">
                                         <div className="w-12 h-12 mx-auto mb-3 bg-gray-100 rounded-full flex items-center justify-center">
                                             <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1196,29 +1196,29 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                                 <Award size={16} className="text-blue-200 shrink-0" />
                                                 <div className="flex-1 min-w-0">
                                                     <p className="text-[10px] font-medium text-blue-100 uppercase">Accreditation</p>
-                                                    <p className="text-sm font-semibold truncate">{eventData.EventName}</p>
+                                                    <p className="text-sm font-semibold truncate">{eventData.eventname}</p>
                                                 </div>
                                                 <Check size={14} className="text-blue-200 flex-shrink-0" />
                                             </div>
-                                            {eventData.EventCode && (
-                                                <p className="text-[10px] text-blue-200 mt-1 pl-6">{eventData.EventCode}</p>
+                                            {eventData.eventcode && (
+                                                <p className="text-[10px] text-blue-200 mt-1 pl-6">{eventData.eventcode}</p>
                                             )}
                                         </div>
 
                                         {/* Area - Nested under Event */}
                                         <div className="ml-3 space-y-3">
-                                            {areaData.AreaName ? (
+                                            {areaData.areaname ? (
                                                 <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-3 py-2.5 rounded-lg shadow-md">
                                                     <div className="flex items-center gap-2">
                                                         <MapPin size={16} className="text-blue-200 shrink-0" />
                                                         <div className="flex-1 min-w-0">
                                                             <p className="text-[10px] font-medium text-blue-100 uppercase">Area</p>
-                                                            <p className="text-sm font-semibold truncate">{areaData.AreaName}</p>
+                                                            <p className="text-sm font-semibold truncate">{areaData.areaname}</p>
                                                         </div>
                                                         <Check size={14} className="text-blue-200 flex-shrink-0" />
                                                     </div>
-                                                    {areaData.AreaCode && (
-                                                        <p className="text-[10px] text-blue-200 mt-1 pl-6">{areaData.AreaCode}</p>
+                                                    {areaData.areacode && (
+                                                        <p className="text-[10px] text-blue-200 mt-1 pl-6">{areaData.areacode}</p>
                                                     )}
                                                 </div>
                                             ) : (
@@ -1235,18 +1235,18 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
 
                                             {/* Criteria - Nested under Area */}
                                             <div className="ml-3 space-y-3">
-                                                {criteriaData.CriteriaName ? (
+                                                {criteriaData.criterianame ? (
                                                     <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-3 py-2.5 rounded-lg shadow-md">
                                                         <div className="flex items-center gap-2">
                                                             <BarChart2 size={16} className="text-blue-200 shrink-0" />
                                                             <div className="flex-1 min-w-0">
                                                                 <p className="text-[10px] font-medium text-blue-100 uppercase">Sub Area</p>
-                                                                <p className="text-sm font-semibold truncate">{criteriaData.CriteriaName}</p>
+                                                                <p className="text-sm font-semibold truncate">{criteriaData.criterianame}</p>
                                                             </div>
                                                             <Check size={14} className="text-blue-200 flex-shrink-0" />
                                                         </div>
-                                                        {criteriaData.CriteriaCode && (
-                                                            <p className="text-[10px] text-blue-200 mt-1 pl-6">{criteriaData.CriteriaCode}</p>
+                                                        {criteriaData.criteriacode && (
+                                                            <p className="text-[10px] text-blue-200 mt-1 pl-6">{criteriaData.criteriacode}</p>
                                                         )}
                                                     </div>
                                                 ) : (
@@ -1263,7 +1263,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
 
                                                 {/* Requirement - Nested under Criteria */}
                                                 <div className="ml-3">
-                                                    {requirementData.RequirementCode ? (
+                                                    {requirementData.requirementcode ? (
                                                         <div className="border-l-4 border-emerald-500 bg-emerald-50 px-3 py-2.5 rounded-r-lg shadow-sm">
                                                             <div className="flex items-center gap-2">
                                                                 <div className="flex-shrink-0 w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center">
@@ -1271,7 +1271,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                                                 </div>
                                                                 <div className="flex-1 min-w-0">
                                                                     <p className="text-[10px] font-medium text-emerald-600 uppercase">Standard</p>
-                                                                    <p className="text-sm font-semibold text-gray-800 truncate">{requirementData.RequirementCode}</p>
+                                                                    <p className="text-sm font-semibold text-gray-800 truncate">{requirementData.requirementcode}</p>
                                                                 </div>
                                                             </div>
                                                             {requirementData.Description && (
@@ -1301,14 +1301,14 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                 <div className="flex items-center justify-between mb-2">
                                     <p className="text-xs text-slate-500">Progress</p>
                                     <p className="text-xs font-medium text-blue-600">
-                                        {(eventData.EventName ? 1 : 0) + (areaData.AreaName ? 1 : 0) + (criteriaData.CriteriaName ? 1 : 0) + (requirementData.RequirementCode ? 1 : 0)}/4
+                                        {(eventData.eventname ? 1 : 0) + (areaData.areaname ? 1 : 0) + (criteriaData.criterianame ? 1 : 0) + (requirementData.requirementcode ? 1 : 0)}/4
                                     </p>
                                 </div>
                                 <div className="w-full bg-gray-200 rounded-full h-2">
                                     <div 
                                         className="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full transition-all duration-300"
                                         style={{ 
-                                            width: `${((eventData.EventName ? 1 : 0) + (areaData.AreaName ? 1 : 0) + (criteriaData.CriteriaName ? 1 : 0) + (requirementData.RequirementCode ? 1 : 0)) * 25}%` 
+                                            width: `${((eventData.eventname ? 1 : 0) + (areaData.areaname ? 1 : 0) + (criteriaData.criterianame ? 1 : 0) + (requirementData.requirementcode ? 1 : 0)) * 25}%` 
                                         }}
                                     />
                                 </div>

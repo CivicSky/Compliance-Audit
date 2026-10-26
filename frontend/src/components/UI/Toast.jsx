@@ -21,8 +21,15 @@ export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
 
   const toast = useCallback(({ title = 'Notice', description, variant = 'info', duration = 1500 }) => {
-    const id = ++toastIdCounter;
-    setToasts(prev => [...prev, { id, title: title || 'Notice', description, variant, duration }].slice(-5));
+    setToasts(prev => {
+      const isDuplicate = prev.some(
+        t => t.description === description && t.title === (title || 'Notice') && t.variant === variant
+      );
+      if (isDuplicate) return prev;
+
+      const id = ++toastIdCounter;
+      return [...prev, { id, title: title || 'Notice', description, variant, duration }].slice(-5);
+    });
   }, []);
 
   const dismiss = useCallback((id) => {

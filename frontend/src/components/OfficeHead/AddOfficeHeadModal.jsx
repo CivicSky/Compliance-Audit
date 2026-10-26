@@ -35,14 +35,14 @@ export default function AddOfficeHeadModal({ isOpen, onClose, onSuccess }) {
             
             // Get existing office heads to exclude them
             const headsResponse = await officeHeadsAPI.getAllHeads();
-            const existingHeadUserIds = (headsResponse || []).map(h => h.UserID);
+            const existingHeadUserIds = (headsResponse || []).map(h => h.userid);
             
-            // Filter: only users with RoleID = 2 (regular users) who are not already heads
+            // Filter: only users with roleid = 2 (regular users) who are not already heads
             // and are approved
             const filteredUsers = allUsers.filter(user => 
-                user.RoleID === 2 && 
-                !existingHeadUserIds.includes(user.UserID) &&
-                user.approval_status === 'approved'
+                user.roleid === 2 && 
+                !existingHeadUserIds.includes(user.userid) &&
+                user.approvalstatus === 'approved'
             );
             
             setAvailableUsers(filteredUsers);
@@ -55,19 +55,19 @@ export default function AddOfficeHeadModal({ isOpen, onClose, onSuccess }) {
     };
 
     // Toggle user selection
-    const toggleUserSelection = (userId) => {
+    const toggleUserSelection = (userid) => {
         setSelectedUserIds(prev => {
-            if (prev.includes(userId)) {
-                return prev.filter(id => id !== userId);
+            if (prev.includes(userid)) {
+                return prev.filter(id => id !== userid);
             } else {
-                return [...prev, userId];
+                return [...prev, userid];
             }
         });
     };
 
     // Filter users by search term
     const filteredUsers = availableUsers.filter(user => {
-        const fullName = `${user.FirstName} ${user.MiddleInitial ? user.MiddleInitial + '.' : ''} ${user.LastName}`.toLowerCase();
+        const fullName = `${user.firstname} ${user.middleinitial ? user.middleinitial + '.' : ''} ${user.lastname}`.toLowerCase();
         const email = (user.Email || '').toLowerCase();
         const search = searchTerm.toLowerCase();
         return fullName.includes(search) || email.includes(search);
@@ -75,7 +75,7 @@ export default function AddOfficeHeadModal({ isOpen, onClose, onSuccess }) {
 
     // Select all filtered users
     const selectAll = () => {
-        const filteredUserIds = filteredUsers.map(u => u.UserID);
+        const filteredUserIds = filteredUsers.map(u => u.userid);
         setSelectedUserIds(filteredUserIds);
     };
 
@@ -207,12 +207,12 @@ export default function AddOfficeHeadModal({ isOpen, onClose, onSuccess }) {
                         ) : (
                             <div className="space-y-1.5">
                                 {filteredUsers.map(user => {
-                                    const isSelected = selectedUserIds.includes(user.UserID);
-                                    const fullName = `${user.FirstName} ${user.MiddleInitial ? user.MiddleInitial + '.' : ''} ${user.LastName}`;
+                                    const isSelected = selectedUserIds.includes(user.userid);
+                                    const fullName = `${user.firstname} ${user.middleinitial ? user.middleinitial + '.' : ''} ${user.lastname}`;
                                     
                                     return (
                                         <label
-                                            key={user.UserID}
+                                            key={user.userid}
                                             className={`flex items-center p-2.5 rounded-xl border cursor-pointer transition-all ${
                                                 isSelected 
                                                     ? 'bg-blue-50/80 border-blue-300 ring-1 ring-blue-300' 
@@ -222,7 +222,7 @@ export default function AddOfficeHeadModal({ isOpen, onClose, onSuccess }) {
                                             <input
                                                 type="checkbox"
                                                 checked={isSelected}
-                                                onChange={() => toggleUserSelection(user.UserID)}
+                                                onChange={() => toggleUserSelection(user.userid)}
                                                 className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
                                             />
                                             <div className="ml-3 flex items-center flex-1 min-w-0">

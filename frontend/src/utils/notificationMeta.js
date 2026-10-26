@@ -18,31 +18,33 @@ export function parseMetaFromMessage(message) {
 }
 
 export function getDisplayMessage(notification) {
-	return parseMetaFromMessage(notification?.Message).text;
+	const msg = notification?.Message ?? notification?.message ?? notification?.Title ?? notification?.title ?? notification?.text ?? '';
+	return parseMetaFromMessage(msg).text;
 }
 
 export function getNotificationMeta(notification) {
-	const { meta } = parseMetaFromMessage(notification?.Message);
-	const table = String(notification?.RelatedTable || '').toLowerCase();
-	const relatedId = notification?.RelatedID != null ? Number(notification.RelatedID) : null;
+	const msg = notification?.Message ?? notification?.message ?? notification?.Title ?? notification?.title ?? notification?.text ?? '';
+	const { meta } = parseMetaFromMessage(msg);
+	const table = String(notification?.relatedtable || '').toLowerCase();
+	const relatedid = notification?.relatedid != null ? Number(notification.relatedid) : null;
 
-	const officeId =
-		meta?.officeId ??
+	const officeid =
+		meta?.officeid ??
 		(['office_personnel', 'requirements_assignment', 'requirement_file_upload', 'offices'].includes(table)
-			? relatedId
+			? relatedid
 			: null);
 
 	return {
 		...meta,
-		officeId: officeId != null && !Number.isNaN(officeId) ? Number(officeId) : null,
-		requirementId: meta?.requirementId != null ? Number(meta.requirementId) : null,
+		officeid: officeid != null && !Number.isNaN(officeid) ? Number(officeid) : null,
+		requirementid: meta?.requirementid != null ? Number(meta.requirementid) : null,
 		viewUserId: meta?.viewUserId != null ? Number(meta.viewUserId) : null,
 		openSubmission: Boolean(meta?.openSubmission) || table === 'requirement_file_upload',
 	};
 }
 
 export function buildNotificationRedirect(notification) {
-	const table = String(notification?.RelatedTable || '').toLowerCase();
+	const table = String(notification?.relatedtable || '').toLowerCase();
 	const meta = getNotificationMeta(notification);
 
 	if (table === 'users_role') return { path: '/home/profile' };
@@ -52,22 +54,30 @@ export function buildNotificationRedirect(notification) {
 		tab: 'categories',
 	});
 
-	if (meta.officeId) {
-		params.set('officeId', String(meta.officeId));
+	if (meta.officeid) {
+		params.set('officeid', String(meta.officeid));
 	} else if (table === 'office_head' || table === 'office_personnel' || table === 'offices') {
-		if (notification?.RelatedID) params.set('officeId', String(notification.RelatedID));
+		if (notification?.relatedid) params.set('officeid', String(notification.relatedid));
 	}
 
-	if (meta.requirementId) params.set('requirementId', String(meta.requirementId));
+	if (meta.requirementid) params.set('requirementid', String(meta.requirementid));
 	if (meta.openSubmission) params.set('openSubmission', '1');
 	if (meta.viewUserId) params.set('viewUserId', String(meta.viewUserId));
 
 	// Auditor area assignment notifications
-	if (table === 'auditor_assignments' || table === 'auditor_area_assignments') {
-		const areaId = meta.areaIds?.[0] || meta.areaId;
-		if (areaId) params.set('areaId', String(areaId));
-		if (meta.officeId) params.set('officeId', String(meta.officeId));
-		if (meta.eventId) params.set('eventId', String(meta.eventId));
+	if (table === 'auditor_assignments' || table === 'auditorareaassignments') {
+		const areaid = meta.areaIds?.[0] || meta.areaid;
+		if (areaid) params.set('areaid', String(areaid));
+		if (meta.officeid) params.set('officeid', String(meta.officeid));
+		if (meta.eventid) params.set('eventid', String(meta.eventid));
+	}
+
+	// Personnel accreditation assignment notifications
+	if (table === 'personnelassignments' || table === 'personnel_assignment') {
+		if (meta.eventid) {
+			return { path: `/home/allc?eventid=${meta.eventid}` };
+		}
+		return { path: '/home/allc' };
 	}
 
 	return { path: `/home/acc-management?${params.toString()}` };

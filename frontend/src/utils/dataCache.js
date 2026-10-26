@@ -157,9 +157,9 @@ if (typeof window !== 'undefined') {
 
 // Convenience helpers
 export const CacheKeys = {
-    officeReqs: (officeId) => `office_reqs_${officeId}`,
-    userFiles: (reqId, userId, officeId = 'all') => `user_files_${reqId}_${officeId || 'all'}_${userId}`,
-    allUserFilesForReq: (reqId, officeId = 'all') => `user_files_${reqId}_${officeId || 'all'}_`,
-    officeSummary: (officeId) => `office_summary_${officeId}`,
+    officeReqs: (officeid) => `office_reqs_${officeid}`,
+    userFiles: (reqId, userid, officeid = 'all') => `user_files_${reqId}_${officeid || 'all'}_${userid}`,
+    allUserFilesForReq: (reqId, officeid = 'all') => `user_files_${reqId}_${officeid || 'all'}_`,
+    officeSummary: (officeid) => `office_summary_${officeid}`,
 };
 

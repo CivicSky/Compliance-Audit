@@ -19,8 +19,8 @@ router.delete("/:id", auth, restrictAuditor, OfficesController.delete);
 // Office Requirements Routes
 router.get("/:id/requirements", auth, OfficesController.getOfficeRequirements);
 router.post("/:id/requirements", auth, restrictAuditor, OfficesController.addOfficeRequirements);
-router.put("/:id/requirements/:requirementId/status", auth, restrictAuditor, OfficesController.updateRequirementStatus);
-router.delete("/:id/requirements/:requirementId", auth, restrictAuditor, OfficesController.removeOfficeRequirement);
+router.put("/:id/requirements/:requirementid/status", auth, OfficesController.updateRequirementStatus);
+router.delete("/:id/requirements/:requirementid", auth, restrictAuditor, OfficesController.removeOfficeRequirement);
 
 module.exports = router;
 

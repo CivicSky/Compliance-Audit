@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { User } from 'lucide-react';
 import { usersAPI } from '../utils/api';
 import EditProfileModal from '../components/EditProfile/EditProfileModal.jsx';
+import ChangePasswordCard from '../components/Profile/ChangePasswordCard.jsx';
 import { API_BASE_URL } from '../utils/apiBase';
 import SmartUserAvatar from '../components/UI/SmartUserAvatar';
 
@@ -46,22 +46,22 @@ export default function Profile() {
 
 	const getRoleName = (u) => {
 		if (!u) return '';
-		if (u.RoleName) {
-			const rn = String(u.RoleName || '').toLowerCase();
+		if (u.rolename) {
+			const rn = String(u.rolename || '').toLowerCase();
 			if (rn === 'admin' || rn === 'administrator') return 'Administrator';
 			if (rn === 'personnel' || rn.includes('personnel') || rn === 'office head') return 'Office Personnel';
 			if (rn === 'user') return 'User';
-			return u.RoleName;
+			return u.rolename;
 		}
 
-		if (Number(u.RoleID) === 1) return 'Administrator';
-		if (Number(u.RoleID) === 3) return 'Office Personnel';
-		if (Number(u.RoleID) === 2) return 'User';
+		if (Number(u.roleid) === 1) return 'Administrator';
+		if (Number(u.roleid) === 3) return 'Office Personnel';
+		if (Number(u.roleid) === 2) return 'User';
 		return 'User';
 	};
 
 	const fullName = user
-		? `${user.FirstName || ''}${user.MiddleInitial ? ` ${user.MiddleInitial}.` : ''} ${user.LastName || ''}`.trim()
+		? `${user.firstname || ''}${user.middleinitial ? ` ${user.middleinitial}.` : ''} ${user.lastname || ''}`.trim()
 		: '';
 
 	if (loading) {
@@ -98,23 +98,13 @@ export default function Profile() {
 
 	return (
 		<ProfileShell>
-			<div className="mx-auto mt-4 max-w-4xl">
-				<div className="mb-5 flex items-center gap-3">
-					<div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-md shadow-blue-500/20 shrink-0">
-						<User className="w-5 h-5 sm:w-5.5 sm:h-5.5" />
-					</div>
-					<div>
-						<h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">Profile</h1>
-						<p className="text-xs text-slate-500 mt-0.5">View and manage your account details.</p>
-					</div>
-				</div>
-
+			<div className="mx-auto mt-4 max-w-4xl space-y-6">
 				<article className="rounded-xl border border-slate-200 bg-white shadow-sm">
 					<div className="flex flex-col gap-5 border-b border-slate-200 px-6 py-6 sm:flex-row sm:items-center sm:justify-between">
 						<div className="flex min-w-0 items-center gap-4">
 							<SmartUserAvatar
 								user={user}
-								src={user?.TempPreview || (user?.ProfilePic ? `${API_BASE_URL}/uploads/profile-pics/${user.ProfilePic}` : null)}
+								src={user?.TempPreview || (user?.profilepic ? `${API_BASE_URL}/uploads/profile-pics/${user.profilepic}` : null)}
 								fullName={fullName}
 								size="h-20 w-20"
 								textSize="text-2xl font-bold"
@@ -128,7 +118,7 @@ export default function Profile() {
 									<span className="inline-flex rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
 										{getRoleName(user)}
 									</span>
-									<span className="truncate text-sm text-slate-500">{user.Email}</span>
+									<span className="truncate text-sm text-slate-500">{user.Email || user.email}</span>
 								</div>
 							</div>
 						</div>
@@ -158,12 +148,15 @@ export default function Profile() {
 
 						<dl className="grid gap-3 sm:grid-cols-2">
 							<DetailRow label="Full name" value={fullName} />
-							<DetailRow label="Email address" value={user.Email} />
+							<DetailRow label="Email address" value={user.Email || user.email} />
 							<DetailRow label="Role" value={getRoleName(user)} />
 							{user.Bio ? <DetailRow label="Bio" value={user.Bio} /> : null}
 						</dl>
 					</div>
 				</article>
+
+				{/* Change Password Settings with Email OTP */}
+				<ChangePasswordCard user={user} />
 			</div>
 
 			{modalOpen && (

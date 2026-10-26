@@ -3,11 +3,11 @@ import CustomSelect from '../UI/CustomSelect';
 
 const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, userRole = 'user' }) => {
   const [formData, setFormData] = useState({
-    EventID: '',
-    RequirementCode: '',
+    eventid: '',
+    requirementcode: '',
     Description: '',
-    CriteriaID: '',
-    ParentRequirementCode: ''
+    criteriaid: '',
+    parentrequirementcode: ''
   });
   
   const [eventsList, setEventsList] = useState([]);
@@ -22,45 +22,45 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, use
   useEffect(() => {
     if (requirement && visible) {
       setFormData({
-        EventID: requirement.EventID || '',
-        RequirementCode: requirement.RequirementCode || '',
-        Description: requirement.Description || '',
-        CriteriaID: requirement.CriteriaID || '',
-        ParentRequirementCode: requirement.ParentRequirementCode || ''
+        eventid: requirement.eventid || '',
+        requirementcode: requirement.requirementcode || '',
+        Description: requirement.description || requirement.Description || '',
+        criteriaid: requirement.criteriaid || '',
+        parentrequirementcode: requirement.parentrequirementcode || ''
       });
       
       // Fetch initial data
       fetchEvents();
       
-      // If there's an EventID, fetch criteria for that event
-      if (requirement.EventID) {
-        fetchCriteriaByEvent(requirement.EventID);
+      // If there's an eventid, fetch criteria for that event
+      if (requirement.eventid) {
+        fetchCriteriaByEvent(requirement.eventid);
       }
       
-      // If there's a CriteriaID, fetch requirements for that criteria
-      if (requirement.CriteriaID) {
-        fetchRequirementsByCriteria(requirement.CriteriaID);
+      // If there's a criteriaid, fetch requirements for that criteria
+      if (requirement.criteriaid) {
+        fetchRequirementsByCriteria(requirement.criteriaid);
       }
     }
   }, [requirement, visible]);
 
   // Fetch criteria when event is selected
   useEffect(() => {
-    if (formData.EventID && visible) {
-      fetchCriteriaByEvent(formData.EventID);
+    if (formData.eventid && visible) {
+      fetchCriteriaByEvent(formData.eventid);
     } else {
       setCriteriaList([]);
     }
-  }, [formData.EventID, visible]);
+  }, [formData.eventid, visible]);
 
   // Fetch requirements for selected criteria
   useEffect(() => {
-    if (formData.CriteriaID && visible) {
-      fetchRequirementsByCriteria(formData.CriteriaID);
+    if (formData.criteriaid && visible) {
+      fetchRequirementsByCriteria(formData.criteriaid);
     } else {
       setRequirementsList([]);
     }
-  }, [formData.CriteriaID, visible]);
+  }, [formData.criteriaid, visible]);
 
   const fetchEvents = async () => {
     try {
@@ -75,11 +75,11 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, use
     }
   };
 
-  const fetchCriteriaByEvent = async (eventId) => {
+  const fetchCriteriaByEvent = async (eventid) => {
     setIsLoading(true);
     try {
       const { criteriaAPI } = await import('../../utils/api');
-      const response = await criteriaAPI.getByEvent(eventId);
+      const response = await criteriaAPI.getByEvent(eventid);
       
       if (response.success) {
         setCriteriaList(response.data);
@@ -91,7 +91,7 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, use
     }
   };
 
-  const fetchRequirementsByCriteria = async (criteriaId) => {
+  const fetchRequirementsByCriteria = async (criteriaid) => {
     try {
       const { requirementsAPI } = await import('../../utils/api');
       const response = await requirementsAPI.getAllRequirements();
@@ -99,8 +99,8 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, use
       if (response.success) {
         // Filter by selected criteria and exclude current requirement
         const filtered = response.data.filter(req => 
-          req.CriteriaID == criteriaId && 
-          req.RequirementID !== requirement.RequirementID
+          req.criteriaid == criteriaid && 
+          req.requirementid !== requirement.requirementid
         );
         setRequirementsList(filtered);
       }
@@ -127,8 +127,8 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, use
 
   const validateForm = () => {
     const newErrors = {};
-    if (!formData.RequirementCode.trim()) {
-      newErrors.RequirementCode = 'Standard code is required';
+    if (!formData.requirementcode.trim()) {
+      newErrors.requirementcode = 'Standard code is required';
     }
     if (!formData.Description.trim()) {
       newErrors.Description = 'Description is required';
@@ -148,11 +148,12 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, use
     setIsSubmitting(true);
 
     const updated = {
-      RequirementID: requirement.RequirementID,
-      RequirementCode: formData.RequirementCode,
+      requirementid: requirement.requirementid,
+      requirementcode: formData.requirementcode,
+      description: formData.Description,
       Description: formData.Description,
-      CriteriaID: formData.CriteriaID,
-      ParentRequirementCode: formData.ParentRequirementCode || null
+      criteriaid: formData.criteriaid,
+      parentrequirementcode: formData.parentrequirementcode || null
     };
 
     try {
@@ -195,25 +196,25 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, use
 
             {/* Parent Requirement Dropdown */}
             <div className="mb-4">
-              <label htmlFor="ParentRequirementCode" className="block text-sm font-semibold text-gray-800 mb-1">
+              <label htmlFor="parentrequirementcode" className="block text-sm font-semibold text-gray-800 mb-1">
                 Parent Standard (Optional)
               </label>
               <CustomSelect
-                id="ParentRequirementCode"
+                id="parentrequirementcode"
                 size="md"
-                value={formData.ParentRequirementCode}
-                onChange={(val) => handleInputChange({ target: { name: 'ParentRequirementCode', value: val } })}
+                value={formData.parentrequirementcode}
+                onChange={(val) => handleInputChange({ target: { name: 'parentrequirementcode', value: val } })}
                 options={[
-                  { value: '', label: !formData.CriteriaID ? 'Select a sub area first' : 'None (Top-level standard)' },
+                  { value: '', label: !formData.criteriaid ? 'Select a sub area first' : 'None (Top-level standard)' },
                   ...requirementsList.map((req) => ({
-                    value: req.RequirementCode,
-                    label: `${req.RequirementCode} - ${req.Description?.substring(0, 50) || ''}${req.Description?.length > 50 ? '...' : ''}`
+                    value: req.requirementcode,
+                    label: `${req.requirementcode} - ${req.Description?.substring(0, 50) || ''}${req.Description?.length > 50 ? '...' : ''}`
                   }))
                 ]}
-                placeholder={!formData.CriteriaID ? 'Select a sub area first' : 'None (Top-level standard)'}
-                disabled={isSubmitting || !formData.CriteriaID || !isAdmin}
+                placeholder={!formData.criteriaid ? 'Select a sub area first' : 'None (Top-level standard)'}
+                disabled={isSubmitting || !formData.criteriaid || !isAdmin}
               />
-              {!formData.CriteriaID ? (
+              {!formData.criteriaid ? (
                 <p className="text-gray-500 text-xs mt-1">
                   Select a sub area to see available parent standards
                 </p>
@@ -230,25 +231,25 @@ const EditRequirementsModal = ({ visible, onClose, requirement = {}, onSave, use
 
             {/* Requirement Code */}
             <div className="mb-4">
-              <label htmlFor="RequirementCode" className="block text-sm font-semibold text-gray-800 mb-1">
+              <label htmlFor="requirementcode" className="block text-sm font-semibold text-gray-800 mb-1">
                 Standard Code *
               </label>
               <input
                 type="text"
-                id="RequirementCode"
-                name="RequirementCode"
-                value={formData.RequirementCode}
+                id="requirementcode"
+                name="requirementcode"
+                value={formData.requirementcode}
                 onChange={handleInputChange}
                 className={`w-full rounded-md bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500 ${
-                  errors.RequirementCode ? 'border-red-500' : 'border border-slate-200'
+                  errors.requirementcode ? 'border-red-500' : 'border border-slate-200'
                 }`}
                 placeholder="e.g., A.1 or just enter a number"
                 disabled={isSubmitting || !isAdmin}
               />
-              {errors.RequirementCode && (
-                <p className="text-red-500 text-sm mt-1">{errors.RequirementCode}</p>
+              {errors.requirementcode && (
+                <p className="text-red-500 text-sm mt-1">{errors.requirementcode}</p>
               )}
-              {formData.ParentRequirementCode && (
+              {formData.parentrequirementcode && (
                 <p className="text-blue-600 text-xs mt-1">
                   If you enter just a number, it will be appended to the parent code
                 </p>

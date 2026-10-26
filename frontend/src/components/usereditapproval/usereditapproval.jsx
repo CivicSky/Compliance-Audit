@@ -5,8 +5,8 @@ import CustomSelect from "../UI/CustomSelect";
 
 export default function UserEditApproval({ selectedUser, onClose, onSuccess }) {
     const { toast } = useToast();
-    const [newApprovalStatus, setNewApprovalStatus] = useState(selectedUser?.approval_status || 'pending');
-    const [newRoleID, setNewRoleID] = useState(selectedUser?.RoleID || 2);
+    const [newApprovalStatus, setNewApprovalStatus] = useState(selectedUser?.approvalstatus || 'pending');
+    const [newRoleID, setNewRoleID] = useState(selectedUser?.roleid || 2);
     const [updating, setUpdating] = useState(false);
 
     const handleApprovalStatusUpdate = async () => {
@@ -16,7 +16,7 @@ export default function UserEditApproval({ selectedUser, onClose, onSuccess }) {
             setUpdating(true);
             
             // Update approval status
-            const approvalResponse = await usersAPI.updateApprovalStatus(selectedUser.UserID, newApprovalStatus);
+            const approvalResponse = await usersAPI.updateApprovalStatus(selectedUser.userid, newApprovalStatus);
             
             // If backend deleted the user (denied), it may return deletedRows; handle that first
             if (approvalResponse.deletedRows && approvalResponse.deletedRows > 0) {
@@ -33,14 +33,14 @@ export default function UserEditApproval({ selectedUser, onClose, onSuccess }) {
 
             // Update role if it changed
             let roleUpdated = false;
-            if (newRoleID !== selectedUser.RoleID) {
-                const roleResponse = await usersAPI.updateUserRole(selectedUser.UserID, newRoleID);
+            if (newRoleID !== selectedUser.roleid) {
+                const roleResponse = await usersAPI.updateUserRole(selectedUser.userid, newRoleID);
                 roleUpdated = roleResponse.success;
             }
             
             if (approvalResponse.success) {
-                const statusChanged = newApprovalStatus !== selectedUser.approval_status;
-                const roleChanged = newRoleID !== selectedUser.RoleID;
+                const statusChanged = newApprovalStatus !== selectedUser.approvalstatus;
+                const roleChanged = newRoleID !== selectedUser.roleid;
                 
                 let message = 'User updated successfully';
                 if (statusChanged && roleChanged) {
@@ -107,7 +107,7 @@ export default function UserEditApproval({ selectedUser, onClose, onSuccess }) {
 
                 <div className="space-y-5 px-6 py-6">
                     <div className="space-y-2 text-sm text-gray-600">
-                        <p><span className="font-semibold text-gray-800">User:</span> {selectedUser.FirstName} {selectedUser.LastName}</p>
+                        <p><span className="font-semibold text-gray-800">User:</span> {selectedUser.firstname} {selectedUser.lastname}</p>
                         <p><span className="font-semibold text-gray-800">Email:</span> {selectedUser.Email}</p>
                     </div>
 
@@ -151,7 +151,7 @@ export default function UserEditApproval({ selectedUser, onClose, onSuccess }) {
                     <button
                         onClick={handleApprovalStatusUpdate}
                         className="flex-1 inline-flex h-9 items-center justify-center rounded-xl bg-blue-600 px-4 text-xs font-semibold text-white shadow-xs transition hover:bg-blue-700 active:scale-95 cursor-pointer disabled:cursor-not-allowed disabled:bg-blue-400"
-                        disabled={updating || (newApprovalStatus === selectedUser.approval_status && newRoleID === selectedUser.RoleID)}
+                        disabled={updating || (newApprovalStatus === selectedUser.approvalstatus && newRoleID === selectedUser.roleid)}
                         type="button"
                     >
                         {updating ? 'Updating...' : 'Update Status'}

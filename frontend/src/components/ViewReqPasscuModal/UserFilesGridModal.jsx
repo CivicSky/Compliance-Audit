@@ -49,10 +49,10 @@ const FileCardItem = memo(({
     onReview
 }) => {
     const [editingTitle, setEditingTitle] = React.useState(false);
-    const fileUrl = item.url || item.file_path || '';
-    const ext = getExtension(item.fileName || fileUrl);
-    const displayTitle = item.displayName || item.fileName || `Standard ${idx + 1}`;
-    const commentText = String(item.comment || item.rejectionReason || '');
+    const fileUrl = item.url || item.filepath || '';
+    const ext = getExtension(item.filename || fileUrl);
+    const displayTitle = item.displayname || item.filename || `Standard ${idx + 1}`;
+    const commentText = String(item.comment || item.rejectionreason || '');
     const [localComment, setLocalComment] = React.useState(commentText);
     const [savedComment, setSavedComment] = React.useState(commentText);
     const [isSavedRecently, setIsSavedRecently] = React.useState(false);
@@ -60,28 +60,45 @@ const FileCardItem = memo(({
     const saveTimerRef = React.useRef(null);
 
     React.useEffect(() => {
-        const text = String(item.comment || item.rejectionReason || '');
+        const text = String(item.comment || item.rejectionreason || '');
         setLocalComment(text);
         setSavedComment(text);
-    }, [item.comment, item.rejectionReason]);
+    }, [item.comment, item.rejectionreason]);
 
     const isDirty = localComment.trim() !== savedComment.trim();
     const isLongComment = localComment.length > 130 || localComment.split('\n').length > 2;
 
-    const reviewStatus = item.reviewStatus || 'pending';
-    const isApproved = reviewStatus === 'approved';
-    const isRejected = reviewStatus === 'rejected';
+    const reviewstatus = item.reviewstatus || 'pending';
+    const isApproved = reviewstatus === 'approved';
+    const isRejected = reviewstatus === 'rejected';
     const canApproveReject = Boolean(isAdmin);
     const canComment = Boolean(isAdmin || isViewerAuditor);
 
     const handleSaveComment = (valToSave = localComment) => {
         const val = String(valToSave || '').trim();
+        const oldVal = String(savedComment || '').trim();
         setSavedComment(val);
         setLocalComment(val);
         onSaveComment?.(item, val);
         setIsSavedRecently(true);
         if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
         saveTimerRef.current = setTimeout(() => setIsSavedRecently(false), 2500);
+
+        if (!val && oldVal) {
+            toast?.({
+                title: 'Comment Cleared',
+                description: 'The comment has been removed.',
+                variant: 'info',
+                duration: 2500
+            });
+        } else if (val && val !== oldVal) {
+            toast?.({
+                title: 'Comment Saved',
+                description: 'File comment updated successfully.',
+                variant: 'success',
+                duration: 2500
+            });
+        }
     };
 
     const handleRejectClick = (e) => {
@@ -254,7 +271,7 @@ const FileCardItem = memo(({
                                     type="button"
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        onUnsubmit?.(item.id || item.fileName);
+                                        onUnsubmit?.(item.id || item.filename);
                                     }}
                                     className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 shrink-0"
                                     title="Remove file"
@@ -269,7 +286,7 @@ const FileCardItem = memo(({
                     <div className="mt-1 flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
                         <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">{getFileTypeLabel(ext)}</span>
                         <span>•</span>
-                        <span className="truncate max-w-[140px] text-slate-400">{item.fileName || 'file'}</span>
+                        <span className="truncate max-w-[140px] text-slate-400">{item.filename || 'file'}</span>
                     </div>
                 </div>
             </div>
@@ -455,7 +472,7 @@ export default function UserFilesGridModal({
     user = null,
     requirement = null,
     files = [],
-    officeId = null,
+    officeid = null,
     onClose,
     onViewFile,
     onUpdateComment,
@@ -469,9 +486,9 @@ export default function UserFilesGridModal({
     viewerRoleId = 0,
     uploading = false
 }) {
-    const isOwnFiles = !!(currentUser && user && Number(currentUser.UserID) === Number(user.UserID));
-    const isViewerAuditor = Number(viewerRoleId || currentUser?.RoleID || 0) === 4 ||
-        String(currentUser?.RoleName || '').toLowerCase().includes('auditor') ||
+    const isOwnFiles = !!(currentUser && user && Number(currentUser.userid) === Number(user.userid));
+    const isViewerAuditor = Number(viewerRoleId || currentUser?.roleid || 0) === 4 ||
+        String(currentUser?.rolename || '').toLowerCase().includes('auditor') ||
         String(currentUser?.Position || '').toLowerCase().includes('auditor') ||
         Boolean(currentUser?.isExternalAuditor);
     const { toast } = useToast();
@@ -493,15 +510,15 @@ export default function UserFilesGridModal({
         if (show) {
             setVisibleCount(pageSize);
         }
-    }, [show, user?.UserID, pageSize]);
+    }, [show, user?.userid, pageSize]);
 
     // Real-time live synchronization while modal is open
     useLiveRefresh(async () => {
-        if (!show || !requirement?.RequirementID || !user?.UserID) return;
+        if (!show || !requirement?.requirementid || !user?.userid) return;
         try {
             const token = localStorage.getItem('token');
             const res = await fetch(
-                `${API_BASE_URL}/api/requirements/${requirement.RequirementID}/user-file/${user.UserID}${officeId ? `?officeId=${officeId}` : ''}`,
+                `${API_BASE_URL}/api/requirements/${requirement.requirementid}/user-file/${user.userid}${officeid ? `?officeid=${officeid}` : ''}`,
                 { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
             );
             if (res.ok) {
@@ -516,7 +533,7 @@ export default function UserFilesGridModal({
         } catch (err) {
             console.warn('Live refresh error in UserFilesGridModal:', err);
         }
-    }, { entityTypes: ['requirements', 'compliance', 'documents', 'all'], deps: [show, requirement?.RequirementID, user?.UserID, officeId] });
+    }, { entityTypes: ['requirements', 'compliance', 'documents', 'all'], deps: [show, requirement?.requirementid, user?.userid, officeid] });
 
     // Native IntersectionObserver for zero JS scroll overhead
     useEffect(() => {
@@ -545,21 +562,21 @@ export default function UserFilesGridModal({
 
     if (!show || !user) return null;
 
-    const displayName = `${user?.FirstName || ''}${user?.LastName ? ' ' + user.LastName : ''}`.trim() || user?.Username || 'Personnel';
+    const displayname = `${user?.firstname || ''}${user?.lastname ? ' ' + user.lastname : ''}`.trim() || user?.Username || 'Personnel';
 
-    const reqCode = requirement?.RequirementCode || 'Requirement';
-    const reqDesc = requirement?.Description || '';
+    const reqCode = requirement?.requirementcode || 'Requirement';
+    const reqDesc = requirement?.description || requirement?.Description || '';
 
     const handleSaveComment = (item, newCommentVal) => {
         const val = newCommentVal.trim();
         if (val !== (item.comment || '')) {
-            onUpdateComment?.(requirement?.RequirementID, item.id, val);
+            onUpdateComment?.(requirement?.requirementid, item.id, val);
             setLocalFiles(prev => {
-                const updated = prev.map(f => f.id === item.id ? { ...f, comment: val, rejectionReason: f.reviewStatus === 'rejected' ? val : f.rejectionReason } : f);
-                if (requirement?.RequirementID && user?.UserID) {
-                    dataCache.set(CacheKeys.userFiles(requirement.RequirementID, user.UserID), updated);
+                const updated = prev.map(f => f.id === item.id ? { ...f, comment: val, rejectionreason: f.reviewstatus === 'rejected' ? val : f.rejectionreason } : f);
+                if (requirement?.requirementid && user?.userid) {
+                    dataCache.set(CacheKeys.userFiles(requirement.requirementid, user.userid), updated);
                     window.dispatchEvent(new CustomEvent('evidence-file-updated', {
-                        detail: { reqId: requirement.RequirementID, userId: user.UserID, files: updated }
+                        detail: { reqId: requirement.requirementid, userid: user.userid, files: updated }
                     }));
                 }
                 return updated;
@@ -576,13 +593,13 @@ export default function UserFilesGridModal({
     const handleRename = async (item, newTitle) => {
         if (!newTitle || !item) return;
         try {
-            await onRename?.(requirement?.RequirementID, item.id, newTitle);
+            await onRename?.(requirement?.requirementid, item.id, newTitle);
             setLocalFiles(prev => {
-                const updated = prev.map(f => f.id === item.id ? { ...f, displayName: newTitle } : f);
-                if (requirement?.RequirementID && user?.UserID) {
-                    dataCache.set(CacheKeys.userFiles(requirement.RequirementID, user.UserID), updated);
+                const updated = prev.map(f => f.id === item.id ? { ...f, displayname: newTitle } : f);
+                if (requirement?.requirementid && user?.userid) {
+                    dataCache.set(CacheKeys.userFiles(requirement.requirementid, user.userid), updated);
                     window.dispatchEvent(new CustomEvent('evidence-file-updated', {
-                        detail: { reqId: requirement.RequirementID, userId: user.UserID, files: updated }
+                        detail: { reqId: requirement.requirementid, userid: user.userid, files: updated }
                     }));
                 }
                 return updated;
@@ -599,25 +616,25 @@ export default function UserFilesGridModal({
     };
 
     const handleExecuteReview = async (item, status, reason = '') => {
-        if (!requirement?.RequirementID || !item?.id) return;
+        if (!requirement?.requirementid || !item?.id) return;
         setIsSubmittingReview(true);
 
         // Instant optimistic update
         setLocalFiles(prev => {
             const updated = prev.map(f => f.id === item.id ? {
                 ...f,
-                reviewStatus: status,
+                reviewstatus: status,
                 comment: reason || f.comment,
-                rejectionReason: status === 'rejected' ? reason : '',
+                rejectionreason: status === 'rejected' ? reason : '',
             } : f);
-            if (requirement?.RequirementID && user?.UserID) {
-                dataCache.set(CacheKeys.userFiles(requirement.RequirementID, user.UserID), updated);
+            if (requirement?.requirementid && user?.userid) {
+                dataCache.set(CacheKeys.userFiles(requirement.requirementid, user.userid), updated);
                 window.dispatchEvent(new CustomEvent('evidence-file-reviewed', {
                     detail: {
-                        reqId: requirement.RequirementID,
+                        reqId: requirement.requirementid,
                         fileId: item.id,
                         status,
-                        userId: user.UserID,
+                        userid: user.userid,
                         reason
                     }
                 }));
@@ -627,27 +644,27 @@ export default function UserFilesGridModal({
 
         try {
             if (onReviewFile) {
-                const resData = await onReviewFile(requirement.RequirementID, item.id, status, reason);
+                const resData = await onReviewFile(requirement.requirementid, item.id, status, reason);
                 if (resData) {
                     setLocalFiles(prev => {
                         const updated = prev.map(f => f.id === item.id ? {
                             ...f,
-                            reviewStatus: resData?.reviewStatus || status,
+                            reviewstatus: resData?.reviewstatus || status,
                             comment: resData?.comment || reason || f.comment,
-                            rejectionReason: resData?.rejectionReason || reason,
-                            reviewedBy: resData?.reviewedBy,
-                            reviewedAt: resData?.reviewedAt,
-                            reviewerName: resData?.reviewerName || (currentUser ? `${currentUser.FirstName || ''} ${currentUser.LastName || ''}`.trim() : 'Auditor')
+                            rejectionreason: resData?.rejectionreason || reason,
+                            reviewedby: resData?.reviewedby,
+                            reviewedat: resData?.reviewedat,
+                            reviewerName: resData?.reviewerName || (currentUser ? `${currentUser.firstname || ''} ${currentUser.lastname || ''}`.trim() : 'Auditor')
                         } : f);
-                        if (requirement?.RequirementID && user?.UserID) {
-                            dataCache.set(CacheKeys.userFiles(requirement.RequirementID, user.UserID), updated);
+                        if (requirement?.requirementid && user?.userid) {
+                            dataCache.set(CacheKeys.userFiles(requirement.requirementid, user.userid), updated);
                             window.dispatchEvent(new CustomEvent('evidence-file-reviewed', {
                                 detail: {
-                                    reqId: requirement.RequirementID,
+                                    reqId: requirement.requirementid,
                                     fileId: item.id,
-                                    status: resData?.reviewStatus || status,
-                                    userId: user.UserID,
-                                    reason: resData?.rejectionReason || reason,
+                                    status: resData?.reviewstatus || status,
+                                    userid: user.userid,
+                                    reason: resData?.rejectionreason || reason,
                                     resData
                                 }
                             }));
@@ -656,7 +673,7 @@ export default function UserFilesGridModal({
                     });
                 }
             } else {
-                const res = await fetch(`${API_BASE_URL}/api/requirements/${requirement.RequirementID}/file/${item.id}/review`, {
+                const res = await fetch(`${API_BASE_URL}/api/requirements/${requirement.requirementid}/file/${item.id}/review`, {
                     method: 'PATCH',
                     headers: {
                         'Content-Type': 'application/json',
@@ -669,22 +686,22 @@ export default function UserFilesGridModal({
                     setLocalFiles(prev => {
                         const updated = prev.map(f => f.id === item.id ? {
                             ...f,
-                            reviewStatus: data.reviewStatus || status,
+                            reviewstatus: data.reviewstatus || status,
                             comment: data.comment || reason || f.comment,
-                            rejectionReason: data.rejectionReason || reason,
-                            reviewedBy: data.reviewedBy,
-                            reviewedAt: data.reviewedAt,
+                            rejectionreason: data.rejectionreason || reason,
+                            reviewedby: data.reviewedby,
+                            reviewedat: data.reviewedat,
                             reviewerName: data.reviewerName
                         } : f);
-                        if (requirement?.RequirementID && user?.UserID) {
-                            dataCache.set(CacheKeys.userFiles(requirement.RequirementID, user.UserID), updated);
+                        if (requirement?.requirementid && user?.userid) {
+                            dataCache.set(CacheKeys.userFiles(requirement.requirementid, user.userid), updated);
                             window.dispatchEvent(new CustomEvent('evidence-file-reviewed', {
                                 detail: {
-                                    reqId: requirement.RequirementID,
+                                    reqId: requirement.requirementid,
                                     fileId: item.id,
-                                    status: data.reviewStatus || status,
-                                    userId: user.UserID,
-                                    reason: data.rejectionReason || reason,
+                                    status: data.reviewstatus || status,
+                                    userid: user.userid,
+                                    reason: data.rejectionreason || reason,
                                     resData: data
                                 }
                             }));
@@ -746,8 +763,8 @@ export default function UserFilesGridModal({
         setDraggedIdx(null);
         setDragOverIdx(null);
 
-        const targetUserId = user.UserID || user.id;
-        const targetReqId = requirement?.RequirementID;
+        const targetUserId = user.userid || user.id;
+        const targetReqId = requirement?.requirementid;
         const orderedIds = updated.map(f => f.id).filter(Boolean);
 
         if (targetReqId && targetUserId && orderedIds.length > 0) {
@@ -797,70 +814,77 @@ export default function UserFilesGridModal({
                 {/* Header matching App Design System */}
                 <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 bg-white shrink-0">
                     {(() => {
-                        const approvedCount = localFiles.filter(f => f.reviewStatus === 'approved').length;
-                        const rejectedCount = localFiles.filter(f => f.reviewStatus === 'rejected').length;
+                        const approvedCount = localFiles.filter(f => f.reviewstatus === 'approved').length;
+                        const rejectedCount = localFiles.filter(f => f.reviewstatus === 'rejected').length;
                         const isAllApproved = approvedCount === localFiles.length && localFiles.length > 0;
                         const isPartialApproved = approvedCount > 0 && !isAllApproved;
                         const hasRejected = rejectedCount > 0;
 
-                        let borderColor = 'border-amber-400';
-                        let badgeBg = 'bg-amber-500';
-                        let badgeIcon = (
-                            <svg className="w-2 h-2 stroke-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
-                                <circle cx="12" cy="12" r="9"/>
-                                <polyline points="12 7 12 12 15 14"/>
-                            </svg>
-                        );
-                        let statusPill = (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-800 border border-amber-200 shadow-2xs">
-                                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse"></span>
-                                Pending Review ({localFiles.length} files)
-                            </span>
-                        );
+                        let borderColor = 'border-slate-200';
+                        let badgeBg = null;
+                        let badgeIcon = null;
+                        let statusPill = null;
 
-                        if (hasRejected) {
-                            borderColor = 'border-rose-400';
-                            badgeBg = 'bg-rose-500';
+                        if (!isViewerAuditor) {
+                            borderColor = 'border-amber-400';
+                            badgeBg = 'bg-amber-500';
                             badgeIcon = (
                                 <svg className="w-2 h-2 stroke-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
-                                    <line x1="12" y1="8" x2="12" y2="12"></line>
-                                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                                    <circle cx="12" cy="12" r="9"/>
+                                    <polyline points="12 7 12 12 15 14"/>
                                 </svg>
                             );
                             statusPill = (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-bold text-rose-700 border border-rose-200 shadow-2xs">
-                                    <span className="h-1.5 w-1.5 rounded-full bg-rose-500"></span>
-                                    Needs Revision ({rejectedCount})
+                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-800 border border-amber-200 shadow-2xs">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                                    Pending Review ({localFiles.length} files)
                                 </span>
                             );
-                        } else if (isAllApproved) {
-                            borderColor = 'border-emerald-500';
-                            badgeBg = 'bg-emerald-500';
-                            badgeIcon = (
-                                <svg className="w-2 h-2 stroke-white" fill="none" viewBox="0 0 24 24" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
-                                    <polyline points="20 6 9 17 4 12" />
-                                </svg>
-                            );
-                            statusPill = (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100/90 px-2.5 py-0.5 text-xs font-bold text-emerald-700 border border-emerald-200 shadow-2xs">
-                                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-                                    All Approved ({localFiles.length} files)
-                                </span>
-                            );
-                        } else if (isPartialApproved) {
-                            borderColor = 'border-blue-400';
-                            badgeBg = 'bg-blue-500';
-                            badgeIcon = (
-                                <svg className="w-2 h-2 stroke-white" fill="none" viewBox="0 0 24 24" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
-                                    <polyline points="20 6 9 17 4 12" />
-                                </svg>
-                            );
-                            statusPill = (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-bold text-blue-700 border border-blue-200 shadow-2xs">
-                                    <span className="h-1.5 w-1.5 rounded-full bg-blue-500"></span>
-                                    {approvedCount}/{localFiles.length} Approved
-                                </span>
-                            );
+
+                            if (hasRejected) {
+                                borderColor = 'border-rose-400';
+                                badgeBg = 'bg-rose-500';
+                                badgeIcon = (
+                                    <svg className="w-2 h-2 stroke-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                                    </svg>
+                                );
+                                statusPill = (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-bold text-rose-700 border border-rose-200 shadow-2xs">
+                                        <span className="h-1.5 w-1.5 rounded-full bg-rose-500"></span>
+                                        Needs Revision ({rejectedCount})
+                                    </span>
+                                );
+                            } else if (isAllApproved) {
+                                borderColor = 'border-emerald-500';
+                                badgeBg = 'bg-emerald-500';
+                                badgeIcon = (
+                                    <svg className="w-2 h-2 stroke-white" fill="none" viewBox="0 0 24 24" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <polyline points="20 6 9 17 4 12" />
+                                    </svg>
+                                );
+                                statusPill = (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100/90 px-2.5 py-0.5 text-xs font-bold text-emerald-700 border border-emerald-200 shadow-2xs">
+                                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                                        All Approved ({localFiles.length} files)
+                                    </span>
+                                );
+                            } else if (isPartialApproved) {
+                                borderColor = 'border-blue-400';
+                                badgeBg = 'bg-blue-500';
+                                badgeIcon = (
+                                    <svg className="w-2 h-2 stroke-white" fill="none" viewBox="0 0 24 24" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <polyline points="20 6 9 17 4 12" />
+                                    </svg>
+                                );
+                                statusPill = (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-bold text-blue-700 border border-blue-200 shadow-2xs">
+                                        <span className="h-1.5 w-1.5 rounded-full bg-blue-500"></span>
+                                        {approvedCount}/{localFiles.length} Approved
+                                    </span>
+                                );
+                            }
                         }
 
                         return (
@@ -872,14 +896,16 @@ export default function UserFilesGridModal({
                                         textSize="text-xs"
                                         ring={`border-2 ${borderColor} shadow-2xs`}
                                     />
-                                    <span className={`absolute -bottom-0.5 -right-0.5 flex h-4 w-4 min-w-[16px] min-h-[16px] shrink-0 items-center justify-center rounded-full border-2 border-white ${badgeBg} text-white shadow-2xs`}>
-                                        {badgeIcon}
-                                    </span>
+                                    {!isViewerAuditor && badgeIcon && (
+                                        <span className={`absolute -bottom-0.5 -right-0.5 flex h-4 w-4 min-w-[16px] min-h-[16px] shrink-0 items-center justify-center rounded-full border-2 border-white ${badgeBg} text-white shadow-2xs`}>
+                                            {badgeIcon}
+                                        </span>
+                                    )}
                                 </div>
                                 <div className="min-w-0">
                                     <div className="flex items-center gap-2.5">
-                                        <h2 className="text-sm sm:text-base font-bold text-slate-900 truncate">{displayName}</h2>
-                                        {statusPill}
+                                        <h2 className="text-sm sm:text-base font-bold text-slate-900 truncate">{displayname}</h2>
+                                        {!isViewerAuditor && statusPill}
                                     </div>
                                     <p className="text-xs text-slate-500 truncate mt-0.5">
                                         <span className="font-semibold text-slate-700">{reqCode}</span>
@@ -908,7 +934,7 @@ export default function UserFilesGridModal({
                                     className="hidden"
                                     multiple
                                     disabled={uploading}
-                                    onChange={(e) => onUpload?.(e, requirement?.RequirementID)}
+                                    onChange={(e) => onUpload?.(e, requirement?.requirementid)}
                                 />
                             </>
                         )}
@@ -932,7 +958,7 @@ export default function UserFilesGridModal({
                         <div className="flex flex-col gap-3">
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                                 {visibleFiles.map((item, idx) => {
-                                    const fileIdKey = item.id || item.fileName || idx;
+                                    const fileIdKey = item.id || item.filename || idx;
                                     return (
                                         <div key={fileIdKey}>
                                             <FileCardItem

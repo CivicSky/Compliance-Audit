@@ -4,14 +4,14 @@ import CustomSelect from "../UI/CustomSelect";
 export default function EditMasterListModal({ isOpen, onClose, onSubmit, item, departments = [] }) {
   const [name, setName] = useState("");
   const [type, setType] = useState("Academic Program");
-  const [departmentId, setDepartmentId] = useState("");
+  const [departmentid, setDepartmentId] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !item) return;
     setName(item.name || "");
     setType(item.type || "Academic Program");
-    setDepartmentId(item.departmentId ? String(item.departmentId) : "");
+    setDepartmentId(item.departmentid ? String(item.departmentid) : "");
     setLoading(false);
   }, [isOpen, item]);
 
@@ -22,14 +22,14 @@ export default function EditMasterListModal({ isOpen, onClose, onSubmit, item, d
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name.trim()) return;
-    if (isAcademic && !departmentId) return;
+    if (isAcademic && !departmentid) return;
     setLoading(true);
     try {
       await onSubmit?.({
         name: name.trim(),
         type,
-        entityTypeId: isAcademic ? 1 : 2,
-        departmentId: isAcademic ? departmentId : null,
+        entitytypeid: isAcademic ? 1 : 2,
+        departmentid: isAcademic ? departmentid : null,
       });
       onClose?.();
     } finally {
@@ -92,7 +92,7 @@ export default function EditMasterListModal({ isOpen, onClose, onSubmit, item, d
             <div>
               <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-600">Department *</label>
               <CustomSelect
-                value={departmentId}
+                value={departmentid}
                 onChange={(val) => setDepartmentId(val)}
                 placeholder="Select Department"
                 options={[

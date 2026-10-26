@@ -22,10 +22,17 @@ const STATUS = {
         dot: 'bg-rose-500',
         border: 'border-rose-200',
     },
+    0: {
+        label: 'No Standards',
+        bg: 'bg-slate-100',
+        text: 'text-slate-600',
+        dot: 'bg-slate-400',
+        border: 'border-slate-200',
+    },
 };
 
-export default function StatusBadge({ statusId, compact = false }) {
-    const status = STATUS[statusId] || STATUS[3];
+export default function StatusBadge({ statusid, compact = false }) {
+    const status = STATUS[statusid] ?? STATUS[3];
 
     return (
         <span

@@ -11,8 +11,8 @@ export default function Events() {
     const [currentUser, setCurrentUser] = useState(null);
     const eventsPRef = useRef();
 
-    const isAuditor = currentUser?.RoleID === 4 || 
-                      String(currentUser?.RoleName || '').toLowerCase().includes('auditor') || 
+    const isAuditor = currentUser?.roleid === 4 || 
+                      String(currentUser?.rolename || '').toLowerCase().includes('auditor') || 
                       currentUser?.isExternalAuditor;
 
     // Fetch current user on mount
@@ -106,9 +106,9 @@ export default function Events() {
             </div>
 
             {/* Content area */}
-            <div className="flex-1 min-h-0 px-4 sm:px-6 pt-3 pb-8 flex flex-col overflow-hidden">
-                <div className={`relative z-10 flex-1 min-h-0 ${viewMode === 'list' ? 'overflow-y-auto pr-1' : 'flex flex-col h-full'} overflow-x-auto`}>
-                    <div className={`${viewMode === 'list' ? 'flex flex-col gap-0 min-w-[720px]' : 'flex-1 min-h-0 h-full flex flex-col'}`}>
+            <div className="flex-1 min-h-0 px-4 sm:px-6 pt-3 pb-3 flex flex-col overflow-hidden">
+                <div className={`relative z-10 flex-1 min-h-0 ${viewMode === 'list' ? 'app-list-scroll overflow-x-auto pr-1' : 'flex flex-col h-full overflow-hidden'}`}>
+                    <div className={`${viewMode === 'list' ? 'flex flex-col gap-0 min-w-[720px] pb-3' : 'flex-1 min-h-0 h-full flex flex-col overflow-hidden'}`}>
                         <EventsP 
                             ref={eventsPRef} 
                             searchTerm={searchTerm} 

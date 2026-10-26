@@ -4,12 +4,12 @@ import { useModal } from "../UI/ModalProvider";
 import CustomSelect from '../UI/CustomSelect';
 
 const EditCriteriaModal = ({ visible, onClose, event = {}, onSave, userRole = 'user' }) => {
-  const [criteriaCode, setCriteriaCode] = useState('');
-  const [criteriaName, setCriteriaName] = useState('');
+  const [criteriacode, setCriteriaCode] = useState('');
+  const [criterianame, setCriteriaName] = useState('');
   // Description removed from form; will send null when saving
-  const [parentCriteriaId, setParentCriteriaId] = useState('');
+  const [parentcriteriaid, setParentCriteriaId] = useState('');
   const [isChild, setIsChild] = useState(false);
-  const [eventId, setEventId] = useState('');
+  const [eventid, setEventId] = useState('');
   const [criteriaList, setCriteriaList] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
@@ -18,12 +18,12 @@ const EditCriteriaModal = ({ visible, onClose, event = {}, onSave, userRole = 'u
 
   useEffect(() => {
     if (event && visible) {
-      setCriteriaCode((event.CriteriaCode || '').toUpperCase());
-      setCriteriaName(event.CriteriaName || '');
+      setCriteriaCode((event.criteriacode || '').toUpperCase());
+      setCriteriaName(event.criterianame || '');
       // description intentionally ignored (send null)
-      setParentCriteriaId(event.ParentCriteriaID ? String(event.ParentCriteriaID) : '');
-      setIsChild(Boolean(event.ParentCriteriaID));
-      setEventId(event.EventID || '');
+      setParentCriteriaId(event.parentcriteriaid ? String(event.parentcriteriaid) : '');
+      setIsChild(Boolean(event.parentcriteriaid));
+      setEventId(event.eventid || '');
     }
   }, [event, visible]);
 
@@ -31,8 +31,8 @@ const EditCriteriaModal = ({ visible, onClose, event = {}, onSave, userRole = 'u
     async function fetchCriteria() {
       try {
         const res = await criteriaAPI.getAll();
-        if (event && event.EventID) {
-          setCriteriaList((res.data || []).filter(c => String(c.EventID) === String(event.EventID)));
+        if (event && event.eventid) {
+          setCriteriaList((res.data || []).filter(c => String(c.eventid) === String(event.eventid)));
         } else {
           setCriteriaList(res.data || []);
         }
@@ -47,13 +47,13 @@ const EditCriteriaModal = ({ visible, onClose, event = {}, onSave, userRole = 'u
 
   const validateForm = () => {
     const newErrors = {};
-    if (!criteriaCode.trim() && !isChild) newErrors.CriteriaCode = 'Sub area code is required';
-    if (!criteriaName.trim()) newErrors.CriteriaName = 'Sub area name is required';
-    // ensure uniqueness of CriteriaCode within the same event (case-insensitive)
-    const code = String(criteriaCode || '').trim().toLowerCase();
+    if (!criteriacode.trim() && !isChild) newErrors.criteriacode = 'Sub area code is required';
+    if (!criterianame.trim()) newErrors.criterianame = 'Sub area name is required';
+    // ensure uniqueness of criteriacode within the same event (case-insensitive)
+    const code = String(criteriacode || '').trim().toLowerCase();
     if (code) {
-      const duplicate = (criteriaList || []).find(c => String(c.CriteriaCode || '').trim().toLowerCase() === code && Number(c.CriteriaID) !== Number(event.CriteriaID));
-      if (duplicate) newErrors.CriteriaCode = 'A sub area with this code already exists for this event.';
+      const duplicate = (criteriaList || []).find(c => String(c.criteriacode || '').trim().toLowerCase() === code && Number(c.criteriaid) !== Number(event.criteriaid));
+      if (duplicate) newErrors.criteriacode = 'A sub area with this code already exists for this event.';
     }
     // Description is optional/removed
     setErrors(newErrors);
@@ -62,9 +62,9 @@ const EditCriteriaModal = ({ visible, onClose, event = {}, onSave, userRole = 'u
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    if (name === 'CriteriaCode') setCriteriaCode((value || '').toUpperCase());
-    else if (name === 'CriteriaName') setCriteriaName(value);
-    else if (name === 'ParentCriteriaID') setParentCriteriaId(value);
+    if (name === 'criteriacode') setCriteriaCode((value || '').toUpperCase());
+    else if (name === 'criterianame') setCriteriaName(value);
+    else if (name === 'parentcriteriaid') setParentCriteriaId(value);
     if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
   };
 
@@ -73,13 +73,13 @@ const EditCriteriaModal = ({ visible, onClose, event = {}, onSave, userRole = 'u
     if (!validateForm()) return;
     setIsSubmitting(true);
     const updated = {
-      CriteriaID: event.CriteriaID,
-      CriteriaCode: isChild ? null : criteriaCode,
-      CriteriaName: criteriaName,
+      criteriaid: event.criteriaid,
+      criteriacode: isChild ? null : criteriacode,
+      criterianame: criterianame,
       Description: null,
-      AreaID: event.AreaID === undefined ? null : event.AreaID,
-      ParentCriteriaID: parentCriteriaId === '' ? null : parentCriteriaId,
-      EventID: eventId
+      areaid: event.areaid === undefined ? null : event.areaid,
+      parentcriteriaid: parentcriteriaid === '' ? null : parentcriteriaid,
+      eventid: eventid
     };
       try {
         if (onSave) await onSave(updated);
@@ -118,59 +118,59 @@ const EditCriteriaModal = ({ visible, onClose, event = {}, onSave, userRole = 'u
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-5">
           {/* Criteria Code */}
           <div className="mb-6">
-            <label htmlFor="CriteriaCode" className="block text-sm font-semibold text-gray-800 mb-2">
+            <label htmlFor="criteriacode" className="block text-sm font-semibold text-gray-800 mb-2">
               Sub Area Code *
             </label>
             <input
               type="text"
-              id="CriteriaCode"
-              name="CriteriaCode"
-              value={criteriaCode}
+              id="criteriacode"
+              name="criteriacode"
+              value={criteriacode}
               onChange={handleInputChange}
-              className={`w-full rounded-md bg-white px-4 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500 ${errors.CriteriaCode ? 'border-red-500' : 'border border-slate-200'}`}
+              className={`w-full rounded-md bg-white px-4 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500 ${errors.criteriacode ? 'border-red-500' : 'border border-slate-200'}`}
               placeholder="e.g., CUR.4.1"
               disabled={isSubmitting || !isAdmin || isChild}
               required={!isChild}
             />
-            {errors.CriteriaCode && <p className="text-red-500 text-sm mt-1">{errors.CriteriaCode}</p>}
+            {errors.criteriacode && <p className="text-red-500 text-sm mt-1">{errors.criteriacode}</p>}
           </div>
 
           {/* Criteria Name */}
           <div className="mb-6">
-            <label htmlFor="CriteriaName" className="block text-sm font-semibold text-gray-800 mb-2">
+            <label htmlFor="criterianame" className="block text-sm font-semibold text-gray-800 mb-2">
               Sub Area Name *
             </label>
             <input
               type="text"
-              id="CriteriaName"
-              name="CriteriaName"
-              value={criteriaName}
+              id="criterianame"
+              name="criterianame"
+              value={criterianame}
               onChange={handleInputChange}
-              className={`w-full rounded-md bg-white px-4 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500 ${errors.CriteriaName ? 'border-red-500' : 'border border-slate-200'}`}
+              className={`w-full rounded-md bg-white px-4 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500 ${errors.criterianame ? 'border-red-500' : 'border border-slate-200'}`}
               placeholder="Enter sub area name"
               disabled={isSubmitting || !isAdmin}
               required
             />
-            {errors.CriteriaName && <p className="text-red-500 text-sm mt-1">{errors.CriteriaName}</p>}
+            {errors.criterianame && <p className="text-red-500 text-sm mt-1">{errors.criterianame}</p>}
           </div>
 
           {/* Parent Criteria Dropdown */}
           <div className="mb-6">
-            <label htmlFor="ParentCriteriaID" className="block text-sm font-semibold text-gray-800 mb-2">
+            <label htmlFor="parentcriteriaid" className="block text-sm font-semibold text-gray-800 mb-2">
               Parent Sub Area (Optional)
             </label>
             <CustomSelect
-              id="ParentCriteriaID"
+              id="parentcriteriaid"
               size="md"
-              value={parentCriteriaId}
-              onChange={(val) => handleInputChange({ target: { name: 'ParentCriteriaID', value: val } })}
+              value={parentcriteriaid}
+              onChange={(val) => handleInputChange({ target: { name: 'parentcriteriaid', value: val } })}
               options={[
                 { value: '', label: 'None (Top-level sub area)' },
                 ...criteriaList
-                  .filter(c => String(c.CriteriaID) !== String(event.CriteriaID))
+                  .filter(c => String(c.criteriaid) !== String(event.criteriaid))
                   .map(c => ({
-                    value: String(c.CriteriaID),
-                    label: `${c.CriteriaCode} - ${c.CriteriaName}`
+                    value: String(c.criteriaid),
+                    label: `${c.criteriacode} - ${c.criterianame}`
                   }))
               ]}
               placeholder="None (Top-level sub area)"

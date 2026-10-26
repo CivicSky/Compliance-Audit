@@ -64,11 +64,11 @@ const OfficesP = forwardRef(
         });
         const { showAlert, showConfirm } = useModal();
 
-        const roleId = Number(currentUser?.RoleID);
-        const roleName = String(currentUser?.RoleName || currentUser?.role_name || '').toLowerCase();
-        const isAuditor = roleId === 4 || roleName.includes('auditor') || Boolean(currentUser?.isExternalAuditor);
-        const isPersonnel = (roleId === 2 || roleId === 3 || roleName.includes('personnel') || roleName.includes('office') || roleName === 'user' || roleName === 'head') && !roleName.includes('auditor') && roleId !== 4 && roleId !== 1 && roleName !== 'admin';
-        const isAdmin = (roleId === 1 || roleName === 'admin') && !isPersonnel;
+        const roleid = Number(currentUser?.roleid);
+        const rolename = String(currentUser?.rolename || currentUser?.rolename || '').toLowerCase();
+        const isAuditor = roleid === 4 || rolename.includes('auditor') || Boolean(currentUser?.isExternalAuditor);
+        const isPersonnel = (roleid === 2 || roleid === 3 || rolename.includes('personnel') || rolename.includes('office') || rolename === 'user' || rolename === 'head') && !rolename.includes('auditor') && roleid !== 4 && roleid !== 1 && rolename !== 'admin';
+        const isAdmin = (roleid === 1 || rolename === 'admin') && !isPersonnel;
 
         const [serverError, setServerError] = useState(null);
         const [isRetrying, setIsRetrying] = useState(false);
@@ -88,12 +88,19 @@ const OfficesP = forwardRef(
 
                 const officesData = Array.isArray(res) ? res : (res && res.data) || [];
                 const assignmentRows = Array.isArray(myAssignmentsRes?.data) ? myAssignmentsRes.data : [];
+                const officeIdsFromRes = Array.isArray(myAssignmentsRes?.officeIds) ? myAssignmentsRes.officeIds : [];
                 const countsByOffice = assignmentRows.reduce((acc, row) => {
-                    const officeId = String(row?.OfficeID ?? '');
-                    if (!officeId) return acc;
-                    acc[officeId] = (acc[officeId] || 0) + 1;
+                    const officeid = String(row?.officeid ?? '');
+                    if (!officeid) return acc;
+                    acc[officeid] = (acc[officeid] || 0) + 1;
                     return acc;
                 }, {});
+                officeIdsFromRes.forEach((id) => {
+                    const oid = String(id ?? '');
+                    if (oid && !countsByOffice[oid]) {
+                        countsByOffice[oid] = 1;
+                    }
+                });
 
                 setOffices(officesData);
                 setMyAssignedOfficeCounts(countsByOffice);
@@ -139,10 +146,10 @@ const OfficesP = forwardRef(
             fetchEventDepartments();
         }, [fetchEventDepartments]);
 
-        const handleUpdateProgramLevel = async (officeId, newLevel) => {
+        const handleUpdateProgramLevel = async (officeid, newLevel) => {
             try {
-                setLoadingProgramLevel(officeId);
-                await officesAPI.updateLevel(officeId, newLevel);
+                setLoadingProgramLevel(officeid);
+                await officesAPI.updateLevel(officeid, newLevel);
                 await fetchOffices({ silent: true });
                 if (showAlert) {
                     showAlert(`Updated accreditation level to ${newLevel}`, 'success');
@@ -178,12 +185,12 @@ const OfficesP = forwardRef(
                 }
             },
             clearSelection: () => setSelectedIds([]),
-            openOfficeById: (officeId, options = {}) => {
-                const targetId = String(officeId || '');
+            openOfficeById: (officeid, options = {}) => {
+                const targetId = String(officeid || '');
                 if (!targetId) return false;
 
                 const targetIndex = filtered.findIndex(
-                    (office) => String(office?.id ?? office?.OfficeID ?? '') === targetId
+                    (office) => String(office?.id ?? office?.officeid ?? '') === targetId
                 );
 
                 if (targetIndex === -1) return false;
@@ -259,8 +266,9 @@ const OfficesP = forwardRef(
 
         // Notify parent when selected changes
         useEffect(() => {
-            onSelectionChange(selectedIds.length, selectedIds);
-        }, [selectedIds, onSelectionChange]);
+            const selectedItems = offices.filter(o => selectedIds.includes(o.id));
+            onSelectionChange(selectedIds.length, selectedIds, selectedItems);
+        }, [selectedIds, offices, onSelectionChange]);
 
         const handleCheckboxChange = (id, checked) => {
             if (checked) setSelectedIds([...selectedIds, id]);
@@ -269,15 +277,15 @@ const OfficesP = forwardRef(
 
         const handleExportOffice = async (office) => {
             try {
-                const officeId = office?.id || office?.OfficeID;
-                if (!officeId) return;
+                const officeid = office?.id || office?.officeid;
+                if (!officeid) return;
 
-                const officeName = office?.office_name || office?.OfficeName || `office-${officeId}`;
-                const { url, fileName } = await officesAPI.exportOfficeExcel(officeId, officeName);
+                const officename = office?.officename || office?.officename || `office-${officeid}`;
+                const { url, filename } = await officesAPI.exportOfficeExcel(officeid, officename);
 
                 const link = document.createElement('a');
                 link.href = url;
-                link.download = fileName;
+                link.download = filename;
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
@@ -292,31 +300,47 @@ const OfficesP = forwardRef(
         };
 
         // Get status badge style
-        const getStatusStyle = (status) => {
+        const getStatusStyle = (status, totalReqs = null) => {
+            if (totalReqs !== null && Number(totalReqs) === 0) {
+                return 'bg-slate-100 text-slate-600 border-slate-200';
+            }
+            const s = String(status || '').toLowerCase();
+            if (s.includes('no standard') || s.includes('no req') || s === 'n/a' || s === 'empty') {
+                return 'bg-slate-100 text-slate-600 border-slate-200';
+            }
             switch (status) {
                 case 'Complied':
                     return 'bg-emerald-50 text-emerald-700 border-emerald-200';
                 case 'Partially Complied':
+                case 'Partial':
                     return 'bg-amber-50 text-amber-700 border-amber-200';
                 default:
                     return 'bg-rose-50 text-rose-700 border-rose-200';
             }
         };
 
-        const getStatusDot = (status) => {
+        const getStatusDot = (status, totalReqs = null) => {
+            if (totalReqs !== null && Number(totalReqs) === 0) {
+                return 'bg-slate-400';
+            }
+            const s = String(status || '').toLowerCase();
+            if (s.includes('no standard') || s.includes('no req') || s === 'n/a' || s === 'empty') {
+                return 'bg-slate-400';
+            }
             switch (status) {
                 case 'Complied': return 'bg-emerald-500';
-                case 'Partially Complied': return 'bg-amber-500';
+                case 'Partially Complied':
+                case 'Partial': return 'bg-amber-500';
                 default: return 'bg-rose-500';
             }
         };
 
-        // Map EventID -> event object for quick lookup (EventCode)
+        // Map eventid -> event object for quick lookup (eventcode)
         const eventsMap = useMemo(() => {
             try {
                 const m = new Map();
                 (events || []).forEach(ev => {
-                    const id = String(ev.EventID ?? ev.id ?? ev.EventCode ?? ev.EventCode ?? '');
+                    const id = String(ev.eventid ?? ev.id ?? ev.eventcode ?? ev.eventcode ?? '');
                     if (id) m.set(id, ev);
                 });
                 return m;
@@ -328,22 +352,22 @@ const OfficesP = forwardRef(
         // Helper to check if office is assigned to the current personnel user
         const isOfficeAssignedToPersonnel = useCallback((o) => {
             if (!currentUser) return false;
-            const uid = String(currentUser.UserID ?? currentUser.id ?? '');
-            const hid = String(currentUser.HeadID ?? currentUser.head_id ?? '');
-            const officeId = String(o.id ?? o.OfficeID ?? '');
+            const uid = String(currentUser.userid ?? currentUser.id ?? '');
+            const hid = String(currentUser.headid ?? currentUser.headid ?? '');
+            const officeid = String(o.id ?? o.officeid ?? '');
 
             // 1. Check requirements assignments count
-            if (myAssignedOfficeCounts && Number(myAssignedOfficeCounts[officeId] || 0) > 0) return true;
+            if (myAssignedOfficeCounts && Number(myAssignedOfficeCounts[officeid] || 0) > 0) return true;
 
             // 2. Check heads array
             if (Array.isArray(o.heads) && o.heads.length > 0) {
                 const matchedHead = o.heads.some(h => {
-                    if (uid && (String(h.UserID ?? '') === uid || String(h.user_id ?? '') === uid)) return true;
-                    if (hid && (String(h.HeadID ?? '') === hid || String(h.head_id ?? '') === hid)) return true;
+                    if (uid && (String(h.userid ?? '') === uid || String(h.userid ?? '') === uid)) return true;
+                    if (hid && (String(h.headid ?? '') === hid || String(h.headid ?? '') === hid)) return true;
                     
-                    const headName = String(h.full_name || `${h.FirstName || ''} ${h.LastName || ''}`).toLowerCase().trim();
-                    const userFirst = String(currentUser.FirstName || currentUser.first_name || '').toLowerCase().trim();
-                    const userLast = String(currentUser.LastName || currentUser.last_name || '').toLowerCase().trim();
+                    const headName = String(h.full_name || `${h.firstname || ''} ${h.lastname || ''}`).toLowerCase().trim();
+                    const userFirst = String(currentUser.firstname || currentUser.firstname || '').toLowerCase().trim();
+                    const userLast = String(currentUser.lastname || currentUser.lastname || '').toLowerCase().trim();
                     if (userFirst && userLast && headName) {
                         if (headName.includes(userFirst) && headName.includes(userLast)) return true;
                     } else if (userFirst && headName && headName.includes(userFirst)) {
@@ -354,17 +378,17 @@ const OfficesP = forwardRef(
                 if (matchedHead) return true;
             }
 
-            // 3. Check direct head_id / head_ids
+            // 3. Check direct headid / head_ids
             if (hid) {
-                if (String(o.head_id ?? '') === hid) return true;
+                if (String(o.headid ?? '') === hid) return true;
                 if (Array.isArray(o.head_ids) && o.head_ids.some(id => String(id) === hid)) return true;
             }
 
             // 4. Check head_name string
             if (o.head_name && o.head_name !== 'Unassigned' && o.head_name !== 'unassigned') {
                 const headName = String(o.head_name).toLowerCase().trim();
-                const userFirst = String(currentUser.FirstName || currentUser.first_name || '').toLowerCase().trim();
-                const userLast = String(currentUser.LastName || currentUser.last_name || '').toLowerCase().trim();
+                const userFirst = String(currentUser.firstname || currentUser.firstname || '').toLowerCase().trim();
+                const userLast = String(currentUser.lastname || currentUser.lastname || '').toLowerCase().trim();
                 if (userFirst && userLast) {
                     if (headName.includes(userFirst) && headName.includes(userLast)) return true;
                 } else if (userFirst && headName && headName.includes(userFirst)) {
@@ -385,22 +409,22 @@ const OfficesP = forwardRef(
 
         // Search filter
         const filteredBySearch = roleFilteredOffices.filter((o) => {
-            const officeName = (o.office_name || '').toLowerCase();
+            const officename = (o.officename || '').toLowerCase();
             const headName = (o.head_name || 'unassigned').toLowerCase();
             const officeType = (o.office_type_name || '').toLowerCase();
             const search = searchTerm.toLowerCase();
 
-            return officeName.includes(search) ||
+            return officename.includes(search) ||
                 headName.includes(search) ||
                 officeType.includes(search);
         });
 
         // Filter by event type
         const filteredByEvent = eventType
-            ? filteredBySearch.filter((o) => String(o.event_id) === String(eventType))
+            ? filteredBySearch.filter((o) => String(o.eventid) === String(eventType))
             : filteredBySearch;
 
-        // Normalize office overall_status to keys: 'compiled', 'partially_compiled', 'not_compiled'
+        // Normalize office overallstatus to keys: 'compiled', 'partially_compiled', 'not_compiled'
         const getStatusKey = (status) => {
             const s = (status || '').toLowerCase().trim();
             // common variations from DB: 'Complied', 'Partially Complied', 'Not Complied',
@@ -415,22 +439,22 @@ const OfficesP = forwardRef(
             return 'not_compiled';
         };
 
-        // Debug: log distinct overall_status values once so we can adapt matching if needed
+        // Debug: log distinct overallstatus values once so we can adapt matching if needed
         useEffect(() => {
             if (!offices || offices.length === 0) return;
-            const statuses = Array.from(new Set(offices.map(o => (o.overall_status || '').toString()))).slice(0, 50);
-            console.debug('OfficesP: distinct overall_status values:', statuses);
+            const statuses = Array.from(new Set(offices.map(o => (o.overallstatus || '').toString()))).slice(0, 50);
+            console.debug('OfficesP: distinct overallstatus values:', statuses);
         }, [offices]);
 
         // Filter by compile status if provided (compiled / partially_compiled / not_compiled)
         // Treat 'all' as no filter
         const compiledFiltered = (sortStatus && sortStatus !== 'all')
-            ? filteredByEvent.filter((o) => getStatusKey(o.overall_status) === sortStatus)
+            ? filteredByEvent.filter((o) => getStatusKey(o.overallstatus) === sortStatus)
             : filteredByEvent;
 
         // Filter by department if selected
         const deptFiltered = departmentFilter
-            ? compiledFiltered.filter((o) => String(o.department_id ?? o.DepartmentID ?? o.DepartmentId ?? '') === String(departmentFilter))
+            ? compiledFiltered.filter((o) => String(o.departmentid ?? o.DepartmentID ?? o.DepartmentId ?? '') === String(departmentFilter))
             : compiledFiltered;
 
         // Filter by program type if selected
@@ -479,8 +503,8 @@ const OfficesP = forwardRef(
 
             // Populate from known eventDepartments for this event
             for (const ed of eventDepartments) {
-                map.set(String(ed.department_id), {
-                    deptId: ed.department_id,
+                map.set(String(ed.departmentid), {
+                    deptId: ed.departmentid,
                     deptName: ed.department_name,
                     eventDeptId: ed.id,
                     programs: [],
@@ -489,22 +513,22 @@ const OfficesP = forwardRef(
 
             // Populate academic offices into their department groups
             for (const office of academicOffices) {
-                const deptKey = String(office.department_id || 'unassigned');
+                const deptKey = String(office.departmentid || 'unassigned');
                 const deptName = office.department_name || 'Unassigned Department';
 
                 if (!map.has(deptKey)) {
                     map.set(deptKey, {
-                        deptId: office.department_id || null,
+                        deptId: office.departmentid || null,
                         deptName,
-                        eventDeptId: office.event_department_id || null,
+                        eventDeptId: office.eventdepartmentid || null,
                         programs: [],
                     });
                 }
 
                 const entry = map.get(deptKey);
                 entry.programs.push(office);
-                if (office.event_department_id && !entry.eventDeptId) {
-                    entry.eventDeptId = office.event_department_id;
+                if (office.eventdepartmentid && !entry.eventDeptId) {
+                    entry.eventDeptId = office.eventdepartmentid;
                 }
             }
 
@@ -567,19 +591,22 @@ const OfficesP = forwardRef(
 
         // Helper to render individual Office Card (Grid View)
         const renderOfficeCard = (office) => {
-            const officeId = String(office?.id ?? office?.OfficeID ?? '');
+            const officeid = String(office?.id ?? office?.officeid ?? '');
             const officeHeads = office.heads || [];
             const officeAuditors = office.auditors || [];
-            const compliancePercent = Math.max(0, Math.min(100, Number(office.compliance_percent || 0)));
-            const statusLabel = office.overall_status === 'Partially Complied' ? 'Partial' : office.overall_status;
+            const totalReqs = Number(office.totalrequirements || 0);
+            const compliancepercent = Math.max(0, Math.min(100, Number(office.compliancepercent || 0)));
+            const statusLabel = totalReqs === 0
+                ? 'No Standards'
+                : (office.overallstatus === 'Partially Complied' ? 'Partial' : (office.overallstatus || 'Not Complied'));
 
             const isSelected = selectedIds.includes(office.id);
-            const isHighlighted = officeId && officeId === String(activeHighlightOfficeId || '');
-            const isAssignedToMe = (myAssignedOfficeCounts[officeId] || 0) > 0;
+            const isHighlighted = officeid && officeid === String(activeHighlightOfficeId || '');
+            const isAssignedToMe = (myAssignedOfficeCounts[officeid] || 0) > 0;
 
-            const officeEventId = String(office.event_id ?? office.EventID ?? office.eventId ?? '');
+            const officeEventId = String(office.eventid ?? office.eventid ?? office.eventid ?? '');
             const matchedEvent = eventsMap.get(officeEventId);
-            const eventCode = matchedEvent?.EventCode ?? matchedEvent?.event_code ?? matchedEvent?.eventCode ?? office.EventCode ?? office.event_code ?? '';
+            const eventcode = matchedEvent?.eventcode ?? matchedEvent?.eventcode ?? matchedEvent?.eventcode ?? office.eventcode ?? office.eventcode ?? '';
 
             return (
                 <div
@@ -601,8 +628,8 @@ const OfficesP = forwardRef(
                 >
                     <div className="h-full p-2.5 rounded-xl overflow-visible bg-gradient-to-b from-white via-white to-slate-50/60 flex flex-col justify-between">
                         {/* Header */}
-                        <div className="flex items-start justify-between gap-1.5 mb-0.5">
-                            <div className="min-w-0 flex items-start gap-1.5 relative">
+                        <div className="flex items-start justify-between gap-1.5 mb-0.5 min-w-0">
+                            <div className="min-w-0 flex-1 flex items-start gap-1.5 relative overflow-hidden">
                                 {/* Animated checkbox */}
                                 <div
                                     className="absolute left-0 top-2"
@@ -628,19 +655,19 @@ const OfficesP = forwardRef(
 
                                 {/* When deleteMode is active translate content */}
                                 <div
-                                    className="flex items-start gap-1.5"
+                                    className="flex items-start gap-1.5 min-w-0 flex-1 overflow-hidden"
                                     style={{
                                         transform: deleteMode ? 'translateX(1.75rem)' : 'translateX(0)',
                                         transition: 'transform 220ms cubic-bezier(0.2,0.8,0.2,1)'
                                     }}
                                 >
                                     {renderOfficeIcon(office, false)}
-                                    <div className="min-w-0">
-                                        <h3 className="text-sm font-semibold text-slate-900 truncate leading-tight">
-                                            {office.office_name}
+                                    <div className="min-w-0 flex-1 overflow-hidden">
+                                        <h3 className="text-xs sm:text-sm font-bold text-slate-900 line-clamp-2 leading-snug break-words" title={office.officename}>
+                                            {office.officename}
                                         </h3>
                                         <p className="text-[10px] text-slate-500 truncate leading-tight mt-0.5">
-                                            {eventCode || (officeEventId ? `#${officeEventId}` : 'No event')}
+                                            {eventcode || (officeEventId ? `#${officeEventId}` : 'No event')}
                                         </p>
                                         {(office.department_name || office.program_type_name) && (
                                             <p className="text-[10px] text-slate-400 truncate leading-tight">
@@ -653,10 +680,10 @@ const OfficesP = forwardRef(
                                 </div>
                             </div>
                             <div className="flex items-start gap-1 shrink-0">
-                                {isAcademicOffice(office) && office.accreditation_level && office.accreditation_level !== 'None' && (
+                                {isAcademicOffice(office) && office.accreditationlevel && office.accreditationlevel !== 'None' && (
                                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md shadow-2xs">
                                         <Award className="h-3 w-3 text-emerald-600" />
-                                        {office.accreditation_level}
+                                        {office.accreditationlevel}
                                     </span>
                                 )}
                                 <span className="px-1.5 py-0.5 text-[10px] font-medium bg-indigo-50 text-indigo-700 rounded-md border border-indigo-100 overflow-hidden max-w-[7.5rem] truncate">
@@ -691,11 +718,11 @@ const OfficesP = forwardRef(
                         <div className="mt-1 mb-1 flex items-center justify-between text-[10px] text-slate-500 border-t border-slate-100 pt-1 px-0.5">
                             <div className="truncate">
                                 <span className="font-semibold uppercase text-slate-400 text-[9px]">Created: </span>
-                                <span className="font-medium text-slate-600">{formatDateTime(office.created_at)}</span>
+                                <span className="font-medium text-slate-600">{formatDateTime(office.createdat)}</span>
                             </div>
                             <div className="truncate text-right">
                                 <span className="font-semibold uppercase text-slate-400 text-[9px]">Updated: </span>
-                                <span className="font-medium text-slate-600">{formatDateTime(office.updated_at || office.created_at)}</span>
+                                <span className="font-medium text-slate-600">{formatDateTime(office.updatedat || office.createdat)}</span>
                             </div>
                         </div>
 
@@ -703,25 +730,27 @@ const OfficesP = forwardRef(
                         <div className="rounded-lg border border-slate-200/90 bg-white/90 px-2 py-1 mb-1">
                             <div className="flex items-center justify-between">
                                 <span className="text-[11px] text-slate-500">
-                                    {office.total_requirements || 0} requirements
+                                    {totalReqs} {totalReqs === 1 ? 'standard' : 'standards'}
                                 </span>
                                 <span className={`
                                     inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold rounded-full border
-                                    ${getStatusStyle(office.overall_status)}
+                                    ${getStatusStyle(statusLabel, totalReqs)}
                                 `}>
-                                    <span className={`w-1.5 h-1.5 rounded-full ${getStatusDot(office.overall_status)}`}></span>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${getStatusDot(statusLabel, totalReqs)}`}></span>
                                     {statusLabel}
                                 </span>
                             </div>
                             <div className="mt-1">
                                 <div className="flex items-center justify-between text-[10px] text-slate-500 mb-0.5">
                                     <span>Compliance</span>
-                                    <span className="font-bold text-slate-700">{compliancePercent % 1 === 0 ? compliancePercent.toFixed(0) : compliancePercent.toFixed(1)}%</span>
+                                    <span className="font-bold text-slate-700">
+                                        {totalReqs === 0 ? 'N/A' : `${compliancepercent % 1 === 0 ? compliancepercent.toFixed(0) : compliancepercent.toFixed(1)}%`}
+                                    </span>
                                 </div>
                                 <div className="h-1 rounded-full bg-slate-200 overflow-hidden">
                                     <div
-                                        className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-indigo-500"
-                                        style={{ width: `${compliancePercent}%` }}
+                                        className={`h-full rounded-full ${totalReqs === 0 ? 'bg-slate-300' : 'bg-gradient-to-r from-cyan-500 to-indigo-500'}`}
+                                        style={{ width: `${totalReqs === 0 ? 0 : compliancepercent}%` }}
                                     />
                                 </div>
                             </div>
@@ -760,9 +789,9 @@ const OfficesP = forwardRef(
                                         </div>
                                     ) : (
                                         officeHeads.map((head) => {
-                                            const firstName = (head.full_name || head.FirstName || 'Personnel').split(' ')[0];
+                                            const firstname = (head.full_name || head.firstname || 'Personnel').split(' ')[0];
                                             return (
-                                                <div key={head.HeadID} className="group relative flex flex-col items-center max-w-[54px]">
+                                                <div key={head.headid} className="group relative flex flex-col items-center max-w-[54px]">
                                                     <SmartUserAvatar
                                                         user={head}
                                                         size="h-6 w-6"
@@ -773,7 +802,7 @@ const OfficesP = forwardRef(
                                                         className="text-[9px] text-slate-600 text-center truncate w-full mt-0.5 font-medium leading-tight" 
                                                         title={head.full_name}
                                                     >
-                                                        {firstName}
+                                                        {firstname}
                                                     </span>
                                                     <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1 -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[10px] font-medium text-white opacity-0 shadow transition-opacity duration-150 group-hover:opacity-100">
                                                         {head.full_name} (Personnel)
@@ -798,9 +827,9 @@ const OfficesP = forwardRef(
                                         </div>
                                     ) : (
                                         officeAuditors.map((aud) => {
-                                            const firstName = (aud.full_name || aud.FirstName || 'Auditor').split(' ')[0];
+                                            const firstname = (aud.full_name || aud.firstname || 'Auditor').split(' ')[0];
                                             return (
-                                                <div key={aud.UserID} className="group relative flex flex-col items-center max-w-[54px]">
+                                                <div key={aud.userid} className="group relative flex flex-col items-center max-w-[54px]">
                                                     <SmartUserAvatar
                                                         user={aud}
                                                         size="h-6 w-6"
@@ -811,7 +840,7 @@ const OfficesP = forwardRef(
                                                         className="text-[9px] text-sky-700 text-center truncate w-full mt-0.5 font-semibold leading-tight" 
                                                         title={aud.full_name}
                                                     >
-                                                        {firstName}
+                                                        {firstname}
                                                     </span>
                                                     <div className="pointer-events-none absolute bottom-full right-0 z-50 mb-1 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[10px] font-medium text-white opacity-0 shadow transition-opacity duration-150 group-hover:opacity-100">
                                                         {aud.full_name} (Auditor)
@@ -831,14 +860,14 @@ const OfficesP = forwardRef(
         // Helper to render individual Office List Row (List View)
         const renderOfficeListRow = (office) => {
             const officeHeads = office.heads || [];
-            const officeId = String(office?.id ?? office?.OfficeID ?? '');
-            const officeEventId = String(office.event_id ?? office.EventID ?? office.eventId ?? '');
+            const officeid = String(office?.id ?? office?.officeid ?? '');
+            const officeEventId = String(office.eventid ?? office.eventid ?? office.eventid ?? '');
             const matchedEvent = eventsMap.get(officeEventId);
-            const eventCode = matchedEvent?.EventCode ?? matchedEvent?.event_code ?? matchedEvent?.eventCode ?? office.EventCode ?? office.event_code ?? '';
+            const eventcode = matchedEvent?.eventcode ?? matchedEvent?.eventcode ?? matchedEvent?.eventcode ?? office.eventcode ?? office.eventcode ?? '';
 
             const isSelected = selectedIds.includes(office.id);
-            const isHighlighted = officeId && officeId === String(activeHighlightOfficeId || '');
-            const isAssignedToMe = (myAssignedOfficeCounts[officeId] || 0) > 0;
+            const isHighlighted = officeid && officeid === String(activeHighlightOfficeId || '');
+            const isAssignedToMe = (myAssignedOfficeCounts[officeid] || 0) > 0;
 
             return (
                 <div
@@ -858,7 +887,7 @@ const OfficesP = forwardRef(
                         }
                     `}
                 >
-                    <div className="grid grid-cols-[minmax(120px,1fr)_160px_160px_100px_140px_80px] gap-6 items-center px-6 py-4">
+                    <div className="grid grid-cols-[minmax(160px,1fr)_130px_160px_100px_140px_60px] gap-6 items-center px-6 py-4">
                         {/* Office Name */}
                         <div className="flex items-center gap-3 min-w-0 relative">
                             <div
@@ -882,63 +911,55 @@ const OfficesP = forwardRef(
                             {renderOfficeIcon(office, deleteMode)}
 
                             <div className="min-w-0">
-                                <div className="text-sm font-semibold text-slate-900 truncate">{office.office_name}</div>
-                                <div className="text-xs text-slate-500 truncate">{eventCode}</div>
+                                <div className="text-sm font-semibold text-slate-900 truncate">{office.officename}</div>
+                                <div className="text-xs text-slate-500 truncate">{eventcode}</div>
                                 {(office.department_name || office.program_type_name) && (
                                     <div className="text-xs text-slate-400 truncate">{office.department_name ? office.department_name : ''}{office.department_name && office.program_type_name ? ' • ' : ''}{office.program_type_name ? office.program_type_name : ''}</div>
                                 )}
                                 <div className="text-[10px] text-slate-400 truncate mt-0.5">
-                                    <span className="font-semibold text-slate-400 uppercase">Created:</span> {formatDateTime(office.created_at)} • <span className="font-semibold text-slate-400 uppercase">Updated:</span> {formatDateTime(office.updated_at || office.created_at)}
+                                    <span className="font-semibold text-slate-400 uppercase">Created:</span> {formatDateTime(office.createdat)} • <span className="font-semibold text-slate-400 uppercase">Updated:</span> {formatDateTime(office.updatedat || office.createdat)}
                                 </div>
                             </div>
                         </div>
 
-                        {/* Office Type & Accreditation Level */}
-                        <div className="flex items-center justify-center gap-1.5 text-sm text-slate-700 flex-wrap">
-                            {isAcademicOffice(office) && office.accreditation_level && office.accreditation_level !== 'None' && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-bold text-emerald-700 bg-emerald-50 rounded-full border border-emerald-200 shadow-2xs">
-                                    <Award className="h-3 w-3 text-emerald-600" />
-                                    {office.accreditation_level}
-                                </span>
-                            )}
-                            <div className="inline-block px-2 py-0.5 text-xs font-medium bg-indigo-50 text-indigo-700 rounded-full border">{office.office_type_name}</div>
-                        </div>
-
-                        {/* Compliance Status */}
-                        <div className="flex items-center justify-center">
-                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full border ${getStatusStyle(office.overall_status)}`}>
-                                <span className={`w-2 h-2 rounded-full ${getStatusDot(office.overall_status)}`}></span>
-                                {office.overall_status}
+                        {/* Office Type */}
+                        <div className="flex items-center">
+                            <span className={`inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded-full border ${
+                                isAcademicOffice(office)
+                                    ? 'bg-blue-50 text-blue-700 border-blue-100'
+                                    : 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                            }`}>
+                                {office.office_type_name || (isAcademicOffice(office) ? 'Academic' : 'Non Academic')}
                             </span>
                         </div>
 
-                        {/* Requirements */}
-                        <div className="flex items-center justify-center">
-                            <div className="text-sm font-medium text-slate-800">{office.total_requirements || 0}</div>
+                        {/* Compliance Status */}
+                        <div className="flex items-center">
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-full border ${getStatusStyle(office.overallstatus, office.totalrequirements)}`}>
+                                <span className={`w-2 h-2 rounded-full ${getStatusDot(office.overallstatus, office.totalrequirements)}`}></span>
+                                {Number(office.totalrequirements || 0) === 0 ? 'No Standards' : (office.overallstatus || 'Not Complied')}
+                            </span>
                         </div>
 
-                        {/* Personnel */}
-                        <div className="flex items-center justify-start">
-                            <div className="flex items-center space-x-3">
-                                {officeHeads.slice(0, 4).map((head, idx) => (
-                                    <SmartUserAvatar
-                                        key={head.HeadID || idx}
-                                        user={head}
-                                        size="w-8 h-8"
-                                        textSize="text-xs font-semibold"
-                                        ring="border-2 border-white shadow-sm"
-                                    />
-                                ))}
-                                {officeHeads.length > 4 && (
-                                    <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-medium text-slate-600 border-2 border-white">
-                                        +{officeHeads.length - 4}
-                                    </div>
-                                )}
-                            </div>
+                        {/* Standards */}
+                        <div className="flex items-center">
+                            <div className="text-xs font-bold text-slate-700">{office.totalrequirements || 0}</div>
+                        </div>
+
+                        {/* Level Status (Replacing Personnel per user request) */}
+                        <div className="flex items-center">
+                            {isAcademicOffice(office) && office.accreditationlevel && office.accreditationlevel !== 'None' && office.accreditationlevel.toUpperCase() !== 'N/A' ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-emerald-700 bg-emerald-50 rounded-full border border-emerald-200 shadow-2xs">
+                                    <Award className="h-3.5 w-3.5 text-emerald-600" />
+                                    {office.accreditationlevel}
+                                </span>
+                            ) : (
+                                <span className="text-slate-400 text-xs font-medium">—</span>
+                            )}
                         </div>
 
                         {/* Actions */}
-                        <div className="flex items-center justify-end pr-3">
+                        <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
                             {!deleteMode && isAdmin && (
                                 <div className="relative">
                                     <button
@@ -949,7 +970,7 @@ const OfficesP = forwardRef(
                                             setOpenMenuOfficeId((prev) => (prev === office.id ? null : office.id));
                                             setOpenMenuAnchorRect((prev) => (prev && String(openMenuOfficeId) === String(office.id) ? null : rect));
                                         }}
-                                        className="office-card-actions-button inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-100 ml-2"
+                                        className="office-card-actions-button inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-100 shadow-2xs hover:border-slate-300 active:scale-95"
                                         aria-label="Open office actions"
                                     >
                                         <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -968,10 +989,23 @@ const OfficesP = forwardRef(
 
         // Controls whether bottom pagination is visible. Set to true if pagination is needed again in the future.
         const SHOW_PAGINATION = false;
-        const containerClass = `space-y-4 relative ${SHOW_PAGINATION ? 'pb-16' : 'pb-6'} h-full overflow-auto pr-1`;
+        const containerClass = `space-y-4 relative h-full flex-1 min-h-0 overflow-y-auto pr-1 pb-6 custom-scrollbar ${viewMode === 'list' ? 'app-list-scroll overflow-x-auto' : ''}`;
 
         return (
             <div className={containerClass}>
+                {/* Sticky Header Row in List Mode - Perfectly Aligned with Cards */}
+                {viewMode === 'list' && (
+                    <div className="sticky top-0 z-30 bg-slate-50/90 backdrop-blur-xs px-[13px] pb-1 pt-0.5">
+                        <div className="grid grid-cols-[minmax(160px,1fr)_130px_160px_100px_140px_60px] gap-6 px-6 py-3 bg-white border border-slate-200 rounded-xl shadow-xs text-xs font-semibold text-slate-700 min-w-[760px]">
+                            <div className="flex items-center">Office Name</div>
+                            <div className="flex items-center">Office Type</div>
+                            <div className="flex items-center">Compliance Status</div>
+                            <div className="flex items-center">Standards</div>
+                            <div className="flex items-center">Level Status</div>
+                            <div className="flex items-center justify-end">Actions</div>
+                        </div>
+                    </div>
+                )}
                 {/* ── ACADEMIC DEPARTMENTS & PROGRAMS SECTION ── */}
                 {academicByDept.length > 0 && (
                     <div className="space-y-4">
@@ -1017,7 +1051,7 @@ const OfficesP = forwardRef(
                                 {/* Department Programs List/Grid */}
                                 <div className="p-3 bg-slate-50/20">
                                     {viewMode === 'grid' ? (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 [&>*]:min-w-0">
                                             {deptGroup.programs.map(renderOfficeCard)}
                                         </div>
                                     ) : (
@@ -1067,7 +1101,7 @@ const OfficesP = forwardRef(
                             {/* Non-Academic Programs List/Grid */}
                             <div className="p-3 bg-slate-50/20">
                                 {viewMode === 'grid' ? (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 [&>*]:min-w-0">
                                         {nonAcademicOffices.map(renderOfficeCard)}
                                     </div>
                                 ) : (
@@ -1094,7 +1128,7 @@ const OfficesP = forwardRef(
                 {/* Portal menu to avoid clipping inside card/list containers */}
                 {openMenuOfficeId && openMenuAnchorRect && (() => {
                     try {
-                        const menuOffice = offices.find(o => String(o.id ?? o.OfficeID ?? '') === String(openMenuOfficeId));
+                        const menuOffice = offices.find(o => String(o.id ?? o.officeid ?? '') === String(openMenuOfficeId));
                         if (!menuOffice) return null;
                         const zoom = parseFloat(getComputedStyle(document.body).zoom) || 1;
                         const menuWidth = 192; // 12rem = 192px (w-48)
@@ -1148,7 +1182,7 @@ const OfficesP = forwardRef(
                                                 Accreditation Level
                                             </label>
                                             <select
-                                                value={menuOffice.accreditation_level || 'Candidate'}
+                                                value={menuOffice.accreditationlevel || 'Candidate'}
                                                 onChange={async (e) => {
                                                     const val = e.target.value;
                                                     setOpenMenuOfficeId(null);
@@ -1172,7 +1206,7 @@ const OfficesP = forwardRef(
                                         <svg className="h-4 w-4 text-rose-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
                                         </svg>
-                                        <span>Delete Office</span>
+                                        <span>Delete {isAcademicOffice(menuOffice) ? 'Program' : 'Office'}</span>
                                     </button>
                                 </div>
                             </div>,

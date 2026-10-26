@@ -12,7 +12,7 @@ function Checkbox({ checked, onChange, className = '' }) {
 }
 
 const getAreaId = (area) => Number(area.id || String(area.key || '').replace('area-', ''));
-const getCriteriaId = (criteria) => Number(criteria.id || criteria.CriteriaID || String(criteria.key || '').replace('criteria-', ''));
+const getCriteriaId = (criteria) => Number(criteria.id || criteria.criteriaid || String(criteria.key || '').replace('criteria-', ''));
 
 export default function BulkAssignPanel({
 	onAssign,
@@ -69,16 +69,16 @@ export default function BulkAssignPanel({
 		let list = filteredEventOffices || [];
 		
 		if (activeOfficeTab === "Programs") {
-			list = list.filter(o => o.entity_type_id === 1 || String(o.category_name || o.TypeName || "").toLowerCase().includes("academic program") || String(o.category_name || o.TypeName || "").toLowerCase().includes("program"));
+			list = list.filter(o => o.entitytypeid === 1 || String(o.category_name || o.typename || "").toLowerCase().includes("academic program") || String(o.category_name || o.typename || "").toLowerCase().includes("program"));
 		} else if (activeOfficeTab === "Offices") {
-			list = list.filter(o => o.entity_type_id === 2 || String(o.category_name || o.TypeName || "").toLowerCase().includes("non-academic") || String(o.category_name || o.TypeName || "").toLowerCase().includes("office"));
+			list = list.filter(o => o.entitytypeid === 2 || String(o.category_name || o.typename || "").toLowerCase().includes("non-academic") || String(o.category_name || o.typename || "").toLowerCase().includes("office"));
 		}
 		
 		return list;
 	}, [filteredEventOffices, activeOfficeTab]);
 
 	const displayedOfficeIds = useMemo(() => {
-		return displayedOffices.map((o) => Number(o.id || o.OfficeID)).filter(Boolean);
+		return displayedOffices.map((o) => Number(o.id || o.officeid)).filter(Boolean);
 	}, [displayedOffices]);
 
 	const allDisplayedSelected = displayedOfficeIds.length > 0 && displayedOfficeIds.every(id => selectedOfficeIds.includes(id));
@@ -100,12 +100,12 @@ export default function BulkAssignPanel({
 		const roots = [];
 
 		for (const criteria of criteriaList) {
-			const id = Number(criteria.CriteriaID);
+			const id = Number(criteria.criteriaid);
 			nodeMap.set(id, {
 				...criteria,
 				id,
 				key: criteria.key || `criteria-${id}`,
-				label: criteria.label || (criteria.CriteriaCode ? `${criteria.CriteriaCode} - ${criteria.CriteriaName}` : criteria.CriteriaName),
+				label: criteria.label || (criteria.criteriacode ? `${criteria.criteriacode} - ${criteria.criterianame}` : criteria.criterianame),
 				requirements: criteria.requirements || [],
 				requirementsLoaded: Boolean(criteria.requirementsLoaded),
 				children: [],
@@ -113,7 +113,7 @@ export default function BulkAssignPanel({
 		}
 
 		for (const node of nodeMap.values()) {
-			const parentId = node.ParentCriteriaID ?? node.parent_criteria_id ?? null;
+			const parentId = node.parentcriteriaid ?? node.parentcriteriaid ?? null;
 			if (parentId && nodeMap.has(Number(parentId))) {
 				nodeMap.get(Number(parentId)).children.push(node);
 			} else {
@@ -125,22 +125,22 @@ export default function BulkAssignPanel({
 	};
 
 	const gatherLoadedRequirementIds = (node) => {
-		const own = (node.requirements || []).map((req) => Number(req.RequirementID)).filter(Boolean);
+		const own = (node.requirements || []).map((req) => Number(req.requirementid)).filter(Boolean);
 		const childIds = (node.children || []).flatMap((child) => gatherLoadedRequirementIds(child));
 		return [...own, ...childIds];
 	};
 
 	const loadRequirementsForNode = async (node) => {
-		const criteriaId = getCriteriaId(node);
-		const loaded = await loadRequirementsForCriteria?.(criteriaId);
-		return (loaded || []).map((req) => Number(req.RequirementID)).filter(Boolean);
+		const criteriaid = getCriteriaId(node);
+		const loaded = await loadRequirementsForCriteria?.(criteriaid);
+		return (loaded || []).map((req) => Number(req.requirementid)).filter(Boolean);
 	};
 
 	const renderCriteriaNode = (node, depth = 0) => {
-		const criteriaId = getCriteriaId(node);
-		const critKey = node.key || `criteria-${criteriaId}`;
+		const criteriaid = getCriteriaId(node);
+		const critKey = node.key || `criteria-${criteriaid}`;
 		const critExpanded = expandedCriteria.has(critKey);
-		const loading = loadingRequirementIds.has(criteriaId);
+		const loading = loadingRequirementIds.has(criteriaid);
 		const loadedReqIds = Array.from(new Set(gatherLoadedRequirementIds(node)));
 		const criteriaChecked = loadedReqIds.length > 0 && loadedReqIds.every((id) => selectedRequirementIdSet.has(id));
 		const requirementsLoaded = Boolean(node.requirementsLoaded);
@@ -191,9 +191,9 @@ export default function BulkAssignPanel({
 							<p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">No standards</p>
 						)}
 						{(node.requirements || []).map((req) => {
-							const reqId = Number(req.RequirementID);
+							const reqId = Number(req.requirementid);
 							const reqChecked = selectedRequirementIdSet.has(reqId);
-							const reqLabel = req.RequirementCode ? `${req.RequirementCode} - ${req.Description}` : req.Description;
+							const reqLabel = req.requirementcode ? `${req.requirementcode} - ${req.Description}` : req.Description;
 							const reqExpanded = expandedReqIds.has(reqId);
 
 							return (
@@ -263,10 +263,10 @@ export default function BulkAssignPanel({
 	}, [requirementSearchTerm, treesWithRoots]);
 
 	const loadAreaRequirementIds = async (area) => {
-		const areaId = getAreaId(area);
-		const criteriaList = area.criteriaLoaded ? area.criteria || [] : await loadCriteriaForArea?.(areaId);
-		const reqLists = await Promise.all((criteriaList || []).map((criteria) => loadRequirementsForCriteria?.(criteria.CriteriaID)));
-		return reqLists.flat().map((req) => Number(req.RequirementID)).filter(Boolean);
+		const areaid = getAreaId(area);
+		const criteriaList = area.criteriaLoaded ? area.criteria || [] : await loadCriteriaForArea?.(areaid);
+		const reqLists = await Promise.all((criteriaList || []).map((criteria) => loadRequirementsForCriteria?.(criteria.criteriaid)));
+		return reqLists.flat().map((req) => Number(req.requirementid)).filter(Boolean);
 	};
 
 	const handleAreaExpand = async (area) => {
@@ -357,13 +357,13 @@ export default function BulkAssignPanel({
 									<p className="px-2 py-4 text-center text-xs text-slate-500">No matching records found.</p>
 								) : (
 									displayedOffices.map((office) => {
-										const officeId = Number(office.id || office.OfficeID);
-										const checked = selectedOfficeIds.includes(officeId);
-										const isAcademic = office.entity_type_id === 1 || String(office.category_name || office.TypeName || "").toLowerCase().includes("academic program") || String(office.category_name || office.TypeName || "").toLowerCase().includes("program");
+										const officeid = Number(office.id || office.officeid);
+										const checked = selectedOfficeIds.includes(officeid);
+										const isAcademic = office.entitytypeid === 1 || String(office.category_name || office.typename || "").toLowerCase().includes("academic program") || String(office.category_name || office.typename || "").toLowerCase().includes("program");
 										
 										return (
 											<label
-												key={officeId}
+												key={officeid}
 												className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition-all relative ${
 													checked
 														? 'border-blue-300 bg-blue-50/40 text-slate-800 shadow-sm'
@@ -372,7 +372,7 @@ export default function BulkAssignPanel({
 											>
 												{/* Checkbox on the left */}
 												<div className="pt-1.5 shrink-0">
-													<Checkbox checked={checked} onChange={(event) => toggleOffice(officeId, event.target.checked)} />
+													<Checkbox checked={checked} onChange={(event) => toggleOffice(officeid, event.target.checked)} />
 												</div>
 												
 												{/* Card Content on the right */}
@@ -397,7 +397,7 @@ export default function BulkAssignPanel({
 														{/* Name & Subtitle */}
 														<div className="min-w-0">
 															<h5 className="text-[10px] font-bold text-slate-800 truncate leading-snug">
-																{office.OfficeName || office.office_name}
+																{office.officename || office.officename}
 															</h5>
 																<p className="text-[8.5px] text-slate-500 truncate leading-normal mt-0.5">
 																	{office.department_name || 'Institution-wide'}
@@ -409,11 +409,11 @@ export default function BulkAssignPanel({
 													<div className="grid grid-cols-2 gap-2 border-t border-slate-100 pt-2 text-[8px] text-slate-400 font-semibold tracking-wider">
 														<div>
 															<p className="uppercase text-[7.5px] text-slate-400 font-bold mb-0.5">Created</p>
-															<p className="text-slate-600 font-bold">{formatDateString(office.created_at)}</p>
+															<p className="text-slate-600 font-bold">{formatDateString(office.createdat)}</p>
 														</div>
 														<div>
 															<p className="uppercase text-[7.5px] text-slate-400 font-bold mb-0.5">Updated</p>
-															<p className="text-slate-600 font-bold">{formatDateString(office.updated_at)}</p>
+															<p className="text-slate-600 font-bold">{formatDateString(office.updatedat)}</p>
 														</div>
 													</div>
 

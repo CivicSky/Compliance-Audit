@@ -11,128 +11,130 @@ import { OfficeCardSkeleton } from "../UI/Skeleton";
 import { useLiveRefresh } from "../../utils/liveSync";
 import ServerOfflineState from "../UI/ServerOfflineState";
 import SmartUserAvatar from "../UI/SmartUserAvatar";
+import { Layers } from "lucide-react";
+import AssignPersonnelScopeModal from "../OfficeHead/AssignPersonnelScopeModal";
 
 const STATIC_MOCK_PERSONNEL = [
     {
-        HeadID: 901,
-        FirstName: "Sarah",
-        MiddleInitial: "M",
-        LastName: "Connor",
+        headid: 901,
+        firstname: "Sarah",
+        middleinitial: "M",
+        lastname: "Connor",
         Position: "Office Head",
         Email: "s.connor@university.edu",
-        ContactInfo: "s.connor@university.edu",
-        OfficeID: 1,
-        assigned_offices: [{ office_name: "Registrar Office", id: 1 }, { office_name: "Admissions Office", id: 2 }]
+        contactinfo: "s.connor@university.edu",
+        officeid: 1,
+        assigned_offices: [{ officename: "Registrar Office", id: 1 }, { officename: "Admissions Office", id: 2 }]
     },
     {
-        HeadID: 902,
-        FirstName: "James",
-        MiddleInitial: "R",
-        LastName: "Vance",
+        headid: 902,
+        firstname: "James",
+        middleinitial: "R",
+        lastname: "Vance",
         Position: "Personnel",
         Email: "james.vance@university.edu",
-        ContactInfo: "james.vance@university.edu",
-        OfficeID: 2,
-        assigned_offices: [{ office_name: "Admissions", id: 2 }]
+        contactinfo: "james.vance@university.edu",
+        officeid: 2,
+        assigned_offices: [{ officename: "Admissions", id: 2 }]
     },
     {
-        HeadID: 903,
-        FirstName: "Elena",
-        MiddleInitial: "G",
-        LastName: "Cruz",
+        headid: 903,
+        firstname: "Elena",
+        middleinitial: "G",
+        lastname: "Cruz",
         Position: "Office Head",
         Email: "elena.cruz@university.edu",
-        ContactInfo: "elena.cruz@university.edu",
-        OfficeID: 3,
-        assigned_offices: [{ office_name: "College of Science", id: 3 }, { office_name: "Biology Dept", id: 4 }, { office_name: "Chemistry Dept", id: 5 }]
+        contactinfo: "elena.cruz@university.edu",
+        officeid: 3,
+        assigned_offices: [{ officename: "College of Science", id: 3 }, { officename: "Biology Dept", id: 4 }, { officename: "Chemistry Dept", id: 5 }]
     },
     {
-        HeadID: 904,
-        FirstName: "Marcus",
-        MiddleInitial: "T",
-        LastName: "Brody",
+        headid: 904,
+        firstname: "Marcus",
+        middleinitial: "T",
+        lastname: "Brody",
         Position: "Personnel",
         Email: "marcus.brody@university.edu",
-        ContactInfo: "marcus.brody@university.edu",
-        OfficeID: 6,
-        assigned_offices: [{ office_name: "Information Technology", id: 6 }, { office_name: "MIS Unit", id: 7 }]
+        contactinfo: "marcus.brody@university.edu",
+        officeid: 6,
+        assigned_offices: [{ officename: "Information Technology", id: 6 }, { officename: "MIS Unit", id: 7 }]
     },
     {
-        HeadID: 905,
-        FirstName: "Maria",
-        MiddleInitial: "D",
-        LastName: "Santos",
+        headid: 905,
+        firstname: "Maria",
+        middleinitial: "D",
+        lastname: "Santos",
         Position: "Office Head",
         Email: "maria.santos@university.edu",
-        ContactInfo: "maria.santos@university.edu",
-        OfficeID: 8,
-        assigned_offices: [{ office_name: "Human Resources", id: 8 }]
+        contactinfo: "maria.santos@university.edu",
+        officeid: 8,
+        assigned_offices: [{ officename: "Human Resources", id: 8 }]
     },
     {
-        HeadID: 906,
-        FirstName: "John",
-        MiddleInitial: "K",
-        LastName: "Miller",
+        headid: 906,
+        firstname: "John",
+        middleinitial: "K",
+        lastname: "Miller",
         Position: "Personnel",
         Email: "john.miller@university.edu",
-        ContactInfo: "john.miller@university.edu",
-        OfficeID: 9,
-        assigned_offices: [{ office_name: "Finance & Accounting", id: 9 }, { office_name: "Cashier Office", id: 10 }]
+        contactinfo: "john.miller@university.edu",
+        officeid: 9,
+        assigned_offices: [{ officename: "Finance & Accounting", id: 9 }, { officename: "Cashier Office", id: 10 }]
     },
     {
-        HeadID: 907,
-        FirstName: "Patricia",
-        MiddleInitial: "L",
-        LastName: "Reyes",
+        headid: 907,
+        firstname: "Patricia",
+        middleinitial: "L",
+        lastname: "Reyes",
         Position: "Personnel",
         Email: "patricia.reyes@university.edu",
-        ContactInfo: "patricia.reyes@university.edu",
-        OfficeID: 11,
-        assigned_offices: [{ office_name: "Student Affairs", id: 11 }, { office_name: "Guidance Office", id: 12 }, { office_name: "Scholarship Dept", id: 13 }]
+        contactinfo: "patricia.reyes@university.edu",
+        officeid: 11,
+        assigned_offices: [{ officename: "Student Affairs", id: 11 }, { officename: "Guidance Office", id: 12 }, { officename: "Scholarship Dept", id: 13 }]
     },
     {
-        HeadID: 908,
-        FirstName: "David",
-        MiddleInitial: "W",
-        LastName: "Chen",
+        headid: 908,
+        firstname: "David",
+        middleinitial: "W",
+        lastname: "Chen",
         Position: "Office Head",
         Email: "david.chen@university.edu",
-        ContactInfo: "david.chen@university.edu",
-        OfficeID: 14,
-        assigned_offices: [{ office_name: "Library Services", id: 14 }]
+        contactinfo: "david.chen@university.edu",
+        officeid: 14,
+        assigned_offices: [{ officename: "Library Services", id: 14 }]
     },
     {
-        HeadID: 909,
-        FirstName: "Anna",
-        MiddleInitial: "V",
-        LastName: "Lopez",
+        headid: 909,
+        firstname: "Anna",
+        middleinitial: "V",
+        lastname: "Lopez",
         Position: "Personnel",
         Email: "anna.lopez@university.edu",
-        ContactInfo: "anna.lopez@university.edu",
-        OfficeID: 15,
-        assigned_offices: [{ office_name: "Research & Development", id: 15 }, { office_name: "Publications", id: 16 }]
+        contactinfo: "anna.lopez@university.edu",
+        officeid: 15,
+        assigned_offices: [{ officename: "Research & Development", id: 15 }, { officename: "Publications", id: 16 }]
     },
     {
-        HeadID: 910,
-        FirstName: "Robert",
-        MiddleInitial: "H",
-        LastName: "Taylor",
+        headid: 910,
+        firstname: "Robert",
+        middleinitial: "H",
+        lastname: "Taylor",
         Position: "Personnel",
         Email: "robert.taylor@university.edu",
-        ContactInfo: "robert.taylor@university.edu",
-        OfficeID: 17,
-        assigned_offices: [{ office_name: "Guidance Counseling", id: 17 }]
+        contactinfo: "robert.taylor@university.edu",
+        officeid: 17,
+        assigned_offices: [{ officename: "Guidance Counseling", id: 17 }]
     },
     {
-        HeadID: 911,
-        FirstName: "Carmen",
-        MiddleInitial: "S",
-        LastName: "Diaz",
+        headid: 911,
+        firstname: "Carmen",
+        middleinitial: "S",
+        lastname: "Diaz",
         Position: "Office Head",
         Email: "carmen.diaz@university.edu",
-        ContactInfo: "carmen.diaz@university.edu",
-        OfficeID: 18,
-        assigned_offices: [{ office_name: "College of Engineering", id: 18 }, { office_name: "Civil Eng Lab", id: 19 }]
+        contactinfo: "carmen.diaz@university.edu",
+        officeid: 18,
+        assigned_offices: [{ officename: "College of Engineering", id: 18 }, { officename: "Civil Eng Lab", id: 19 }]
     }
 ];
 
@@ -149,8 +151,10 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
     const [detailsHead, setDetailsHead] = useState(null);
     const [detailsOffices, setDetailsOffices] = useState([]);
     const [currentUser, setCurrentUser] = useState(null);
+    const [isScopeModalOpen, setIsScopeModalOpen] = useState(false);
+    const [scopeModalPerson, setScopeModalPerson] = useState(null);
 
-    const isAdmin = currentUser?.RoleName === 'admin' || currentUser?.RoleID === 1;
+    const isAdmin = currentUser?.rolename === 'admin' || currentUser?.roleid === 1;
 
     // Fetch office heads and offices data from database
     useEffect(() => {
@@ -196,9 +200,9 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
         // Apply search filter first
         if (searchTerm.trim()) {
             filtered = officeHeads.filter(person => {
-                const fullName = `${person.FirstName}${person.MiddleInitial ? ' ' + person.MiddleInitial + '.' : ''} ${person.LastName}`.toLowerCase();
+                const fullName = `${person.firstname}${person.middleinitial ? ' ' + person.middleinitial + '.' : ''} ${person.lastname}`.toLowerCase();
                 const position = person.Position?.toLowerCase() || '';
-                const contact = (person.Email || person.ContactInfo || '').toLowerCase();
+                const contact = (person.Email || person.contactinfo || '').toLowerCase();
                 const searchLower = searchTerm.toLowerCase();
 
                 return fullName.includes(searchLower) ||
@@ -210,13 +214,13 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
         // Apply filtering based on sort type
         switch (sortType) {
             case 'assigned':
-                // Show only assigned office heads (those with OfficeID or assigned_offices)
-                filtered = filtered.filter(person => person.OfficeID || (person.assigned_offices && person.assigned_offices.length > 0));
+                // Show only assigned office heads (those with officeid or assigned_offices)
+                filtered = filtered.filter(person => person.officeid || (person.assigned_offices && person.assigned_offices.length > 0));
                 break;
 
             case 'unassigned':
                 // Show only unassigned office heads
-                filtered = filtered.filter(person => !person.OfficeID && (!person.assigned_offices || person.assigned_offices.length === 0));
+                filtered = filtered.filter(person => !person.officeid && (!person.assigned_offices || person.assigned_offices.length === 0));
                 break;
 
             case 'name':
@@ -227,8 +231,8 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
 
         // Sort by name in ascending order for all cases
         const sortedFiltered = [...filtered].sort((a, b) => {
-            const nameA = `${a.FirstName} ${a.LastName}`.toLowerCase();
-            const nameB = `${b.FirstName} ${b.LastName}`.toLowerCase();
+            const nameA = `${a.firstname} ${a.lastname}`.toLowerCase();
+            const nameB = `${b.firstname} ${b.lastname}`.toLowerCase();
             return nameA.localeCompare(nameB);
         });
 
@@ -249,37 +253,37 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
         }
     }, [deleteMode]);
 
-    const handleCheckboxChange = (headId, isChecked) => {
+    const handleCheckboxChange = (headid, isChecked) => {
         setSelectedHeads(prev => {
             const newSet = new Set(prev);
             if (isChecked) {
-                newSet.add(headId);
+                newSet.add(headid);
             } else {
-                newSet.delete(headId);
+                newSet.delete(headid);
             }
             return newSet;
         });
     };
 
-    const toggleHeadSelection = (headId) => {
+    const toggleHeadSelection = (headid) => {
         setSelectedHeads(prev => {
             const next = new Set(prev);
-            if (next.has(headId)) {
-                next.delete(headId);
+            if (next.has(headid)) {
+                next.delete(headid);
             } else {
-                next.add(headId);
+                next.add(headid);
             }
             return next;
         });
     };
 
-    const toggleExpand = (headId) => {
+    const toggleExpand = (headid) => {
         setExpandedCards(prev => {
             const newSet = new Set(prev);
-            if (newSet.has(headId)) {
-                newSet.delete(headId);
+            if (newSet.has(headid)) {
+                newSet.delete(headid);
             } else {
-                newSet.add(headId);
+                newSet.add(headid);
             }
             return newSet;
         });
@@ -373,12 +377,12 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
     };
 
     const handleDeleteHead = async (person) => {
-        if (!person?.HeadID) return;
+        if (!person?.headid) return;
 
-        const confirmed = await showConfirm(`Delete office personnel "${person.FirstName || ''} ${person.LastName || ''}"? This cannot be undone.`);
+        const confirmed = await showConfirm(`Delete office personnel "${person.firstname || ''} ${person.lastname || ''}"? This cannot be undone.`);
         if (!confirmed) return;
 
-        const result = await deleteSelectedHeads([person.HeadID]);
+        const result = await deleteSelectedHeads([person.headid]);
         if (result?.success) {
             await showAlert('Office personnel deleted successfully.');
         } else {
@@ -426,23 +430,23 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
         try {
             const formData = new FormData();
             const fallbackHead = selectedHead || {};
-            const firstName = (updated.FirstName !== undefined ? updated.FirstName : fallbackHead.FirstName) || '';
-            const middleInitial = (updated.MiddleInitial !== undefined ? updated.MiddleInitial : fallbackHead.MiddleInitial) || '';
-            const lastName = (updated.LastName !== undefined ? updated.LastName : fallbackHead.LastName) || '';
+            const firstname = (updated.firstname !== undefined ? updated.firstname : fallbackHead.firstname) || '';
+            const middleinitial = (updated.middleinitial !== undefined ? updated.middleinitial : fallbackHead.middleinitial) || '';
+            const lastname = (updated.lastname !== undefined ? updated.lastname : fallbackHead.lastname) || '';
             const position = (updated.Position !== undefined ? updated.Position : fallbackHead.Position) || '';
-            const contactInfo = (updated.ContactInfo !== undefined ? updated.ContactInfo : fallbackHead.ContactInfo) || '';
+            const contactinfo = (updated.contactinfo !== undefined ? updated.contactinfo : fallbackHead.contactinfo) || '';
 
-            formData.append('FirstName', firstName.trim());
-            formData.append('MiddleInitial', middleInitial.trim());
-            formData.append('LastName', lastName.trim());
+            formData.append('firstname', firstname.trim());
+            formData.append('middleinitial', middleinitial.trim());
+            formData.append('lastname', lastname.trim());
             formData.append('Position', position.trim());
-            formData.append('ContactInfo', contactInfo.trim());
+            formData.append('contactinfo', contactinfo.trim());
 
-            if (updated.ProfilePic && typeof updated.ProfilePic === 'object') {
-                formData.append('profilePic', updated.ProfilePic);
+            if (updated.profilepic && typeof updated.profilepic === 'object') {
+                formData.append('profilepic', updated.profilepic);
             }
 
-            const response = await officeHeadsAPI.updateHead(updated.HeadID, formData);
+            const response = await officeHeadsAPI.updateHead(updated.headid, formData);
             if (!response?.success) {
                 await showAlert(response?.message || 'Failed to update office personnel.');
                 return false;
@@ -461,8 +465,8 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
 
     const parseContactInfo = (person = {}) => {
         const primaryEmail = person.Email || person.email || person.EmailAddress || person.emailAddress || person.email_address;
-        const contactInfo = person.ContactInfo || person.contactInfo || '';
-        const normalizedContact = String(contactInfo || '');
+        const contactinfo = person.contactinfo || person.contactinfo || '';
+        const normalizedContact = String(contactinfo || '');
         const emailMatch = normalizedContact.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
         const phoneMatch = normalizedContact.match(/(\+?\d[\d\s()-]{6,}\d)/);
 
@@ -473,7 +477,7 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
     };
 
     const formatJoinDate = (person) => {
-        const rawDate = person?.CreatedAt || person?.created_at || person?.createdAt || person?.JoinDate;
+        const rawDate = person?.createdat || person?.createdat || person?.createdat || person?.JoinDate;
         if (!rawDate) {
             return 'N/A';
         }
@@ -490,11 +494,11 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
         });
     };
 
-    const officeHasHead = (office, headId) => {
-        const normalizedHeadId = Number(headId);
+    const officeHasHead = (office, headid) => {
+        const normalizedHeadId = Number(headid);
 
         if (!Number.isNaN(normalizedHeadId)) {
-            if (Number(office?.head_id) === normalizedHeadId || Number(office?.HeadID) === normalizedHeadId) {
+            if (Number(office?.headid) === normalizedHeadId || Number(office?.headid) === normalizedHeadId) {
                 return true;
             }
 
@@ -506,7 +510,7 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                 return true;
             }
 
-            if (Array.isArray(office?.heads) && office.heads.some((head) => Number(head?.HeadID || head?.head_id) === normalizedHeadId)) {
+            if (Array.isArray(office?.heads) && office.heads.some((head) => Number(head?.headid || head?.headid) === normalizedHeadId)) {
                 return true;
             }
         }
@@ -514,12 +518,11 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
         return false;
     };
 
-    const itemsPerPage = viewMode === 'grid' ? 12 : 20; // 12 for 4x3 grid
+    const itemsPerPage = 12; // 12 for 4x3 grid
     const totalPages = Math.max(1, Math.ceil(filteredOfficeHeads.length / itemsPerPage));
     const startIdx = (currentPage - 1) * itemsPerPage;
     const paginatedOfficeHeads = filteredOfficeHeads.slice(startIdx, startIdx + itemsPerPage);
-    // Use pagination for both list and grid views so the UI is consistent
-    const visibleOfficeHeads = paginatedOfficeHeads;
+    const visibleOfficeHeads = viewMode === 'list' ? filteredOfficeHeads : paginatedOfficeHeads;
 
     useEffect(() => {
         if (currentPage > totalPages) {
@@ -577,7 +580,7 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
     }
 
     return (
-        <div className={viewMode === 'list' ? 'mt-1 w-full flex flex-col pb-24' : 'w-full h-full min-h-0 flex-1 flex flex-col pt-1.5 px-0.5'}>
+        <div className={viewMode === 'list' ? 'mt-1 w-full flex flex-col pb-24' : 'w-full h-full min-h-0 flex-1 flex flex-col pt-1.5 px-0.5 overflow-hidden'}>
             {/* Search Results Counter */}
             {searchTerm.trim() && (
                 <div className="text-xs text-gray-600 mb-2 shrink-0">
@@ -592,41 +595,41 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                     style={{ top: 0, zIndex: 3 }}
                 >
                     <div className="col-span-4 flex items-center">Name</div>
-                    <div className="col-span-2 flex items-center justify-center">Role</div>
-                    <div className="col-span-1 flex items-center justify-center">Status</div>
+                    <div className="col-span-2 flex items-center">Role</div>
+                    <div className="col-span-1 flex items-center">Status</div>
                     <div className="col-span-1 flex items-center justify-end">Actions</div>
                 </div>
             )}
 
-            <div className={viewMode === 'list' ? 'flex flex-col gap-2 pt-1 pb-1' : 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 grid-rows-3 gap-2 sm:gap-2.5 lg:gap-3 flex-1 min-h-0 h-full p-1'}>
+            <div className={viewMode === 'list' ? 'flex flex-col gap-2 pt-1 pb-1' : 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 grid-rows-3 gap-2 sm:gap-2.5 lg:gap-3 flex-1 min-h-0 h-full p-1 overflow-hidden'}>
                 {visibleOfficeHeads.map((person) => {
-                    const fullName = `${person.FirstName || ''}${person.MiddleInitial ? ' ' + person.MiddleInitial + '.' : ''} ${person.LastName || ''}`.trim() || 'Personnel';
-                    const initials = `${(person.FirstName || '').trim().charAt(0)}${(person.LastName || '').trim().charAt(0)}`.toUpperCase() || 'OP';
+                    const fullName = `${person.firstname || ''}${person.middleinitial ? ' ' + person.middleinitial + '.' : ''} ${person.lastname || ''}`.trim() || 'Personnel';
+                    const initials = `${(person.firstname || '').trim().charAt(0)}${(person.lastname || '').trim().charAt(0)}`.toUpperCase() || 'OP';
                     const profilePicUrl = person.TempPreview
                         ? person.TempPreview
-                        : person.ProfilePic
-                            ? `${API_BASE_URL}/uploads/profile-pics/${person.ProfilePic}`
+                        : person.profilepic
+                            ? `${API_BASE_URL}/uploads/profile-pics/${person.profilepic}`
                             : null;
                     const assignedOffices = (person.assigned_offices && person.assigned_offices.length > 0)
                         ? person.assigned_offices
-                        : offices.filter((office) => officeHasHead(office, person.HeadID));
+                        : offices.filter((office) => officeHasHead(office, person.headid));
                     const isAssigned = assignedOffices.length > 0;
                     const statusClass = isAssigned
                         ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80'
                         : 'bg-slate-100 text-slate-600 border-slate-200';
-                    const isExpanded = expandedCards.has(person.HeadID);
-                    const isSelected = selectedHeads.has(person.HeadID);
+                    const isExpanded = expandedCards.has(person.headid);
+                    const isSelected = selectedHeads.has(person.headid);
                     const { email } = parseContactInfo(person);
 
                     if (viewMode === 'list') {
                         return (
                             <div
-                                key={person.HeadID}
+                                key={person.headid}
                                 onClick={() => {
-                                    if (deleteMode) toggleHeadSelection(person.HeadID);
+                                    if (deleteMode) toggleHeadSelection(person.headid);
                                     else openDetails(person, assignedOffices);
                                 }}
-                                className={`relative rounded-xl border border-slate-200 bg-white shadow-2xs ${selectedHeads.has(person.HeadID) ? 'ring-2 ring-blue-500 border-blue-500' : ''
+                                className={`relative rounded-xl border border-slate-200 bg-white shadow-2xs ${selectedHeads.has(person.headid) ? 'ring-2 ring-blue-500 border-blue-500' : ''
                                     } ${deleteMode ? 'cursor-pointer' : 'app-card-hover cursor-pointer'}`}
                             >
                                 <div className="grid grid-cols-8 items-center gap-2 px-4 py-3">
@@ -636,8 +639,8 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                                             <div className="flex-shrink-0">
                                                 <input
                                                     type="checkbox"
-                                                    checked={selectedHeads.has(person.HeadID)}
-                                                    onChange={(e) => handleCheckboxChange(person.HeadID, e.target.checked)}
+                                                    checked={selectedHeads.has(person.headid)}
+                                                    onChange={(e) => handleCheckboxChange(person.headid, e.target.checked)}
                                                     onClick={(e) => e.stopPropagation()}
                                                     className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                                                 />
@@ -662,14 +665,14 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                                     </div>
 
                                     {/* Role column (col-span-2) */}
-                                    <div className="col-span-2 flex items-center justify-center">
+                                    <div className="col-span-2 flex items-center">
                                         <span className="inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold bg-indigo-50 text-indigo-700 border-indigo-200">
-                                            {person.Position || person.RoleName || person.role || 'Personnel'}
+                                            {person.Position || person.rolename || person.role || 'Personnel'}
                                         </span>
                                     </div>
 
                                     {/* Status column (col-span-1) */}
-                                    <div className="col-span-1 flex items-center justify-center">
+                                    <div className="col-span-1 flex items-center">
                                         <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${statusClass}`}>
                                             {isAssigned ? 'Assigned' : 'Unassigned'}
                                         </span>
@@ -684,12 +687,12 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             const rect = e.currentTarget.getBoundingClientRect();
-                                                            const isOpen = actionMenuHeadId === person.HeadID;
+                                                            const isOpen = actionMenuHeadId === person.headid;
                                                             if (isOpen) {
                                                                 setActionMenuHeadId(null);
                                                                 setActionMenuAnchorRect(null);
                                                             } else {
-                                                                setActionMenuHeadId(person.HeadID);
+                                                                setActionMenuHeadId(person.headid);
                                                                 setActionMenuAnchorRect(rect);
                                                             }
                                                         }}
@@ -714,7 +717,7 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
 
                     return (
                         <div
-                            key={person.HeadID}
+                            key={person.headid}
                             className={`group relative flex flex-col justify-between rounded-2xl bg-white shadow-2xs h-full min-h-0 transition-all duration-200 ${
                                 isSelected
                                     ? 'border-2 border-rose-500 ring-2 ring-inset ring-rose-400/50 bg-rose-50/25 shadow-sm'
@@ -730,7 +733,7 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                                         <input
                                             type="checkbox"
                                             checked={isSelected}
-                                            onChange={(e) => handleCheckboxChange(person.HeadID, e.target.checked)}
+                                            onChange={(e) => handleCheckboxChange(person.headid, e.target.checked)}
                                             onClick={(e) => e.stopPropagation()}
                                             className="h-4 w-4 rounded border-rose-300 text-rose-600 focus:ring-rose-500 cursor-pointer"
                                         />
@@ -748,12 +751,12 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     const rect = e.currentTarget.getBoundingClientRect();
-                                                    const isOpen = actionMenuHeadId === person.HeadID;
+                                                    const isOpen = actionMenuHeadId === person.headid;
                                                     if (isOpen) {
                                                         setActionMenuHeadId(null);
                                                         setActionMenuAnchorRect(null);
                                                     } else {
-                                                        setActionMenuHeadId(person.HeadID);
+                                                        setActionMenuHeadId(person.headid);
                                                         setActionMenuAnchorRect(rect);
                                                     }
                                                 }}
@@ -774,7 +777,7 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                                 {/* Profile Section */}
                                 <div
                                     onClick={() => {
-                                        if (deleteMode) toggleHeadSelection(person.HeadID);
+                                        if (deleteMode) toggleHeadSelection(person.headid);
                                         else openDetails(person, assignedOffices);
                                     }}
                                     className="cursor-pointer group/content min-h-0 flex-1 flex flex-col justify-center"
@@ -819,12 +822,12 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                                             Assigned Office(s)
                                         </div>
                                         {assignedOffices.length > 0 ? (
-                                            <div className="flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold text-slate-800 truncate" title={assignedOffices.map(o => o.OfficeName || o.office_name).join(', ')}>
+                                            <div className="flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold text-slate-800 truncate" title={assignedOffices.map(o => o.officename || o.officename).join(', ')}>
                                                 <svg className="w-3 h-3 text-teal-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                                     <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                                                 </svg>
                                                 <span className="truncate">
-                                                    {assignedOffices[0].OfficeName || assignedOffices[0].office_name || `Office #${assignedOffices[0].id || assignedOffices[0].OfficeID}`}
+                                                    {assignedOffices[0].officename || assignedOffices[0].officename || `Office #${assignedOffices[0].id || assignedOffices[0].officeid}`}
                                                     {assignedOffices.length > 1 && ` (+${assignedOffices.length - 1})`}
                                                 </span>
                                             </div>
@@ -834,16 +837,33 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                                     </div>
 
                                     {!deleteMode && (
-                                        <button
-                                            type="button"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                openDetails(person, assignedOffices);
-                                            }}
-                                            className="shrink-0 rounded-lg px-2 py-0.5 text-[9px] sm:text-[10px] font-bold transition flex items-center gap-1 bg-slate-100 text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 border border-slate-200/60"
-                                        >
-                                            Details
-                                        </button>
+                                        <div className="flex items-center gap-1">
+                                            {isAdmin && (
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setScopeModalPerson(person);
+                                                        setIsScopeModalOpen(true);
+                                                    }}
+                                                    className="shrink-0 rounded-lg px-2 py-0.5 text-[9px] sm:text-[10px] font-bold transition flex items-center gap-1 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200/80 cursor-pointer"
+                                                    title="Assign Areas, Sub Areas, or Standards"
+                                                >
+                                                    <Layers className="w-2.5 h-2.5" />
+                                                    <span>Scope</span>
+                                                </button>
+                                            )}
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    openDetails(person, assignedOffices);
+                                                }}
+                                                className="shrink-0 rounded-lg px-2 py-0.5 text-[9px] sm:text-[10px] font-bold transition flex items-center gap-1 bg-slate-100 text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 border border-slate-200/60 cursor-pointer"
+                                            >
+                                                Details
+                                            </button>
+                                        </div>
                                     )}
                                 </div>
                             </div>
@@ -852,17 +872,6 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                 })}
             </div>
 
-            {viewMode === 'list' && (
-                <div className="pt-1">
-                    <Pagination
-                        currentPage={currentPage}
-                        totalPages={totalPages}
-                        onPageChange={(p) => setCurrentPage(p)}
-                        fixed={false}
-                        showWhenSinglePage={true}
-                    />
-                </div>
-            )}
             {viewMode !== 'list' && (
                 <div className="pt-1">
                     <Pagination
@@ -877,8 +886,8 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
 
             {/* Portal actions menu to avoid clipping inside list/card containers */}
             {isAdmin && actionMenuHeadId && actionMenuAnchorRect && typeof document !== 'undefined' && (() => {
-                const menuPerson = officeHeads.find((h) => String(h.HeadID) === String(actionMenuHeadId))
-                    || filteredOfficeHeads.find((h) => String(h.HeadID) === String(actionMenuHeadId));
+                const menuPerson = officeHeads.find((h) => String(h.headid) === String(actionMenuHeadId))
+                    || filteredOfficeHeads.find((h) => String(h.headid) === String(actionMenuHeadId));
 
                 if (!menuPerson) return null;
 
@@ -914,6 +923,20 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                             </button>
                             <button
                                 type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActionMenuHeadId(null);
+                                    setActionMenuAnchorRect(null);
+                                    setScopeModalPerson(menuPerson);
+                                    setIsScopeModalOpen(true);
+                                }}
+                                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 transition whitespace-nowrap cursor-pointer"
+                            >
+                                <Layers className="h-4 w-4 text-indigo-600 shrink-0" />
+                                <span>Assign Scope</span>
+                            </button>
+                            <button
+                                type="button"
                                 onClick={async (e) => {
                                     e.stopPropagation();
                                     setActionMenuHeadId(null);
@@ -938,6 +961,11 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                 onClose={closeDetails}
                 head={detailsHead}
                 offices={detailsOffices}
+                onAssignScope={isAdmin ? (person) => {
+                    closeDetails();
+                    setScopeModalPerson(person);
+                    setIsScopeModalOpen(true);
+                } : null}
             />
 
             {/* Edit modal */}
@@ -947,6 +975,21 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                 head={selectedHead}
                 onSave={handleSave}
             />
+
+            {/* Scope Assignment Modal */}
+            {isScopeModalOpen && scopeModalPerson && (
+                <AssignPersonnelScopeModal
+                    isOpen={isScopeModalOpen}
+                    onClose={() => {
+                        setIsScopeModalOpen(false);
+                        setScopeModalPerson(null);
+                    }}
+                    personnel={scopeModalPerson}
+                    onSuccess={() => {
+                        fetchOfficeHeads(true);
+                    }}
+                />
+            )}
         </div>
     );
 });

@@ -12,11 +12,11 @@ const stripExtension = (name) => {
 
 export default function RenameInline({ item, onRename, forceEditing = false, onCancel, onStart }) {
     const [editing, setEditing] = useState(false);
-    const [value, setValue] = useState(() => stripExtension(item.displayName || item.fileName || ''));
+    const [value, setValue] = useState(() => stripExtension(item.displayname || item.filename || ''));
 
     useEffect(() => {
-        setValue(stripExtension(item.displayName || item.fileName || ''));
-    }, [item.displayName, item.fileName]);
+        setValue(stripExtension(item.displayname || item.filename || ''));
+    }, [item.displayname, item.filename]);
 
     useEffect(() => {
         if (forceEditing) setEditing(true);
@@ -29,7 +29,7 @@ export default function RenameInline({ item, onRename, forceEditing = false, onC
     const isEditing = forceEditing || editing;
 
     const doCancel = () => {
-        setValue(stripExtension(item.displayName || item.fileName || ''));
+        setValue(stripExtension(item.displayname || item.filename || ''));
         setEditing(false);
         if (typeof onCancel === 'function') onCancel();
     };

@@ -10,7 +10,7 @@ export function fileNameFromUrl(url) {
     }
 }
 
-export async function downloadFileFromUrl(fileUrl, fileName) {
+export async function downloadFileFromUrl(fileUrl, filename) {
     if (!fileUrl) throw new Error('No file URL');
 
     const token = localStorage.getItem('token');
@@ -22,7 +22,7 @@ export async function downloadFileFromUrl(fileUrl, fileName) {
     const downloadUrl = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = downloadUrl;
-    a.download = fileName || fileNameFromUrl(fileUrl);
+    a.download = filename || fileNameFromUrl(fileUrl);
     document.body.appendChild(a);
     a.click();
     a.remove();

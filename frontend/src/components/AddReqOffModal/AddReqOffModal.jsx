@@ -22,7 +22,7 @@ export default function AddReqOffModal({ isOpen, onClose, office, onSave }) {
         setLoading(true);
         try {
             // Fetch all requirements for the office's event
-            const response = await axios.get(`${API_BASE_URL}/api/requirements/all?eventId=${office.event_id}`);
+            const response = await axios.get(`${API_BASE_URL}/api/requirements/all?eventid=${office.eventid}`);
             const allRequirements = response.data.data || [];
             console.log('All requirements for event:', allRequirements);
             console.log('First requirement:', JSON.stringify(allRequirements[0], null, 2));
@@ -30,10 +30,10 @@ export default function AddReqOffModal({ isOpen, onClose, office, onSave }) {
             // Fetch current office requirements
             const officeReqResponse = await axios.get(`${API_BASE_URL}/api/offices/${office.id}/requirements`);
             const officeRequirements = officeReqResponse.data.data || [];
-            const officeReqIds = officeRequirements.map(r => r.RequirementID);
+            const officeReqIds = officeRequirements.map(r => r.requirementid);
 
             // Filter out requirements already assigned to office
-            const availableReqs = allRequirements.filter(req => !officeReqIds.includes(req.RequirementID));
+            const availableReqs = allRequirements.filter(req => !officeReqIds.includes(req.requirementid));
             console.log('Available requirements:', availableReqs);
             console.log('Available requirement details:', JSON.stringify(availableReqs, null, 2));
             setRequirements(availableReqs);
@@ -58,7 +58,7 @@ export default function AddReqOffModal({ isOpen, onClose, office, onSave }) {
         if (selectedRequirements.length === filtered.length) {
             setSelectedRequirements([]);
         } else {
-            setSelectedRequirements(filtered.map(r => r.RequirementID));
+            setSelectedRequirements(filtered.map(r => r.requirementid));
         }
     };
 
@@ -73,7 +73,7 @@ export default function AddReqOffModal({ isOpen, onClose, office, onSave }) {
 
             dataCache.invalidate('office_reqs_');
 
-            await showAlert(`Successfully added ${selectedRequirements.length} standard item(s) to ${office.office_name || office.OfficeName || 'office'}.`, 'success');
+            await showAlert(`Successfully added ${selectedRequirements.length} standard item(s) to ${office.officename || office.officename || 'office'}.`, 'success');
             
             onSave();
             onClose();
@@ -88,9 +88,9 @@ export default function AddReqOffModal({ isOpen, onClose, office, onSave }) {
 
     const getFilteredRequirements = () => {
         return requirements.filter(req =>
-            (req.RequirementCode && req.RequirementCode.toLowerCase().includes(searchTerm.toLowerCase())) ||
+            (req.requirementcode && req.requirementcode.toLowerCase().includes(searchTerm.toLowerCase())) ||
             (req.Description && req.Description.toLowerCase().includes(searchTerm.toLowerCase())) ||
-            (req.CriteriaCode && req.CriteriaCode.toLowerCase().includes(searchTerm.toLowerCase()))
+            (req.criteriacode && req.criteriacode.toLowerCase().includes(searchTerm.toLowerCase()))
         );
     };
 
@@ -112,7 +112,7 @@ export default function AddReqOffModal({ isOpen, onClose, office, onSave }) {
                             </div>
                             <div>
                                 <h2 className="text-xl font-bold">Add Standards to Office</h2>
-                                <p className="text-sm text-green-100">{office.office_name}</p>
+                                <p className="text-sm text-green-100">{office.officename}</p>
                             </div>
                         </div>
                         <button
@@ -177,61 +177,61 @@ export default function AddReqOffModal({ isOpen, onClose, office, onSave }) {
                                     {searchTerm ? 'No standards match your search' : 'All standards are already assigned'}
                                 </p>
                             </div>
-                        ) : office.event_id === 8 ? (
+                        ) : office.eventid === 8 ? (
                             // PASSCU - Hierarchical view with Area -> Criteria -> Requirements
                             <div className="space-y-6">
                                 {(() => {
                                     // Group requirements by Area
                                     const areaGroups = filteredRequirements.reduce((acc, req) => {
-                                        const areaCode = req.AreaCode || 'No Area';
-                                        if (!acc[areaCode]) {
-                                            acc[areaCode] = {
-                                                areaName: req.AreaName || 'Unknown Area',
+                                        const areacode = req.areacode || 'No Area';
+                                        if (!acc[areacode]) {
+                                            acc[areacode] = {
+                                                areaname: req.areaname || 'Unknown Area',
                                                 requirements: []
                                             };
                                         }
-                                        acc[areaCode].requirements.push(req);
+                                        acc[areacode].requirements.push(req);
                                         return acc;
                                     }, {});
 
-                                    return Object.entries(areaGroups).map(([areaCode, areaData]) => (
-                                        <div key={areaCode} className="space-y-4">
+                                    return Object.entries(areaGroups).map(([areacode, areaData]) => (
+                                        <div key={areacode} className="space-y-4">
                                             {/* Area Header */}
                                             <div className="bg-gradient-to-r from-purple-600 to-purple-700 text-white px-4 py-3 rounded-lg shadow-md">
-                                                <h3 className="text-base font-bold">{areaCode}</h3>
-                                                <p className="text-xs text-purple-100 mt-1">{areaData.areaName}</p>
+                                                <h3 className="text-base font-bold">{areacode}</h3>
+                                                <p className="text-xs text-purple-100 mt-1">{areaData.areaname}</p>
                                             </div>
 
                                             {/* Group by Criteria within this Area */}
                                             {(() => {
                                                 const criteriaGroups = areaData.requirements.reduce((acc, req) => {
-                                                    const criteriaCode = req.CriteriaCode || 'No Sub Area';
-                                                    if (!acc[criteriaCode]) {
-                                                        acc[criteriaCode] = {
-                                                            criteriaName: req.CriteriaName || 'Unknown Sub Area',
+                                                    const criteriacode = req.criteriacode || 'No Sub Area';
+                                                    if (!acc[criteriacode]) {
+                                                        acc[criteriacode] = {
+                                                            criterianame: req.criterianame || 'Unknown Sub Area',
                                                             requirements: []
                                                         };
                                                     }
-                                                    acc[criteriaCode].requirements.push(req);
+                                                    acc[criteriacode].requirements.push(req);
                                                     return acc;
                                                 }, {});
 
-                                                return Object.entries(criteriaGroups).map(([criteriaCode, criteriaData]) => (
-                                                    <div key={criteriaCode} className="ml-4 space-y-2">
+                                                return Object.entries(criteriaGroups).map(([criteriacode, criteriaData]) => (
+                                                    <div key={criteriacode} className="ml-4 space-y-2">
                                                         {/* Criteria Header */}
                                                         <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white px-4 py-3 rounded-lg shadow-md">
-                                                            <h3 className="text-sm font-bold">{criteriaCode}</h3>
-                                                            <p className="text-xs text-indigo-100 mt-1">{criteriaData.criteriaName}</p>
+                                                            <h3 className="text-sm font-bold">{criteriacode}</h3>
+                                                            <p className="text-xs text-indigo-100 mt-1">{criteriaData.criterianame}</p>
                                                         </div>
 
                                                         {/* Requirements under this Criteria */}
                                                         <div className="ml-4 space-y-2">
                                                             {criteriaData.requirements.map((req) => (
                                                                 <div
-                                                                    key={req.RequirementID}
-                                                                    onClick={() => handleToggleRequirement(req.RequirementID)}
+                                                                    key={req.requirementid}
+                                                                    onClick={() => handleToggleRequirement(req.requirementid)}
                                                                     className={`border-l-4 rounded-r-lg p-4 cursor-pointer transition-all ${
-                                                                        selectedRequirements.includes(req.RequirementID)
+                                                                        selectedRequirements.includes(req.requirementid)
                                                                             ? 'bg-green-50 border-green-500 shadow-sm'
                                                                             : 'bg-white border-indigo-200 hover:border-green-300 hover:bg-green-50/30'
                                                                     }`}
@@ -239,13 +239,13 @@ export default function AddReqOffModal({ isOpen, onClose, office, onSave }) {
                                                                     <div className="flex items-start gap-3">
                                                                         <input
                                                                             type="checkbox"
-                                                                            checked={selectedRequirements.includes(req.RequirementID)}
-                                                                            onChange={() => handleToggleRequirement(req.RequirementID)}
+                                                                            checked={selectedRequirements.includes(req.requirementid)}
+                                                                            onChange={() => handleToggleRequirement(req.requirementid)}
                                                                             className="w-5 h-5 text-green-600 border-gray-300 rounded focus:ring-green-500 mt-0.5"
                                                                         />
                                                                         <div className="flex-1">
                                                                             <h4 className="font-semibold text-gray-800">
-                                                                                {req.RequirementCode || 'No Code'}
+                                                                                {req.requirementcode || 'No Code'}
                                                                             </h4>
                                                                             <p className="text-sm text-gray-600 mt-1">{req.Description}</p>
                                                                         </div>
@@ -266,33 +266,33 @@ export default function AddReqOffModal({ isOpen, onClose, office, onSave }) {
                                 {(() => {
                                     // Group requirements by Criteria
                                     const criteriaGroups = filteredRequirements.reduce((acc, req) => {
-                                        const criteriaCode = req.CriteriaCode || 'No Criteria';
-                                        if (!acc[criteriaCode]) {
-                                            acc[criteriaCode] = {
-                                                criteriaName: req.CriteriaName || 'Unknown Criteria',
+                                        const criteriacode = req.criteriacode || 'No Criteria';
+                                        if (!acc[criteriacode]) {
+                                            acc[criteriacode] = {
+                                                criterianame: req.criterianame || 'Unknown Criteria',
                                                 requirements: []
                                             };
                                         }
-                                        acc[criteriaCode].requirements.push(req);
+                                        acc[criteriacode].requirements.push(req);
                                         return acc;
                                     }, {});
 
-                                    return Object.entries(criteriaGroups).map(([criteriaCode, criteriaData]) => (
-                                        <div key={criteriaCode} className="space-y-2">
+                                    return Object.entries(criteriaGroups).map(([criteriacode, criteriaData]) => (
+                                        <div key={criteriacode} className="space-y-2">
                                             {/* Criteria Header */}
                                             <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white px-4 py-3 rounded-lg shadow-md">
-                                                <h3 className="text-base font-bold">{criteriaCode}</h3>
-                                                <p className="text-xs text-indigo-100 mt-1">{criteriaData.criteriaName}</p>
+                                                <h3 className="text-base font-bold">{criteriacode}</h3>
+                                                <p className="text-xs text-indigo-100 mt-1">{criteriaData.criterianame}</p>
                                             </div>
 
                                             {/* Requirements under this Criteria */}
                                             <div className="ml-4 space-y-2">
                                                 {criteriaData.requirements.map((req) => (
                                                     <div
-                                                        key={req.RequirementID}
-                                                        onClick={() => handleToggleRequirement(req.RequirementID)}
+                                                        key={req.requirementid}
+                                                        onClick={() => handleToggleRequirement(req.requirementid)}
                                                         className={`border-l-4 rounded-r-lg p-4 cursor-pointer transition-all ${
-                                                            selectedRequirements.includes(req.RequirementID)
+                                                            selectedRequirements.includes(req.requirementid)
                                                                 ? 'bg-green-50 border-green-500 shadow-sm'
                                                                 : 'bg-white border-indigo-200 hover:border-green-300 hover:bg-green-50/30'
                                                         }`}
@@ -300,13 +300,13 @@ export default function AddReqOffModal({ isOpen, onClose, office, onSave }) {
                                                         <div className="flex items-start gap-3">
                                                             <input
                                                                 type="checkbox"
-                                                                checked={selectedRequirements.includes(req.RequirementID)}
-                                                                onChange={() => handleToggleRequirement(req.RequirementID)}
+                                                                checked={selectedRequirements.includes(req.requirementid)}
+                                                                onChange={() => handleToggleRequirement(req.requirementid)}
                                                                 className="w-5 h-5 text-green-600 border-gray-300 rounded focus:ring-green-500 mt-0.5"
                                                             />
                                                             <div className="flex-1">
                                                                 <h4 className="font-semibold text-gray-800">
-                                                                    {req.RequirementCode || 'No Code'}
+                                                                    {req.requirementcode || 'No Code'}
                                                                 </h4>
                                                                 <p className="text-sm text-gray-600 mt-1">{req.Description}</p>
                                                             </div>
@@ -340,59 +340,59 @@ export default function AddReqOffModal({ isOpen, onClose, office, onSave }) {
                                     <p className="text-gray-500 text-sm">Select requirements to preview</p>
                                     <p className="text-gray-400 text-xs mt-1">Selected items will appear here</p>
                                 </div>
-                            ) : office.event_id === 8 ? (
+                            ) : office.eventid === 8 ? (
                                 // PASSCU - Preview with Area -> Criteria -> Requirements hierarchy
                                 <div className="space-y-6">
                                     {(() => {
-                                        const selectedReqs = requirements.filter(req => selectedRequirements.includes(req.RequirementID));
+                                        const selectedReqs = requirements.filter(req => selectedRequirements.includes(req.requirementid));
                                         
                                         // Group by Area
                                         const areaGroups = selectedReqs.reduce((acc, req) => {
-                                            const areaCode = req.AreaCode || 'No Area';
-                                            if (!acc[areaCode]) {
-                                                acc[areaCode] = {
-                                                    areaName: req.AreaName || 'Unknown Area',
+                                            const areacode = req.areacode || 'No Area';
+                                            if (!acc[areacode]) {
+                                                acc[areacode] = {
+                                                    areaname: req.areaname || 'Unknown Area',
                                                     requirements: []
                                                 };
                                             }
-                                            acc[areaCode].requirements.push(req);
+                                            acc[areacode].requirements.push(req);
                                             return acc;
                                         }, {});
 
-                                        return Object.entries(areaGroups).map(([areaCode, areaData]) => (
-                                            <div key={areaCode} className="space-y-4">
+                                        return Object.entries(areaGroups).map(([areacode, areaData]) => (
+                                            <div key={areacode} className="space-y-4">
                                                 {/* Area Header */}
                                                 <div className="bg-gradient-to-r from-purple-600 to-purple-700 text-white px-4 py-3 rounded-lg shadow-md">
-                                                    <h3 className="text-base font-bold">{areaCode}</h3>
-                                                    <p className="text-xs text-purple-100 mt-1">{areaData.areaName}</p>
+                                                    <h3 className="text-base font-bold">{areacode}</h3>
+                                                    <p className="text-xs text-purple-100 mt-1">{areaData.areaname}</p>
                                                 </div>
 
                                                 {/* Group by Criteria within this Area */}
                                                 {(() => {
                                                     const criteriaGroups = areaData.requirements.reduce((acc, req) => {
-                                                        const criteriaCode = req.CriteriaCode || 'No Criteria';
-                                                        if (!acc[criteriaCode]) {
-                                                            acc[criteriaCode] = {
-                                                                criteriaName: req.CriteriaName || 'Unknown Criteria',
+                                                        const criteriacode = req.criteriacode || 'No Criteria';
+                                                        if (!acc[criteriacode]) {
+                                                            acc[criteriacode] = {
+                                                                criterianame: req.criterianame || 'Unknown Criteria',
                                                                 requirements: []
                                                             };
                                                         }
-                                                        acc[criteriaCode].requirements.push(req);
+                                                        acc[criteriacode].requirements.push(req);
                                                         return acc;
                                                     }, {});
 
-                                                    return Object.entries(criteriaGroups).map(([criteriaCode, criteriaData]) => (
-                                                        <div key={criteriaCode} className="ml-4 space-y-2">
+                                                    return Object.entries(criteriaGroups).map(([criteriacode, criteriaData]) => (
+                                                        <div key={criteriacode} className="ml-4 space-y-2">
                                                             {/* Criteria Header */}
                                                             <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white px-4 py-3 rounded-lg shadow-md">
-                                                                <h3 className="text-sm font-bold">{criteriaCode}</h3>
-                                                                <p className="text-xs text-indigo-100 mt-1">{criteriaData.criteriaName}</p>
+                                                                <h3 className="text-sm font-bold">{criteriacode}</h3>
+                                                                <p className="text-xs text-indigo-100 mt-1">{criteriaData.criterianame}</p>
                                                             </div>
 
                                                             {/* Requirements under this Criteria */}
                                                             <div className="ml-4 space-y-2">
                                                                 {criteriaData.requirements.map((req) => (
-                                                                    <div key={req.RequirementID} className="border-l-4 border-indigo-200 bg-white p-4 rounded-r-lg shadow-sm">
+                                                                    <div key={req.requirementid} className="border-l-4 border-indigo-200 bg-white p-4 rounded-r-lg shadow-sm">
                                                                         <div className="flex items-start gap-3">
                                                                             <div className="flex-shrink-0 w-5 h-5 rounded-full bg-green-100 flex items-center justify-center mt-1">
                                                                                 <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
@@ -400,7 +400,7 @@ export default function AddReqOffModal({ isOpen, onClose, office, onSave }) {
                                                                                 </svg>
                                                                             </div>
                                                                             <div className="flex-1">
-                                                                                <h4 className="font-bold text-sm text-gray-800">{req.RequirementCode || 'No Code'}</h4>
+                                                                                <h4 className="font-bold text-sm text-gray-800">{req.requirementcode || 'No Code'}</h4>
                                                                                 <p className="text-xs text-gray-600 mt-1">{req.Description}</p>
                                                                             </div>
                                                                         </div>
@@ -418,33 +418,33 @@ export default function AddReqOffModal({ isOpen, onClose, office, onSave }) {
                                 // Non-PASSCU - Preview with Criteria grouping
                                 <div className="space-y-4">
                                     {(() => {
-                                        const selectedReqs = requirements.filter(req => selectedRequirements.includes(req.RequirementID));
+                                        const selectedReqs = requirements.filter(req => selectedRequirements.includes(req.requirementid));
                                         
                                         // Group by Criteria
                                         const criteriaGroups = selectedReqs.reduce((acc, req) => {
-                                            const criteriaCode = req.CriteriaCode || 'No Criteria';
-                                            if (!acc[criteriaCode]) {
-                                                acc[criteriaCode] = {
-                                                    criteriaName: req.CriteriaName || 'Unknown Criteria',
+                                            const criteriacode = req.criteriacode || 'No Criteria';
+                                            if (!acc[criteriacode]) {
+                                                acc[criteriacode] = {
+                                                    criterianame: req.criterianame || 'Unknown Criteria',
                                                     requirements: []
                                                 };
                                             }
-                                            acc[criteriaCode].requirements.push(req);
+                                            acc[criteriacode].requirements.push(req);
                                             return acc;
                                         }, {});
 
-                                        return Object.entries(criteriaGroups).map(([criteriaCode, criteriaData]) => (
-                                            <div key={criteriaCode} className="space-y-2">
+                                        return Object.entries(criteriaGroups).map(([criteriacode, criteriaData]) => (
+                                            <div key={criteriacode} className="space-y-2">
                                                 {/* Criteria Header */}
                                                 <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-3 rounded-lg shadow-md">
-                                                    <h3 className="text-sm font-bold">{criteriaCode}</h3>
-                                                    <p className="text-xs text-blue-100 mt-1">{criteriaData.criteriaName}</p>
+                                                    <h3 className="text-sm font-bold">{criteriacode}</h3>
+                                                    <p className="text-xs text-blue-100 mt-1">{criteriaData.criterianame}</p>
                                                 </div>
 
                                                 {/* Requirements under this Criteria */}
                                                 <div className="ml-4 space-y-2">
                                                     {criteriaData.requirements.map((req) => (
-                                                        <div key={req.RequirementID} className="border-l-4 border-blue-200 bg-white p-4 rounded-r-lg shadow-sm">
+                                                        <div key={req.requirementid} className="border-l-4 border-blue-200 bg-white p-4 rounded-r-lg shadow-sm">
                                                             <div className="flex items-start gap-3">
                                                                 <div className="flex-shrink-0 w-5 h-5 rounded-full bg-green-100 flex items-center justify-center mt-1">
                                                                     <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
@@ -452,7 +452,7 @@ export default function AddReqOffModal({ isOpen, onClose, office, onSave }) {
                                                                     </svg>
                                                                 </div>
                                                                 <div className="flex-1">
-                                                                    <h4 className="font-bold text-sm text-gray-800">{req.RequirementCode || 'No Code'}</h4>
+                                                                    <h4 className="font-bold text-sm text-gray-800">{req.requirementcode || 'No Code'}</h4>
                                                                     <p className="text-xs text-gray-600 mt-1">{req.Description}</p>
                                                                 </div>
                                                             </div>

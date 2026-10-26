@@ -4,13 +4,13 @@ const db = require('../db');
 exports.getAllUsers = async (req, res) => {
   try {
     const [users] = await db.query(
-      'SELECT u.UserID, u.FirstName, u.MiddleInitial, u.LastName, u.Email, u.RoleID, u.ProfilePic, r.RoleName FROM users u LEFT JOIN roles r ON u.RoleID = r.RoleID'
+      'SELECT u.userid, u.firstname, u.middleinitial, u.lastname, u.Email, u.roleid, u.profilepic, r.rolename FROM users u LEFT JOIN roles r ON u.roleid = r.roleid'
     );
     
     // Add combined FullName to each user
     const usersWithFullName = users.map(user => ({
       ...user,
-      FullName: `${user.FirstName}${user.MiddleInitial ? ' ' + user.MiddleInitial + '.' : ''} ${user.LastName}`
+      FullName: `${user.firstname}${user.middleinitial ? ' ' + user.middleinitial + '.' : ''} ${user.lastname}`
     }));
     
     res.json({

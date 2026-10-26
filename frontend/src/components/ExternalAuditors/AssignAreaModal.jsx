@@ -31,7 +31,7 @@ export default function AssignAreaModal({ show, auditor, onClose, onSaveSuccess 
                 const fetchedEvents = Array.isArray(eventsData) ? eventsData : (eventsData.events || eventsData.data || []);
                 
                 const activeEvents = fetchedEvents.filter(ev => {
-                    const s = String(ev.status || ev.Status || ev.IsActive || '').toLowerCase();
+                    const s = String(ev.status || ev.Status || ev.isactive || '').toLowerCase();
                     return s !== 'inactive' && s !== '0' && s !== 'false' && s !== 'archived';
                 });
                 if (mounted) setEvents(activeEvents);
@@ -41,36 +41,36 @@ export default function AssignAreaModal({ show, auditor, onClose, onSaveSuccess 
                 const areasData = await areasRes.json();
                 const fetchedAreas = Array.isArray(areasData) ? areasData : (areasData.data || []);
                 
-                const activeEventIds = new Set(activeEvents.map(e => Number(e.EventID)));
+                const activeEventIds = new Set(activeEvents.map(e => Number(e.eventid)));
                 const activeAreas = fetchedAreas.filter(area => {
-                    const isAreaActive = Number(area.IsActive ?? 1) === 1;
-                    const isParentEventActive = !area.EventID || activeEventIds.has(Number(area.EventID));
+                    const isAreaActive = Number(area.isactive ?? 1) === 1;
+                    const isParentEventActive = !area.eventid || activeEventIds.has(Number(area.eventid));
                     return isAreaActive && isParentEventActive;
                 });
                 if (mounted) setAreas(activeAreas);
 
                 // 3. Fetch current auditor's assigned areas
-                const targetUserId = auditor.UserID ?? auditor.id ?? auditor.user_id;
+                const targetUserId = auditor.userid ?? auditor.id ?? auditor.userid;
                 let preferredEventId = '';
                 if (targetUserId) {
                     const assignRes = await fetch(`${API_BASE_URL}/api/areas/assignments/${targetUserId}`, { headers });
                     if (assignRes.ok) {
                         const assignData = await assignRes.json();
                         const existingAssigned = assignData.assignments || [];
-                        const assignedIds = new Set(existingAssigned.map(a => Number(a.area_id ?? a.AreaID)));
+                        const assignedIds = new Set(existingAssigned.map(a => Number(a.areaid ?? a.areaid)));
                         if (mounted) setSelectedAreaIds(assignedIds);
 
                         // If auditor is already assigned in one of the active events, pick that as default
-                        const match = existingAssigned.find(a => a.EventID && activeEvents.some(e => String(e.EventID) === String(a.EventID)));
+                        const match = existingAssigned.find(a => a.eventid && activeEvents.some(e => String(e.eventid) === String(a.eventid)));
                         if (match) {
-                            preferredEventId = String(match.EventID);
+                            preferredEventId = String(match.eventid);
                         }
                     }
                 }
 
                 if (mounted) {
-                    const defaultId = preferredEventId || (activeEvents[0] ? String(activeEvents[0].EventID) : '');
-                    setSelectedEventId(prev => (prev && activeEvents.some(e => String(e.EventID) === String(prev))) ? prev : defaultId);
+                    const defaultId = preferredEventId || (activeEvents[0] ? String(activeEvents[0].eventid) : '');
+                    setSelectedEventId(prev => (prev && activeEvents.some(e => String(e.eventid) === String(prev))) ? prev : defaultId);
                 }
             } catch (err) {
                 console.error("Error loading areas/events for assignment:", err);
@@ -86,18 +86,18 @@ export default function AssignAreaModal({ show, auditor, onClose, onSaveSuccess 
     if (!show || !auditor) return null;
 
     const filteredAreas = areas.filter(area => {
-        const matchesEvent = String(area.EventID) === String(selectedEventId);
-        const code = String(area.AreaCode || '').toLowerCase();
-        const name = String(area.AreaName || '').toLowerCase();
+        const matchesEvent = String(area.eventid) === String(selectedEventId);
+        const code = String(area.areacode || '').toLowerCase();
+        const name = String(area.areaname || '').toLowerCase();
         const search = searchTerm.toLowerCase().trim();
         const matchesSearch = !search || code.includes(search) || name.includes(search);
         return matchesEvent && matchesSearch;
     });
 
-    const toggleArea = (areaId) => {
+    const toggleArea = (areaid) => {
         setSelectedAreaIds(prev => {
             const next = new Set(prev);
-            const numId = Number(areaId);
+            const numId = Number(areaid);
             if (next.has(numId)) {
                 next.delete(numId);
             } else {
@@ -110,7 +110,7 @@ export default function AssignAreaModal({ show, auditor, onClose, onSaveSuccess 
     const handleSelectAll = () => {
         setSelectedAreaIds(prev => {
             const next = new Set(prev);
-            filteredAreas.forEach(a => next.add(Number(a.AreaID)));
+            filteredAreas.forEach(a => next.add(Number(a.areaid)));
             return next;
         });
     };
@@ -118,7 +118,7 @@ export default function AssignAreaModal({ show, auditor, onClose, onSaveSuccess 
     const handleDeselectAll = () => {
         setSelectedAreaIds(prev => {
             const next = new Set(prev);
-            filteredAreas.forEach(a => next.delete(Number(a.AreaID)));
+            filteredAreas.forEach(a => next.delete(Number(a.areaid)));
             return next;
         });
     };
@@ -128,7 +128,7 @@ export default function AssignAreaModal({ show, auditor, onClose, onSaveSuccess 
         setSaving(true);
         try {
             const token = localStorage.getItem('token');
-            const targetUserId = auditor.UserID ?? auditor.id ?? auditor.user_id;
+            const targetUserId = auditor.userid ?? auditor.id ?? auditor.userid;
             const res = await fetch(`${API_BASE_URL}/api/areas/assign`, {
                 method: 'POST',
                 headers: {
@@ -136,14 +136,14 @@ export default function AssignAreaModal({ show, auditor, onClose, onSaveSuccess 
                     'Authorization': token ? `Bearer ${token}` : ''
                 },
                 body: JSON.stringify({
-                    userId: targetUserId,
+                    userid: targetUserId,
                     areaIds: Array.from(selectedAreaIds)
                 })
             });
 
             const data = await res.json();
             if (res.ok && data.success) {
-                await showAlert(`Successfully updated area assignments for ${auditor.FirstName} ${auditor.LastName}!`, 'success');
+                await showAlert(`Successfully updated area assignments for ${auditor.firstname} ${auditor.lastname}!`, 'success');
                 onSaveSuccess?.();
                 onClose?.();
             } else {
@@ -157,7 +157,7 @@ export default function AssignAreaModal({ show, auditor, onClose, onSaveSuccess 
         }
     };
 
-    const fullName = `${auditor.FirstName || ''} ${auditor.LastName || ''}`.trim() || 'Auditor';
+    const fullName = `${auditor.firstname || ''} ${auditor.lastname || ''}`.trim() || 'Auditor';
 
     return createPortal(
         <div 
@@ -200,8 +200,8 @@ export default function AssignAreaModal({ show, auditor, onClose, onSaveSuccess 
                             value={selectedEventId}
                             onChange={(val) => setSelectedEventId(val)}
                             options={events.map(ev => ({
-                                value: String(ev.EventID),
-                                label: `${ev.EventCode ? `${ev.EventCode}: ` : ''}${ev.EventName}`
+                                value: String(ev.eventid),
+                                label: `${ev.eventcode ? `${ev.eventcode}: ` : ''}${ev.eventname}`
                             }))}
                             placeholder={events.length === 0 ? "No active accreditations" : "Select Accreditation"}
                             size="sm"
@@ -229,7 +229,7 @@ export default function AssignAreaModal({ show, auditor, onClose, onSaveSuccess 
                 {/* Selection Count Bar */}
                 <div className="px-5 py-2.5 bg-blue-50 border-b border-blue-100 flex items-center justify-between shrink-0 text-xs">
                     <span className="font-semibold text-blue-800">
-                        {filteredAreas.filter(a => selectedAreaIds.has(Number(a.AreaID))).length} of {filteredAreas.length} Area(s) Selected
+                        {filteredAreas.filter(a => selectedAreaIds.has(Number(a.areaid))).length} of {filteredAreas.length} Area(s) Selected
                     </span>
                     <div className="flex items-center gap-3 text-xs">
                         <button
@@ -264,13 +264,13 @@ export default function AssignAreaModal({ show, auditor, onClose, onSaveSuccess 
                         </div>
                     ) : (
                         filteredAreas.map(area => {
-                            const isChecked = selectedAreaIds.has(Number(area.AreaID));
-                            const targetUserId = auditor.UserID ?? auditor.id ?? auditor.user_id;
+                            const isChecked = selectedAreaIds.has(Number(area.areaid));
+                            const targetUserId = auditor.userid ?? auditor.id ?? auditor.userid;
                             const isAssignedToOther = area.AuditorUserID && Number(area.AuditorUserID) !== Number(targetUserId);
 
                             return (
                                 <label
-                                    key={area.AreaID}
+                                    key={area.areaid}
                                     className={`flex items-start gap-3 p-3 rounded-xl border transition cursor-pointer ${
                                         isChecked 
                                             ? 'border-blue-500 bg-blue-50/70 shadow-xs' 
@@ -280,17 +280,17 @@ export default function AssignAreaModal({ show, auditor, onClose, onSaveSuccess 
                                     <input
                                         type="checkbox"
                                         checked={isChecked}
-                                        onChange={() => toggleArea(area.AreaID)}
+                                        onChange={() => toggleArea(area.areaid)}
                                         className="h-4 w-4 mt-0.5 accent-blue-600 rounded border-slate-300"
                                     />
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center justify-between gap-2">
                                             <div className="flex items-center gap-2 min-w-0">
                                                 <span className="inline-block px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-blue-100 text-blue-700 shrink-0">
-                                                    {area.AreaCode || 'AREA'}
+                                                    {area.areacode || 'AREA'}
                                                 </span>
                                                 <span className="font-semibold text-xs text-slate-800 truncate">
-                                                    {area.AreaName}
+                                                    {area.areaname}
                                                 </span>
                                             </div>
                                             {isAssignedToOther && (

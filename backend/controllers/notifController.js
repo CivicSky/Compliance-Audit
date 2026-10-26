@@ -5,35 +5,35 @@ class NotificationController {
     // GET all notifications for a user
     static async getUserNotifications(req, res) {
         try {
-            const { userId } = req.params;
+            const { userid } = req.params;
             const { filter } = req.query; // 'all', 'read', 'unread'
             
-            let whereClause = 'WHERE n.UserID = ?';
-            const queryParams = [userId];
+            let whereClause = 'WHERE n.userid = ?';
+            const queryParams = [userid];
             
             if (filter === 'read') {
-                whereClause += ' AND n.IsRead = TRUE';
+                whereClause += ' AND n.isread = TRUE';
             } else if (filter === 'unread') {
-                whereClause += ' AND n.IsRead = FALSE';
+                whereClause += ' AND n.isread = FALSE';
             }
             
             const [notifications] = await db.query(`
                 SELECT 
-                    n.NotificationID,
-                    n.Title,
-                    n.Message,
-                    n.Type,
-                    n.RelatedTable,
-                    n.RelatedID,
-                    n.IsRead,
-                    n.CreatedAt,
-                    n.ReadAt,
-                    u.FirstName as AdminFirstName,
-                    u.LastName as AdminLastName
+                    n.notificationid,
+                    n.Title AS "Title",
+                    n.Message AS "Message",
+                    n.Type AS "Type",
+                    n.relatedtable,
+                    n.relatedid,
+                    n.isread,
+                    n.createdat,
+                    n.readat,
+                    u.firstname as "AdminFirstName",
+                    u.lastname as "AdminLastName"
                 FROM notifications n
-                LEFT JOIN users u ON n.AdminID = u.UserID
+                LEFT JOIN users u ON n.adminid = u.userid
                 ${whereClause}
-                ORDER BY n.CreatedAt DESC
+                ORDER BY n.createdat DESC
             `, queryParams);
             
             res.json({
@@ -53,8 +53,8 @@ class NotificationController {
     // POST create new notification (admin only)
     static async createNotification(req, res) {
         try {
-            const { userIds, adminId, title, message, type = 'info', relatedTable, relatedId } = req.body;
-            const senderId = Number(adminId || req.user?.userId);
+            const { userIds, adminid, title, message, type = 'info', relatedtable, relatedid } = req.body;
+            const senderId = Number(adminid || req.user?.userid);
             const safeType = ['info', 'success', 'warning', 'error', 'announcement'].includes(type) ? type : 'info';
             const normalizedUserIds = [...new Set((Array.isArray(userIds) ? userIds : []).map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0))];
             
@@ -73,12 +73,12 @@ class NotificationController {
             }
             
             // Insert notifications for each user
-            const insertPromises = normalizedUserIds.map(userId => {
+            const insertPromises = normalizedUserIds.map(userid => {
                 return db.query(`
                     INSERT INTO notifications 
-                    (UserID, AdminID, Title, Message, Type, RelatedTable, RelatedID, CreatedAt)
+                    (userid, adminid, Title, Message, Type, relatedtable, relatedid, createdat)
                     VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
-                `, [userId, senderId, title, message, safeType, relatedTable || null, relatedId || null]);
+                `, [userid, senderId, title, message, safeType, relatedtable || null, relatedid || null]);
             });
             
             await Promise.all(insertPromises);
@@ -100,13 +100,13 @@ class NotificationController {
     // PUT mark notification as read
     static async markAsRead(req, res) {
         try {
-            const { notificationId } = req.params;
+            const { notificationid } = req.params;
             
             await db.query(`
                 UPDATE notifications 
-                SET IsRead = TRUE, ReadAt = NOW() 
-                WHERE NotificationID = ?
-            `, [notificationId]);
+                SET isread = TRUE, readat = NOW() 
+                WHERE notificationid = ?
+            `, [notificationid]);
             
             res.json({
                 success: true,
@@ -125,13 +125,13 @@ class NotificationController {
     // PUT mark all notifications as read for a user
     static async markAllAsRead(req, res) {
         try {
-            const { userId } = req.params;
+            const { userid } = req.params;
             
             await db.query(`
                 UPDATE notifications 
-                SET IsRead = TRUE, ReadAt = NOW() 
-                WHERE UserID = ? AND IsRead = FALSE
-            `, [userId]);
+                SET isread = TRUE, readat = NOW() 
+                WHERE userid = ? AND isread = FALSE
+            `, [userid]);
             
             res.json({
                 success: true,
@@ -150,16 +150,16 @@ class NotificationController {
     // GET notification counts
     static async getNotificationCounts(req, res) {
         try {
-            const { userId } = req.params;
+            const { userid } = req.params;
             
             const [counts] = await db.query(`
                 SELECT 
                     COUNT(*) as total,
-                    COALESCE(SUM(CASE WHEN IsRead = FALSE THEN 1 ELSE 0 END), 0) as unread,
-                    COALESCE(SUM(CASE WHEN IsRead = TRUE THEN 1 ELSE 0 END), 0) as "read"
+                    COALESCE(SUM(CASE WHEN isread = FALSE THEN 1 ELSE 0 END), 0) as unread,
+                    COALESCE(SUM(CASE WHEN isread = TRUE THEN 1 ELSE 0 END), 0) as "read"
                 FROM notifications 
-                WHERE UserID = ?
-            `, [userId]);
+                WHERE userid = ?
+            `, [userid]);
             
             const c = counts && counts[0] ? counts[0] : { total: 0, unread: 0, read: 0 };
             const unreadNum = Number(c.unread || 0);
@@ -189,12 +189,12 @@ class NotificationController {
     // DELETE notification
     static async deleteNotification(req, res) {
         try {
-            const { notificationId } = req.params;
+            const { notificationid } = req.params;
             
             await db.query(`
                 DELETE FROM notifications 
-                WHERE NotificationID = ?
-            `, [notificationId]);
+                WHERE notificationid = ?
+            `, [notificationid]);
             
             res.json({
                 success: true,

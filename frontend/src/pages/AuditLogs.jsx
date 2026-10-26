@@ -7,6 +7,19 @@ import { useLiveRefresh } from "../utils/liveSync";
 import ServerOfflineState from "../components/UI/ServerOfflineState";
 import { Activity, Plus, FileEdit, ShieldAlert, X, FileText, Award } from "lucide-react";
 
+import {
+    actionStyles,
+    normalizeActionLabel,
+    resolveLogContext,
+    buildInDepthMessage,
+    roleIdToName,
+    stripEmojis,
+    formatTimestamp,
+    tryParseJson,
+    toTitle,
+    toArrayPayload,
+} from "../utils/auditLogHelpers";
+
 export default function AuditLogs() {
     const [logs, setLogs] = useState([]);
     const [loading, setloading] = useState(true);
@@ -25,437 +38,21 @@ export default function AuditLogs() {
     const [expandedLogId, setExpandedLogId] = useState(null);
     const itemsPerPage = 7;
 
-    const actionStyles = {
-        Created: {
-            badge: "bg-emerald-100/90 text-emerald-800 border-emerald-300/80",
-            iconBg: "bg-emerald-500 text-white",
-            icon: (
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                </svg>
-            )
-        },
-        Updated: {
-            badge: "bg-indigo-100/90 text-indigo-800 border-indigo-300/80",
-            iconBg: "bg-indigo-500 text-white",
-            icon: (
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" />
-                </svg>
-            )
-        },
-        Deleted: {
-            badge: "bg-rose-100/90 text-rose-800 border-rose-300/80",
-            iconBg: "bg-rose-500 text-white",
-            icon: (
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                </svg>
-            )
-        },
-        Viewed: {
-            badge: "bg-sky-100/90 text-sky-800 border-sky-300/80",
-            iconBg: "bg-sky-500 text-white",
-            icon: (
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-            )
-        },
-        Login: {
-            badge: "bg-violet-100/90 text-violet-800 border-violet-300/80",
-            iconBg: "bg-violet-500 text-white",
-            icon: (
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l3 3m0 0l-3 3m3-3H2.25" />
-                </svg>
-            )
-        },
-        Logout: {
-            badge: "bg-amber-100/90 text-amber-800 border-amber-300/80",
-            iconBg: "bg-amber-500 text-white",
-            icon: (
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
-                </svg>
-            )
-        },
-        default: {
-            badge: "bg-slate-100 text-slate-800 border-slate-300",
-            iconBg: "bg-slate-500 text-white",
-            icon: (
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-            )
-        }
-    };
-
-    const verbToCrud = {
-        POST: "Created",
-        PUT: "Updated",
-        PATCH: "Updated",
-        DELETE: "Deleted",
-        GET: "Viewed",
-    };
-
-    const toTitle = (value) => {
-        return String(value || "")
-            .replace(/([a-z])([A-Z])/g, "$1 $2")
-            .replace(/[._-]+/g, " ")
-            .replace(/\s+/g, " ")
-            .trim()
-            .replace(/\b\w/g, (c) => c.toUpperCase());
-    };
-
-    const toArrayPayload = (payload) => {
-        if (Array.isArray(payload)) return payload;
-        if (Array.isArray(payload?.data)) return payload.data;
-        if (Array.isArray(payload?.events)) return payload.events;
-        if (Array.isArray(payload?.areas)) return payload.areas;
-        if (Array.isArray(payload?.criteria)) return payload.criteria;
-        if (Array.isArray(payload?.requirements)) return payload.requirements;
-        if (Array.isArray(payload?.offices)) return payload.offices;
-        if (Array.isArray(payload?.logs)) return payload.logs;
-        return [];
-    };
-
-    const tryParseJson = (value) => {
-        if (!value || typeof value !== "string") return null;
-        const trimmed = value.trim();
-        if (!(trimmed.startsWith("{") || trimmed.startsWith("["))) return null;
-        try {
-            return JSON.parse(trimmed);
-        } catch {
-            return null;
-        }
-    };
-
-    const roleIdToName = (value) => {
-        const normalized = String(value ?? "").trim().toLowerCase();
-        if (!normalized) return "";
-        if (normalized === "1" || normalized === "admin") return "Admin";
-        if (normalized === "2" || normalized === "user") return "User";
-        return toTitle(normalized);
-    };
-
-    const stripEmojis = (str) => {
-        return String(str || '')
-            .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]|[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FAFF}\u{FE00}-\u{FE0F}\u{1F000}-\u{1F02F}\u{1F0A0}-\u{1F0FF}\u{200D}])/gu, '')
-            .replace(/\s{2,}/g, ' ')
-            .trim();
-    };
-
-    const normalizeActionLabel = (rawAction) => {
-        const normalized = String(rawAction || "").trim();
-        const action = normalized;
-        const httpMatch = action.match(/^(GET|POST|PUT|PATCH|DELETE)\s+/i);
-        if (httpMatch) return verbToCrud[httpMatch[1].toUpperCase()] || "Updated";
-
-        if (/login/i.test(action)) return "Login";
-        if (/logout/i.test(action)) return "Logout";
-        if (/AuditorAssignedAreas/i.test(action)) return "Updated";
-        if (/OfficeHeadUpdated/i.test(action)) return "Updated";
-        if (/OfficeHeadAdded/i.test(action)) return "Created";
-        if (/OfficeHeadDeleted/i.test(action)) return "Deleted";
-        if (/CriteriaDeleted|Criteria deleted/i.test(action)) return "Deleted";
-        if (/RequirementDeleted/i.test(action)) return "Deleted";
-        if (/EventDeleted/i.test(action)) return "Deleted";
-        if (/OfficeDeleted/i.test(action)) return "Deleted";
-        if (/AreaDeleted/i.test(action)) return "Deleted";
-        if (/RequirementUpdated|OfficeUpdated|EventUpdated|AccreditationLevelUpdated/i.test(action)) return "Updated";
-        if (/(added|created|registered|copied)$/i.test(action)) return "Created";
-        if (/(updated|relocated|assigned)$/i.test(action)) return "Updated";
-        if (/(deleted|canceled|cancelled|removed)$/i.test(action)) return "Deleted";
-
-        return "Updated";
-    };
-
-    // Deep context resolver walking up the accreditation tree
-    const resolveLogContext = (log) => {
-        const detailsSource = log.DetailsParsed || tryParseJson(log.Details) || null;
-        const d = detailsSource && typeof detailsSource === "object"
-            ? (detailsSource.body && typeof detailsSource.body === "object" ? detailsSource.body : detailsSource)
-            : {};
-
-        // 1. Office / Program
-        const officeId = d.OfficeID || d.officeId;
-        const officeObj = officeId ? officeLookup[String(officeId)] : null;
-        const officeName = d.OfficeName || d.officeName || d.office_name || d.OfficeCode || officeObj?.OfficeName || officeObj?.OfficeCode || "";
-
-        // 2. Requirement
-        const reqId = d.RequirementID || d.requirementId;
-        const reqObj = reqId ? requirementLookup[String(reqId)] : null;
-        const reqCode = d.RequirementCode || d.requirementCode || reqObj?.RequirementCode || (reqId ? `REQ-${reqId}` : "");
-        const reqDesc = d.RequirementDescription || d.Description || d.description || reqObj?.Description || "";
-
-        // 3. Criteria
-        const critId = d.CriteriaID || d.criteriaId || reqObj?.CriteriaID;
-        const critObj = critId ? criteriaLookup[String(critId)] : null;
-        const critCode = d.CriteriaCode || d.criteriaCode || critObj?.CriteriaCode || "";
-        const critName = d.CriteriaName || d.criteriaName || critObj?.CriteriaName || "";
-        const critLabel = critCode && critName ? `${critCode}. ${critName}` : (critCode || critName);
-
-        // 4. Area
-        const areaId = d.AreaID || d.areaId || critObj?.AreaID;
-        const areaObj = areaId ? areaLookup[String(areaId)] : null;
-        const areaName = d.AreaName || d.areaName || areaObj?.AreaName || "";
-
-        // 5. Accreditation Event
-        const eventId = d.EventID || d.eventId || areaObj?.EventID || officeObj?.EventID;
-        const eventObj = eventId ? eventLookup[String(eventId)] : null;
-        const eventName = d.EventName || d.eventName || eventObj?.EventName || (typeof eventObj === 'string' ? eventObj : "");
-
-        // 6. Evidence File
-        const fileName = d.DisplayName || d.displayName || d.FileName || d.fileName || d.file_name || "";
-
-        // 7. Target User
-        const targetUserId = d.userId || d.UserID || d.targetUserId || d.TargetUserID;
-        const targetUserName = d.userName || d.FullName || (targetUserId ? userLookup[String(targetUserId)] : "");
-
-        return {
-            officeName,
-            reqCode,
-            reqDesc,
-            critLabel,
-            areaName,
-            eventName,
-            fileName,
-            targetUserName,
-            reqIds: d.requirementIds || d.RequirementIDs,
-            rawDetails: d
-        };
-    };
-
-    const buildInDepthMessage = (log, actionLabel, ctx) => {
-        const rawAction = String(log.Action || "").trim();
-        const d = ctx.rawDetails || {};
-
-        if (actionLabel === "Login") return "User logged in to Compliance Portal";
-        if (actionLabel === "Logout") return "User logged out of Compliance Portal";
-
-        // External Auditor Assignment
-        if (/AuditorAssignedAreas/i.test(rawAction)) {
-            const audName = d.AuditorName || (d.AuditorUserID ? `Auditor #${d.AuditorUserID}` : 'External Auditor');
-            const count = d.AssignedAreaCount ?? (Array.isArray(d.Areas) ? d.Areas.length : 0);
-            const areaNames = Array.isArray(d.Areas)
-                ? d.Areas.map(a => a.AreaCode ? (a.AreaName ? `${a.AreaCode} (${a.AreaName})` : a.AreaCode) : a.AreaName).filter(Boolean).join(', ')
-                : '';
-            if (count === 0) return `Updated assignments for ${audName} (cleared assigned areas)`;
-            return `Assigned External Auditor ${audName} to ${count} area(s)${areaNames ? `: ${areaNames}` : ''}`;
-        }
-
-        // Office Personnel
-        if (/OfficeHeadUpdated/i.test(rawAction)) {
-            const headName = d.HeadName || 'Office Personnel';
-            const changes = d.changes || {};
-            if (changes.Position) {
-                return `Updated position of "${headName}" from "${changes.Position.from}" to "${changes.Position.to}"`;
-            }
-            const changedFields = Object.keys(changes);
-            if (changedFields.length > 0) {
-                return `Updated Office Personnel "${headName}" (changed: ${changedFields.join(', ')})`;
-            }
-            return `Updated Office Personnel "${headName}"`;
-        }
-        if (/OfficeHeadAdded/i.test(rawAction)) {
-            const headName = d.HeadName || (Array.isArray(d.HeadNames) ? d.HeadNames.join(', ') : 'Office Personnel');
-            const pos = d.Position ? ` as ${d.Position}` : '';
-            return `Added Office Personnel "${headName}"${pos}`;
-        }
-        if (/OfficeHeadDeleted/i.test(rawAction)) {
-            const headName = d.HeadName || (Array.isArray(d.HeadNames) ? d.HeadNames.join(', ') : 'Office Personnel');
-            return `Removed Office Personnel "${headName}"`;
-        }
-
-        // File Upload
-        if (/RequirementFileUploaded|Upload/i.test(rawAction)) {
-            let msg = `Uploaded standard file ${ctx.fileName ? `"${ctx.fileName}"` : 'document'}`;
-            if (ctx.reqCode) msg += ` for Standard ${ctx.reqCode}`;
-            if (ctx.officeName) msg += ` in ${ctx.officeName}`;
-            if (ctx.eventName) msg += ` under "${ctx.eventName}"`;
-            return msg;
-        }
-
-        // File Delete
-        if (/RequirementFileDeleted|Unsubmit/i.test(rawAction)) {
-            let msg = `Removed standard file ${ctx.fileName ? `"${ctx.fileName}"` : 'document'}`;
-            if (ctx.reqCode) msg += ` from Standard ${ctx.reqCode}`;
-            if (ctx.officeName) msg += ` in ${ctx.officeName}`;
-            return msg;
-        }
-
-        // Requirement Added
-        if (/RequirementAdded/i.test(rawAction) && actionLabel === "Created") {
-            let msg = `Created Standard ${ctx.reqCode ? ctx.reqCode : ''}`;
-            if (ctx.reqDesc) msg += ` ("${ctx.reqDesc}")`;
-            if (ctx.critLabel) msg += ` under Sub Area ${ctx.critLabel}`;
-            if (ctx.areaName) msg += ` in ${ctx.areaName}`;
-            if (ctx.eventName) msg += ` — "${ctx.eventName}"`;
-            return msg;
-        }
-
-        // Requirement Updated
-        if (/RequirementUpdated/i.test(rawAction)) {
-            const changes = d.changes || {};
-            const code = d.RequirementCode || ctx.reqCode || '';
-            if (changes.RequirementCode) {
-                return `Updated Standard: code changed from "${changes.RequirementCode.from}" to "${changes.RequirementCode.to}"`;
-            }
-            if (changes.Description) {
-                const prev = String(changes.Description.from || '').slice(0, 60);
-                const next = String(changes.Description.to || '').slice(0, 60);
-                return `Updated Standard ${code}: description changed from "${prev}" to "${next}"`;
-            }
-            const changedFields = Object.keys(changes);
-            if (changedFields.length > 0) {
-                return `Updated Standard ${code} (changed: ${changedFields.join(', ')})`;
-            }
-            return `Updated Standard ${code}${ctx.critLabel ? ` under Sub Area ${ctx.critLabel}` : ''}`;
-        }
-
-        // Requirement Deleted
-        if (/RequirementDeleted/i.test(rawAction)) {
-            const deleted = Array.isArray(d.deletedRequirements) ? d.deletedRequirements : [];
-            if (deleted.length === 1) {
-                const r = deleted[0];
-                return `Deleted Standard ${r.RequirementCode || ''}${r.Description ? ` ("${r.Description}")` : ''}${r.EventName ? ` from "${r.EventName}"` : ''}`;
-            }
-            if (deleted.length > 1) {
-                return `Deleted ${deleted.length} Standards: ${deleted.map(r => r.RequirementCode || 'Unknown').join(', ')}`;
-            }
-            return `Deleted ${(d.deletedCount || d.requirementIds?.length || 0)} Standard(s)`;
-        }
-
-        // Criteria Added
-        if (/CriteriaAdded|Criteria/i.test(rawAction) && actionLabel === "Created") {
-            let msg = `Created Sub Area ${ctx.critLabel ? `"${ctx.critLabel}"` : ''}`;
-            if (ctx.areaName) msg += ` under ${ctx.areaName}`;
-            if (ctx.eventName) msg += ` — "${ctx.eventName}"`;
-            return msg;
-        }
-
-        // Criteria Deleted
-        if (/CriteriaDeleted|Criteria deleted/i.test(rawAction)) {
-            const deleted = Array.isArray(d.deletedCriteria) ? d.deletedCriteria : [];
-            if (deleted.length === 1) {
-                const c = deleted[0];
-                const label = c.CriteriaCode && c.CriteriaName ? `${c.CriteriaCode}. ${c.CriteriaName}` : (c.CriteriaCode || c.CriteriaName || 'Unknown');
-                return `Deleted Sub Area "${label}"${c.EventName ? ` from "${c.EventName}"` : ''}`;
-            }
-            if (deleted.length > 1) {
-                return `Deleted ${deleted.length} Sub Areas: ${deleted.map(c => c.CriteriaCode || 'Unknown').join(', ')}`;
-            }
-            return `Deleted ${(d.deletedCount || d.criteriaIds?.length || 0)} Sub Area(s)`;
-        }
-
-        // Area Added
-        if (/AreaAdded|Area/i.test(rawAction) && actionLabel === "Created") {
-            let msg = `Created Area ${ctx.areaName ? `"${ctx.areaName}"` : ''}`;
-            if (ctx.eventName) msg += ` under "${ctx.eventName}"`;
-            return msg;
-        }
-
-        // Area Deleted
-        if (/AreaDeleted/i.test(rawAction)) {
-            const areaIds = d.areaIds || [];
-            return `Deleted ${areaIds.length || 1} Area(s)${ctx.areaName ? `: "${ctx.areaName}"` : ''}`;
-        }
-
-        // Office / Program Created or Updated
-        if (/OfficeAdded/i.test(rawAction)) {
-            let msg = `Created Office/Program ${ctx.officeName ? `"${ctx.officeName}"` : ''}`;
-            if (ctx.eventName) msg += ` under "${ctx.eventName}"`;
-            if (Array.isArray(ctx.reqIds)) msg += ` (${ctx.reqIds.length} requirement${ctx.reqIds.length === 1 ? '' : 's'} assigned)`;
-            return msg;
-        }
-        if (/OfficeUpdated/i.test(rawAction)) {
-            const changes = d.changes || {};
-            const name = d.OfficeName || ctx.officeName || '';
-            if (changes.OfficeName) {
-                return `Updated Office: name changed from "${changes.OfficeName.from}" to "${changes.OfficeName.to}"`;
-            }
-            const changedFields = Object.keys(changes);
-            const headChanges = d.headChanges || {};
-            const headAdded = Array.isArray(headChanges.added) && headChanges.added.length > 0 ? ` Added personnel: ${headChanges.added.join(', ')}.` : '';
-            const headRemoved = Array.isArray(headChanges.removed) && headChanges.removed.length > 0 ? ` Removed personnel: ${headChanges.removed.join(', ')}.` : '';
-            if (changedFields.length > 0 || headAdded || headRemoved) {
-                return `Updated Office "${name}" (changed: ${changedFields.join(', ') || 'personnel'}).${headAdded}${headRemoved}`;
-            }
-            return `Updated Office/Program ${name ? `"${name}"` : ''}${ctx.eventName ? ` under "${ctx.eventName}"` : ''}`;
-        }
-        if (/OfficeDeleted/i.test(rawAction)) {
-            const name = d.OfficeName || ctx.officeName || '';
-            return `Deleted Office/Program${name ? ` "${name}"` : ''}${d.EventName || ctx.eventName ? ` from "${d.EventName || ctx.eventName}"` : ''}`;
-        }
-        if (/Office/i.test(rawAction)) {
-            let msg = `${actionLabel} Office/Program ${ctx.officeName ? `"${ctx.officeName}"` : ''}`;
-            if (ctx.eventName) msg += ` under "${ctx.eventName}"`;
-            if (Array.isArray(ctx.reqIds)) msg += ` (${ctx.reqIds.length} requirement${ctx.reqIds.length === 1 ? '' : 's'} assigned)`;
-            return msg;
-        }
-
-        // Accreditation Event
-        if (/EventAdded/i.test(rawAction)) {
-            return `Created Accreditation Event ${ctx.eventName ? `"${ctx.eventName}"` : ''}${d.EventCode ? ` (${d.EventCode})` : ''}`;
-        }
-        if (/EventUpdated/i.test(rawAction)) {
-            const changes = d.changes || {};
-            if (changes.EventName) {
-                return `Updated Accreditation Event: name changed from "${changes.EventName.from}" to "${changes.EventName.to}"`;
-            }
-            if (changes.EventCode) {
-                return `Updated Accreditation Event "${d.EventName}": code changed from "${changes.EventCode.from}" to "${changes.EventCode.to}"`;
-            }
-            return `Updated Accreditation Event ${ctx.eventName ? `"${ctx.eventName}"` : ''}`;
-        }
-        if (/EventDeleted/i.test(rawAction)) {
-            const names = Array.isArray(d.deletedNames) ? d.deletedNames.filter(Boolean) : [];
-            if (names.length === 1) return `Deleted Accreditation Event "${names[0]}"`;
-            if (names.length > 1) return `Deleted ${names.length} Accreditation Events: ${names.join(', ')}`;
-            return `Deleted Accreditation Event ${ctx.eventName ? `"${ctx.eventName}"` : ''}`;
-        }
-        if (/EventCopied/i.test(rawAction)) {
-            return `Copied Accreditation Event ${ctx.eventName ? `"${ctx.eventName}"` : ''}`;
-        }
-
-        // User Updates
-        if (/UserRoleUpdated/i.test(rawAction)) {
-            return `Updated role for user ${ctx.targetUserName ? `"${ctx.targetUserName}"` : ''}`;
-        }
-        if (/UserApprovalUpdated/i.test(rawAction)) {
-            return `Updated approval status for user ${ctx.targetUserName ? `"${ctx.targetUserName}"` : ''}`;
-        }
-        if (/UserUpdated|User/i.test(rawAction)) {
-            return `Updated User ${ctx.targetUserName ? `"${ctx.targetUserName}"` : ''}`;
-        }
-
-        // Fallback
-        const existingMessage = String(log.Message || "").trim();
-        if (existingMessage && !/^(GET|POST|PUT|PATCH|DELETE)\s+\//i.test(existingMessage) && !/\/api\//i.test(existingMessage)) {
-            return existingMessage;
-        }
-
-        let fallback = `${actionLabel} Record`;
-        if (ctx.officeName) fallback += ` for ${ctx.officeName}`;
-        if (ctx.reqCode) fallback += ` (${ctx.reqCode})`;
-        if (ctx.eventName) fallback += ` under "${ctx.eventName}"`;
-        return fallback;
-    };
-
     const preparedLogs = useMemo(() => {
+        const lookups = { eventLookup, areaLookup, criteriaLookup, requirementLookup, officeLookup, userLookup };
         return logs.map((log) => {
-            const normalizedAction = normalizeActionLabel(log.Action);
-            const ctx = resolveLogContext(log);
+            const rawAction = log?.Action || log?.action || '';
+            const normalizedAction = normalizeActionLabel(rawAction);
+            const ctx = resolveLogContext(log, lookups);
             const rawMessage = buildInDepthMessage(log, normalizedAction, ctx);
             return {
                 ...log,
-                Action: stripEmojis(log.Action),
+                Action: stripEmojis(rawAction),
+                Timestamp: log?.Timestamp || log?.timestamp,
                 normalizedAction,
                 context: ctx,
                 readableMessage: stripEmojis(rawMessage),
-                displayName: stripEmojis(log.displayName),
+                displayname: stripEmojis(log?.displayname || log?.FullName),
             };
         });
     }, [logs, eventLookup, areaLookup, criteriaLookup, requirementLookup, officeLookup, userLookup]);
@@ -471,15 +68,15 @@ export default function AuditLogs() {
             const haystack = [
                 log.readableMessage,
                 log.normalizedAction,
-                log.displayName,
-                log.RoleName,
-                c.officeName,
+                log.displayname,
+                log.rolename,
+                c.officename,
                 c.reqCode,
                 c.reqDesc,
                 c.critLabel,
-                c.areaName,
-                c.eventName,
-                c.fileName,
+                c.areaname,
+                c.eventname,
+                c.filename,
                 log.Details,
             ]
                 .map((v) => String(v || "").toLowerCase())
@@ -589,10 +186,10 @@ export default function AuditLogs() {
                     const arr = toArrayPayload(payload);
                     const map = {};
                     for (const item of arr) {
-                        if (item?.EventID != null) {
-                            map[String(item.EventID)] = {
-                                EventName: item.EventName || "",
-                                EventCode: item.EventCode || "",
+                        if (item?.eventid != null) {
+                            map[String(item.eventid)] = {
+                                eventname: item.eventname || "",
+                                eventcode: item.eventcode || "",
                                 Year: item.Year || ""
                             };
                         }
@@ -606,10 +203,10 @@ export default function AuditLogs() {
                     const arr = toArrayPayload(payload);
                     const map = {};
                     for (const item of arr) {
-                        if (item?.AreaID != null) {
-                            map[String(item.AreaID)] = {
-                                AreaName: item.AreaName || "",
-                                EventID: item.EventID || null
+                        if (item?.areaid != null) {
+                            map[String(item.areaid)] = {
+                                areaname: item.areaname || "",
+                                eventid: item.eventid || null
                             };
                         }
                     }
@@ -622,11 +219,11 @@ export default function AuditLogs() {
                     const arr = toArrayPayload(payload);
                     const map = {};
                     for (const item of arr) {
-                        if (item?.CriteriaID != null) {
-                            map[String(item.CriteriaID)] = {
-                                CriteriaCode: item.CriteriaCode || "",
-                                CriteriaName: item.CriteriaName || "",
-                                AreaID: item.AreaID || null
+                        if (item?.criteriaid != null) {
+                            map[String(item.criteriaid)] = {
+                                criteriacode: item.criteriacode || "",
+                                criterianame: item.criterianame || "",
+                                areaid: item.areaid || null
                             };
                         }
                     }
@@ -639,11 +236,11 @@ export default function AuditLogs() {
                     const arr = toArrayPayload(payload);
                     const map = {};
                     for (const item of arr) {
-                        if (item?.RequirementID != null) {
-                            map[String(item.RequirementID)] = {
-                                RequirementCode: item.RequirementCode || "",
+                        if (item?.requirementid != null) {
+                            map[String(item.requirementid)] = {
+                                requirementcode: item.requirementcode || "",
                                 Description: item.Description || "",
-                                CriteriaID: item.CriteriaID || null
+                                criteriaid: item.criteriaid || null
                             };
                         }
                     }
@@ -656,11 +253,11 @@ export default function AuditLogs() {
                     const arr = toArrayPayload(payload);
                     const map = {};
                     for (const item of arr) {
-                        if (item?.OfficeID != null) {
-                            map[String(item.OfficeID)] = {
-                                OfficeName: item.OfficeName || "",
+                        if (item?.officeid != null) {
+                            map[String(item.officeid)] = {
+                                officename: item.officename || "",
                                 OfficeCode: item.OfficeCode || "",
-                                EventID: item.EventID || null
+                                eventid: item.eventid || null
                             };
                         }
                     }
@@ -673,12 +270,12 @@ export default function AuditLogs() {
                     const arr = toArrayPayload(payload?.users ? { data: payload.users } : payload);
                     const map = {};
                     for (const u of arr) {
-                        if (u?.UserID != null) {
+                        if (u?.userid != null) {
                             const name = String(
                                 u.FullName ||
-                                `${u.FirstName || ""}${u.MiddleInitial ? ` ${u.MiddleInitial}.` : ""} ${u.LastName || ""}`
+                                `${u.firstname || ""}${u.middleinitial ? ` ${u.middleinitial}.` : ""} ${u.lastname || ""}`
                             ).replace(/\s+/g, " ").trim();
-                            map[String(u.UserID)] = name || u.Email || "User";
+                            map[String(u.userid)] = name || u.Email || "User";
                         }
                     }
                     setUserLookup(map);
@@ -888,19 +485,19 @@ export default function AuditLogs() {
                                 const style = actionStyles[action] || actionStyles.default;
                                 const readableMessage = log.readableMessage;
                                 const { time, date } = formatTimestamp(log.Timestamp);
-                                const isExpanded = expandedLogId === log.LogID;
-                                const userDisplayName = log.displayName || (log.UserID ? `User #${log.UserID}` : 'System');
-                                const roleLabel = log.RoleName ? roleIdToName(log.RoleName) : '';
+                                const isExpanded = expandedLogId === log.logid;
+                                const userDisplayName = log.displayname || (log.userid ? `User #${log.userid}` : 'System');
+                                const roleLabel = log.rolename ? roleIdToName(log.rolename) : '';
                                 const ctx = log.context;
 
                                 return (
                                     <div
-                                        key={log.LogID}
+                                        key={log.logid}
                                         className="group transition-colors hover:bg-slate-50/80"
                                     >
                                         <div
                                             className="flex items-center justify-between px-4 py-2 text-xs cursor-pointer gap-3"
-                                            onClick={() => setExpandedLogId(prev => prev === log.LogID ? null : log.LogID)}
+                                            onClick={() => setExpandedLogId(prev => prev === log.logid ? null : log.logid)}
                                         >
                                             {/* Left: Icon + Action Badge + Message */}
                                             <div className="flex items-center gap-2.5 min-w-0 flex-1">
@@ -926,12 +523,12 @@ export default function AuditLogs() {
                                                                 <span className="rounded bg-slate-100 px-1 py-0.2 text-[9px] font-semibold text-slate-600">{roleLabel}</span>
                                                             </>
                                                         )}
-                                                        {ctx.eventName && (
+                                                        {ctx.eventname && (
                                                             <>
                                                                 <span>•</span>
-                                                                <span className="text-blue-600 font-semibold truncate max-w-[180px] inline-flex items-center gap-1" title={ctx.eventName}>
+                                                                <span className="text-blue-600 font-semibold truncate max-w-[180px] inline-flex items-center gap-1" title={ctx.eventname}>
                                                                     <Award className="w-3 h-3 text-blue-500 shrink-0" />
-                                                                    <span>{ctx.eventName}</span>
+                                                                    <span>{ctx.eventname}</span>
                                                                 </span>
                                                             </>
                                                         )}
@@ -963,26 +560,26 @@ export default function AuditLogs() {
                                         {isExpanded && (
                                             <div className="px-5 py-4 bg-slate-50/90 border-t border-slate-100 text-xs text-slate-700 transition-all animate-in fade-in duration-150">
                                                 <div className="mb-2 flex items-center justify-between text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                                                    <span>Detailed Activity Breakdown (Log ID #{log.LogID})</span>
+                                                    <span>Detailed Activity Breakdown (Log ID #{log.logid})</span>
                                                     <span>Action: {log.Action}</span>
                                                 </div>
 
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                                                    {ctx.eventName && (
+                                                    {ctx.eventname && (
                                                         <div className="rounded-xl border border-blue-200/80 bg-white p-3 shadow-2xs">
                                                             <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 flex items-center gap-1">
                                                                 Accreditation Event
                                                             </span>
-                                                            <span className="text-xs font-bold text-slate-900 mt-1 block">{ctx.eventName}</span>
+                                                            <span className="text-xs font-bold text-slate-900 mt-1 block">{ctx.eventname}</span>
                                                         </div>
                                                     )}
 
-                                                    {ctx.areaName && (
+                                                    {ctx.areaname && (
                                                         <div className="rounded-xl border border-indigo-200/80 bg-white p-3 shadow-2xs">
                                                             <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 flex items-center gap-1">
                                                                 Area
                                                             </span>
-                                                            <span className="text-xs font-bold text-slate-900 mt-1 block">{ctx.areaName}</span>
+                                                            <span className="text-xs font-bold text-slate-900 mt-1 block">{ctx.areaname}</span>
                                                         </div>
                                                     )}
 
@@ -1006,22 +603,22 @@ export default function AuditLogs() {
                                                         </div>
                                                     )}
 
-                                                    {ctx.officeName && (
+                                                    {ctx.officename && (
                                                         <div className="rounded-xl border border-emerald-200/80 bg-white p-3 shadow-2xs">
                                                             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 flex items-center gap-1">
                                                                 Office / Program
                                                             </span>
-                                                            <span className="text-xs font-bold text-slate-900 mt-1 block">{ctx.officeName}</span>
+                                                            <span className="text-xs font-bold text-slate-900 mt-1 block">{ctx.officename}</span>
                                                         </div>
                                                     )}
 
-                                                    {ctx.fileName && (
+                                                    {ctx.filename && (
                                                         <div className="rounded-xl border border-amber-200/80 bg-white p-3 shadow-2xs">
                                                             <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 flex items-center gap-1">
                                                                 Standard File
                                                             </span>
-                                                            <span className="text-xs font-bold text-slate-900 mt-1 block truncate" title={ctx.fileName}>
-                                                                {ctx.fileName}
+                                                            <span className="text-xs font-bold text-slate-900 mt-1 block truncate" title={ctx.filename}>
+                                                                {ctx.filename}
                                                             </span>
                                                         </div>
                                                     )}
@@ -1102,18 +699,18 @@ export default function AuditLogs() {
                                                                     if (isReq) {
                                                                         return (
                                                                             <div key={idx} className="px-3 py-1.5 flex items-start gap-2">
-                                                                                <span className="font-mono font-bold text-rose-700 text-[10px] shrink-0 mt-0.5">{item.RequirementCode || `#${idx + 1}`}</span>
+                                                                                <span className="font-mono font-bold text-rose-700 text-[10px] shrink-0 mt-0.5">{item.requirementcode || `#${idx + 1}`}</span>
                                                                                 <span className="text-slate-700">{item.Description || '(no description)'}</span>
-                                                                                {item.EventName && <span className="ml-auto text-slate-400 text-[10px] shrink-0">{item.EventName}</span>}
+                                                                                {item.eventname && <span className="ml-auto text-slate-400 text-[10px] shrink-0">{item.eventname}</span>}
                                                                             </div>
                                                                         );
                                                                     }
                                                                     if (isCrit) {
                                                                         return (
                                                                             <div key={idx} className="px-3 py-1.5 flex items-start gap-2">
-                                                                                <span className="font-mono font-bold text-rose-700 text-[10px] shrink-0 mt-0.5">{item.CriteriaCode || `#${idx + 1}`}</span>
-                                                                                <span className="text-slate-700">{item.CriteriaName || '(no name)'}</span>
-                                                                                {item.EventName && <span className="ml-auto text-slate-400 text-[10px] shrink-0">{item.EventName}</span>}
+                                                                                <span className="font-mono font-bold text-rose-700 text-[10px] shrink-0 mt-0.5">{item.criteriacode || `#${idx + 1}`}</span>
+                                                                                <span className="text-slate-700">{item.criterianame || '(no name)'}</span>
+                                                                                {item.eventname && <span className="ml-auto text-slate-400 text-[10px] shrink-0">{item.eventname}</span>}
                                                                             </div>
                                                                         );
                                                                     }

@@ -10,12 +10,12 @@ const COMPANY_EMAIL_DOMAIN = "@lccbonline.edu.ph";
 export default function Register() {
     const navigate = useNavigate();
     const [formData, setFormData] = useState({
-        firstName: "",
-        middleInitial: "",
-        lastName: "",
+        firstname: "",
+        middleinitial: "",
+        lastname: "",
         email: "",
         password: "",
-        roleId: "3" // Fixed to Office Head role (3)
+        roleid: "3" // Fixed to Office Head role (3)
     });
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
@@ -87,21 +87,21 @@ export default function Register() {
 
         try {
             console.log('Submitting registration with data:', {
-                firstName: formData.firstName,
-                middleInitial: formData.middleInitial,
-                lastName: formData.lastName,
+                firstname: formData.firstname,
+                middleinitial: formData.middleinitial,
+                lastname: formData.lastname,
                 email: formData.email,
-                roleId: parseInt(formData.roleId)
+                roleid: parseInt(formData.roleid)
             });
 
             navigate("/otp", {
                 state: {
-                    firstName: formData.firstName,
-                    middleInitial: formData.middleInitial,
-                    lastName: formData.lastName,
+                    firstname: formData.firstname,
+                    middleinitial: formData.middleinitial,
+                    lastname: formData.lastname,
                     email: formData.email,
                     password: formData.password,
-                    roleId: 3,
+                    roleid: 3,
                 },
             });
         } catch (err) {
@@ -172,15 +172,15 @@ export default function Register() {
 
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1">
+                                <label htmlFor="firstname" className="block text-sm font-medium text-gray-700 mb-1">
                                     First Name *
                                 </label>
                                 <input
                                     type="text"
-                                    id="firstName"
-                                    name="firstName"
+                                    id="firstname"
+                                    name="firstname"
                                     required
-                                    value={formData.firstName}
+                                    value={formData.firstname}
                                     onChange={handleChange}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                                     placeholder="First name"
@@ -188,15 +188,15 @@ export default function Register() {
                             </div>
 
                             <div>
-                                <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1">
+                                <label htmlFor="lastname" className="block text-sm font-medium text-gray-700 mb-1">
                                     Last Name *
                                 </label>
                                 <input
                                     type="text"
-                                    id="lastName"
-                                    name="lastName"
+                                    id="lastname"
+                                    name="lastname"
                                     required
-                                    value={formData.lastName}
+                                    value={formData.lastname}
                                     onChange={handleChange}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                                     placeholder="Last name"
@@ -205,15 +205,15 @@ export default function Register() {
                         </div>
 
                         <div>
-                            <label htmlFor="middleInitial" className="block text-sm font-medium text-gray-700 mb-1">
+                            <label htmlFor="middleinitial" className="block text-sm font-medium text-gray-700 mb-1">
                                 Middle Initial
                             </label>
                             <input
                                 type="text"
-                                id="middleInitial"
-                                name="middleInitial"
+                                id="middleinitial"
+                                name="middleinitial"
                                 maxLength="1"
-                                value={formData.middleInitial}
+                                value={formData.middleinitial}
                                 onChange={handleChange}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                                 placeholder="M"
@@ -243,7 +243,7 @@ export default function Register() {
                             </p>
                         </div>
 
-                        <input type="hidden" name="roleId" value="3" />
+                        <input type="hidden" name="roleid" value="3" />
                         <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
                             Role is fixed to Office Head.
                         </div>

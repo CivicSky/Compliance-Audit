@@ -25,8 +25,8 @@ export default function ProofDocumentViewerModal({
         }).catch(() => {});
     }, []);
 
-    const isAuditor = currentUser?.RoleID === 4 || 
-                      String(currentUser?.RoleName || '').toLowerCase().includes('auditor') || 
+    const isAuditor = currentUser?.roleid === 4 || 
+                      String(currentUser?.rolename || '').toLowerCase().includes('auditor') || 
                       currentUser?.isExternalAuditor;
 
     if (!show || !proofFileUrl) return null;

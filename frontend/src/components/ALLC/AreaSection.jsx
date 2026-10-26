@@ -10,6 +10,10 @@ export default function AreaSection({
     onToggleSelect,
     onMenuClick,
     onDeleteClick,
+    onAssignClick,
+    assignedPersonnelCount,
+    assignedPersonnel = [],
+    childPersonnel = [],
     isAssigned,
     isAuditor,
     children
@@ -26,6 +30,10 @@ export default function AreaSection({
                 onToggleSelect={onToggleSelect}
                 onMenuClick={onMenuClick}
                 onDeleteClick={onDeleteClick}
+                onAssignClick={onAssignClick}
+                assignedPersonnelCount={assignedPersonnelCount}
+                assignedPersonnel={assignedPersonnel}
+                childPersonnel={childPersonnel}
                 isAssigned={isAssigned}
                 isAuditor={isAuditor}
             />

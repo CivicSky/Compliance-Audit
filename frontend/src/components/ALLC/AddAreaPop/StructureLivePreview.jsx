@@ -14,8 +14,8 @@ export default function StructureLivePreview({
 	// Format Area title
 	const formatAreaTitle = (data) => {
 		if (!data) return 'AREA (Select Area)';
-		const code = (data.AreaCode || '').trim();
-		const name = (data.AreaName || '').trim();
+		const code = (data.areacode || '').trim();
+		const name = (data.areaname || '').trim();
 		if (!code && !name) return 'AREA: Untitled Area';
 		if (!code) return name;
 		if (!name) return code.toUpperCase().startsWith('AREA') ? code : `AREA ${code}`;
@@ -25,8 +25,8 @@ export default function StructureLivePreview({
 	// Format Criteria title
 	const formatCriteriaTitle = (data) => {
 		if (!data) return 'Sub Area (Select Sub Area)';
-		const code = (data.CriteriaCode || '').trim().replace(/\.$/, '');
-		const name = (data.CriteriaName || '').trim();
+		const code = (data.criteriacode || '').trim().replace(/\.$/, '');
+		const name = (data.criterianame || '').trim();
 		if (!code && !name) return 'Untitled Sub Area';
 		if (code && name) return `${code}. ${name}`;
 		return code ? `${code}.` : name;
@@ -96,7 +96,7 @@ export default function StructureLivePreview({
 											{formatAreaTitle(areaData)}
 										</p>
 										<div className="mt-0.5 flex flex-wrap gap-2 text-[9px] text-blue-100/80">
-											<span>Created: {formatDateTime(areaData.CreatedAt || currentDate)}</span>
+											<span>Created: {formatDateTime(areaData.createdat || currentDate)}</span>
 										</div>
 									</div>
 								</div>
@@ -172,7 +172,7 @@ export default function StructureLivePreview({
 											{formatAreaTitle(areaData)}
 										</p>
 										<div className="mt-0.5 flex flex-wrap gap-2 text-[9px] text-blue-100/80">
-											<span>Created: {formatDateTime(areaData.CreatedAt || currentDate)}</span>
+											<span>Created: {formatDateTime(areaData.createdat || currentDate)}</span>
 										</div>
 									</div>
 								</div>
@@ -201,7 +201,7 @@ export default function StructureLivePreview({
 													{formatCriteriaTitle(criteriaData)}
 												</p>
 												<div className="mt-0.5 flex flex-wrap gap-2 text-[9px] text-blue-100/80">
-													<span>Created: {formatDateTime(criteriaData.CreatedAt || currentDate)}</span>
+													<span>Created: {formatDateTime(criteriaData.createdat || currentDate)}</span>
 												</div>
 											</div>
 										</div>
@@ -224,7 +224,7 @@ export default function StructureLivePreview({
 										<div className="bg-blue-100 border-l-4 border-blue-500 p-3 rounded-lg flex items-start gap-3 shadow-xs ring-2 ring-blue-400/40">
 											<div className="flex-1 min-w-0">
 												<p className="font-bold text-slate-800 text-sm">
-													{requirementData?.RequirementCode?.trim() || 'A.1 (Code)'}
+													{requirementData?.requirementcode?.trim() || 'A.1 (Code)'}
 												</p>
 												<p className="text-xs text-slate-600 mt-1 leading-relaxed whitespace-pre-wrap">
 													{requirementData?.Description?.trim() || 'Standard description text will appear here...'}

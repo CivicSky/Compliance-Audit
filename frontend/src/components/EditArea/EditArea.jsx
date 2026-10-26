@@ -2,37 +2,44 @@
 import React, { useState, useEffect } from 'react';
 
 const EditAreaModal = ({ visible, onClose, area = {}, onSave, userRole = 'user' }) => {
-  const [areaCode, setAreaCode] = useState('');
-  const [areaName, setAreaName] = useState('');
+  const [areacode, setAreaCode] = useState('');
+  const [areaname, setAreaName] = useState('');
   // Description removed from form; will send null when saving
-  // Removed sortOrder and isActive
+  // Removed sortorder and isactive
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isAdmin = userRole === 'admin' || userRole === 1;
 
   useEffect(() => {
     if (area) {
-      setAreaCode(area.AreaCode || '');
-      setAreaName(area.AreaName || '');
+      setAreaCode(area.areacode || '');
+      setAreaName(area.areaname || '');
       // description intentionally ignored (send null)
-      // Removed sortOrder and isActive
+      // Removed sortorder and isactive
     }
   }, [area]);
 
   if (!visible) return null;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
     const updated = {
-      AreaID: area.AreaID,
-      AreaCode: areaCode,
-      AreaName: areaName,
+      areaid: area.areaid,
+      areacode: areacode,
+      areaname: areaname,
+      description: null,
       Description: null,
-      // Removed SortOrder and IsActive
     };
-    onSave(updated);
-    setIsSubmitting(false);
-    onClose();
+    try {
+      if (onSave) {
+        await onSave(updated);
+      }
+      onClose();
+    } catch (err) {
+      console.error('Error saving area:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -60,14 +67,14 @@ const EditAreaModal = ({ visible, onClose, area = {}, onSave, userRole = 'user' 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 mb-6">
             {/* Area Code */}
             <div>
-              <label htmlFor="areaCode" className="block text-sm font-semibold text-gray-800 mb-1">
+              <label htmlFor="areacode" className="block text-sm font-semibold text-gray-800 mb-1">
                 Area Code *
               </label>
               <input
                 type="text"
-                id="areaCode"
-                name="areaCode"
-                value={areaCode}
+                id="areacode"
+                name="areacode"
+                value={areacode}
                 onChange={e => setAreaCode(e.target.value)}
                 className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
                 placeholder="e.g., AREA1"
@@ -77,14 +84,14 @@ const EditAreaModal = ({ visible, onClose, area = {}, onSave, userRole = 'user' 
             </div>
             {/* Area Name */}
             <div>
-              <label htmlFor="areaName" className="block text-sm font-semibold text-gray-800 mb-1">
+              <label htmlFor="areaname" className="block text-sm font-semibold text-gray-800 mb-1">
                 Area Name *
               </label>
               <input
                 type="text"
-                id="areaName"
-                name="areaName"
-                value={areaName}
+                id="areaname"
+                name="areaname"
+                value={areaname}
                 onChange={e => setAreaName(e.target.value)}
                 className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
                 placeholder="e.g., Vision, Mission, Goals & Objectives"

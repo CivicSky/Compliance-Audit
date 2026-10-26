@@ -36,7 +36,7 @@ export default function Area() {
     const [selectedAreaIds, setSelectedAreaIds] = useState([]);
 
     // Only treat as admin when the current user is loaded and has an admin role
-    const isAdmin = !!(currentUser && (currentUser.RoleName === 'admin' || currentUser.RoleID === 1));
+    const isAdmin = !!(currentUser && (currentUser.rolename === 'admin' || currentUser.roleid === 1));
 
     // Fetch current user on mount
     useEffect(() => {
@@ -60,8 +60,8 @@ export default function Area() {
                     setEvents(allEvents.data);
                     if (allEvents.data.length > 0) {
                         const savedId = localStorage.getItem('acc_selected_event_id') || localStorage.getItem('selected_audit_event_id');
-                        const valid = allEvents.data.find(e => String(e.EventID || e.id) === String(savedId));
-                        setSelectedEventId(valid ? (valid.EventID || valid.id) : allEvents.data[0].EventID);
+                        const valid = allEvents.data.find(e => String(e.eventid || e.id) === String(savedId));
+                        setSelectedEventId(valid ? (valid.eventid || valid.id) : allEvents.data[0].eventid);
                     }
                 } else {
                     setEvents([]);
@@ -103,7 +103,7 @@ export default function Area() {
         try {
             const { requirementsAPI } = await import('../utils/api');
             const response = await requirementsAPI.updateRequirement(
-                updatedRequirement.RequirementID,
+                updatedRequirement.requirementid,
                 updatedRequirement
             );
 
@@ -182,9 +182,9 @@ export default function Area() {
             areaProfileRef.current.onAreaClick = (area) => {
                 if (areaSelectionMode) {
                     setSelectedAreaIds((prev) =>
-                        prev.includes(area.AreaID)
-                            ? prev.filter((id) => id !== area.AreaID)
-                            : [...prev, area.AreaID]
+                        prev.includes(area.areaid)
+                            ? prev.filter((id) => id !== area.areaid)
+                            : [...prev, area.areaid]
                     );
                 } else {
                     setSelectedArea(area);
@@ -223,7 +223,7 @@ export default function Area() {
     const handleEditAreaSave = async (updatedArea) => {
         try {
             const { areasAPI } = await import('../utils/api');
-            const response = await areasAPI.updateArea(updatedArea.AreaID, updatedArea);
+            const response = await areasAPI.updateArea(updatedArea.areaid, updatedArea);
             if (response.success) {
                 if (areaProfileRef.current && areaProfileRef.current.refresh) areaProfileRef.current.refresh();
                 await showAlert('Area updated successfully!');
@@ -260,8 +260,8 @@ export default function Area() {
                                 value={selectedEventId}
                                 onChange={(val) => setSelectedEventId(val)}
                                 options={events.map((event) => ({
-                                    value: String(event.EventID),
-                                    label: event.EventName || event.eventType,
+                                    value: String(event.eventid),
+                                    label: event.eventname || event.eventType,
                                 }))}
                             />
                         </div>
@@ -331,14 +331,14 @@ export default function Area() {
 
             {/* Area List */}
             <AreaProfile
-                eventId={selectedEventId}
+                eventid={selectedEventId}
                 ref={areaProfileRef}
                 onAreaClick={(area) => {
                     if (areaSelectionMode) {
                         setSelectedAreaIds((prev) =>
-                            prev.includes(area.AreaID)
-                                ? prev.filter((id) => id !== area.AreaID)
-                                : [...prev, area.AreaID]
+                            prev.includes(area.areaid)
+                                ? prev.filter((id) => id !== area.areaid)
+                                : [...prev, area.areaid]
                         );
                     } else {
                         setSelectedArea(area);
@@ -355,7 +355,7 @@ export default function Area() {
                     onClose={() => setIsEditAreaModalOpen(false)}
                     area={selectedArea}
                     onSave={handleEditAreaSave}
-                    userRole={currentUser?.RoleID}
+                    userRole={currentUser?.roleid}
                 />
             )}
 
@@ -375,7 +375,7 @@ export default function Area() {
                 }}
                 requirement={selectedRequirement}
                 onSave={handleEditSave}
-                userRole={currentUser?.RoleID}
+                userRole={currentUser?.roleid}
             />
             </div>
         </div>

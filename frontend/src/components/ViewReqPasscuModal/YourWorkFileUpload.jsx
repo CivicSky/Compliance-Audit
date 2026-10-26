@@ -32,9 +32,9 @@ const formatBytes = (bytes) => {
 };
 
 export default function YourWorkFileUpload({
-    requirementId,
-    userId = null,
-    hasUploaded = false,
+    requirementid,
+    userid = null,
+    hasuploaded = false,
     file = null,
     files = [],
     isLoadingFile = false,
@@ -53,10 +53,25 @@ export default function YourWorkFileUpload({
     isAdmin = false
 }) {
     const { toast } = useToast();
-    const inputId = `your-work-file-${requirementId}`;
+    const inputId = `your-work-file-${requirementid}`;
     const [editingFileId, setEditingFileId] = useState(null);
     const [titleInput, setTitleInput] = useState('');
     const [expandedComments, setExpandedComments] = useState({});
+
+    const isAuditorUser = useMemo(() => {
+        try {
+            const stored = localStorage.getItem('user');
+            const currentUser = stored ? JSON.parse(stored) : null;
+            if (!currentUser) return false;
+            return currentUser.roleid === 4 || 
+                   Number(currentUser.roleid) === 4 ||
+                   String(currentUser.rolename || '').toLowerCase().includes('auditor') || 
+                   String(currentUser.Position || '').toLowerCase().includes('auditor') ||
+                   Boolean(currentUser.isExternalAuditor);
+        } catch {
+            return false;
+        }
+    }, []);
 
     // Normalize files list: support either files array or single file prop
     const rawFileList = useMemo(() => {
@@ -85,15 +100,15 @@ export default function YourWorkFileUpload({
         }
     }, [rawFileList, isUploading]);
 
-    const approvedCount = localFiles.filter(f => f.reviewStatus === 'approved').length;
-    const rejectedCount = localFiles.filter(f => f.reviewStatus === 'rejected').length;
+    const approvedCount = localFiles.filter(f => f.reviewstatus === 'approved').length;
+    const rejectedCount = localFiles.filter(f => f.reviewstatus === 'rejected').length;
     const isAllApproved = approvedCount === localFiles.length && localFiles.length > 0;
     const isPartialApproved = approvedCount > 0 && !isAllApproved;
     const hasRejected = rejectedCount > 0;
 
-    let workStatus = 'Assigned';
-    let workStatusColor = 'text-slate-400 font-semibold';
-    if (localFiles.length > 0) {
+    let workStatus = isAuditorUser ? '' : 'Assigned';
+    let workStatusColor = isAuditorUser ? '' : 'text-slate-400 font-semibold';
+    if (!isAuditorUser && localFiles.length > 0) {
         if (hasRejected) {
             workStatus = `Needs Revision (${rejectedCount})`;
             workStatusColor = 'text-rose-600 font-semibold';
@@ -137,14 +152,14 @@ export default function YourWorkFileUpload({
         setDraggedIdx(null);
         setDragOverIdx(null);
 
-        const targetUserId = movedItem?.uploaded_by || movedItem?.userId || userId;
+        const targetUserId = movedItem?.uploadedby || movedItem?.userid || userid;
         const orderedIds = updated.map(f => f.id).filter(Boolean);
 
-        if (orderedIds.length > 0 && targetUserId && requirementId) {
+        if (orderedIds.length > 0 && targetUserId && requirementid) {
             onReorder?.(updated);
             try {
                 const token = localStorage.getItem('token');
-                await fetch(`${API_BASE_URL}/api/requirements/${requirementId}/user-file/${targetUserId}/reorder`, {
+                await fetch(`${API_BASE_URL}/api/requirements/${requirementid}/user-file/${targetUserId}/reorder`, {
                     method: 'PATCH',
                     headers: { 
                         'Content-Type': 'application/json',
@@ -172,20 +187,20 @@ export default function YourWorkFileUpload({
     const handleStartRename = (e, item) => {
         e?.stopPropagation();
         if (readOnly) return;
-        setEditingFileId(item.id || item.fileName);
-        setTitleInput(item.displayName || item.fileName || '');
+        setEditingFileId(item.id || item.filename);
+        setTitleInput(item.displayname || item.filename || '');
     };
 
     const handleSaveRename = (item) => {
         if (!editingFileId) return;
         const trimmed = titleInput.trim();
-        if (trimmed && trimmed !== (item.displayName || item.fileName)) {
+        if (trimmed && trimmed !== (item.displayname || item.filename)) {
             setLocalFiles(prev => prev.map(f => (
-                ((f.id && item.id && f.id === item.id) || f.fileName === item.fileName)
-                    ? { ...f, displayName: trimmed }
+                ((f.id && item.id && f.id === item.id) || f.filename === item.filename)
+                    ? { ...f, displayname: trimmed }
                     : f
             )));
-            onRename?.(requirementId, item.id, trimmed);
+            onRename?.(requirementid, item.id, trimmed);
             toast?.({
                 title: 'Title Updated',
                 description: `Renamed to "${trimmed}"`,
@@ -199,33 +214,43 @@ export default function YourWorkFileUpload({
     const handleSaveRenameInline = (item, newTitle) => {
         const trimmed = String(newTitle || '').trim();
         if (!trimmed) return;
-        if (trimmed !== (item.displayName || item.fileName)) {
+        if (trimmed !== (item.displayname || item.filename)) {
             setLocalFiles(prev => prev.map(f => (
-                ((f.id && item.id && f.id === item.id) || f.fileName === item.fileName)
-                    ? { ...f, displayName: trimmed }
+                ((f.id && item.id && f.id === item.id) || f.filename === item.filename)
+                    ? { ...f, displayname: trimmed }
                     : f
             )));
-            onRename?.(requirementId, item.id, trimmed);
+            onRename?.(requirementid, item.id, trimmed);
             toast?.({ title: 'Title Updated', description: 'Renamed file', variant: 'success', duration: 2000 });
         }
         setEditingFileId(null);
     };
 
     const handleSaveComment = (item, newCommentVal) => {
-        const val = newCommentVal.trim();
-        if (val !== (item.comment || '')) {
+        const val = String(newCommentVal || '').trim();
+        const oldVal = String(item.comment || '').trim();
+        if (val !== oldVal) {
             setLocalFiles(prev => prev.map(f => (
-                ((f.id && item.id && f.id === item.id) || f.fileName === item.fileName)
+                ((f.id && item.id && f.id === item.id) || f.filename === item.filename)
                     ? { ...f, comment: val }
                     : f
             )));
-            onUpdateComment?.(requirementId, item.id, val);
-            toast?.({
-                title: 'Comment Saved',
-                description: 'Updated file feedback comment',
-                variant: 'success',
-                duration: 2000
-            });
+            onUpdateComment?.(requirementid, item.id, val);
+            if (!val && oldVal) {
+                toast?.({
+                    title: 'Comment Cleared',
+                    description: 'The comment has been removed.',
+                    variant: 'info',
+                    duration: 2500
+                });
+            } else {
+                toast?.({
+                    title: 'Comment Saved',
+                    description: 'Updated file feedback comment',
+                    variant: 'success',
+                    duration: 2000
+                });
+            }
         }
     };
 
@@ -256,18 +281,18 @@ export default function YourWorkFileUpload({
             {localFiles.length > 0 && (
                 <div className="space-y-3 mb-3">
                     {localFiles.map((item, index) => {
-                        const fileUrl = item.url || item.file_path || '';
-                        const ext = getExtension(item.fileName || fileUrl);
-                        const displayTitle = item.displayName || item.fileName || `Document ${index + 1}`;
-                        const isEditingThis = editingFileId === (item.id || item.fileName);
-                        const fileIdKey = item.id || item.fileName || index;
+                        const fileUrl = item.url || item.filepath || '';
+                        const ext = getExtension(item.filename || fileUrl);
+                        const displayTitle = item.displayname || item.filename || `Document ${index + 1}`;
+                        const isEditingThis = editingFileId === (item.id || item.filename);
+                        const fileIdKey = item.id || item.filename || index;
                         const isExpanded = !!expandedComments[fileIdKey];
                         const commentText = String(item.comment || '');
                         const isLongComment = commentText.length > 130 || commentText.split('\n').length > 2;
 
-                        const reviewStatus = item.reviewStatus || 'pending';
-                        const isApproved = reviewStatus === 'approved';
-                        const isRejected = reviewStatus === 'rejected';
+                        const reviewstatus = item.reviewstatus || 'pending';
+                        const isApproved = reviewstatus === 'approved';
+                        const isRejected = reviewstatus === 'rejected';
 
                         return (
                             <div
@@ -281,15 +306,15 @@ export default function YourWorkFileUpload({
                                 className={`group/card cursor-pointer flex flex-col gap-2.5 rounded-xl border bg-white p-3.5 shadow-2xs transition-all ${
                                     draggedIdx === index ? 'opacity-40 scale-[0.98] border-dashed border-blue-400 bg-blue-50/20' : 
                                     dragOverIdx === index ? 'border-blue-500 ring-2 ring-blue-400/50 shadow-md scale-[1.01]' : 
-                                    isRejected ? 'border-rose-300/80 bg-rose-50/10 hover:border-rose-400 hover:shadow-md' :
-                                    isApproved ? 'border-emerald-200/80 bg-emerald-50/10 hover:border-emerald-400 hover:shadow-md' :
+                                    !isAuditorUser && isRejected ? 'border-rose-300/80 bg-rose-50/10 hover:border-rose-400 hover:shadow-md' :
+                                    !isAuditorUser && isApproved ? 'border-emerald-200/80 bg-emerald-50/10 hover:border-emerald-400 hover:shadow-md' :
                                     'border-slate-200/90 hover:border-blue-400 hover:shadow-md hover:bg-blue-50/20'
                                 } ${compact ? 'text-xs' : ''}`}
                             >
                                 {/* Top Review Badge Header */}
                                 <div className="flex items-center justify-between gap-2">
                                     <div className="flex items-center gap-1.5">
-                                        {isApproved && (
+                                        {!isAuditorUser && isApproved && (
                                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-2xs">
                                                 <svg className="w-3 h-3 text-emerald-600 stroke-current" fill="none" viewBox="0 0 24 24" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                                                     <polyline points="20 6 9 17 4 12" />
@@ -297,7 +322,7 @@ export default function YourWorkFileUpload({
                                                 Approved
                                             </span>
                                         )}
-                                        {isRejected && (
+                                        {!isAuditorUser && isRejected && (
                                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200 shadow-2xs">
                                                 <svg className="w-3 h-3 text-rose-600 stroke-current" fill="none" viewBox="0 0 24 24" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                                                     <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -306,7 +331,7 @@ export default function YourWorkFileUpload({
                                                 Needs Revision
                                             </span>
                                         )}
-                                        {!isApproved && !isRejected && (
+                                        {!isAuditorUser && !isApproved && !isRejected && (
                                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 shadow-2xs">
                                                 <svg className="w-3 h-3 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                                                     <circle cx="12" cy="12" r="9"/>
@@ -365,7 +390,7 @@ export default function YourWorkFileUpload({
                                             <div className="mt-1 flex items-center gap-2 text-[10px] font-medium text-slate-500">
                                                 <span className="rounded bg-slate-100 px-1.5 py-0.5 text-slate-600">{getFileTypeLabel(ext)}</span>
                                                 <span>•</span>
-                                                <span className="truncate max-w-[260px] text-slate-400">{item.fileName || 'file'}</span>
+                                                <span className="truncate max-w-[260px] text-slate-400">{item.filename || 'file'}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -378,7 +403,7 @@ export default function YourWorkFileUpload({
                                                     forceEditing={isEditingThis}
                                                     onRename={(newTitle) => handleSaveRenameInline(item, newTitle)}
                                                     onCancel={() => setEditingFileId(null)}
-                                                    onStart={() => setEditingFileId(item.id || item.fileName)}
+                                                    onStart={() => setEditingFileId(item.id || item.filename)}
                                                 />
                                             </div>
                                         )}
@@ -389,13 +414,13 @@ export default function YourWorkFileUpload({
                                                 onClick={async (e) => {
                                                     e.stopPropagation();
                                                     if (unsubmitting) return;
-                                                    const targetId = item.id || item.fileId || item.fileName;
-                                                    const res = await onUnsubmit?.(requirementId, targetId);
+                                                    const targetId = item.id || item.fileId || item.filename;
+                                                    const res = await onUnsubmit?.(requirementid, targetId);
                                                     if (res !== false) {
                                                         setLocalFiles((prev) => prev.filter((f) => {
                                                             if (targetId && f.id && String(f.id) === String(targetId)) return false;
                                                             if (targetId && f.fileId && String(f.fileId) === String(targetId)) return false;
-                                                            if (targetId && f.fileName && f.fileName === targetId) return false;
+                                                            if (targetId && f.filename && f.filename === targetId) return false;
                                                             return true;
                                                         }));
                                                     }
@@ -413,7 +438,7 @@ export default function YourWorkFileUpload({
                                 </div>
 
                                 {/* Rejection Feedback Banner (if rejected) */}
-                                {isRejected && (item.rejectionReason || commentText) ? (
+                                {isRejected && !isAuditorUser && (item.rejectionreason || commentText) ? (
                                     <div 
                                         className="rounded-lg bg-rose-50 border border-rose-200/90 p-2.5 text-xs text-rose-900 flex flex-col gap-1 shadow-2xs"
                                         onClick={(e) => e.stopPropagation()}
@@ -425,13 +450,13 @@ export default function YourWorkFileUpload({
                                             <span>Auditor Revision Feedback:</span>
                                         </div>
                                         <p className="text-rose-700 font-medium text-[11px] leading-snug pl-5 whitespace-pre-wrap break-words break-all [overflow-wrap:anywhere]">
-                                            {item.rejectionReason || commentText}
+                                            {item.rejectionreason || commentText}
                                         </p>
                                         {item.reviewerName && (
                                             <span className="text-[10px] text-rose-500 pl-5 font-normal">Reviewed by: {item.reviewerName}</span>
                                         )}
                                     </div>
-                                ) : (
+                                ) : (!isAuditorUser && (
                                     /* Dedicated Multi-Line Per-File Comment Section (Only when not rejected) */
                                     <div 
                                         className="mt-1.5 pt-2 border-t border-slate-100 flex flex-col gap-1"
@@ -473,7 +498,7 @@ export default function YourWorkFileUpload({
                                             </div>
                                         )}
                                     </div>
-                                )}
+                                ))}
                             </div>
                         );
                     })}
@@ -552,7 +577,7 @@ export default function YourWorkFileUpload({
                         type="file"
                         accept=".pdf,.doc,.docx,.xlsx,.xls,.jpg,.jpeg,.png,.gif,.mp4,.webm,.ogg,.mov,.avi,.mkv"
                         multiple
-                        onChange={(e) => onUpload?.(e, requirementId)}
+                        onChange={(e) => onUpload?.(e, requirementid)}
                         className="hidden"
                         disabled={isUploading}
                     />

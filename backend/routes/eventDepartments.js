@@ -4,7 +4,7 @@ const controller = require('../controllers/eventDepartmentsController');
 const auth = require('../middleware/auth');
 
 // All routes require authentication
-router.get('/event/:eventId', auth, controller.getByEvent);
+router.get('/event/:eventid', auth, controller.getByEvent);
 router.post('/', auth, controller.assignDepartment);
 router.put('/:id/level', auth, controller.updateLevel);
 router.delete('/:id', auth, controller.deleteDepartment);

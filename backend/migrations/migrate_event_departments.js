@@ -1,91 +1,91 @@
 const db = require('../db');
 
 async function runMigration() {
-  console.log('Starting migration for event_departments...');
+  console.log('Starting migration for eventdepartments...');
 
-  // 1. Create event_departments table
+  // 1. Create eventdepartments table
   await db.query(`
-    CREATE TABLE IF NOT EXISTS event_departments (
+    CREATE TABLE IF NOT EXISTS eventdepartments (
       id SERIAL PRIMARY KEY,
-      event_id INTEGER NOT NULL REFERENCES events("EventID") ON DELETE CASCADE,
-      department_id INTEGER NOT NULL REFERENCES departments(id) ON DELETE CASCADE,
-      accreditation_level VARCHAR(50) NOT NULL DEFAULT 'Level I',
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      CONSTRAINT uq_event_department UNIQUE (event_id, department_id)
+      eventid INTEGER NOT NULL REFERENCES events("eventid") ON DELETE CASCADE,
+      departmentid INTEGER NOT NULL REFERENCES departments(id) ON DELETE CASCADE,
+      accreditationlevel VARCHAR(50) NOT NULL DEFAULT 'Level I',
+      createdat TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updatedat TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT uq_event_department UNIQUE (eventid, departmentid)
     );
   `);
-  console.log('Created/verified event_departments table');
+  console.log('Created/verified eventdepartments table');
 
-  // 2. Add event_department_id column to offices table if not exists
+  // 2. Add eventdepartmentid column to offices table if not exists
   await db.query(`
     DO $$ 
     BEGIN 
       IF NOT EXISTS (
         SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'offices' AND column_name = 'event_department_id'
+        WHERE table_name = 'offices' AND column_name = 'eventdepartmentid'
       ) THEN 
-        ALTER TABLE offices ADD COLUMN event_department_id INTEGER REFERENCES event_departments(id) ON DELETE SET NULL;
+        ALTER TABLE offices ADD COLUMN eventdepartmentid INTEGER REFERENCES eventdepartments(id) ON DELETE SET NULL;
       END IF; 
     END $$;
   `);
-  console.log('Created/verified event_department_id column on offices');
+  console.log('Created/verified eventdepartmentid column on offices');
 
-  // 3. Backfill existing academic offices into event_departments
+  // 3. Backfill existing academic offices into eventdepartments
   const [academicOffices] = await db.query(`
-    SELECT o."OfficeID", o."EventID", m.department_id
+    SELECT o."officeid", o."eventid", m.departmentid
     FROM offices o
-    JOIN master_list m ON o.master_list_id = m.id
-    WHERE m.entity_type_id = 1 
-      AND m.department_id IS NOT NULL 
-      AND o."EventID" IS NOT NULL
-      AND o."EventID" IN (SELECT "EventID" FROM events)
-      AND o.event_department_id IS NULL;
+    JOIN masterlist m ON o.masterlistid = m.id
+    WHERE m.entitytypeid = 1 
+      AND m.departmentid IS NOT NULL 
+      AND o."eventid" IS NOT NULL
+      AND o."eventid" IN (SELECT "eventid" FROM events)
+      AND o.eventdepartmentid IS NULL;
   `);
 
-  console.log(`Found ${academicOffices.length} academic office records to link to event_departments.`);
+  console.log(`Found ${academicOffices.length} academic office records to link to eventdepartments.`);
 
   for (const row of academicOffices) {
-    const { OfficeID, EventID, department_id } = row;
-    if (!EventID || !department_id) continue;
+    const { officeid, eventid, departmentid } = row;
+    if (!eventid || !departmentid) continue;
 
     // Check if event_department entry exists
     const [existing] = await db.query(
-      `SELECT id FROM event_departments WHERE event_id = ? AND department_id = ? LIMIT 1`,
-      [EventID, department_id]
+      `SELECT id FROM eventdepartments WHERE eventid = ? AND departmentid = ? LIMIT 1`,
+      [eventid, departmentid]
     );
 
     let eventDeptId = existing[0]?.id;
 
     if (!eventDeptId) {
       const [inserted] = await db.query(
-        `INSERT INTO event_departments (event_id, department_id, accreditation_level)
+        `INSERT INTO eventdepartments (eventid, departmentid, accreditationlevel)
          VALUES (?, ?, 'Level I')
-         ON CONFLICT (event_id, department_id) DO UPDATE SET updated_at = CURRENT_TIMESTAMP
+         ON CONFLICT (eventid, departmentid) DO UPDATE SET updatedat = CURRENT_TIMESTAMP
          RETURNING id`,
-        [EventID, department_id]
+        [eventid, departmentid]
       );
       eventDeptId = inserted[0]?.id || inserted.insertId;
     }
 
     if (eventDeptId) {
       await db.query(
-        `UPDATE offices SET event_department_id = ? WHERE "OfficeID" = ?`,
-        [eventDeptId, OfficeID]
+        `UPDATE offices SET eventdepartmentid = ? WHERE "officeid" = ?`,
+        [eventDeptId, officeid]
       );
     }
   }
 
-  console.log('Successfully backfilled academic offices into event_departments!');
+  console.log('Successfully backfilled academic offices into eventdepartments!');
 
   // Verify created records
   const [createdEventDepts] = await db.query(`
-    SELECT ed.id, ed.event_id, ed.department_id, ed.accreditation_level, d.name AS dept_name, e."EventName"
-    FROM event_departments ed
-    JOIN departments d ON ed.department_id = d.id
-    JOIN events e ON ed.event_id = e."EventID";
+    SELECT ed.id, ed.eventid, ed.departmentid, ed.accreditationlevel, d.name AS dept_name, e."eventname"
+    FROM eventdepartments ed
+    JOIN departments d ON ed.departmentid = d.id
+    JOIN events e ON ed.eventid = e."eventid";
   `);
-  console.log('Current event_departments records:', createdEventDepts);
+  console.log('Current eventdepartments records:', createdEventDepts);
 
   process.exit(0);
 }

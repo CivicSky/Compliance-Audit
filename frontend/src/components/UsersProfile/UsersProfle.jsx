@@ -20,26 +20,26 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
     const [currentPage, setCurrentPage] = useState(1);
     const [currentUserID, setCurrentUserID] = useState(null);
     const [currentUser, setCurrentUser] = useState(null);
-    const isAdmin = currentUser?.RoleName === 'admin' || currentUser?.RoleID === 1;
+    const isAdmin = currentUser?.rolename === 'admin' || currentUser?.roleid === 1;
     const [actionMenuUserId, setActionMenuUserId] = useState(null);
     const [actionMenuAnchorRect, setActionMenuAnchorRect] = useState(null);
     const { showConfirm } = useModal();
     const { toast } = useToast();
 
     const normalizeRoleKey = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-    const getRoleLabel = (person) => person.RoleName || (person.RoleID === 1 ? 'Admin' : 'User');
+    const getRoleLabel = (person) => person.rolename || (person.roleid === 1 ? 'Admin' : 'User');
     const getRoleBadgeClass = (person) => {
-        if (person.RoleID === 1) return 'bg-blue-100 text-blue-800 border-blue-200';
-        if (person.RoleID === 2) return 'bg-sky-100 text-sky-800 border-sky-200';
-        if (person.RoleID === 3) return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+        if (person.roleid === 1) return 'bg-blue-100 text-blue-800 border-blue-200';
+        if (person.roleid === 2) return 'bg-sky-100 text-sky-800 border-sky-200';
+        if (person.roleid === 3) return 'bg-emerald-100 text-emerald-800 border-emerald-200';
         return 'bg-gray-100 text-gray-800 border-gray-200';
     };
     const getApprovalLabel = (person) => {
-        const status = String(person.approval_status || 'pending');
+        const status = String(person.approvalstatus || 'pending');
         return status.charAt(0).toUpperCase() + status.slice(1);
     };
     const getApprovalBadgeClass = (person) => {
-        const status = String(person.approval_status || 'pending').toLowerCase();
+        const status = String(person.approvalstatus || 'pending').toLowerCase();
         if (status === 'approved') return 'bg-green-100 text-green-800 border-green-200';
         if (status === 'pending') return 'bg-yellow-100 text-yellow-800 border-yellow-200';
         if (status === 'denied') return 'bg-red-100 text-red-800 border-red-200';
@@ -58,7 +58,7 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
                             const response = await usersAPI.getLoggedInUser();
                             if (response && response.success && response.user) {
                                 {
-                                    setCurrentUserID(response.user.UserID);
+                                    setCurrentUserID(response.user.userid);
                                     setCurrentUser(response.user);
                                 }
                             }
@@ -150,9 +150,9 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
         // Apply search filter
         if (searchTerm.trim()) {
             filtered = users.filter(person => {
-                const fullName = `${person.FirstName}${person.MiddleInitial ? ' ' + person.MiddleInitial + '.' : ''} ${person.LastName}`.toLowerCase();
+                const fullName = `${person.firstname}${person.middleinitial ? ' ' + person.middleinitial + '.' : ''} ${person.lastname}`.toLowerCase();
                 const email = person.Email?.toLowerCase() || '';
-                const role = person.RoleName?.toLowerCase() || '';
+                const role = person.rolename?.toLowerCase() || '';
                 const searchLower = searchTerm.toLowerCase();
 
                 return fullName.includes(searchLower) ||
@@ -162,9 +162,9 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
         }
 
         // Apply approval status filter
-        if (filterOptions.approvalStatus && filterOptions.approvalStatus.length > 0) {
+        if (filterOptions.approvalstatus && filterOptions.approvalstatus.length > 0) {
             filtered = filtered.filter(person =>
-                filterOptions.approvalStatus.includes(person.approval_status || 'pending')
+                filterOptions.approvalstatus.includes(person.approvalstatus || 'pending')
             );
         }
 
@@ -172,15 +172,15 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
         if (filterOptions.roles && filterOptions.roles.length > 0) {
             filtered = filtered.filter(person => {
                 const selectedRoles = filterOptions.roles.map(normalizeRoleKey);
-                const userRole = normalizeRoleKey(person.RoleName || (person.RoleID === 1 ? 'admin' : 'user'));
+                const userRole = normalizeRoleKey(person.rolename || (person.roleid === 1 ? 'admin' : 'user'));
                 return selectedRoles.includes(userRole);
             });
         }
 
         // Sort by name in ascending order
         const sortedFiltered = [...filtered].sort((a, b) => {
-            const nameA = `${a.FirstName} ${a.LastName}`.toLowerCase();
-            const nameB = `${b.FirstName} ${b.LastName}`.toLowerCase();
+            const nameA = `${a.firstname} ${a.lastname}`.toLowerCase();
+            const nameB = `${b.firstname} ${b.lastname}`.toLowerCase();
             return nameA.localeCompare(nameB);
         });
 
@@ -211,13 +211,13 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
         }
     }, [deleteMode]);
 
-    const handleCheckboxChange = (userId, isChecked) => {
+    const handleCheckboxChange = (userid, isChecked) => {
         setSelectedUsers(prev => {
             const newSet = new Set(prev);
             if (isChecked) {
-                newSet.add(userId);
+                newSet.add(userid);
             } else {
-                newSet.delete(userId);
+                newSet.delete(userid);
             }
             return newSet;
         });
@@ -314,8 +314,8 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
             {viewMode === 'list' && (
                 <div className="grid grid-cols-12 items-center gap-3 px-4 py-3 bg-white border border-slate-200 rounded-xl shadow-2xs text-xs font-semibold text-gray-700 sticky top-0 z-30 min-w-[720px] mb-2">
                     <div className="col-span-5 flex items-center">Name</div>
-                    <div className="col-span-3 flex items-center justify-center">Role</div>
-                    <div className="col-span-3 flex items-center justify-center">Approval Status</div>
+                    <div className="col-span-3 flex items-center">Role</div>
+                    <div className="col-span-3 flex items-center">Approval Status</div>
                     <div className="col-span-1 flex items-center justify-end">Actions</div>
                 </div>
             )}
@@ -323,8 +323,8 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
             <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pt-1.5 pb-20' : 'space-y-2 pt-1 pb-1'}>
                 {visibleUsers.map((person) => {
                     // Construct full name
-                    const fullName = `${person.FirstName || ''}${person.MiddleInitial ? ' ' + person.MiddleInitial + '.' : ''} ${person.LastName || ''}`.trim() || 'User';
-                    const initials = `${(person.FirstName || '').trim().charAt(0)}${(person.LastName || '').trim().charAt(0)}`.toUpperCase() || 'U';
+                    const fullName = `${person.firstname || ''}${person.middleinitial ? ' ' + person.middleinitial + '.' : ''} ${person.lastname || ''}`.trim() || 'User';
+                    const initials = `${(person.firstname || '').trim().charAt(0)}${(person.lastname || '').trim().charAt(0)}`.toUpperCase() || 'U';
                     const roleLabel = getRoleLabel(person);
                     const approvalLabel = getApprovalLabel(person);
                     const roleBadgeClass = getRoleBadgeClass(person);
@@ -334,16 +334,16 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
                     let profilePicUrl = null;
                     if (person.TempPreview) {
                         profilePicUrl = person.TempPreview;
-                    } else if (person.ProfilePic) {
-                        profilePicUrl = `${API_BASE_URL}/uploads/profile-pics/${person.ProfilePic}`;
+                    } else if (person.profilepic) {
+                        profilePicUrl = `${API_BASE_URL}/uploads/profile-pics/${person.profilepic}`;
                     }
                     if (viewMode === 'list') {
                         return (
                             <div
-                                key={person.UserID}
-                                onClick={() => deleteMode ? handleCheckboxChange(person.UserID, !selectedUsers.has(person.UserID)) : (onUserClick && onUserClick(person))}
-                                className={`relative rounded-xl border border-slate-200 bg-white shadow-2xs ${selectedUsers.has(person.UserID) ? 'ring-2 ring-rose-500 border-rose-500 bg-rose-50/20' : ''
-                                    } ${currentUserID === person.UserID ? 'border-blue-300 bg-blue-50/30' : ''
+                                key={person.userid}
+                                onClick={() => deleteMode ? handleCheckboxChange(person.userid, !selectedUsers.has(person.userid)) : (onUserClick && onUserClick(person))}
+                                className={`relative rounded-xl border border-slate-200 bg-white shadow-2xs ${selectedUsers.has(person.userid) ? 'ring-2 ring-rose-500 border-rose-500 bg-rose-50/20' : ''
+                                    } ${currentUserID === person.userid ? 'border-blue-300 bg-blue-50/30' : ''
                                     } ${deleteMode ? 'cursor-pointer hover:border-rose-300' : 'app-card-hover cursor-pointer'}`}
                             >
                                 <div className="grid grid-cols-12 items-center gap-3 px-4 py-2.5">
@@ -353,8 +353,8 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
                                             <div className="flex-shrink-0">
                                                 <input
                                                     type="checkbox"
-                                                    checked={selectedUsers.has(person.UserID)}
-                                                    onChange={(e) => handleCheckboxChange(person.UserID, e.target.checked)}
+                                                    checked={selectedUsers.has(person.userid)}
+                                                    onChange={(e) => handleCheckboxChange(person.userid, e.target.checked)}
                                                     className="h-4 w-4 rounded border-rose-300 text-rose-600 focus:ring-rose-500"
                                                     onClick={(e) => e.stopPropagation()}
                                                 />
@@ -373,7 +373,7 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
                                                 <span className="text-xs font-bold text-slate-800 truncate">
                                                     {fullName}
                                                 </span>
-                                                {currentUserID === person.UserID && (
+                                                {currentUserID === person.userid && (
                                                     <span className="text-[9px] bg-blue-100 text-blue-700 font-bold px-1.5 py-0.2 rounded shrink-0">
                                                         You
                                                     </span>
@@ -386,14 +386,14 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
                                     </div>
 
                                     {/* Role */}
-                                    <div className="col-span-3 flex items-center justify-center">
+                                    <div className="col-span-3 flex items-center">
                                         <span className={`inline-flex items-center rounded-md border px-2.5 py-0.5 text-[10px] font-semibold ${roleBadgeClass}`}>
                                             {roleLabel}
                                         </span>
                                     </div>
 
                                     {/* Status */}
-                                    <div className="col-span-3 flex items-center justify-center">
+                                    <div className="col-span-3 flex items-center">
                                         <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold tracking-wide border ${approvalBadgeClass}`}>
                                             {approvalLabel}
                                         </span>
@@ -407,8 +407,8 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     const rect = e.currentTarget.getBoundingClientRect();
-                                                    setActionMenuUserId((prev) => (prev === person.UserID ? null : person.UserID));
-                                                    setActionMenuAnchorRect((prev) => (actionMenuUserId === person.UserID ? null : rect));
+                                                    setActionMenuUserId((prev) => (prev === person.userid ? null : person.userid));
+                                                    setActionMenuAnchorRect((prev) => (actionMenuUserId === person.userid ? null : rect));
                                                 }}
                                                 className="user-actions-button flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 shadow-2xs"
                                                 aria-label="User actions"
@@ -429,11 +429,11 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
 
                     return (
                         <div
-                            key={person.UserID}
-                            onClick={() => deleteMode ? handleCheckboxChange(person.UserID, !selectedUsers.has(person.UserID)) : (onUserClick && onUserClick(person))}
-                            className={`group relative flex flex-col justify-between rounded-2xl border bg-white shadow-2xs app-card-hover min-h-[200px] ${selectedUsers.has(person.UserID)
+                            key={person.userid}
+                            onClick={() => deleteMode ? handleCheckboxChange(person.userid, !selectedUsers.has(person.userid)) : (onUserClick && onUserClick(person))}
+                            className={`group relative flex flex-col justify-between rounded-2xl border bg-white shadow-2xs app-card-hover min-h-[200px] ${selectedUsers.has(person.userid)
                                     ? 'border-rose-500 ring-2 ring-rose-400/50 bg-rose-50/15'
-                                    : currentUserID === person.UserID
+                                    : currentUserID === person.userid
                                         ? 'border-blue-300 bg-blue-50/20'
                                         : 'border-slate-200/90'
                                 } ${deleteMode ? 'cursor-pointer hover:border-rose-300' : 'cursor-pointer'}`}
@@ -444,8 +444,8 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
                                     {deleteMode ? (
                                         <input
                                             type="checkbox"
-                                            checked={selectedUsers.has(person.UserID)}
-                                            onChange={(e) => handleCheckboxChange(person.UserID, e.target.checked)}
+                                            checked={selectedUsers.has(person.userid)}
+                                            onChange={(e) => handleCheckboxChange(person.userid, e.target.checked)}
                                             className="h-4 w-4 rounded border-rose-300 text-rose-600 focus:ring-rose-500 cursor-pointer"
                                             onClick={(e) => e.stopPropagation()}
                                         />
@@ -465,8 +465,8 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     const rect = e.currentTarget.getBoundingClientRect();
-                                                    setActionMenuUserId((prev) => (prev === person.UserID ? null : person.UserID));
-                                                    setActionMenuAnchorRect((prev) => (actionMenuUserId === person.UserID ? null : rect));
+                                                    setActionMenuUserId((prev) => (prev === person.userid ? null : person.userid));
+                                                    setActionMenuAnchorRect((prev) => (actionMenuUserId === person.userid ? null : rect));
                                                 }}
                                                 className="user-actions-button flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition hover:bg-slate-50 hover:text-slate-700"
                                                 aria-label="User actions"
@@ -497,7 +497,7 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
                                         <h3 className="text-[14px] font-bold text-slate-900 truncate group-hover:text-blue-600 transition-colors">
                                             {fullName}
                                         </h3>
-                                        {currentUserID === person.UserID && (
+                                        {currentUserID === person.userid && (
                                             <span className="inline-block mt-0.5 text-[9px] font-bold text-blue-600 uppercase tracking-wider">
                                                 (You)
                                             </span>
@@ -520,8 +520,8 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
 
             {/* Portal action menu (prevents clipping inside card/list containers) */}
             {isAdmin && actionMenuUserId && actionMenuAnchorRect && typeof document !== 'undefined' && (() => {
-                const menuPerson = users.find((u) => String(u.UserID) === String(actionMenuUserId))
-                    || filteredUsers.find((u) => String(u.UserID) === String(actionMenuUserId));
+                const menuPerson = users.find((u) => String(u.userid) === String(actionMenuUserId))
+                    || filteredUsers.find((u) => String(u.userid) === String(actionMenuUserId));
 
                 if (!menuPerson) return null;
 
@@ -561,14 +561,14 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
                                     e.stopPropagation();
                                     setActionMenuUserId(null);
                                     setActionMenuAnchorRect(null);
-                                    const userName = `${menuPerson.FirstName || ''} ${menuPerson.LastName || ''}`.trim() || 'this user';
+                                    const userName = `${menuPerson.firstname || ''} ${menuPerson.lastname || ''}`.trim() || 'this user';
                                     const confirmed = await showConfirm(
                                         `Delete user "${userName}"? This cannot be undone.`,
                                         'Confirm Deletion'
                                     );
                                     if (!confirmed) return;
                                     try {
-                                        const result = await deleteSelectedUsers([menuPerson.UserID]);
+                                        const result = await deleteSelectedUsers([menuPerson.userid]);
                                         if (result?.success) {
                                             fetchUsers();
                                             toast({
@@ -578,7 +578,7 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
                                                 duration: 3000,
                                             });
                                         } else {
-                                            setUsers((prev) => prev.filter((u) => u.UserID !== menuPerson.UserID));
+                                            setUsers((prev) => prev.filter((u) => u.userid !== menuPerson.userid));
                                             toast({
                                                 title: 'Notice',
                                                 description: result?.message || `"${userName}" was removed.`,

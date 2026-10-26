@@ -5,9 +5,9 @@ import Header from '../components/Header/header';
 
 function checkIsAdminUser(user) {
     if (!user) return false;
-    const roleId = Number(user.RoleID ?? user.role_id ?? 0);
-    const roleName = String(user.RoleName ?? user.role_name ?? '').toLowerCase();
-    return roleId === 1 || roleName === 'admin' || roleName === 'administrator';
+    const roleid = Number(user.roleid ?? user.roleid ?? 0);
+    const rolename = String(user.rolename ?? user.rolename ?? '').toLowerCase();
+    return roleid === 1 || rolename === 'admin' || rolename === 'administrator';
 }
 
 function getStoredIsAdmin() {
@@ -56,9 +56,9 @@ export default function AppLayout() {
             {isAdmin && (
                 <Navbar isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
             )}
-            <main className={`pt-14 ${isAdmin ? 'lg:ml-[var(--sidebar-width)]' : 'lg:ml-0'} bg-app min-h-screen relative z-10 transition-[margin-left] duration-200`}>
+            <main className={`pt-14 ${isAdmin ? 'lg:ml-[var(--sidebar-width)]' : 'lg:ml-0'} bg-app min-h-screen relative z-10 transition-[margin-left] duration-200 flex flex-col`}>
                 <Header onToggleMobileMenu={() => setIsMobileMenuOpen((prev) => !prev)} isAdmin={isAdmin} />
-                <div className="animate-page-enter min-h-[calc(100vh-3.5rem)] flex flex-col">
+                <div className="animate-page-enter min-h-[calc(100vh-3.5rem)] flex-1 flex flex-col">
                     <Outlet />
                 </div>
             </main>

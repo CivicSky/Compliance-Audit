@@ -10,6 +10,12 @@ export default function CriteriaSection({
     onToggleSelect,
     onMenuClick,
     onDeleteClick,
+    onAssignClick,
+    assignedPersonnelCount,
+    assignedPersonnel = [],
+    inheritedPersonnel = [],
+    childPersonnel = [],
+    isAssigned,
     children
 }) {
     return (
@@ -25,6 +31,12 @@ export default function CriteriaSection({
                 onToggleSelect={onToggleSelect}
                 onMenuClick={onMenuClick}
                 onDeleteClick={onDeleteClick}
+                onAssignClick={onAssignClick}
+                assignedPersonnelCount={assignedPersonnelCount}
+                assignedPersonnel={assignedPersonnel}
+                inheritedPersonnel={inheritedPersonnel}
+                childPersonnel={childPersonnel}
+                isAssigned={isAssigned}
             />
             {isExpanded && children}
         </div>

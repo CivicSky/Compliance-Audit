@@ -148,8 +148,8 @@ export default function OfficeHead() {
 
         try {
             const [instRes, stdRes] = await Promise.all([
-                usersAPI.createRegistrationInvite({ roleId: 3, allowAnyEmail: false }),
-                usersAPI.createRegistrationInvite({ roleId: 3, allowAnyEmail: true })
+                usersAPI.createRegistrationInvite({ roleid: 3, allowAnyEmail: false }),
+                usersAPI.createRegistrationInvite({ roleid: 3, allowAnyEmail: true })
             ]);
 
             if (!instRes.success || !instRes.inviteUrl) {
@@ -329,9 +329,9 @@ export default function OfficeHead() {
             </div>
 
             {/* Content Container */}
-            <div className="flex-1 min-h-0 flex flex-col px-4 sm:px-6 pt-3 pb-8 overflow-hidden">
-                <div className={`relative z-10 flex-1 min-h-0 ${viewMode === 'list' ? 'overflow-y-auto pr-1' : 'flex flex-col h-full'} overflow-x-auto`}>
-                    <div className={`${viewMode === 'list' ? 'flex flex-col gap-0 min-w-[720px]' : 'flex-1 min-h-0 h-full flex flex-col'}`}>
+            <div className="flex-1 min-h-0 flex flex-col px-4 sm:px-6 pt-3 pb-3 overflow-hidden">
+                <div className={`relative z-10 flex-1 min-h-0 ${viewMode === 'list' ? 'app-list-scroll overflow-x-auto pr-1' : 'flex flex-col h-full overflow-hidden'}`}>
+                    <div className={`${viewMode === 'list' ? 'flex flex-col gap-0 min-w-[720px] pb-3' : 'flex-1 min-h-0 h-full flex flex-col overflow-hidden'}`}>
                         <OfficeHeadP 
                             ref={officePRef} 
                             searchTerm={searchTerm} 

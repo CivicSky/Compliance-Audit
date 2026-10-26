@@ -39,6 +39,6 @@ const Card = forwardRef(({
   );
 });
 
-Card.displayName = 'Card';
+Card.displayname = 'Card';
 
 export default Card;

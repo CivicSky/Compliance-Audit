@@ -11,18 +11,18 @@ export default function EventTabs({ selectedEventId, onChange }) {
       try {
         const userRes = await usersAPI.getLoggedInUser().catch(() => null);
         const currentUser = userRes?.user || userRes?.data || userRes;
-        const isAuditor = Number(currentUser?.RoleID) === 4 || 
-                          String(currentUser?.RoleName || '').toLowerCase().includes('auditor') || 
+        const isAuditor = Number(currentUser?.roleid) === 4 || 
+                          String(currentUser?.rolename || '').toLowerCase().includes('auditor') || 
                           Boolean(currentUser?.isExternalAuditor);
 
         let assignedEventIds = null;
-        if (isAuditor && currentUser?.UserID) {
+        if (isAuditor && currentUser?.userid) {
           const token = localStorage.getItem('token');
-          const assignRes = await fetch(`${API_BASE_URL}/api/areas/assignments/${currentUser.UserID}`, {
+          const assignRes = await fetch(`${API_BASE_URL}/api/areas/assignments/${currentUser.userid}`, {
             headers: token ? { 'Authorization': `Bearer ${token}` } : {}
           }).then(r => r.json()).catch(() => null);
           if (assignRes?.success && Array.isArray(assignRes.assignments)) {
-            assignedEventIds = new Set(assignRes.assignments.map(a => Number(a.EventID)));
+            assignedEventIds = new Set(assignRes.assignments.map(a => Number(a.eventid)));
           }
         }
 
@@ -37,19 +37,19 @@ export default function EventTabs({ selectedEventId, onChange }) {
 
         // Auditor Scoping: if user is auditor, only show events they are assigned to!
         if (isAuditor && assignedEventIds) {
-          active = active.filter(e => assignedEventIds.has(Number(e.EventID || e.id)));
+          active = active.filter(e => assignedEventIds.has(Number(e.eventid || e.id)));
         }
 
         const toShow = Array.isArray(active) ? active : [];
         if (mounted) setEvents(toShow);
 
         // If current selectedEventId is not in toShow list (or empty), pick persisted or first available
-        const currentValid = toShow.some(e => String(e.EventID || e.id) === String(selectedEventId));
+        const currentValid = toShow.some(e => String(e.eventid || e.id) === String(selectedEventId));
         if (!currentValid && toShow.length > 0 && typeof onChange === 'function') {
           const savedEventId = localStorage.getItem('acc_selected_event_id') || localStorage.getItem('selected_audit_event_id');
-          const validSaved = toShow.find(e => String(e.EventID || e.id) === String(savedEventId));
+          const validSaved = toShow.find(e => String(e.eventid || e.id) === String(savedEventId));
           const target = validSaved || toShow[0];
-          const targetId = target.EventID || target.id || '';
+          const targetId = target.eventid || target.id || '';
           localStorage.setItem('acc_selected_event_id', String(targetId));
           localStorage.setItem('selected_audit_event_id', String(targetId));
           onChange(targetId);
@@ -64,7 +64,7 @@ export default function EventTabs({ selectedEventId, onChange }) {
   }, []);
 
   const handleSelect = (ev) => {
-    const id = ev.EventID || ev.id || ev.EventCode || ev.EventName || ev.name || '';
+    const id = ev.eventid || ev.id || ev.eventcode || ev.eventname || ev.name || '';
     if (id) {
       localStorage.setItem('acc_selected_event_id', String(id));
       localStorage.setItem('selected_audit_event_id', String(id));
@@ -84,14 +84,14 @@ export default function EventTabs({ selectedEventId, onChange }) {
     <div className="w-full border-b-2 border-slate-300 px-1">
       <div className="flex items-end justify-start gap-4 flex-nowrap overflow-x-auto">
         {events.map(ev => {
-          const id = ev.EventID || ev.id || ev.EventCode || '';
-          const isActive = String(id) === String(selectedEventId);
-          const fullName = ev.EventCode || ev.EventName || ev.name || '';
+          const id = ev.eventid || ev.id || ev.eventcode || '';
+          const isactive = String(id) === String(selectedEventId);
+          const fullName = ev.eventcode || ev.eventname || ev.name || '';
           return (
             <button
               key={id || JSON.stringify(ev)}
               onClick={() => handleSelect(ev)}
-              className={`relative -mb-[2px] h-8 whitespace-nowrap border-b-4 px-0.5 text-xs transition-colors ${isActive ? 'border-blue-600 font-medium text-slate-900' : 'border-transparent font-normal text-slate-600 hover:text-slate-800'}`}
+              className={`relative -mb-[2px] h-8 whitespace-nowrap border-b-4 px-0.5 text-xs transition-colors ${isactive ? 'border-blue-600 font-medium text-slate-900' : 'border-transparent font-normal text-slate-600 hover:text-slate-800'}`}
             >
               <span>{fullName}</span>
             </button>

@@ -30,8 +30,8 @@ const wrapLines = (text, maxLen, maxLines) => {
 	return lines;
 };
 
-const renderDocxThumbSvg = (fileName, rawText) => {
-	const title = String(fileName || 'Document').slice(0, 28);
+const renderDocxThumbSvg = (filename, rawText) => {
+	const title = String(filename || 'Document').slice(0, 28);
 	const lines = wrapLines(rawText, 34, 6);
 	const textEls = lines
 		.map((l, idx) => {
@@ -54,10 +54,10 @@ const renderDocxThumbSvg = (fileName, rawText) => {
 </svg>`);
 };
 
-const renderXlsxThumbSvg = (fileName, workbook) => {
+const renderXlsxThumbSvg = (filename, workbook) => {
 	const sheetName = workbook?.SheetNames?.[0];
 	const sheet = sheetName ? workbook.Sheets[sheetName] : null;
-	const title = String(fileName || sheetName || 'Spreadsheet').slice(0, 26);
+	const title = String(filename || sheetName || 'Spreadsheet').slice(0, 26);
 
 	const maxRows = 6;
 	const maxCols = 4;
@@ -135,7 +135,7 @@ export default function SubmissionViewer({
 	onClose,
 	requirement,
 	users = [],
-	officeId,
+	officeid,
 	onCommentSaved,
 	currentUser,
 	onViewUserFile,
@@ -153,8 +153,8 @@ export default function SubmissionViewer({
 	unsubmittingFile = false,
 }) {
 	const { showConfirm } = useModal();
-	const isViewerAuditor = Number(viewerRoleId || currentUser?.RoleID || 0) === 4 ||
-		String(currentUser?.RoleName || '').toLowerCase().includes('auditor') ||
+	const isViewerAuditor = Number(viewerRoleId || currentUser?.roleid || 0) === 4 ||
+		String(currentUser?.rolename || '').toLowerCase().includes('auditor') ||
 		String(currentUser?.Position || '').toLowerCase().includes('auditor') ||
 		Boolean(currentUser?.isExternalAuditor);
 
@@ -185,19 +185,19 @@ export default function SubmissionViewer({
 	const activeRequirement = show ? requirement : cachedRequirement;
 	const activeUsers = show ? users : cachedUsers;
 
-	const requirementId = activeRequirement?.RequirementID;
-	const title = activeRequirement?.RequirementTitle || activeRequirement?.Title || activeRequirement?.RequirementCode || 'Submission';
+	const requirementid = activeRequirement?.requirementid;
+	const title = activeRequirement?.RequirementTitle || activeRequirement?.Title || activeRequirement?.requirementcode || 'Submission';
 
 	const assignedCount = activeUsers.length;
 	const turnedInCount = activeUsers.reduce(
-		(acc, u) => acc + ((u?.HasUploaded === 1 || u?.HasUploaded === true) ? 1 : 0),
+		(acc, u) => acc + ((u?.hasuploaded === 1 || u?.hasuploaded === true) ? 1 : 0),
 		0
 	);
 
 	const uploadedUserIds = useMemo(() => {
 		return (activeUsers || [])
-			.filter((u) => (u?.HasUploaded === 1 || u?.HasUploaded === true) && u?.UserID)
-			.map((u) => Number(u.UserID))
+			.filter((u) => (u?.hasuploaded === 1 || u?.hasuploaded === true) && u?.userid)
+			.map((u) => Number(u.userid))
 			.filter((id) => Number.isFinite(id) && id > 0);
 	}, [activeUsers]);
 	const uploadedUserIdsKey = uploadedUserIds.join(',');
@@ -215,7 +215,7 @@ export default function SubmissionViewer({
 	const lastThumbKeyRef = useRef('');
 	const thumbByUserIdRef = useRef({});
 	const thumbLoadingByUserIdRef = useRef({});
-	const shouldRenderPrivateCommentSection = !!(showPrivateComments && (canEditPrivateComments || String(savedComment || '').trim()));
+	const shouldRenderPrivateCommentSection = !isViewerAuditor && !!(showPrivateComments && (canEditPrivateComments || String(savedComment || '').trim()));
 
 	const { toast } = useToast();
 
@@ -225,7 +225,7 @@ export default function SubmissionViewer({
 		setSavedCommentAt(null);
 		setCommentInput('');
 		setCommentStatus('');
-	}, [show, requirementId]);
+	}, [show, requirementid]);
 
 	useEffect(() => {
 		thumbByUserIdRef.current = thumbByUserId;
@@ -235,7 +235,7 @@ export default function SubmissionViewer({
 	}, [thumbLoadingByUserId]);
 
 	useEffect(() => {
-		if (!show || !requirementId || uploadedUserIds.length === 0) {
+		if (!show || !requirementid || uploadedUserIds.length === 0) {
 			setFileByUserId({});
 			setFilesByUserId({});
 			setLoadingByUserId({});
@@ -253,7 +253,7 @@ export default function SubmissionViewer({
 		const initialLoadingMap = {};
 
 		uploadedUserIds.forEach((id) => {
-			const cacheKey = CacheKeys.userFiles(requirementId, id, officeId);
+			const cacheKey = CacheKeys.userFiles(requirementid, id, officeid);
 			const cached = dataCache.get(cacheKey);
 			if (cached && Array.isArray(cached) && cached.length > 0) {
 				initialFilesMap[id] = cached;
@@ -271,12 +271,12 @@ export default function SubmissionViewer({
 		setThumbLoadingByUserId({});
 		lastThumbKeyRef.current = '';
 
-		const fetchUserFile = async (userId) => {
+		const fetchUserFile = async (userid) => {
 			try {
 				const token = localStorage.getItem('token');
 				const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
 				const res = await fetch(
-					`${API_BASE_URL}/api/requirements/${requirementId}/user-file/${userId}${officeId ? `?officeId=${officeId}` : ''}`,
+					`${API_BASE_URL}/api/requirements/${requirementid}/user-file/${userid}${officeid ? `?officeid=${officeid}` : ''}`,
 					{ headers, signal: controller.signal }
 				);
 				if (!res.ok) {
@@ -291,18 +291,18 @@ export default function SubmissionViewer({
 						: (data.file ? [data.file] : []);
 					
 					// Save in dataCache
-					dataCache.set(CacheKeys.userFiles(requirementId, userId, officeId), list);
+					dataCache.set(CacheKeys.userFiles(requirementid, userid, officeid), list);
 
-					setFilesByUserId((prev) => ({ ...prev, [userId]: list }));
+					setFilesByUserId((prev) => ({ ...prev, [userid]: list }));
 					if (data.file || list.length > 0) {
-						setFileByUserId((prev) => ({ ...prev, [userId]: data.file || list[list.length - 1] }));
+						setFileByUserId((prev) => ({ ...prev, [userid]: data.file || list[list.length - 1] }));
 					}
 				}
 			} catch (e) {
 				// ignore
 			} finally {
 				if (!cancelled) {
-					setLoadingByUserId((prev) => ({ ...prev, [userId]: false }));
+					setLoadingByUserId((prev) => ({ ...prev, [userid]: false }));
 				}
 			}
 		};
@@ -325,17 +325,17 @@ export default function SubmissionViewer({
 			cancelled = true;
 			controller.abort();
 		};
-	}, [show, requirementId, officeId, uploadedUserIdsKey]);
+	}, [show, requirementid, officeid, uploadedUserIdsKey]);
 
 	// Real-time live synchronization for evidence files while drawer is open
 	useLiveRefresh(async () => {
-		if (!show || !requirementId || uploadedUserIds.length === 0) return;
-		for (const userId of uploadedUserIds) {
+		if (!show || !requirementid || uploadedUserIds.length === 0) return;
+		for (const userid of uploadedUserIds) {
 			try {
 				const token = localStorage.getItem('token');
 				const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
 				const res = await fetch(
-					`${API_BASE_URL}/api/requirements/${requirementId}/user-file/${userId}${officeId ? `?officeId=${officeId}` : ''}`,
+					`${API_BASE_URL}/api/requirements/${requirementid}/user-file/${userid}${officeid ? `?officeid=${officeid}` : ''}`,
 					{ headers }
 				);
 				if (res.ok) {
@@ -344,10 +344,10 @@ export default function SubmissionViewer({
 						const list = Array.isArray(data.files) && data.files.length > 0 
 							? data.files 
 							: (data.file ? [data.file] : []);
-						dataCache.set(CacheKeys.userFiles(requirementId, userId, officeId), list);
-						setFilesByUserId((prev) => ({ ...prev, [userId]: list }));
+						dataCache.set(CacheKeys.userFiles(requirementid, userid, officeid), list);
+						setFilesByUserId((prev) => ({ ...prev, [userid]: list }));
 						if (data.file || list.length > 0) {
-							setFileByUserId((prev) => ({ ...prev, [userId]: data.file || list[list.length - 1] }));
+							setFileByUserId((prev) => ({ ...prev, [userid]: data.file || list[list.length - 1] }));
 						}
 					}
 				}
@@ -355,15 +355,15 @@ export default function SubmissionViewer({
 				// ignore
 			}
 		}
-	}, { entityTypes: ['requirements', 'compliance', 'documents', 'all'], deps: [show, requirementId, officeId, uploadedUserIdsKey] });
+	}, { entityTypes: ['requirements', 'compliance', 'documents', 'all'], deps: [show, requirementid, officeid, uploadedUserIdsKey] });
 
 	// Listen for immediate local review and update events to update file review statuses with 0ms delay
 	useEffect(() => {
 		const handleReviewed = (e) => {
-			const { reqId, fileId, status, userId, reason, resData } = e.detail || {};
-			if (reqId && Number(reqId) !== Number(requirementId)) return;
+			const { reqId, fileId, status, userid, reason, resData } = e.detail || {};
+			if (reqId && Number(reqId) !== Number(requirementid)) return;
 
-			const targetUserId = userId ? Number(userId) : null;
+			const targetUserId = userid ? Number(userid) : null;
 			if (targetUserId) {
 				setFilesByUserId((prev) => {
 					const existing = prev[targetUserId] || [];
@@ -371,16 +371,16 @@ export default function SubmissionViewer({
 						if (Number(f.id) === Number(fileId)) {
 							return {
 								...f,
-								reviewStatus: status,
-								rejectionReason: status === 'rejected' ? reason : (f.rejectionReason || ''),
+								reviewstatus: status,
+								rejectionreason: status === 'rejected' ? reason : (f.rejectionreason || ''),
 								comment: reason || f.comment,
 								...(resData || {})
 							};
 						}
 						return f;
 					});
-					if (requirementId) {
-						dataCache.set(CacheKeys.userFiles(requirementId, targetUserId), updated);
+					if (requirementid) {
+						dataCache.set(CacheKeys.userFiles(requirementid, targetUserId), updated);
 					}
 					return { ...prev, [targetUserId]: updated };
 				});
@@ -390,8 +390,8 @@ export default function SubmissionViewer({
 					if (f && Number(f.id) === Number(fileId)) {
 						const updated = {
 							...f,
-							reviewStatus: status,
-							rejectionReason: status === 'rejected' ? reason : (f.rejectionReason || ''),
+							reviewstatus: status,
+							rejectionreason: status === 'rejected' ? reason : (f.rejectionreason || ''),
 							comment: reason || f.comment,
 							...(resData || {})
 						};
@@ -400,7 +400,7 @@ export default function SubmissionViewer({
 					return prev;
 				});
 			} else {
-				// If userId wasn't specified, scan all users
+				// If userid wasn't specified, scan all users
 				setFilesByUserId((prev) => {
 					let changed = false;
 					const next = { ...prev };
@@ -411,13 +411,13 @@ export default function SubmissionViewer({
 							changed = true;
 							next[uid] = list.map((f) => Number(f.id) === Number(fileId) ? {
 								...f,
-								reviewStatus: status,
-								rejectionReason: status === 'rejected' ? reason : (f.rejectionReason || ''),
+								reviewstatus: status,
+								rejectionreason: status === 'rejected' ? reason : (f.rejectionreason || ''),
 								comment: reason || f.comment,
 								...(resData || {})
 							} : f);
-							if (requirementId) {
-								dataCache.set(CacheKeys.userFiles(requirementId, uid), next[uid]);
+							if (requirementid) {
+								dataCache.set(CacheKeys.userFiles(requirementid, uid), next[uid]);
 							}
 						}
 					});
@@ -427,16 +427,16 @@ export default function SubmissionViewer({
 		};
 
 		const handleFileUpdated = (e) => {
-			const { reqId, userId, files } = e.detail || {};
-			if (reqId && Number(reqId) !== Number(requirementId)) return;
-			if (userId && Array.isArray(files)) {
-				const uid = Number(userId);
+			const { reqId, userid, files } = e.detail || {};
+			if (reqId && Number(reqId) !== Number(requirementid)) return;
+			if (userid && Array.isArray(files)) {
+				const uid = Number(userid);
 				setFilesByUserId((prev) => ({ ...prev, [uid]: files }));
 				if (files.length > 0) {
 					setFileByUserId((prev) => ({ ...prev, [uid]: files[files.length - 1] }));
 				}
-				if (requirementId) {
-					dataCache.set(CacheKeys.userFiles(requirementId, uid), files);
+				if (requirementid) {
+					dataCache.set(CacheKeys.userFiles(requirementid, uid), files);
 				}
 			}
 		};
@@ -447,10 +447,10 @@ export default function SubmissionViewer({
 			window.removeEventListener('evidence-file-reviewed', handleReviewed);
 			window.removeEventListener('evidence-file-updated', handleFileUpdated);
 		};
-	}, [requirementId]);
+	}, [requirementid]);
 
 	const handleSaveComment = async () => {
-		if (!show || !requirementId || !officeId) return;
+		if (!show || !requirementid || !officeid) return;
 		const next = String(commentInput || '').trim();
 		if (!next) return;
 		setSavingComment(true);
@@ -462,12 +462,12 @@ export default function SubmissionViewer({
 				...(token ? { Authorization: `Bearer ${token}` } : {})
 			};
 			const res = await fetch(
-				`${API_BASE_URL}/api/offices/${officeId}/requirements/${requirementId}/status`,
+				`${API_BASE_URL}/api/offices/${officeid}/requirements/${requirementid}/status`,
 				{
 					method: 'PUT',
 					headers,
 					body: JSON.stringify({
-						statusId: requirement?.ComplianceStatusID || 3,
+						statusid: requirement?.ComplianceStatusID || 3,
 						comments: commentInput
 					})
 				}
@@ -491,7 +491,7 @@ export default function SubmissionViewer({
 	};
 
 	const handleClearComment = async () => {
-		if (!show || !requirementId || !officeId || !canEditPrivateComments || !savedComment) return;
+		if (!show || !requirementid || !officeid || !canEditPrivateComments || !savedComment) return;
 		const ok = await showConfirm('Clear this comment? This cannot be undone.');
 		if (!ok) return;
 
@@ -504,12 +504,12 @@ export default function SubmissionViewer({
 				...(token ? { Authorization: `Bearer ${token}` } : {})
 			};
 			const res = await fetch(
-				`${API_BASE_URL}/api/offices/${officeId}/requirements/${requirementId}/status`,
+				`${API_BASE_URL}/api/offices/${officeid}/requirements/${requirementid}/status`,
 				{
 					method: 'PUT',
 					headers,
 					body: JSON.stringify({
-						statusId: requirement?.ComplianceStatusID || 3,
+						statusid: requirement?.ComplianceStatusID || 3,
 						comments: ''
 					})
 				}
@@ -533,18 +533,18 @@ export default function SubmissionViewer({
 	};
 
 	// 'Your Work' view only when there's exactly one assigned user, viewer is allowed work actions, and the user is currentUser
-	const isCurrentUserSingleUser = users.length === 1 && users.some(u => Number(u?.UserID) === Number(currentUser?.UserID));
+	const isCurrentUserSingleUser = users.length === 1 && users.some(u => Number(u?.userid) === Number(currentUser?.userid));
 	const isYourWorkView = Boolean(allowWorkActions) && !canEditPrivateComments && isCurrentUserSingleUser;
 	const isReadOnlyWorkView = !allowWorkActions;
 	const workUser = isYourWorkView
-		? (users.length === 1 ? users[0] : users.find(u => Number(u?.UserID) === Number(currentUser?.UserID)))
+		? (users.length === 1 ? users[0] : users.find(u => Number(u?.userid) === Number(currentUser?.userid)))
 		: null;
-	const workUserId = workUser?.UserID ? Number(workUser.UserID) : null;
+	const workUserId = workUser?.userid ? Number(workUser.userid) : null;
 	const workFile = workUserId ? fileByUserId[workUserId] : null;
 	const workFiles = workUserId ? (filesByUserId[workUserId] || (workFile ? [workFile] : [])) : [];
 	const workHasUploaded = workUserId && filesByUserId[workUserId] !== undefined
 		? filesByUserId[workUserId].length > 0
-		: (workUser?.HasUploaded === 1 || workUser?.HasUploaded === true || workFiles.length > 0);
+		: (workUser?.hasuploaded === 1 || workUser?.hasuploaded === true || workFiles.length > 0);
 	const workThumb = workUserId ? thumbByUserId[workUserId] : null;
 	const workLoadingFile = workUserId ? loadingByUserId[workUserId] : false;
 	const workLoadingThumb = workUserId ? thumbLoadingByUserId[workUserId] : false;
@@ -562,7 +562,7 @@ export default function SubmissionViewer({
 		return uploadedUserIds
 			.map((id) => {
 				const f = fileByUserId[id];
-				return f ? `${id}:${f.url || ''}:${f.fileName || ''}` : `${id}:`;
+				return f ? `${id}:${f.url || ''}:${f.filename || ''}` : `${id}:`;
 			})
 			.join('|');
 	}, [uploadedUserIdsKey, fileByUserId]);
@@ -589,25 +589,25 @@ export default function SubmissionViewer({
 	const handleUploadAndRefresh = async (e) => {
 		if (!onFileUpload || !currentUser) return;
 		try {
-			await onFileUpload(e, requirementId);
+			await onFileUpload(e, requirementid);
 		} catch (err) {
 			console.error('Upload handler error', err);
 			toast?.({ title: 'Upload failed', description: err?.message || 'Failed to upload files', variant: 'error', duration: 2500 });
 		}
 		// After upload completes, fetch the user's files for this requirement
 		try {
-			const userId = Number(currentUser.UserID);
-			if (!userId) return;
+			const userid = Number(currentUser.userid);
+			if (!userid) return;
 			const token = localStorage.getItem('token');
 			const headers = token ? { Authorization: `Bearer ${token}` } : {};
-			const res = await fetch(`${API_BASE_URL}/api/requirements/${requirementId}/user-file/${userId}${officeId ? `?officeId=${officeId}` : ''}`, { headers });
+			const res = await fetch(`${API_BASE_URL}/api/requirements/${requirementid}/user-file/${userid}${officeid ? `?officeid=${officeid}` : ''}`, { headers });
 			if (!res.ok) return;
 			const data = await res.json();
 			if (data?.success) {
 				const list = Array.isArray(data.files) && data.files.length > 0 ? data.files : (data.file ? [data.file] : []);
-				dataCache.set(CacheKeys.userFiles(requirementId, userId, officeId), list);
-				setFilesByUserId((prev) => ({ ...prev, [userId]: list }));
-				if (list.length > 0) setFileByUserId((prev) => ({ ...prev, [userId]: list[list.length - 1] }));
+				dataCache.set(CacheKeys.userFiles(requirementid, userid, officeid), list);
+				setFilesByUserId((prev) => ({ ...prev, [userid]: list }));
+				if (list.length > 0) setFileByUserId((prev) => ({ ...prev, [userid]: list[list.length - 1] }));
 				toast?.({ title: 'Upload complete', description: 'Your files are now available', variant: 'success', duration: 1800 });
 			}
 		} catch (err) {
@@ -616,10 +616,10 @@ export default function SubmissionViewer({
 	};
 
 	useEffect(() => {
-		if (!show || !requirementId || uploadedUserIds.length === 0) return;
+		if (!show || !requirementid || uploadedUserIds.length === 0) return;
 		if (!fileByUserIdKey) return;
 
-		const thumbKey = `${requirementId}:${uploadedUserIdsKey}:${fileByUserIdKey}`;
+		const thumbKey = `${requirementid}:${uploadedUserIdsKey}:${fileByUserIdKey}`;
 		if (lastThumbKeyRef.current === thumbKey) return;
 		lastThumbKeyRef.current = thumbKey;
 
@@ -664,38 +664,38 @@ export default function SubmissionViewer({
 		const makeXlsxThumb = async (file) => {
 			const buf = await fetchArrayBuffer(file.url);
 			const wb = XLSX.read(buf, { type: 'array' });
-			return renderXlsxThumbSvg(file.fileName, wb);
+			return renderXlsxThumbSvg(file.filename, wb);
 		};
 
 		const makeDocxThumb = async (file) => {
 			const buf = await fetchArrayBuffer(file.url);
 			const { value } = await mammoth.extractRawText({ arrayBuffer: buf });
-			return renderDocxThumbSvg(file.fileName, value);
+			return renderDocxThumbSvg(file.filename, value);
 		};
 
-		const generateForUser = async (userId) => {
-			const file = fileByUserId[userId];
+		const generateForUser = async (userid) => {
+			const file = fileByUserId[userid];
 			if (!file?.url) return;
-			const ext = getExtension(file.fileName || file.url);
+			const ext = getExtension(file.filename || file.url);
 			if (isImageExt(ext)) return;
 			if (!isPdfExt(ext) && !isDocxExt(ext) && !isXlsxExt(ext)) return;
-			if (thumbByUserIdRef.current[userId] || thumbLoadingByUserIdRef.current[userId]) return;
-			if (inFlight.has(userId)) return;
-			inFlight.add(userId);
+			if (thumbByUserIdRef.current[userid] || thumbLoadingByUserIdRef.current[userid]) return;
+			if (inFlight.has(userid)) return;
+			inFlight.add(userid);
 
-			setThumbLoadingByUserId((prev) => ({ ...prev, [userId]: true }));
+			setThumbLoadingByUserId((prev) => ({ ...prev, [userid]: true }));
 			try {
 				let thumb;
 				if (isPdfExt(ext)) thumb = await makePdfThumb(file);
 				else if (isXlsxExt(ext)) thumb = await makeXlsxThumb(file);
 				else if (isDocxExt(ext)) thumb = await makeDocxThumb(file);
 				if (cancelled) return;
-				if (thumb) setThumbByUserId((prev) => ({ ...prev, [userId]: thumb }));
+				if (thumb) setThumbByUserId((prev) => ({ ...prev, [userid]: thumb }));
 			} catch (e) {
 				// ignore; fallback UI remains
 			} finally {
-				inFlight.delete(userId);
-				if (!cancelled) setThumbLoadingByUserId((prev) => ({ ...prev, [userId]: false }));
+				inFlight.delete(userid);
+				if (!cancelled) setThumbLoadingByUserId((prev) => ({ ...prev, [userid]: false }));
 			}
 		};
 
@@ -718,7 +718,7 @@ export default function SubmissionViewer({
 			cancelled = true;
 			controller.abort();
 		};
-	}, [show, requirementId, uploadedUserIdsKey, fileByUserIdKey]);
+	}, [show, requirementid, uploadedUserIdsKey, fileByUserIdKey]);
 
 	if (!shouldRender) return null;
 
@@ -768,9 +768,9 @@ export default function SubmissionViewer({
 
 						{isYourWorkView && (
 							<YourWorkFileUpload
-								requirementId={requirementId}
-								userId={workUserId}
-								hasUploaded={workHasUploaded || workFiles.length > 0}
+								requirementid={requirementid}
+								userid={workUserId}
+								hasuploaded={workHasUploaded || workFiles.length > 0}
 								file={workFile}
 								files={workFiles}
 								thumb={workThumb}
@@ -784,8 +784,8 @@ export default function SubmissionViewer({
 										if (newFiles && newFiles.length > 0) {
 											setFileByUserId((prev) => ({ ...prev, [workUserId]: newFiles[newFiles.length - 1] }));
 										}
-										if (requirementId) {
-											dataCache.set(CacheKeys.userFiles(requirementId, workUserId), newFiles);
+										if (requirementid) {
+											dataCache.set(CacheKeys.userFiles(requirementid, workUserId), newFiles);
 										}
 									}
 								}}
@@ -794,10 +794,10 @@ export default function SubmissionViewer({
 										if (!newFile || !workUserId) return;
 										setFilesByUserId((prev) => {
 											const existing = prev[workUserId] || [];
-											const exists = existing.some((f) => ((f.id && newFile.id && f.id === newFile.id) || (f.fileName && newFile.fileName && f.fileName === newFile.fileName)));
+											const exists = existing.some((f) => ((f.id && newFile.id && f.id === newFile.id) || (f.filename && newFile.filename && f.filename === newFile.filename)));
 											const updated = exists ? existing : [...existing, newFile];
-											if (requirementId) {
-												dataCache.set(CacheKeys.userFiles(requirementId, workUserId), updated);
+											if (requirementid) {
+												dataCache.set(CacheKeys.userFiles(requirementid, workUserId), updated);
 											}
 											return {
 												...prev,
@@ -822,12 +822,12 @@ export default function SubmissionViewer({
 											const updated = currentList.filter((f) => {
 												if (fileId && f.id && String(f.id) === String(fileId)) return false;
 												if (fileId && f.fileId && String(f.fileId) === String(fileId)) return false;
-												if (fileId && f.fileName && f.fileName === fileId) return false;
+												if (fileId && f.filename && f.filename === fileId) return false;
 												return true;
 											});
-											if (requirementId) {
-												dataCache.set(CacheKeys.userFiles(requirementId, workUserId, officeId), updated);
-												dataCache.set(CacheKeys.userFiles(requirementId, workUserId), updated);
+											if (requirementid) {
+												dataCache.set(CacheKeys.userFiles(requirementid, workUserId, officeid), updated);
+												dataCache.set(CacheKeys.userFiles(requirementid, workUserId), updated);
 											}
 											return {
 												...prev,
@@ -839,7 +839,7 @@ export default function SubmissionViewer({
 											if (!curr) return prev;
 											const matches = (fileId && curr.id && String(curr.id) === String(fileId)) ||
 															(fileId && curr.fileId && String(curr.fileId) === String(fileId)) ||
-															(fileId && curr.fileName && curr.fileName === fileId);
+															(fileId && curr.filename && curr.filename === fileId);
 											if (matches) {
 												return { ...prev, [workUserId]: null };
 											}
@@ -853,15 +853,15 @@ export default function SubmissionViewer({
 										setFilesByUserId((prev) => ({
 											...prev,
 											[workUserId]: (prev[workUserId] || []).map((f) =>
-												((f.id && fileId && f.id === fileId) || f.fileName === fileId)
-													? { ...f, displayName: newDisplayName }
+												((f.id && fileId && f.id === fileId) || f.filename === fileId)
+													? { ...f, displayname: newDisplayName }
 													: f
 											)
 										}));
 										setFileByUserId((prev) => {
 											const curr = prev[workUserId];
-											if (curr && ((curr.id && fileId && curr.id === fileId) || curr.fileName === fileId)) {
-												return { ...prev, [workUserId]: { ...curr, displayName: newDisplayName } };
+											if (curr && ((curr.id && fileId && curr.id === fileId) || curr.filename === fileId)) {
+												return { ...prev, [workUserId]: { ...curr, displayname: newDisplayName } };
 											}
 											return prev;
 										});
@@ -873,7 +873,7 @@ export default function SubmissionViewer({
 										setFilesByUserId((prev) => ({
 											...prev,
 											[workUserId]: (prev[workUserId] || []).map((f) =>
-												((f.id && fileId && f.id === fileId) || f.fileName === fileId)
+												((f.id && fileId && f.id === fileId) || f.filename === fileId)
 													? { ...f, comment: newComment }
 													: f
 											)
@@ -883,7 +883,7 @@ export default function SubmissionViewer({
 								}}
 								onViewFile={
 									workHasUploaded && onViewUserFile && workUser
-										? (item) => onViewUserFile(workUser, requirementId, item)
+										? (item) => onViewUserFile(workUser, requirementid, item)
 										: undefined
 								}
 								readOnly={isReadOnlyWorkView}
@@ -896,29 +896,29 @@ export default function SubmissionViewer({
 							<div className="mt-3 pr-1">
 								<div className="flex flex-col gap-3">
 									{users.map((u) => {
-										const displayName = `${u?.FirstName || ''}${u?.LastName ? ' ' + u.LastName : ''}`.trim() || u?.Username || 'User';
-										const userId = u?.UserID ? Number(u.UserID) : null;
-										const cachedFiles = (userId && requirementId) ? dataCache.get(CacheKeys.userFiles(requirementId, userId)) : null;
-										const userFiles = (userId && filesByUserId[userId] && filesByUserId[userId].length > 0)
-											? filesByUserId[userId]
+										const displayname = `${u?.firstname || ''}${u?.lastname ? ' ' + u.lastname : ''}`.trim() || u?.Username || 'User';
+										const userid = u?.userid ? Number(u.userid) : null;
+										const cachedFiles = (userid && requirementid) ? dataCache.get(CacheKeys.userFiles(requirementid, userid)) : null;
+										const userFiles = (userid && filesByUserId[userid] && filesByUserId[userid].length > 0)
+											? filesByUserId[userid]
 											: (cachedFiles && Array.isArray(cachedFiles) && cachedFiles.length > 0)
 											? cachedFiles
 											: (u?.userFiles && Array.isArray(u.userFiles) && u.userFiles.length > 0)
 											? u.userFiles
-											: (userId && fileByUserId[userId] ? [fileByUserId[userId]] : []);
-										const hasUploaded = (userId && filesByUserId[userId] !== undefined)
-											? filesByUserId[userId].length > 0
-											: (userFiles.length > 0 || u?.HasUploaded === 1 || u?.HasUploaded === true);
+											: (userid && fileByUserId[userid] ? [fileByUserId[userid]] : []);
+										const hasuploaded = (userid && filesByUserId[userid] !== undefined)
+											? filesByUserId[userid].length > 0
+											: (userFiles.length > 0 || u?.hasuploaded === 1 || u?.hasuploaded === true);
 
 										return (
 											<div
-												key={u?.UserID || displayName}
+												key={u?.userid || displayname}
 												className="w-full overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xs cursor-pointer transition hover:border-blue-400 hover:shadow-md hover:bg-blue-50/20"
 												onClick={() => {
 													if (onViewUserFilesModal) {
-														onViewUserFilesModal(u, requirementId, userFiles);
+														onViewUserFilesModal(u, requirementid, userFiles);
 													} else {
-														onViewUserFile?.(u, requirementId);
+														onViewUserFile?.(u, requirementid);
 													}
 												}}
 												role="button"
@@ -926,8 +926,8 @@ export default function SubmissionViewer({
 											>
 												<div className="flex items-center justify-between">
 													{(() => {
-														const approvedCount = userFiles.filter(f => f.reviewStatus === 'approved').length;
-														const rejectedCount = userFiles.filter(f => f.reviewStatus === 'rejected').length;
+														const approvedCount = userFiles.filter(f => f.reviewstatus === 'approved').length;
+														const rejectedCount = userFiles.filter(f => f.reviewstatus === 'rejected').length;
 														const isAllApproved = approvedCount === userFiles.length && userFiles.length > 0;
 														const isPartialApproved = approvedCount > 0 && !isAllApproved;
 														const hasRejected = rejectedCount > 0;
@@ -935,7 +935,7 @@ export default function SubmissionViewer({
 														let borderColor = 'border-slate-200';
 														let badge = null;
 
-														if (hasUploaded) {
+														if (hasuploaded && !isViewerAuditor) {
 															if (hasRejected) {
 																borderColor = 'border-rose-400';
 																badge = (
@@ -989,9 +989,9 @@ export default function SubmissionViewer({
 																	{badge}
 																</div>
 																<div className="min-w-0">
-																	<div className="truncate text-xs font-bold text-slate-800">{displayName}</div>
+																	<div className="truncate text-xs font-bold text-slate-800">{displayname}</div>
 																	<div className="mt-0.5 truncate text-[11px] font-medium text-slate-500">
-																		{hasUploaded ? `${userFiles.length} standard file(s) uploaded` : 'Assigned (Pending upload)'}
+																		{hasuploaded ? `${userFiles.length} standard file(s) uploaded` : (isViewerAuditor ? 'Assigned' : 'Assigned (Pending upload)')}
 																	</div>
 																</div>
 															</div>
@@ -1000,15 +1000,16 @@ export default function SubmissionViewer({
 
 													<div className="flex items-center gap-2">
 														{(() => {
-															if (!hasUploaded) {
+															if (isViewerAuditor) return null;
+															if (!hasuploaded) {
 																return (
 																	<span className="shrink-0 rounded-full px-3 py-1 text-[11px] font-bold bg-slate-100 text-slate-500">
 																		Assigned
 																	</span>
 																);
 															}
-															const approvedCount = userFiles.filter(f => f.reviewStatus === 'approved').length;
-															const rejectedCount = userFiles.filter(f => f.reviewStatus === 'rejected').length;
+															const approvedCount = userFiles.filter(f => f.reviewstatus === 'approved').length;
+															const rejectedCount = userFiles.filter(f => f.reviewstatus === 'rejected').length;
 															const isAllApproved = approvedCount === userFiles.length && userFiles.length > 0;
 															const isPartialApproved = approvedCount > 0 && !isAllApproved;
 															const hasRejected = rejectedCount > 0;
@@ -1051,10 +1052,10 @@ export default function SubmissionViewer({
 									})}
 
 									{/* Single upload control placed below the user list for auditors to add files */}
-									{allowWorkActions && currentUser && onFileUpload && users.some((uu) => Number(uu?.UserID) === Number(currentUser?.UserID)) && (
+									{allowWorkActions && currentUser && onFileUpload && users.some((uu) => Number(uu?.userid) === Number(currentUser?.userid)) && (
 										<div className="mt-2 px-0">
 											<input
-												id={`user-upload-${requirementId}-${currentUser?.UserID}`}
+												id={`user-upload-${requirementid}-${currentUser?.userid}`}
 												type="file"
 												accept=".pdf,.doc,.docx,.xlsx,.xls,.jpg,.jpeg,.png,.gif,.mp4,.webm,.ogg,.mov,.avi,.mkv"
 												multiple
@@ -1062,7 +1063,7 @@ export default function SubmissionViewer({
 												onChange={handleUploadAndRefresh}
 											/>
 											<label
-												htmlFor={`user-upload-${requirementId}-${currentUser?.UserID}`}
+												htmlFor={`user-upload-${requirementid}-${currentUser?.userid}`}
 												onClick={(e) => e.stopPropagation()}
 												className="mx-3 w-full cursor-pointer items-center justify-center rounded-xl border border-dashed border-blue-300 bg-blue-50/50 font-semibold text-blue-700 hover:border-blue-400 hover:bg-blue-100/60 transition-all flex px-4 py-2.5 text-xs gap-2"
 											>
@@ -1101,9 +1102,19 @@ export default function SubmissionViewer({
 													type="button"
 													onClick={handleClearComment}
 													disabled={savingComment}
-													className="rounded-md px-2 py-0.5 text-[11px] font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-40"
+													className="rounded-md px-2 py-0.5 text-[11px] font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-40 flex items-center gap-1"
 												>
-													Clear
+													{savingComment ? (
+														<>
+															<svg className="animate-spin h-3 w-3 text-rose-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+																<circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+																<path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+															</svg>
+															<span>Clearing...</span>
+														</>
+													) : (
+														'Clear'
+													)}
 												</button>
 											) : null}
 										</div>
@@ -1120,26 +1131,33 @@ export default function SubmissionViewer({
 											value={commentInput}
 											onChange={(e) => setCommentInput(e.target.value)}
 											onKeyDown={(e) => {
-												if (e.key === 'Enter') {
+												if (e.key === 'Enter' && !savingComment) {
 													e.preventDefault();
 													handleSaveComment();
 												}
 											}}
-											className="flex-1 bg-transparent outline-none text-[13px] text-gray-800 placeholder:text-gray-400"
-											placeholder="Add private comment..."
-											disabled={savingComment || !officeId}
+											className="flex-1 bg-transparent outline-none text-[13px] text-gray-800 placeholder:text-gray-400 disabled:opacity-50"
+											placeholder={savingComment ? "Saving comment..." : "Add private comment..."}
+											disabled={savingComment || !officeid}
 										/>
 										<button
 											type="button"
 											onClick={handleSaveComment}
-											disabled={savingComment || !officeId || !String(commentInput || '').trim()}
+											disabled={savingComment || !officeid || !String(commentInput || '').trim()}
 											className="h-8 w-8 rounded-full flex items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-40"
 											aria-label="Send private comment"
-											title={!officeId ? 'Office required' : 'Send'}
+											title={savingComment ? 'Saving...' : (!officeid ? 'Office required' : 'Send')}
 										>
-											<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-												<path d="M3 12L21 3l-6 18-2.7-7.3L3 12Z" fill="currentColor" />
-											</svg>
+											{savingComment ? (
+												<svg className="animate-spin h-4 w-4 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+													<circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+													<path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+												</svg>
+											) : (
+												<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+													<path d="M3 12L21 3l-6 18-2.7-7.3L3 12Z" fill="currentColor" />
+												</svg>
+											)}
 										</button>
 									</div>
 									{commentStatus === 'Failed to save' ? (

@@ -22,7 +22,7 @@ const server = http.createServer(app);
 const { initSocket, emitDataChange } = require('./socket');
 const io = initSocket(server);
 app.set('io', io);
-const port = 5000;
+const port = process.env.PORT || 5000;
 const cors = require('cors');
 const userRoutes = require('./routes/users');
 const userListRoutes = require('./routes/userlist');
@@ -39,6 +39,7 @@ const departmentsRoutes = require('./routes/departments');
 const programTypesRoutes = require('./routes/program_types');
 const masterlistRoutes = require('./routes/masterlist');
 const eventDepartmentsRoutes = require('./routes/eventDepartments');
+const personnelAssignmentsRoutes = require('./routes/personnelassignments');
 
 console.log('Backend started and logger active');
 
@@ -63,9 +64,9 @@ app.use('/uploads', (req, res, next) => {
         try {
             const token = authHeader.split(" ")[1];
             const decoded = jwt.verify(token, "MY_SECRET_KEY");
-            const roleId = Number(decoded.roleId);
+            const roleid = Number(decoded.roleid);
             
-            if (roleId === 4) {
+            if (roleid === 4) {
                 const isDownloadRequest = req.headers['sec-fetch-dest'] === 'download' || 
                                          req.query.download === '1' || 
                                          req.query.attachment === '1' ||
@@ -79,6 +80,8 @@ app.use('/uploads', (req, res, next) => {
     next();
 }, express.static('uploads'));
 app.use('/uploads/profile-pics', express.static('uploads/profile-pics'));
+app.use('/api/uploads/profile-pics', express.static('uploads/profile-pics'));
+app.use('/api/uploads', express.static('uploads'));
 /*const rolesRoutes = require('./routes/roles');
 const requirementsRoutes = require('./routes/requirements');
 const officetypesRoutes = require('./routes/officetypes');
@@ -99,11 +102,11 @@ app.use((req, res, next) => {
   res.on('finish', () => {
     try {
       if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
-        const userId = req.user?.userId || null;
+        const userid = req.user?.userid || null;
         const action = `${req.method} ${req.originalUrl}`;
         const details = JSON.stringify({ status: res.statusCode, body: req.body || null });
-        if (userId) {
-          recordLog(userId, action, details);
+        if (userid) {
+          recordLog(userid, action, details);
         }
 
         // Broadcast real-time change to all connected clients on successful mutation
@@ -172,17 +175,18 @@ app.use('/api/criteria', criteriaRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/logs', logsRoutes);
 app.use('/api/departments', departmentsRoutes);
-app.use('/api/program_types', programTypesRoutes);
+app.use('/api/programtypes', programTypesRoutes);
 app.use('/api/masterlist', masterlistRoutes);
 app.use('/api/event-departments', eventDepartmentsRoutes);
+app.use('/api/personnel-assignments', personnelAssignmentsRoutes);
 // Ensure basic roles exist on startup (Admin, User, Personnel)
 const db = require('./db');
 async function ensureRoles() {
   try {
-    const [rows] = await db.query('SELECT "RoleName" FROM roles WHERE "RoleName" IN (\'Admin\',\'User\',\'Personnel\')');
-    const existing = rows.map(r => r.RoleName);
+    const [rows] = await db.query('SELECT "rolename" FROM roles WHERE "rolename" IN (\'Admin\',\'User\',\'Personnel\')');
+    const existing = rows.map(r => r.rolename);
     if (!existing.includes('Personnel')) {
-      await db.query('INSERT INTO roles ("RoleName", "Description") VALUES (?, ?)', ['Personnel', 'Personnel role']);
+      await db.query('INSERT INTO roles ("rolename", "Description") VALUES (?, ?)', ['Personnel', 'Personnel role']);
       console.log('Inserted missing role: Personnel');
     }
   } catch (err) {

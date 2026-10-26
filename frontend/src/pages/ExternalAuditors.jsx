@@ -77,7 +77,7 @@ export default function ExternalAuditors() {
     const [serverError, setServerError] = useState(null);
     const [isRetrying, setIsRetrying] = useState(false);
 
-    // Fetch External Auditors (RoleID === 4 or position External Auditor)
+    // Fetch External Auditors (roleid === 4 or position External Auditor)
     const fetchAuditors = async (isRetry = false) => {
         try {
             if (isRetry) setIsRetrying(true);
@@ -89,18 +89,18 @@ export default function ExternalAuditors() {
             
             // Filter users where role is auditor or position is external auditor
             const auditorUsers = rawUsers.filter(u => {
-                const roleId = Number(u.RoleID ?? u.role_id ?? 0);
-                const roleName = String(u.RoleName ?? u.role_name ?? "").toLowerCase();
+                const roleid = Number(u.roleid ?? u.roleid ?? 0);
+                const rolename = String(u.rolename ?? u.rolename ?? "").toLowerCase();
                 const pos = String(u.Position ?? u.position ?? "").toLowerCase();
-                return roleId === 4 || roleName.includes("auditor") || pos.includes("external auditor") || pos.includes("auditor");
+                return roleid === 4 || rolename.includes("auditor") || pos.includes("external auditor") || pos.includes("auditor");
             }).map(u => ({
                 ...u,
-                UserID: u.UserID || u.id || u.user_id,
-                FirstName: u.FirstName || u.first_name || "",
-                LastName: u.LastName || u.last_name || "",
+                userid: u.userid || u.id || u.userid,
+                firstname: u.firstname || u.firstname || "",
+                lastname: u.lastname || u.lastname || "",
                 Email: u.Email || u.email || "",
-                assignedArea: u.assignedArea || u.assignedarea || u.assigned_area || u.AssignedAreas || u.assignedareas || u.area_name || u.AreaName || "",
-                lastActive: u.lastActive || u.last_active || u.updated_at || u.created_at || "Recent",
+                assignedArea: u.assignedArea || u.assignedarea || u.assigned_area || u.AssignedAreas || u.assignedareas || u.areaname || u.areaname || "",
+                lastActive: u.lastActive || u.last_active || u.updatedat || u.createdat || "Recent",
                 status: u.status || u.Status || "Active",
                 avatar: u.avatar || u.ProfileImage || u.profile_image || null
             }));
@@ -129,7 +129,7 @@ export default function ExternalAuditors() {
     const filteredAuditors = useMemo(() => {
         const q = searchTerm.trim().toLowerCase();
         return auditors.filter(person => {
-            const fullName = `${person.FirstName || ""} ${person.LastName || ""}`.toLowerCase();
+            const fullName = `${person.firstname || ""} ${person.lastname || ""}`.toLowerCase();
             const email = (person.Email || "").toLowerCase();
             const area = (person.assignedArea || "").toLowerCase();
             const matchesSearch = !q || fullName.includes(q) || email.includes(q) || area.includes(q);
@@ -145,9 +145,12 @@ export default function ExternalAuditors() {
     // Pagination calculations
     const totalPages = Math.max(1, Math.ceil(filteredAuditors.length / itemsPerPage));
     const visibleAuditors = useMemo(() => {
+        if (viewMode === 'list') {
+            return filteredAuditors;
+        }
         const startIdx = (currentPage - 1) * itemsPerPage;
         return filteredAuditors.slice(startIdx, startIdx + itemsPerPage);
-    }, [filteredAuditors, currentPage]);
+    }, [filteredAuditors, currentPage, viewMode]);
 
     useEffect(() => {
         setCurrentPage(1);
@@ -155,7 +158,7 @@ export default function ExternalAuditors() {
 
     const handleSelectAll = (checked) => {
         if (checked) {
-            setSelectedIds(visibleAuditors.map(a => a.UserID));
+            setSelectedIds(visibleAuditors.map(a => a.userid));
         } else {
             setSelectedIds([]);
         }
@@ -179,7 +182,7 @@ export default function ExternalAuditors() {
         try {
             const resp = await usersAPI.deleteUsers(selectedIds);
             if (resp && resp.success) {
-                setAuditors(prev => prev.filter(a => !selectedIds.includes(a.UserID)));
+                setAuditors(prev => prev.filter(a => !selectedIds.includes(a.userid)));
                 setSelectedIds([]);
                 setDeleteMode(false);
                 toast({
@@ -213,7 +216,7 @@ export default function ExternalAuditors() {
         setInviteCopied(false);
 
         try {
-            const response = await usersAPI.createRegistrationInvite({ roleId: 4, allowAnyEmail: true });
+            const response = await usersAPI.createRegistrationInvite({ roleid: 4, allowAnyEmail: true });
             if (!response.success || !response.inviteUrl) {
                 throw new Error(response.message || "Failed to generate invite link");
             }
@@ -379,9 +382,9 @@ export default function ExternalAuditors() {
                 </div>
             </div>
 
-            <div className="flex-1 overflow-hidden px-4 sm:px-6 pt-3 pb-8 flex flex-col min-h-0">
+            <div className={`flex-1 overflow-hidden px-4 sm:px-6 pt-3 ${viewMode === 'list' ? 'pb-3' : 'pb-8'} flex flex-col min-h-0`}>
                 {/* Main Content Area */}
-                <div className={`flex-1 min-h-0 ${viewMode === 'list' && !serverError && visibleAuditors.length > 0 ? 'overflow-y-auto' : 'flex flex-col h-full'}`}>
+                <div className={`flex-1 min-h-0 ${viewMode === 'list' && !serverError && visibleAuditors.length > 0 ? 'app-list-scroll overflow-x-auto pr-1' : 'flex flex-col h-full overflow-hidden'}`}>
                     {loading ? (
                         <div className="w-full">
                             <CardListSkeleton count={6} />
@@ -446,25 +449,25 @@ export default function ExternalAuditors() {
                                         )}
                                         <span>Auditor Name</span>
                                     </div>
-                                    <div className="col-span-2 flex items-center justify-center">Role</div>
-                                    <div className="col-span-3 flex items-center justify-center">Assigned Area</div>
-                                    <div className="col-span-2 flex items-center justify-center">Status</div>
+                                    <div className="col-span-2 flex items-center">Role</div>
+                                    <div className="col-span-3 flex items-center">Assigned Area</div>
+                                    <div className="col-span-2 flex items-center">Status</div>
                                     <div className="col-span-1 flex items-center justify-end">Actions</div>
                                 </div>
                             )}
 
-                            <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 grid-rows-3 gap-2 sm:gap-2.5 lg:gap-3 flex-1 min-h-0 h-full p-1' : 'space-y-2 pt-1 pb-16 min-w-[720px]'}>
+                            <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 grid-rows-3 gap-2 sm:gap-2.5 lg:gap-3 flex-1 min-h-0 h-full p-1 overflow-hidden' : 'space-y-2 pt-1 pb-3 min-w-[720px]'}>
                                 {visibleAuditors.map((auditor) => {
                                     const isAssigned = !!auditor.assignedArea;
-                                    const isSelected = selectedIds.includes(auditor.UserID);
-                                    const fullName = `${auditor.FirstName || ''} ${auditor.LastName || ''}`.trim() || 'Auditor';
+                                    const isSelected = selectedIds.includes(auditor.userid);
+                                    const fullName = `${auditor.firstname || ''} ${auditor.lastname || ''}`.trim() || 'Auditor';
 
                                     if (viewMode === 'list') {
                                         return (
                                             <div
-                                                key={auditor.UserID}
+                                                key={auditor.userid}
                                                 onClick={() => {
-                                                    if (deleteMode) handleToggleSelect(auditor.UserID);
+                                                    if (deleteMode) handleToggleSelect(auditor.userid);
                                                     else handleOpenDetails(auditor);
                                                 }}
                                                 className={`relative rounded-xl border border-slate-200 bg-white shadow-2xs ${
@@ -479,7 +482,7 @@ export default function ExternalAuditors() {
                                                                 <input
                                                                     type="checkbox"
                                                                     checked={isSelected}
-                                                                    onChange={() => handleToggleSelect(auditor.UserID)}
+                                                                    onChange={() => handleToggleSelect(auditor.userid)}
                                                                     onClick={(e) => e.stopPropagation()}
                                                                     className="h-4 w-4 rounded border-rose-300 text-rose-600 focus:ring-rose-500 cursor-pointer"
                                                                 />
@@ -505,14 +508,14 @@ export default function ExternalAuditors() {
                                                     </div>
 
                                                     {/* Role (col-span-2) */}
-                                                    <div className="col-span-2 flex items-center justify-center">
+                                                    <div className="col-span-2 flex items-center">
                                                         <span className="inline-flex items-center rounded-md border px-2.5 py-0.5 text-[10px] font-semibold bg-sky-50 text-sky-700 border-sky-200/60">
                                                             External Auditor
                                                         </span>
                                                     </div>
 
                                                     {/* Assigned Area (col-span-3) */}
-                                                    <div className="col-span-3 flex items-center justify-center min-w-0 px-2">
+                                                    <div className="col-span-3 flex items-center min-w-0">
                                                         {auditor.assignedArea ? (
                                                             <span 
                                                                 className="inline-flex items-center gap-1 max-w-full rounded-md bg-blue-50 border border-blue-200/60 px-2 py-0.5 text-[10px] font-semibold text-blue-700 truncate"
@@ -529,7 +532,7 @@ export default function ExternalAuditors() {
                                                     </div>
 
                                                     {/* Status (col-span-2) */}
-                                                    <div className="col-span-2 flex items-center justify-center">
+                                                    <div className="col-span-2 flex items-center">
                                                         <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold tracking-wide border ${
                                                             isAssigned ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80' : 'bg-slate-100 text-slate-600 border-slate-200'
                                                         }`}>
@@ -545,7 +548,7 @@ export default function ExternalAuditors() {
                                                                 type="button"
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
-                                                                    setOpenMenuId(openMenuId === auditor.UserID ? null : auditor.UserID);
+                                                                    setOpenMenuId(openMenuId === auditor.userid ? null : auditor.userid);
                                                                 }}
                                                                 className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 shadow-2xs"
                                                                 title="Actions"
@@ -557,7 +560,7 @@ export default function ExternalAuditors() {
                                                                 </svg>
                                                             </button>
 
-                                                            {openMenuId === auditor.UserID && (
+                                                            {openMenuId === auditor.userid && (
                                                                 <div 
                                                                     ref={menuRef}
                                                                     className="absolute right-0 top-8 z-40 w-44 rounded-xl border border-slate-200 bg-white p-1 shadow-xl animate-in fade-in zoom-in-95 duration-100"
@@ -597,14 +600,14 @@ export default function ExternalAuditors() {
                                                                         onClick={async (e) => {
                                                                             e.stopPropagation();
                                                                             setOpenMenuId(null);
-                                                                            const auditorName = `${auditor.FirstName || ''} ${auditor.LastName || ''}`.trim() || 'this auditor';
+                                                                            const auditorName = `${auditor.firstname || ''} ${auditor.lastname || ''}`.trim() || 'this auditor';
                                                                             const confirmed = await showConfirm(
                                                                                 `Remove external auditor "${auditorName}"? This cannot be undone.`,
                                                                                 'Confirm Removal'
                                                                             );
                                                                             if (confirmed) {
                                                                                 try {
-                                                                                    const resp = await usersAPI.deleteUsers([auditor.UserID]);
+                                                                                    const resp = await usersAPI.deleteUsers([auditor.userid]);
                                                                                     if (resp?.success) {
                                                                                         fetchAuditors();
                                                                                         toast({
@@ -650,7 +653,7 @@ export default function ExternalAuditors() {
 
                                     return (
                                         <div
-                                            key={auditor.UserID}
+                                            key={auditor.userid}
                                             className={`group relative flex flex-col justify-between rounded-2xl bg-white shadow-2xs h-full min-h-0 transition-all duration-200 ${
                                                 isSelected 
                                                     ? 'border-2 border-rose-500 ring-2 ring-inset ring-rose-400/50 bg-rose-50/25 shadow-sm' 
@@ -666,7 +669,7 @@ export default function ExternalAuditors() {
                                                         <input
                                                             type="checkbox"
                                                             checked={isSelected}
-                                                            onChange={() => handleToggleSelect(auditor.UserID)}
+                                                            onChange={() => handleToggleSelect(auditor.userid)}
                                                             onClick={(e) => e.stopPropagation()}
                                                             className="h-4 w-4 rounded border-rose-300 text-rose-600 focus:ring-rose-500 cursor-pointer"
                                                         />
@@ -689,7 +692,7 @@ export default function ExternalAuditors() {
                                                                 type="button"
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
-                                                                    setOpenMenuId(openMenuId === auditor.UserID ? null : auditor.UserID);
+                                                                    setOpenMenuId(openMenuId === auditor.userid ? null : auditor.userid);
                                                                 }}
                                                                 className="flex h-6 w-6 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition hover:bg-slate-50 hover:text-slate-700"
                                                                 title="Options"
@@ -701,7 +704,7 @@ export default function ExternalAuditors() {
                                                                 </svg>
                                                             </button>
 
-                                                            {openMenuId === auditor.UserID && (
+                                                            {openMenuId === auditor.userid && (
                                                                 <div 
                                                                     ref={menuRef}
                                                                     className="absolute right-0 top-7 z-30 w-44 rounded-xl border border-slate-200 bg-white p-1 shadow-xl animate-in fade-in zoom-in-95 duration-100"
@@ -738,14 +741,14 @@ export default function ExternalAuditors() {
                                                                         type="button"
                                                                         onClick={async () => {
                                                                             setOpenMenuId(null);
-                                                                            const auditorName = `${auditor.FirstName || ''} ${auditor.LastName || ''}`.trim() || 'this auditor';
+                                                                            const auditorName = `${auditor.firstname || ''} ${auditor.lastname || ''}`.trim() || 'this auditor';
                                                                             const confirmed = await showConfirm(
                                                                                 `Remove external auditor "${auditorName}"? This cannot be undone.`,
                                                                                 'Confirm Removal'
                                                                             );
                                                                             if (confirmed) {
                                                                                 try {
-                                                                                    const resp = await usersAPI.deleteUsers([auditor.UserID]);
+                                                                                    const resp = await usersAPI.deleteUsers([auditor.userid]);
                                                                                     if (resp?.success) {
                                                                                         fetchAuditors();
                                                                                         toast({
@@ -789,7 +792,7 @@ export default function ExternalAuditors() {
                                                 {/* Profile Main Info */}
                                                 <div 
                                                     onClick={() => {
-                                                        if (deleteMode) handleToggleSelect(auditor.UserID);
+                                                        if (deleteMode) handleToggleSelect(auditor.userid);
                                                         else handleOpenDetails(auditor);
                                                     }}
                                                     className="cursor-pointer group/content min-h-0 flex-1 flex flex-col justify-center my-0.5"
@@ -872,8 +875,8 @@ export default function ExternalAuditors() {
                 </div>
             </div>
 
-            {/* Application Standard Fixed Bottom Pagination Bar */}
-            {!loading && filteredAuditors.length > 0 && (
+            {/* Application Standard Fixed Bottom Pagination Bar (Grid mode only - removed in list mode per request) */}
+            {viewMode === 'grid' && !loading && filteredAuditors.length > 0 && (
                 <Pagination
                     currentPage={currentPage}
                     totalPages={totalPages}

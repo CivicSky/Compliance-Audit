@@ -31,6 +31,7 @@ const FIXED_DEPARTMENTS = [
   { id: 2, name: 'SHTM' },
   { id: 3, name: 'SARFAID' },
   { id: 4, name: 'SSLATE' },
+  { id: 5, name: 'IBED' },
 ];
 
 export default function DepartmentsView({
@@ -55,21 +56,21 @@ export default function DepartmentsView({
   const [updatingProgramLevel, setUpdatingProgramLevel] = useState(null);
   const [viewSection, setViewSection] = useState('academic'); // 'academic' or 'non-academic'
 
-  const roleName = String(currentUser?.RoleName || '').toLowerCase();
-  const roleId = Number(currentUser?.RoleID);
-  const isAdmin = (roleId === 1 || roleName === 'admin') && !roleName.includes('auditor');
+  const rolename = String(currentUser?.rolename || '').toLowerCase();
+  const roleid = Number(currentUser?.roleid);
+  const isAdmin = (roleid === 1 || rolename === 'admin') && !rolename.includes('auditor');
 
   // Sync active event if prop changes or auto-select first active event / persisted event
   useEffect(() => {
     if (!events || events.length === 0) return;
 
     const savedId = localStorage.getItem('acc_selected_event_id') || localStorage.getItem('selected_audit_event_id');
-    const validPassed = events.find((e) => String(e.EventID ?? e.id) === String(selectedEventId));
-    const validSaved = events.find((e) => String(e.EventID ?? e.id) === String(savedId));
-    const currentValid = events.find((e) => String(e.EventID ?? e.id) === String(activeEventId));
+    const validPassed = events.find((e) => String(e.eventid ?? e.id) === String(selectedEventId));
+    const validSaved = events.find((e) => String(e.eventid ?? e.id) === String(savedId));
+    const currentValid = events.find((e) => String(e.eventid ?? e.id) === String(activeEventId));
     
     const target = validPassed || currentValid || validSaved || events[0];
-    const targetId = String(target.EventID ?? target.id);
+    const targetId = String(target.eventid ?? target.id);
 
     if (activeEventId !== targetId) {
       setActiveEventId(targetId);
@@ -85,16 +86,16 @@ export default function DepartmentsView({
       newLevelOrEvent.stopPropagation();
     }
     const newLevel = typeof newLevelOrEvent === 'string' ? newLevelOrEvent : newLevelOrEvent?.target?.value;
-    const progId = program.id ?? program.OfficeID;
+    const progId = program.id ?? program.officeid;
 
-    if (!newLevel || newLevel === (program.accreditation_level || 'None')) return;
+    if (!newLevel || newLevel === (program.accreditationlevel || 'None')) return;
 
     try {
       setUpdatingProgramLevel(progId);
       await officesAPI.updateLevel(progId, newLevel);
       if (onRefresh) onRefresh();
       if (showAlert) {
-        showAlert(`Updated ${program.office_name || program.OfficeName} to ${newLevel}`, 'success');
+        showAlert(`Updated ${program.officename || program.officename} to ${newLevel}`, 'success');
       }
     } catch (err) {
       console.error('Failed to update program accreditation level:', err);
@@ -110,7 +111,7 @@ export default function DepartmentsView({
   const officesInEvent = useMemo(() => {
     if (!activeEventId || activeEventId === 'all') return offices;
     return offices.filter(
-      (o) => String(o.event_id ?? o.EventID ?? '') === String(activeEventId)
+      (o) => String(o.eventid ?? o.eventid ?? '') === String(activeEventId)
     );
   }, [offices, activeEventId]);
 
@@ -128,11 +129,11 @@ export default function DepartmentsView({
     return officesInEvent.filter((o) => !isAcademicOffice(o));
   }, [officesInEvent]);
 
-  // Group academic offices by department - All 4 fixed departments ALWAYS present
+  // Group academic offices by department - All 5 fixed departments ALWAYS present
   const departmentsList = useMemo(() => {
     const map = new Map();
 
-    // 1. Always seed with ALL 4 predefined institutional departments
+    // 1. Always seed with ALL 5 predefined institutional departments
     for (const fd of FIXED_DEPARTMENTS) {
       map.set(String(fd.id), {
         deptId: fd.id,
@@ -144,8 +145,8 @@ export default function DepartmentsView({
 
     // 2. Distribute academic programs into their predefined departments
     for (const office of academicOffices) {
-      if (!office.department_id) continue; // Never create an unassigned/empty department card
-      const deptKey = String(office.department_id);
+      if (!office.departmentid) continue; // Never create an unassigned/empty department card
+      const deptKey = String(office.departmentid);
       if (map.has(deptKey)) {
         map.get(deptKey).programs.push(office);
       }
@@ -161,8 +162,8 @@ export default function DepartmentsView({
           dept.deptCode.toLowerCase().includes(q) ||
           dept.deptName.toLowerCase().includes(q);
         const matchPrograms = dept.programs.some((p) =>
-          (p.office_name || p.OfficeName || '').toLowerCase().includes(q) ||
-          (p.accreditation_level || '').toLowerCase().includes(q)
+          (p.officename || p.officename || '').toLowerCase().includes(q) ||
+          (p.accreditationlevel || '').toLowerCase().includes(q)
         );
         return matchDept || matchPrograms;
       });
@@ -180,8 +181,22 @@ export default function DepartmentsView({
   }, [selectedDeptId, departmentsList]);
 
   // Compliance status helper
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (status, totalReqs = null) => {
+    if (totalReqs !== null && Number(totalReqs) === 0) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold text-slate-600 bg-slate-100 border border-slate-200 rounded-full">
+          <span className="w-1.5 h-1.5 rounded-full bg-slate-400" /> No Standards
+        </span>
+      );
+    }
     const s = String(status || '').toLowerCase();
+    if (s.includes('no standard') || s.includes('no req') || s === 'n/a' || s === 'empty') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold text-slate-600 bg-slate-100 border border-slate-200 rounded-full">
+          <span className="w-1.5 h-1.5 rounded-full bg-slate-400" /> No Standards
+        </span>
+      );
+    }
     if (s.includes('complied') && !s.includes('not') && !s.includes('partial')) {
       return (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full">
@@ -204,12 +219,12 @@ export default function DepartmentsView({
   };
 
   // Header event switch handler
-  const handleEventTabClick = (eventId) => {
-    setActiveEventId(eventId);
+  const handleEventTabClick = (eventid) => {
+    setActiveEventId(eventid);
     setSelectedDeptId(null);
-    localStorage.setItem('acc_selected_event_id', String(eventId));
-    localStorage.setItem('selected_audit_event_id', String(eventId));
-    if (onSelectEvent) onSelectEvent(eventId);
+    localStorage.setItem('acc_selected_event_id', String(eventid));
+    localStorage.setItem('selected_audit_event_id', String(eventid));
+    if (onSelectEvent) onSelectEvent(eventid);
   };
 
   return (
@@ -245,8 +260,8 @@ export default function DepartmentsView({
         {/* Event Horizontal Tabs (Photo 2) */}
         <div className="flex items-center gap-6 overflow-x-auto border-t border-slate-100 pt-1 -mb-[1px] scrollbar-none">
           {events.map((ev) => {
-            const evId = String(ev.EventID ?? ev.id);
-            const evCode = ev.EventCode || ev.EventName || `Event #${evId}`;
+            const evId = String(ev.eventid ?? ev.id);
+            const evCode = ev.eventcode || ev.eventname || `Event #${evId}`;
             const isSelected = String(activeEventId) === String(evId);
 
             return (
@@ -347,7 +362,7 @@ export default function DepartmentsView({
                     <p className="text-xs text-slate-500 mt-0.5">
                       {selectedDepartment.programs.length}{' '}
                       {selectedDepartment.programs.length === 1 ? 'Program' : 'Programs'}{' '}
-                      under this department for this audit event
+                      under this department for this accreditation
                     </p>
                   </div>
                 </div>
@@ -369,13 +384,13 @@ export default function DepartmentsView({
                 <GraduationCap className="h-10 w-10 text-slate-300 mx-auto mb-2" />
                 <h4 className="text-sm font-bold text-slate-700">No Programs in this Department</h4>
                 <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
-                  No academic programs are currently assigned under this department for this audit event.
+                  No academic programs are currently assigned under this department for this accreditation.
                 </p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {selectedDepartment.programs.map((program) => {
-                  const progId = program.id ?? program.OfficeID;
+                  const progId = program.id ?? program.officeid;
                   const heads = program.heads || [];
                   const isUpdatingThisProg = updatingProgramLevel === progId;
 
@@ -391,12 +406,12 @@ export default function DepartmentsView({
                           <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200/80 px-2 py-0.5 rounded-md">
                             ACADEMIC PROGRAM
                           </span>
-                          {getStatusBadge(program.overall_status)}
+                          {getStatusBadge(program.overallstatus, program.totalrequirements)}
                         </div>
 
                         {/* Program Name */}
                         <h4 className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors line-clamp-2">
-                          {program.office_name || program.OfficeName}
+                          {program.officename || program.officename}
                         </h4>
 
                         {/* Program Accreditation Level Dropdown */}
@@ -409,14 +424,14 @@ export default function DepartmentsView({
                           </span>
                           {isAdmin ? (
                             <DepartmentLevelDropdown
-                              value={program.accreditation_level || 'None'}
+                              value={program.accreditationlevel || 'None'}
                               onChange={(newLevel) => handleProgramLevelChange(newLevel, program)}
                               disabled={isUpdatingThisProg}
                               levels={ACCREDITATION_LEVELS}
                             />
                           ) : (
                             <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-lg">
-                              {program.accreditation_level || 'None'}
+                              {program.accreditationlevel || 'None'}
                             </span>
                           )}
                         </div>
@@ -426,14 +441,14 @@ export default function DepartmentsView({
                       <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
                         <div className="flex items-center gap-1.5 font-medium">
                           <FileText className="h-3.5 w-3.5 text-slate-400" />
-                          <span>{program.total_requirements || 0} Reqs</span>
+                          <span>{program.totalrequirements || 0} Reqs</span>
                         </div>
 
                         {/* Heads Avatars */}
                         <div className="flex items-center -space-x-1.5">
                           {heads.slice(0, 3).map((h, i) => (
                             <SmartUserAvatar
-                              key={h.HeadID || i}
+                              key={h.headid || i}
                               user={h}
                               size="h-6 w-6"
                               textSize="text-[9px] font-bold"
@@ -513,14 +528,14 @@ export default function DepartmentsView({
                         <div className="flex flex-wrap gap-1.5">
                           {deptGroup.programs.slice(0, 3).map((p) => (
                             <span
-                              key={p.id ?? p.OfficeID}
+                              key={p.id ?? p.officeid}
                               className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-700 bg-white border border-slate-200 px-2 py-0.5 rounded-md truncate max-w-[200px]"
-                              title={p.office_name || p.OfficeName}
+                              title={p.officename || p.officename}
                             >
-                              <span className="truncate">{p.office_name || p.OfficeName}</span>
-                              {p.accreditation_level && p.accreditation_level !== 'None' && (
+                              <span className="truncate">{p.officename || p.officename}</span>
+                              {p.accreditationlevel && p.accreditationlevel !== 'None' && (
                                 <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200 shrink-0">
-                                  {p.accreditation_level}
+                                  {p.accreditationlevel}
                                 </span>
                               )}
                             </span>
@@ -577,7 +592,7 @@ export default function DepartmentsView({
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {nonAcademicOffices.map((office) => {
-                  const offId = office.id ?? office.OfficeID;
+                  const offId = office.id ?? office.officeid;
                   const heads = office.heads || [];
 
                   return (
@@ -591,24 +606,24 @@ export default function DepartmentsView({
                           <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
                             INSTITUTIONAL UNIT
                           </span>
-                          {getStatusBadge(office.overall_status)}
+                          {getStatusBadge(office.overallstatus, office.totalrequirements)}
                         </div>
 
                         <h4 className="text-sm font-bold text-slate-900 group-hover:text-emerald-600 transition-colors">
-                          {office.office_name || office.OfficeName}
+                          {office.officename || office.officename}
                         </h4>
                       </div>
 
                       <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
                         <div className="flex items-center gap-1 font-medium">
                           <FileText className="h-3.5 w-3.5 text-slate-400" />
-                          <span>{office.total_requirements || 0} Reqs</span>
+                          <span>{office.totalrequirements || 0} Reqs</span>
                         </div>
 
                         <div className="flex items-center -space-x-1.5">
                           {heads.slice(0, 3).map((h, i) => (
                             <SmartUserAvatar
-                              key={h.HeadID || i}
+                              key={h.headid || i}
                               user={h}
                               size="h-6 w-6"
                               textSize="text-[9px] font-bold"

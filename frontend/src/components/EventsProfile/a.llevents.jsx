@@ -30,20 +30,20 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
         // Apply search filter
         if (searchTerm.trim()) {
             filtered = events.filter(event => {
-                const eventName = event.EventName?.toLowerCase() || '';
+                const eventname = event.eventname?.toLowerCase() || '';
                 const description = event.Description?.toLowerCase() || '';
-                const eventCode = event.EventCode?.toLowerCase() || '';
+                const eventcode = event.eventcode?.toLowerCase() || '';
                 const searchLower = searchTerm.toLowerCase();
                 
-                return eventName.includes(searchLower) || 
+                return eventname.includes(searchLower) || 
                        description.includes(searchLower) || 
-                       eventCode.includes(searchLower);
+                       eventcode.includes(searchLower);
             });
         }
 
         // Sort by event name in ascending order
         const sortedFiltered = [...filtered].sort((a, b) => {
-            return (a.EventName || '').localeCompare(b.EventName || '');
+            return (a.eventname || '').localeCompare(b.eventname || '');
         });
 
         setFilteredEvents(sortedFiltered);
@@ -63,13 +63,13 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
         }
     }, [deleteMode]);
 
-    const handleCheckboxChange = (eventId, isChecked) => {
+    const handleCheckboxChange = (eventid, isChecked) => {
         setSelectedEvents(prev => {
             const newSet = new Set(prev);
             if (isChecked) {
-                newSet.add(eventId);
+                newSet.add(eventid);
             } else {
-                newSet.delete(eventId);
+                newSet.delete(eventid);
             }
             return newSet;
         });
@@ -82,7 +82,7 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
             const response = await eventsAPI.deleteEvents(eventIds);
             
             if (response.success) {
-                setEvents(prev => prev.filter(event => !eventIds.includes(event.EventID)));
+                setEvents(prev => prev.filter(event => !eventIds.includes(event.eventid)));
                 setSelectedEvents(new Set());
                 toast?.({
                     title: 'Events Deleted',
@@ -155,7 +155,7 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
 
     // Get status badge style
     const getStatusStyle = (event) => {
-        if (event.CreatedAt) {
+        if (event.createdat) {
             return 'bg-emerald-50 text-emerald-700 border-emerald-200';
         }
         return 'bg-gray-50 text-gray-600 border-gray-200';
@@ -223,7 +223,7 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
             <div className="space-y-2 pt-1 pb-1">
                 {filteredEvents.map((event) => (
                     <div 
-                        key={event.EventID}
+                        key={event.eventid}
                         onClick={() => !deleteMode && onEventClick && onEventClick(event)}
                         className={`
                             relative bg-white rounded-lg border
@@ -231,7 +231,7 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
                                 ? 'border-slate-200' 
                                 : 'border-slate-200/80 app-card-hover cursor-pointer'
                             }
-                            ${selectedEvents.has(event.EventID) 
+                            ${selectedEvents.has(event.eventid) 
                                 ? 'ring-2 ring-indigo-500 border-indigo-500 bg-indigo-50/30' 
                                 : ''
                             }
@@ -244,8 +244,8 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
                                     <div className="flex-shrink-0">
                                         <input
                                             type="checkbox"
-                                            checked={selectedEvents.has(event.EventID)}
-                                            onChange={(e) => handleCheckboxChange(event.EventID, e.target.checked)}
+                                            checked={selectedEvents.has(event.eventid)}
+                                            onChange={(e) => handleCheckboxChange(event.eventid, e.target.checked)}
                                             className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-brand-500"
                                             onClick={(e) => e.stopPropagation()}
                                         />
@@ -263,16 +263,16 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2">
                                         <h3 className="text-sm font-medium text-gray-900 truncate">
-                                            {event.EventName}
+                                            {event.eventname}
                                         </h3>
                                         <span className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full border ${getStatusStyle(event)}`}>
                                             {event.status === 'active' ? 'Active' : 'Inactive'}
                                         </span>
                                     </div>
                                     
-                                    {event.EventCode && (
+                                    {event.eventcode && (
                                         <p className="text-xs text-gray-500 mt-0.5">
-                                            {event.EventCode}
+                                            {event.eventcode}
                                         </p>
                                     )}
                                     
@@ -284,15 +284,15 @@ const EventsP = forwardRef(({ searchTerm = '', deleteMode = false, onSelectionCh
                                 </div>
 
                                 {/* Download Button - Only if folder exists */}
-                                {downloadableFolders.includes(event.EventName.replace(/[<>:"/\\|?*]/g, '_').trim()) && (
+                                {downloadableFolders.includes(event.eventname.replace(/[<>:"/\\|?*]/g, '_').trim()) && (
                                     <button
                                         className="flex-shrink-0 px-2 py-1 bg-emerald-50 text-emerald-700 rounded-md text-xs font-medium hover:bg-emerald-100 transition-colors flex items-center gap-1 border border-emerald-200"
                                         onClick={async (e) => {
                                             e.stopPropagation();
                                             e.preventDefault();
                                             try {
-                                                const sanitizedName = event.EventName.replace(/[<>:"/\\|?*]/g, '_').trim();
-                                                const url = await eventsAPI.downloadEventZip(event.EventName);
+                                                const sanitizedName = event.eventname.replace(/[<>:"/\\|?*]/g, '_').trim();
+                                                const url = await eventsAPI.downloadEventZip(event.eventname);
                                                 
                                                 const link = document.createElement('a');
                                                 link.href = url;

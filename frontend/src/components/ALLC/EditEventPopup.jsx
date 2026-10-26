@@ -3,18 +3,18 @@ import { createPortal } from "react-dom";
 import CustomSelect from "../UI/CustomSelect";
 
 export default function EditEventPopup({ open, event, onCancel, onConfirm }) {
-    const [eventName, setEventName] = useState("");
-    const [eventCode, setEventCode] = useState("");
+    const [eventname, setEventName] = useState("");
+    const [eventcode, setEventCode] = useState("");
     const [status, setStatus] = useState("active");
-    const [accreditationLevel, setAccreditationLevel] = useState("N/A");
+    const [accreditationlevel, setAccreditationLevel] = useState("N/A");
 
     // When event changes or popup opens, update fields
     useEffect(() => {
         if (event) {
-            setEventName(event.EventName || "");
-            setEventCode(event.EventCode || "");
+            setEventName(event.eventname || "");
+            setEventCode(event.eventcode || "");
             setStatus(event.status || "active");
-            setAccreditationLevel(event.accreditation_level || "N/A");
+            setAccreditationLevel(event.accreditationlevel || "N/A");
         }
     }, [event, open]);
 
@@ -32,7 +32,7 @@ export default function EditEventPopup({ open, event, onCancel, onConfirm }) {
                         <input
                             type="text"
                             className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                            value={eventName}
+                            value={eventname}
                             onChange={e => setEventName(e.target.value)}
                         />
                     </div>
@@ -41,14 +41,14 @@ export default function EditEventPopup({ open, event, onCancel, onConfirm }) {
                         <input
                             type="text"
                             className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                            value={eventCode}
+                            value={eventcode}
                             onChange={e => setEventCode(e.target.value)}
                         />
                     </div>
                     <div>
                         <label className="block text-sm font-semibold text-gray-800 mb-1">Accreditation Level</label>
                         <CustomSelect
-                            value={accreditationLevel}
+                            value={accreditationlevel}
                             onChange={(val) => setAccreditationLevel(val)}
                             options={[
                                 { value: "Level I", label: "Level I" },
@@ -83,8 +83,8 @@ export default function EditEventPopup({ open, event, onCancel, onConfirm }) {
                     <button
                         className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-green-700"
                         onClick={() => {
-                            console.log('EditEventPopup onConfirm:', { EventName: eventName, EventCode: eventCode, Description: null, status, accreditation_level: accreditationLevel });
-                            onConfirm({ EventName: eventName, EventCode: eventCode, Description: null, status, accreditation_level: accreditationLevel });
+                            console.log('EditEventPopup onConfirm:', { eventname: eventname, eventcode: eventcode, Description: null, status, accreditationlevel: accreditationlevel });
+                            onConfirm({ eventname: eventname, eventcode: eventcode, Description: null, status, accreditationlevel: accreditationlevel });
                         }}
                     >
                         Save

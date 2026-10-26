@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useImperativeHandle, forwardRef } from "react";
 import { areasAPI } from "../../utils/api";
 
-const AreaProfile = forwardRef(function AreaProfile({ eventId, onAreaClick, selectedAreaIds = [], selectionMode = false }, ref) {
+const AreaProfile = forwardRef(function AreaProfile({ eventid, onAreaClick, selectedAreaIds = [], selectionMode = false }, ref) {
   const [areas, setAreas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -11,8 +11,8 @@ const AreaProfile = forwardRef(function AreaProfile({ eventId, onAreaClick, sele
     setError(null);
     try {
       let response;
-      if (eventId) {
-        response = await areasAPI.getByEvent(eventId);
+      if (eventid) {
+        response = await areasAPI.getByEvent(eventid);
       } else {
         response = await areasAPI.getAll();
       }
@@ -32,7 +32,7 @@ const AreaProfile = forwardRef(function AreaProfile({ eventId, onAreaClick, sele
   useEffect(() => {
     fetchAreas();
     // eslint-disable-next-line
-  }, [eventId]);
+  }, [eventid]);
 
   useImperativeHandle(ref, () => ({
     refresh: fetchAreas
@@ -47,10 +47,10 @@ const AreaProfile = forwardRef(function AreaProfile({ eventId, onAreaClick, sele
     <div className="mt-6 w-full space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-1.5 pb-1.5">
         {areas.map(area => {
-          const isSelected = selectionMode && selectedAreaIds.includes(area.AreaID);
+          const isSelected = selectionMode && selectedAreaIds.includes(area.areaid);
           return (
             <div
-              key={area.AreaID}
+              key={area.areaid}
               className={`bg-white rounded-xl shadow-2xs p-4 app-card-hover cursor-pointer border border-slate-200 border-l-4 border-l-cyan-500 ${isSelected ? 'area-selected-outer ring-2 ring-indigo-500' : ''}`}
               style={isSelected ? { borderLeftWidth: '8px' } : {}}
               onClick={() => {
@@ -69,10 +69,10 @@ const AreaProfile = forwardRef(function AreaProfile({ eventId, onAreaClick, sele
                     className="accent-blue-600 w-5 h-5"
                   />
                 )}
-                <h3 className="font-semibold text-lg text-blue-700">{area.AreaCode} - {area.AreaName}</h3>
+                <h3 className="font-semibold text-lg text-blue-700">{area.areacode} - {area.areaname}</h3>
               </div>
-              <p className="text-gray-600 mt-1">{area.Description}</p>
-              <p className="text-xs text-gray-400 mt-2">Event ID: {area.EventID}</p>
+              <p className="text-gray-600 mt-1">{area.description || area.Description}</p>
+              <p className="text-xs text-gray-400 mt-2">Event ID: {area.eventid}</p>
             </div>
           );
         })}

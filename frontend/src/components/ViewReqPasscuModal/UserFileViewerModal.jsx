@@ -25,9 +25,9 @@ export default function UserFileViewerModal({
         }).catch(() => {});
     }, []);
 
-    const isAuditor = currentUser?.RoleID === 4 || 
-                      Number(currentUser?.roleId) === 4 ||
-                      String(currentUser?.RoleName || '').toLowerCase().includes('auditor') || 
+    const isAuditor = currentUser?.roleid === 4 || 
+                      Number(currentUser?.roleid) === 4 ||
+                      String(currentUser?.rolename || '').toLowerCase().includes('auditor') || 
                       String(currentUser?.role || '').toLowerCase().includes('auditor') ||
                       String(currentUser?.Position || '').toLowerCase().includes('auditor') ||
                       Boolean(currentUser?.isExternalAuditor);
@@ -46,9 +46,9 @@ export default function UserFileViewerModal({
 
     if (!show || !selectedUserFile) return null;
 
-    const url = String(selectedUserFile?.url || selectedUserFile?.file_path || '');
-    const rawName = String(selectedUserFile?.displayName || selectedUserFile?.fileName || '').trim() || fileNameFromUrl(url);
-    const extMatch = (selectedUserFile?.fileName || url).match(/\.([a-zA-Z0-9]+)(?:\?|#|$)/);
+    const url = String(selectedUserFile?.url || selectedUserFile?.filepath || '');
+    const rawName = String(selectedUserFile?.displayname || selectedUserFile?.filename || '').trim() || fileNameFromUrl(url);
+    const extMatch = (selectedUserFile?.filename || url).match(/\.([a-zA-Z0-9]+)(?:\?|#|$)/);
     const ext = extMatch ? extMatch[1] : '';
     let downloadName = rawName;
     if (ext && !downloadName.toLowerCase().endsWith(`.${ext.toLowerCase()}`)) {
@@ -92,7 +92,7 @@ export default function UserFileViewerModal({
                 <div className="pointer-events-none fixed inset-0 z-[10001] flex items-center justify-center overflow-hidden opacity-15 select-none">
                     <div className="rotate-[-25deg] text-center text-white text-sm sm:text-lg md:text-2xl font-black uppercase tracking-widest leading-loose">
                         CONFIDENTIAL • AUDIT EVALUATION ONLY<br />
-                        {currentUser?.FirstName || ''} {currentUser?.LastName || 'Auditor'} • {new Date().toLocaleDateString()}
+                        {currentUser?.firstname || ''} {currentUser?.lastname || 'Auditor'} • {new Date().toLocaleDateString()}
                     </div>
                 </div>
             )}

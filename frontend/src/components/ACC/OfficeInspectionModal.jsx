@@ -14,7 +14,7 @@ export default function OfficeInspectionModal({
   isAdmin = false
 }) {
   const { showAlert } = useModal();
-  const officeId = office?.OfficeID || office?.id;
+  const officeid = office?.officeid || office?.id;
 
   const [loading, setLoading] = useState(true);
   const [hierarchy, setHierarchy] = useState([]);
@@ -25,18 +25,18 @@ export default function OfficeInspectionModal({
   const [updatingReqId, setUpdatingReqId] = useState(null);
   const [proofDocument, setProofDocument] = useState(null);
   const [uploadingProof, setUploadingProof] = useState(false);
-  const [currentLevel, setCurrentLevel] = useState(office?.accreditation_level || 'Candidate');
+  const [currentLevel, setCurrentLevel] = useState(office?.accreditationlevel || 'None');
 
   useEffect(() => {
-    setCurrentLevel(office?.accreditation_level || 'Candidate');
-  }, [office?.accreditation_level]);
+    setCurrentLevel(office?.accreditationlevel || 'None');
+  }, [office?.accreditationlevel]);
 
   // Fetch requirement compliance hierarchy for this office
   const fetchRequirements = async () => {
-    if (!officeId) return;
+    if (!officeid) return;
     try {
       setLoading(true);
-      const res = await officesAPI.getOfficeRequirements(officeId);
+      const res = await officesAPI.getOfficeRequirements(officeid);
       const data = res?.data || res || [];
 
       setHierarchy(Array.isArray(data) ? data : []);
@@ -46,7 +46,7 @@ export default function OfficeInspectionModal({
       (Array.isArray(data) ? data : []).forEach(area => {
         (area.criteria || area.Criteria || []).forEach(crit => {
           (crit.requirements || crit.Requirements || []).forEach(req => {
-            const reqId = req.RequirementID || req.id;
+            const reqId = req.requirementid || req.id;
             initialComments[reqId] = req.comments || req.Comments || '';
           });
         });
@@ -55,7 +55,7 @@ export default function OfficeInspectionModal({
 
       // Fetch proof document if any
       try {
-        const proofRes = await officesAPI.getOfficeProofDocuments(officeId);
+        const proofRes = await officesAPI.getOfficeProofDocuments(officeid);
         if (proofRes?.data && proofRes.data.length > 0) {
           setProofDocument(proofRes.data[0]);
         }
@@ -71,7 +71,7 @@ export default function OfficeInspectionModal({
 
   useEffect(() => {
     fetchRequirements();
-  }, [officeId]);
+  }, [officeid]);
 
   // Compute overall compliance score
   const complianceStats = useMemo(() => {
@@ -104,8 +104,8 @@ export default function OfficeInspectionModal({
       setUpdatingReqId(reqId);
       const currentComment = commentsMap[reqId] || '';
 
-      const res = await officesAPI.updateRequirementStatus(officeId, reqId, {
-        statusId: nextStatusId,
+      const res = await officesAPI.updateRequirementStatus(officeid, reqId, {
+        statusid: nextStatusId,
         comments: currentComment
       });
 
@@ -154,15 +154,15 @@ export default function OfficeInspectionModal({
       hierarchy.forEach(area => {
         (area.criteria || []).forEach(crit => {
           (crit.requirements || []).forEach(req => {
-            if (Number(req.RequirementID || req.id) === Number(reqId)) {
+            if (Number(req.requirementid || req.id) === Number(reqId)) {
               currentStatus = Number(req.Status || req.status || 3);
             }
           });
         });
       });
 
-      await officesAPI.updateRequirementStatus(officeId, reqId, {
-        statusId: currentStatus,
+      await officesAPI.updateRequirementStatus(officeid, reqId, {
+        statusid: currentStatus,
         comments: commentText
       });
 
@@ -199,7 +199,7 @@ export default function OfficeInspectionModal({
       setUploadingProof(true);
       const formData = new FormData();
       formData.append('document', file);
-      formData.append('office_id', officeId);
+      formData.append('officeid', officeid);
 
       const res = await officesAPI.uploadProofDocument(formData);
       if (res?.success) {
@@ -236,7 +236,7 @@ export default function OfficeInspectionModal({
             <div>
               <div className="flex items-center gap-2.5">
                 <h1 className="text-xl font-black text-slate-900 tracking-tight">
-                  {office?.OfficeName || office?.office_name || 'BSIT'}
+                  {office?.officename || office?.officename || 'BSIT'}
                 </h1>
                 <span className={`px-2.5 py-0.5 rounded-md text-[11px] font-bold border ${
                   isAcademic 
@@ -246,7 +246,7 @@ export default function OfficeInspectionModal({
                   {isAcademic ? 'Academic' : 'Non-Academic'}
                 </span>
                 <span className="px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200 uppercase">
-                  Event: {office?.event_name || office?.EventName || 'PAASCU-COPY'}
+                  Event: {office?.eventname || office?.eventname || 'PAASCU-COPY'}
                 </span>
                 {isAcademic && (
                   isAdmin ? (
@@ -258,22 +258,22 @@ export default function OfficeInspectionModal({
                           const val = e.target.value;
                           setCurrentLevel(val);
                           try {
-                            await officesAPI.updateLevel(officeId, val);
-                            if (onUpdateOffice) onUpdateOffice({ ...office, accreditation_level: val });
+                            await officesAPI.updateLevel(officeid, val);
+                            if (onUpdateOffice) onUpdateOffice({ ...office, accreditationlevel: val });
                           } catch (err) {
                             console.error(err);
                           }
                         }}
                         className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md py-0.5 px-2 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer shadow-2xs"
                       >
-                        {['Candidate', 'Level I', 'Level II', 'Level III', 'Level IV'].map((lvl) => (
+                        {['None', 'Candidate', 'Level I', 'Level II', 'Level III', 'Level IV'].map((lvl) => (
                           <option key={lvl} value={lvl}>{lvl}</option>
                         ))}
                       </select>
                     </div>
                   ) : (
                     <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 border border-emerald-200">
-                      {currentLevel || 'Candidate'}
+                      {currentLevel || 'None'}
                     </span>
                   )
                 )}
@@ -282,34 +282,77 @@ export default function OfficeInspectionModal({
           </div>
 
           {/* Personnel & External Auditor Badges */}
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-4 text-xs border-r border-slate-200 pr-6">
-              {/* Personnel */}
-              <div className="flex items-center gap-2">
-                <div className="h-7 w-7 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600">
-                  <User className="h-4 w-4" />
-                </div>
-                <div>
-                  <span className="block text-[9px] font-extrabold uppercase tracking-wider text-slate-400">PERSONNEL</span>
-                  <span className="font-bold text-slate-800">
-                    {office?.head_name || office?.HeadName || (Array.isArray(office?.heads) && office.heads.length > 0 ? office.heads.map(h => h.full_name || `${h.FirstName || ''} ${h.LastName || ''}`.trim() || h.FirstName).filter(Boolean).join(', ') : 'Unassigned')}
-                  </span>
-                </div>
-              </div>
+          {(() => {
+            const currentUid = Number(currentUser?.userid ?? currentUser?.id ?? 0);
+            const isAuditor = currentUser?.roleid === 4 || currentUser?.rolename?.toLowerCase()?.includes('auditor') || Boolean(currentUser?.isExternalAuditor);
+            const resolvedIsAdmin = Boolean(isAdmin || ((currentUser?.roleid === 1 || currentUser?.rolename?.toLowerCase() === 'admin') && !isAuditor));
 
-              {/* External Auditor */}
-              <div className="flex items-center gap-2">
-                <div className="h-7 w-7 rounded-full bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center">
-                  <UserCheck className="h-4 w-4" />
-                </div>
-                <div>
-                  <span className="block text-[9px] font-extrabold uppercase tracking-wider text-blue-600">EXTERNAL AUDITOR</span>
-                  <span className="font-bold text-slate-900">
-                    {office?.auditor_name || 'VJ JAVELLANA'}
-                  </span>
+            let showPersonnel = false;
+            let displayHeadName = '';
+            if (resolvedIsAdmin) {
+              showPersonnel = true;
+              displayHeadName = office?.head_name || office?.HeadName || (Array.isArray(office?.heads) && office.heads.length > 0 ? office.heads.map(h => h.full_name || `${h.firstname || ''} ${h.lastname || ''}`.trim() || h.firstname).filter(Boolean).join(', ') : 'Unassigned');
+            } else if (!isAuditor) {
+              const isUserHead = (office?.heads && Array.isArray(office.heads) && office.heads.some(h => Number(h.headid || h.userid || h.id) === currentUid)) ||
+                                 (Number(office?.headid) === currentUid);
+              if (isUserHead) {
+                showPersonnel = true;
+                displayHeadName = currentUser?.firstname ? `${currentUser.firstname} ${currentUser.lastname || ''}`.trim() : 'Assigned to you';
+              }
+            }
+
+            let showAuditor = false;
+            let displayAuditorName = '';
+            if (resolvedIsAdmin) {
+              showAuditor = true;
+              displayAuditorName = office?.auditor_name || 'Unassigned';
+            } else if (isAuditor) {
+              const isUserAuditor = (Number(office?.auditor_id || office?.auditorid) === currentUid) ||
+                                    (office?.auditor_name && currentUser?.firstname && office.auditor_name.toLowerCase().includes(currentUser.firstname.toLowerCase()));
+              if (isUserAuditor) {
+                showAuditor = true;
+                displayAuditorName = currentUser?.firstname ? `${currentUser.firstname} ${currentUser.lastname || ''}`.trim() : 'Assigned to you';
+              }
+            }
+
+            if (!showPersonnel && !showAuditor) return null;
+
+            return (
+              <div className="flex items-center gap-6">
+                <div className="flex items-center gap-4 text-xs border-r border-slate-200 pr-6">
+                  {/* Personnel */}
+                  {showPersonnel && (
+                    <div className="flex items-center gap-2">
+                      <div className="h-7 w-7 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600">
+                        <User className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <span className="block text-[9px] font-extrabold uppercase tracking-wider text-slate-400">PERSONNEL</span>
+                        <span className="font-bold text-slate-800">
+                          {displayHeadName}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* External Auditor */}
+                  {showAuditor && (
+                    <div className="flex items-center gap-2">
+                      <div className="h-7 w-7 rounded-full bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center">
+                        <UserCheck className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <span className="block text-[9px] font-extrabold uppercase tracking-wider text-blue-600">EXTERNAL AUDITOR</span>
+                        <span className="font-bold text-slate-900">
+                          {displayAuditorName}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
+            );
+          })()}
 
             {/* Score Pill */}
             <div className="flex items-center gap-3">
@@ -394,24 +437,24 @@ export default function OfficeInspectionModal({
             </div>
           ) : (
             hierarchy.map((area) => {
-              const areaId = area.AreaID || area.id;
+              const areaid = area.areaid || area.id;
               const criteriaList = area.criteria || area.Criteria || [];
 
               return (
-                <div key={areaId} className="space-y-4">
+                <div key={areaid} className="space-y-4">
                   {/* Area Header Banner */}
                   <div className="bg-blue-600 text-white rounded-xl p-4 shadow-xs">
                     <h3 className="text-xs font-extrabold uppercase tracking-wider text-blue-200">
-                      {area.AreaCode || area.code ? `AREA ${area.AreaCode || area.code}` : 'AREA'}
+                      {area.areacode || area.code ? `AREA ${area.areacode || area.code}` : 'AREA'}
                     </h3>
                     <h2 className="text-base font-black text-white mt-0.5">
-                      {area.AreaName || area.name || 'Philosophy and Objectives'}
+                      {area.areaname || area.name || 'Philosophy and Objectives'}
                     </h2>
                   </div>
 
                   {/* Criteria & Requirements Cards */}
                   {criteriaList.map((crit) => {
-                    const critId = crit.CriteriaID || crit.id;
+                    const critId = crit.criteriaid || crit.id;
                     const reqs = crit.requirements || crit.Requirements || [];
 
                     return (
@@ -419,30 +462,30 @@ export default function OfficeInspectionModal({
                         {/* Criteria Header */}
                         <div className="bg-slate-800 text-white rounded-xl p-3.5 shadow-2xs">
                           <h4 className="text-xs font-bold text-slate-200">
-                            {crit.CriteriaCode || crit.code ? `${crit.CriteriaCode || crit.code}` : ''}
+                            {crit.criteriacode || crit.code ? `${crit.criteriacode || crit.code}` : ''}
                           </h4>
                           <p className="text-xs font-semibold text-white mt-0.5">
-                            {crit.CriteriaName || crit.name || ''}
+                            {crit.criterianame || crit.name || ''}
                           </p>
                         </div>
 
                         {/* Requirements Items */}
                         <div className="space-y-3">
                           {reqs.map((req) => {
-                            const reqId = req.RequirementID || req.id;
-                            const statusId = Number(req.Status || req.status || 3);
+                            const reqId = req.requirementid || req.id;
+                            const statusid = Number(req.Status || req.status || 3);
                             const isExpanded = expandedReqs.has(reqId);
                             const isUpdating = updatingReqId === reqId;
 
                             // Filter check
-                            if (statusFilter === 'complied' && statusId !== 5) return null;
-                            if (statusFilter === 'partial' && statusId !== 4) return null;
-                            if (statusFilter === 'not' && statusId !== 3) return null;
+                            if (statusFilter === 'complied' && statusid !== 5) return null;
+                            if (statusFilter === 'partial' && statusid !== 4) return null;
+                            if (statusFilter === 'not' && statusid !== 3) return null;
 
                             const q = searchTerm.trim().toLowerCase();
                             if (q) {
                               const desc = String(req.Description || req.description || '').toLowerCase();
-                              const code = String(req.RequirementCode || req.code || '').toLowerCase();
+                              const code = String(req.requirementcode || req.code || '').toLowerCase();
                               if (!desc.includes(q) && !code.includes(q)) return null;
                             }
 
@@ -454,7 +497,7 @@ export default function OfficeInspectionModal({
                                 {/* Left: Status Slider (Photo 4) */}
                                 <div className="shrink-0 pt-0.5">
                                   <StatusSlider
-                                    statusId={statusId}
+                                    statusid={statusid}
                                     onChange={(nextVal) => handleStatusChange(reqId, nextVal)}
                                     updating={isUpdating}
                                   />
@@ -464,7 +507,7 @@ export default function OfficeInspectionModal({
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2">
                                     <span className="text-xs font-extrabold text-slate-900">
-                                      {req.RequirementCode || req.code || `Requirement #${reqId}`}
+                                      {req.requirementcode || req.code || `Requirement #${reqId}`}
                                     </span>
                                   </div>
 
@@ -558,7 +601,7 @@ export default function OfficeInspectionModal({
             {proofDocument && (
               <>
                 <a
-                  href={proofDocument.file_path}
+                  href={proofDocument.filepath}
                   download
                   className="px-3.5 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-lg text-xs font-bold border border-slate-200 transition-colors flex items-center gap-1.5"
                 >
@@ -567,7 +610,7 @@ export default function OfficeInspectionModal({
                 </a>
 
                 <a
-                  href={proofDocument.file_path}
+                  href={proofDocument.filepath}
                   target="_blank"
                   rel="noreferrer"
                   className="px-3.5 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-lg text-xs font-bold border border-slate-200 transition-colors flex items-center gap-1.5"

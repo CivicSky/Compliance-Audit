@@ -6,11 +6,11 @@ import CustomSelect from '../UI/CustomSelect';
 
 export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
     const [formData, setFormData] = useState({
-        EventID: '',
-        RequirementCode: '',
+        eventid: '',
+        requirementcode: '',
         Description: '',
-        CriteriaID: '',
-        ParentRequirementCode: '',
+        criteriaid: '',
+        parentrequirementcode: '',
         ChildCriteriaID: ''
     });
 
@@ -31,30 +31,30 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
 
     // Fetch criteria when event is selected
     useEffect(() => {
-        if (formData.EventID) {
-            fetchCriteriaByEvent(formData.EventID);
+        if (formData.eventid) {
+            fetchCriteriaByEvent(formData.eventid);
         } else {
             setCriteriaList([]);
         }
-    }, [formData.EventID]);
+    }, [formData.eventid]);
 
     // Fetch requirements for selected criteria
     useEffect(() => {
-        if (formData.CriteriaID) {
-            fetchRequirementsByCriteria(formData.CriteriaID);
+        if (formData.criteriaid) {
+            fetchRequirementsByCriteria(formData.criteriaid);
         } else {
             setRequirementsList([]);
         }
         // clear selected child when criteria changes
         setFormData(prev => ({ ...prev, ChildCriteriaID: '' }));
-    }, [formData.CriteriaID]);
+    }, [formData.criteriaid]);
 
     // When child selection changes, load requirements for that child (to populate parent options)
     useEffect(() => {
         if (formData.ChildCriteriaID) {
             fetchRequirementsByCriteria(formData.ChildCriteriaID);
-        } else if (formData.CriteriaID) {
-            fetchRequirementsByCriteria(formData.CriteriaID);
+        } else if (formData.criteriaid) {
+            fetchRequirementsByCriteria(formData.criteriaid);
         } else {
             setRequirementsList([]);
         }
@@ -65,12 +65,12 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
     // Also regenerate when criteria list or criteria selection changes
     useEffect(() => {
         generateRequirementCode();
-    }, [criteriaList, formData.CriteriaID]);
+    }, [criteriaList, formData.criteriaid]);
 
     // Regenerate when parent selection, child selection, or available requirements change
     useEffect(() => {
         generateRequirementCode();
-    }, [formData.ParentRequirementCode, formData.ChildCriteriaID, requirementsList]);
+    }, [formData.parentrequirementcode, formData.ChildCriteriaID, requirementsList]);
 
     const fetchEvents = async () => {
         try {
@@ -85,12 +85,12 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
         }
     };
 
-    const fetchCriteriaByEvent = async (eventId) => {
+    const fetchCriteriaByEvent = async (eventid) => {
         setIsLoading(true);
         try {
             const { criteriaAPI } = await import('../../utils/api');
-            console.log('Fetching criteria for event:', eventId);
-            const response = await criteriaAPI.getByEvent(eventId);
+            console.log('Fetching criteria for event:', eventid);
+            const response = await criteriaAPI.getByEvent(eventid);
             console.log('Criteria response:', response);
             
             if (response.success) {
@@ -106,16 +106,16 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
         }
     };
 
-    const fetchRequirementsByCriteria = async (criteriaId) => {
+    const fetchRequirementsByCriteria = async (criteriaid) => {
         try {
             const { requirementsAPI } = await import('../../utils/api');
-            console.log('Fetching requirements for criteria:', criteriaId);
+            console.log('Fetching requirements for criteria:', criteriaid);
             const response = await requirementsAPI.getAllRequirements();
             console.log('Requirements response:', response);
             
             if (response.success) {
                 // Filter requirements by selected criteria
-                const filtered = response.data.filter(req => req.CriteriaID == criteriaId);
+                const filtered = response.data.filter(req => req.criteriaid == criteriaid);
                 console.log('Filtered requirements for criteria:', filtered);
                 setRequirementsList(filtered);
             } else {
@@ -142,62 +142,62 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
     };
 
     // compute child criteria for selected criteria
-    const childCriteriaOptions = (criteriaList || []).filter(c => String(c.ParentCriteriaID || '') === String(formData.CriteriaID));
+    const childCriteriaOptions = (criteriaList || []).filter(c => String(c.parentcriteriaid || '') === String(formData.criteriaid));
 
     // top-level criteria (exclude children) for the main Criteria dropdown
-    const topLevelCriteria = (criteriaList || []).filter(c => c.ParentCriteriaID === null || c.ParentCriteriaID === undefined || String(c.ParentCriteriaID) === '');
+    const topLevelCriteria = (criteriaList || []).filter(c => c.parentcriteriaid === null || c.parentcriteriaid === undefined || String(c.parentcriteriaid) === '');
 
-    const getBaseCriteriaCode = (criteriaId) => {
-        if (!criteriaId) return '';
+    const getBaseCriteriaCode = (criteriaid) => {
+        if (!criteriaid) return '';
         const list = criteriaList || [];
-        const crit = list.find(c => String(c.CriteriaID) === String(criteriaId) || Number(c.CriteriaID) === Number(criteriaId));
+        const crit = list.find(c => String(c.criteriaid) === String(criteriaid) || Number(c.criteriaid) === Number(criteriaid));
         if (!crit) return '';
-        const code = crit.CriteriaCode ?? crit.criteria_code ?? '';
+        const code = crit.criteriacode ?? crit.criteriacode ?? '';
         if (code) return code;
-        const parentId = crit.ParentCriteriaID ?? crit.parent_criteria_id ?? null;
+        const parentId = crit.parentcriteriaid ?? crit.parentcriteriaid ?? null;
         if (parentId) {
-            const parent = list.find(c => String(c.CriteriaID) === String(parentId) || Number(c.CriteriaID) === Number(parentId));
-            return parent?.CriteriaCode ?? parent?.criteria_code ?? '';
+            const parent = list.find(c => String(c.criteriaid) === String(parentId) || Number(c.criteriaid) === Number(parentId));
+            return parent?.criteriacode ?? parent?.criteriacode ?? '';
         }
         return '';
     };
 
     const generateRequirementCode = () => {
         // Base code should always come from the parent criteria (children are grouping only)
-        const baseCriteriaId = formData.CriteriaID;
+        const baseCriteriaId = formData.criteriaid;
         const baseCode = getBaseCriteriaCode(baseCriteriaId);
         if (!baseCode) {
-            setFormData(prev => ({ ...prev, RequirementCode: '' }));
+            setFormData(prev => ({ ...prev, requirementcode: '' }));
             return;
         }
 
         // Determine list of existing requirements to compute next index
-        const targetCriteriaId = formData.ChildCriteriaID || formData.CriteriaID;
-        const list = (requirementsList || []).filter(r => String(r.CriteriaID) === String(targetCriteriaId));
+        const targetCriteriaId = formData.ChildCriteriaID || formData.criteriaid;
+        const list = (requirementsList || []).filter(r => String(r.criteriaid) === String(targetCriteriaId));
         const escapedBase = baseCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const nums = list.map(o => {
-            const rc = String(o.RequirementCode || '');
+            const rc = String(o.requirementcode || '');
             const m = rc.match(new RegExp(`^${escapedBase}\\.(\\d+)$`));
             return m ? Number(m[1]) : null;
         }).filter(n => n !== null);
         const next = nums.length ? Math.max(...nums) + 1 : 1;
-        setFormData(prev => ({ ...prev, RequirementCode: `${baseCode}.${next}` }));
+        setFormData(prev => ({ ...prev, requirementcode: `${baseCode}.${next}` }));
     };
 
     const validateForm = () => {
         const newErrors = {};
         
-        if (!formData.EventID) {
-            newErrors.EventID = 'Event is required';
+        if (!formData.eventid) {
+            newErrors.eventid = 'Event is required';
         }
-        if (!formData.RequirementCode.trim()) {
-            newErrors.RequirementCode = 'Standard code is required';
+        if (!formData.requirementcode.trim()) {
+            newErrors.requirementcode = 'Standard code is required';
         }
         if (!formData.Description.trim()) {
             newErrors.Description = 'Description is required';
         }
-        if (!formData.CriteriaID) {
-            newErrors.CriteriaID = 'Sub area is required';
+        if (!formData.criteriaid) {
+            newErrors.criteriaid = 'Sub area is required';
         }
 
         setErrors(newErrors);
@@ -218,12 +218,13 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
             const { requirementsAPI } = await import('../../utils/api');
             
             // Add requirement to database
-            const targetCriteriaId = formData.ChildCriteriaID ? formData.ChildCriteriaID : formData.CriteriaID;
+            const targetCriteriaId = formData.ChildCriteriaID ? formData.ChildCriteriaID : formData.criteriaid;
             const response = await requirementsAPI.addRequirement({
-                RequirementCode: formData.RequirementCode,
+                requirementcode: formData.requirementcode,
+                description: formData.Description,
                 Description: formData.Description,
-                CriteriaID: targetCriteriaId,
-                ParentRequirementCode: formData.ParentRequirementCode || null
+                criteriaid: targetCriteriaId,
+                parentrequirementcode: formData.parentrequirementcode || null
             });
 
             if (response.success) {
@@ -231,10 +232,10 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                 
                 // Reset form and close modal
                 setFormData({
-                    RequirementCode: '',
+                    requirementcode: '',
                     Description: '',
-                    CriteriaID: '',
-                    ParentRequirementCode: ''
+                    criteriaid: '',
+                    parentrequirementcode: ''
                 });
                 
                 // Call onSuccess callback if provided
@@ -260,11 +261,11 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
         if (!isSubmitting) {
             // Reset form when closing
             setFormData({
-                EventID: '',
-                RequirementCode: '',
+                eventid: '',
+                requirementcode: '',
                 Description: '',
-                CriteriaID: '',
-                ParentRequirementCode: ''
+                criteriaid: '',
+                parentrequirementcode: ''
             });
             setErrors({});
             setCriteriaList([]);
@@ -299,53 +300,53 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                         <form onSubmit={handleSubmit} className="space-y-4">
                     {/* Event Selection */}
                     <div>
-                        <label htmlFor="EventID" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                        <label htmlFor="eventid" className="block text-xs font-semibold text-slate-700 mb-1.5">
                             Accreditation *
                         </label>
                         <CustomSelect
-                            id="EventID"
+                            id="eventid"
                             size="md"
-                            value={formData.EventID}
-                            onChange={(val) => handleInputChange({ target: { name: 'EventID', value: val } })}
+                            value={formData.eventid}
+                            onChange={(val) => handleInputChange({ target: { name: 'eventid', value: val } })}
                             options={eventsList.map((event) => ({
-                                 value: String(event.EventID),
-                                 label: `${event.EventCode} - ${event.EventName}`
+                                 value: String(event.eventid),
+                                 label: `${event.eventcode} - ${event.eventname}`
                             }))}
                             placeholder="Select an accreditation"
                             disabled={isSubmitting}
-                            buttonClassName={errors.EventID ? '!border-red-400' : ''}
+                            buttonClassName={errors.eventid ? '!border-red-400' : ''}
                         />
-                        {errors.EventID && (
-                            <p className="text-red-500 text-[11px] mt-1">{errors.EventID}</p>
+                        {errors.eventid && (
+                            <p className="text-red-500 text-[11px] mt-1">{errors.eventid}</p>
                         )}
                         <p className="text-[11px] text-slate-400 mt-1">Select the accreditation to filter sub areas</p>
                     </div>
 
                     {/* Criteria Dropdown */}
                     <div>
-                        <label htmlFor="CriteriaID" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                        <label htmlFor="criteriaid" className="block text-xs font-semibold text-slate-700 mb-1.5">
                             Sub Area *
                         </label>
                         <CustomSelect
-                            id="CriteriaID"
+                            id="criteriaid"
                             size="md"
-                            value={formData.CriteriaID}
-                            onChange={(val) => handleInputChange({ target: { name: 'CriteriaID', value: val } })}
+                            value={formData.criteriaid}
+                            onChange={(val) => handleInputChange({ target: { name: 'criteriaid', value: val } })}
                             options={topLevelCriteria.map((criteria) => ({
-                                value: String(criteria.CriteriaID),
-                                label: `${criteria.CriteriaCode} - ${criteria.CriteriaName}`
+                                value: String(criteria.criteriaid),
+                                label: `${criteria.criteriacode} - ${criteria.criterianame}`
                             }))}
-                            placeholder={!formData.EventID ? 'Select an accreditation first' : 'Select a sub area'}
-                            disabled={isSubmitting || isLoading || !formData.EventID}
-                            buttonClassName={errors.CriteriaID ? '!border-red-400' : ''}
+                            placeholder={!formData.eventid ? 'Select an accreditation first' : 'Select a sub area'}
+                            disabled={isSubmitting || isLoading || !formData.eventid}
+                            buttonClassName={errors.criteriaid ? '!border-red-400' : ''}
                         />
-                        {errors.CriteriaID && (
-                            <p className="text-red-500 text-[11px] mt-1">{errors.CriteriaID}</p>
+                        {errors.criteriaid && (
+                            <p className="text-red-500 text-[11px] mt-1">{errors.criteriaid}</p>
                         )}
                         {isLoading && (
                             <p className="text-slate-400 text-[11px] mt-1">Loading sub areas...</p>
                         )}
-                        {!isLoading && formData.EventID && topLevelCriteria.length === 0 && (
+                        {!isLoading && formData.eventid && topLevelCriteria.length === 0 && (
                             <p className="text-amber-600 text-[11px] mt-1">No top-level sub areas found for this accreditation.</p>
                         )}
                         {!isLoading && topLevelCriteria.length > 0 && (
@@ -355,25 +356,25 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
 
                     {/* Parent Requirement Code */}
                     <div>
-                        <label htmlFor="ParentRequirementCode" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                        <label htmlFor="parentrequirementcode" className="block text-xs font-semibold text-slate-700 mb-1.5">
                             Parent Standard Code (Optional)
                         </label>
                         <CustomSelect
-                            id="ParentRequirementCode"
+                            id="parentrequirementcode"
                             size="md"
-                            value={formData.ParentRequirementCode}
-                            onChange={(val) => handleInputChange({ target: { name: 'ParentRequirementCode', value: val } })}
+                            value={formData.parentrequirementcode}
+                            onChange={(val) => handleInputChange({ target: { name: 'parentrequirementcode', value: val } })}
                             options={[
-                                { value: '', label: !formData.CriteriaID ? 'Select a sub area first' : 'None (Top-level standard)' },
+                                { value: '', label: !formData.criteriaid ? 'Select a sub area first' : 'None (Top-level standard)' },
                                 ...requirementsList.map((req) => ({
-                                    value: req.RequirementCode,
-                                    label: `${req.RequirementCode} - ${req.Description?.substring(0, 50) || ''}${req.Description?.length > 50 ? '...' : ''}`
+                                    value: req.requirementcode,
+                                    label: `${req.requirementcode} - ${req.Description?.substring(0, 50) || ''}${req.Description?.length > 50 ? '...' : ''}`
                                 }))
                             ]}
-                            placeholder={!formData.CriteriaID ? 'Select a sub area first' : 'None (Top-level standard)'}
-                            disabled={isSubmitting || !formData.CriteriaID}
+                            placeholder={!formData.criteriaid ? 'Select a sub area first' : 'None (Top-level standard)'}
+                            disabled={isSubmitting || !formData.criteriaid}
                         />
-                        {!formData.CriteriaID ? (
+                        {!formData.criteriaid ? (
                             <p className="text-slate-400 text-[11px] mt-1">
                                 Select a sub area to see available parent standards
                             </p>
@@ -402,12 +403,12 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                                 options={[
                                     { value: '', label: 'No child selected (use selected sub area)' },
                                     ...childCriteriaOptions.map(cc => ({
-                                        value: String(cc.CriteriaID),
-                                        label: cc.CriteriaCode ? `${cc.CriteriaCode} - ${cc.CriteriaName}` : cc.CriteriaName
+                                        value: String(cc.criteriaid),
+                                        label: cc.criteriacode ? `${cc.criteriacode} - ${cc.criterianame}` : cc.criterianame
                                     }))
                                 ]}
                                 placeholder="No child selected (use selected sub area)"
-                                disabled={isSubmitting || !formData.CriteriaID}
+                                disabled={isSubmitting || !formData.criteriaid}
                             />
                             <p className="text-[11px] text-slate-400 mt-1">Choose a child sub area to save this standard under that child.</p>
                         </div>
@@ -415,23 +416,23 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
 
                     {/* Requirement Code */}
                     <div>
-                        <label htmlFor="RequirementCode" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                        <label htmlFor="requirementcode" className="block text-xs font-semibold text-slate-700 mb-1.5">
                             Standard Code *
                         </label>
                         <input
                             type="text"
-                            id="RequirementCode"
-                            name="RequirementCode"
-                            value={formData.RequirementCode}
+                            id="requirementcode"
+                            name="requirementcode"
+                            value={formData.requirementcode}
                             onChange={handleInputChange}
                             className={`w-full px-3 py-2 text-xs border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ${
-                                errors.RequirementCode ? 'border-red-400' : 'border-slate-200'
+                                errors.requirementcode ? 'border-red-400' : 'border-slate-200'
                             }`}
                             placeholder="e.g., A.1, B.2.1"
                             disabled={isSubmitting}
                         />
-                        {errors.RequirementCode && (
-                            <p className="text-red-500 text-[11px] mt-1">{errors.RequirementCode}</p>
+                        {errors.requirementcode && (
+                            <p className="text-red-500 text-[11px] mt-1">{errors.requirementcode}</p>
                         )}
                     </div>
 
@@ -469,7 +470,7 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                         </button>
                         <button
                             type="submit"
-                            disabled={isSubmitting || !formData.EventID || !formData.CriteriaID}
+                            disabled={isSubmitting || !formData.eventid || !formData.criteriaid}
                             className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-4 text-xs font-semibold text-white shadow-2xs hover:bg-blue-700 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                         >
                             {isSubmitting && (
@@ -484,11 +485,11 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                     {/* Right Side - Preview */}
                     <div className="w-1/2 p-6 bg-slate-50 flex flex-col justify-start">
                         {(() => {
-                            const selectedCrit = criteriaList.find(c => String(c.CriteriaID) === String(formData.ChildCriteriaID || formData.CriteriaID));
+                            const selectedCrit = criteriaList.find(c => String(c.criteriaid) === String(formData.ChildCriteriaID || formData.criteriaid));
                             const selectedArea = selectedCrit ? {
-                                AreaID: selectedCrit.AreaID,
-                                AreaName: selectedCrit.AreaName || selectedCrit.area_name,
-                                AreaCode: selectedCrit.AreaCode || selectedCrit.area_code
+                                areaid: selectedCrit.areaid,
+                                areaname: selectedCrit.areaname || selectedCrit.areaname,
+                                areacode: selectedCrit.areacode || selectedCrit.areacode
                             } : null;
 
                             return (
@@ -497,10 +498,10 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
                                     areaData={selectedArea}
                                     criteriaData={selectedCrit || null}
                                     requirementData={{
-                                        RequirementCode: formData.RequirementCode,
+                                        requirementcode: formData.requirementcode,
                                         Description: formData.Description
                                     }}
-                                    event={eventsList.find(e => String(e.EventID) === String(formData.EventID)) || null}
+                                    event={eventsList.find(e => String(e.eventid) === String(formData.eventid)) || null}
                                 />
                             );
                         })()}

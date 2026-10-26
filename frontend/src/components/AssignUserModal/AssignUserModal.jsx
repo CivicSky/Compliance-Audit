@@ -4,7 +4,7 @@ import { useModal } from "../UI/ModalProvider";
 import { API_BASE_URL } from '../../utils/apiBase';
 import SmartUserAvatar from '../UI/SmartUserAvatar';
 
-export default function AssignUserModal({ isOpen, onClose, requirement, officeId, onSuccess, currentUserId, isAdmin = false }) {
+export default function AssignUserModal({ isOpen, onClose, requirement, officeid, onSuccess, currentUserId, isAdmin = false }) {
     const [availableUsers, setAvailableUsers] = useState([]);
     const [assignedUsers, setAssignedUsers] = useState([]);
     const [selectedUserIds, setSelectedUserIds] = useState([]);
@@ -30,8 +30,8 @@ export default function AssignUserModal({ isOpen, onClose, requirement, officeId
         try {
             // Fetch available users and assigned users in parallel
             const [availableRes, assignedRes] = await Promise.all([
-                requirementsAPI.getAvailableUsersForAssignment(requirement.RequirementID, officeId),
-                requirementsAPI.getAssignedUsers(requirement.RequirementID, officeId)
+                requirementsAPI.getAvailableUsersForAssignment(requirement.requirementid, officeid),
+                requirementsAPI.getAssignedUsers(requirement.requirementid, officeid)
             ]);
 
             setAvailableUsers(availableRes.data || []);
@@ -45,10 +45,10 @@ export default function AssignUserModal({ isOpen, onClose, requirement, officeId
     };
 
     // Toggle user selection
-    const toggleUserSelection = (userId) => {
+    const toggleUserSelection = (userid) => {
         setSelectedUserIds(prev => {
-            if (prev.includes(userId)) {
-                return prev.filter(id => id !== userId);
+            if (prev.includes(userid)) {
+                return prev.filter(id => id !== userid);
             } else {
                 // Check if we can add more (max 4 total assigned)
                 const totalAfterAdd = assignedUsers.length + prev.length + 1;
@@ -56,7 +56,7 @@ export default function AssignUserModal({ isOpen, onClose, requirement, officeId
                     setError('Maximum 4 users can be assigned to a requirement');
                     return prev;
                 }
-                return [...prev, userId];
+                return [...prev, userid];
             }
         });
         setError('');
@@ -65,7 +65,7 @@ export default function AssignUserModal({ isOpen, onClose, requirement, officeId
     // Filter users by search term
     const filteredUsers = availableUsers.filter(user => {
         if (user.isAssigned) return false; // Hide already assigned users
-        const fullName = `${user.FirstName} ${user.MiddleInitial ? user.MiddleInitial + '.' : ''} ${user.LastName}`.toLowerCase();
+        const fullName = `${user.firstname} ${user.middleinitial ? user.middleinitial + '.' : ''} ${user.lastname}`.toLowerCase();
         const email = (user.Email || '').toLowerCase();
         const search = searchTerm.toLowerCase();
         return fullName.includes(search) || email.includes(search);
@@ -88,8 +88,8 @@ export default function AssignUserModal({ isOpen, onClose, requirement, officeId
 
         try {
             const response = await requirementsAPI.assignUsersToRequirement(
-                requirement.RequirementID,
-                officeId,
+                requirement.requirementid,
+                officeid,
                 selectedUserIds,
                 currentUserId
             );
@@ -114,12 +114,12 @@ export default function AssignUserModal({ isOpen, onClose, requirement, officeId
         }
     };
 
-    const handleRemoveAssignment = async (assignmentId) => {
+    const handleRemoveAssignment = async (assignmentid) => {
         const ok = await showConfirm('Are you sure you want to remove this user assignment?');
         if (!ok) return;
 
         try {
-            const response = await requirementsAPI.removeUserAssignment(assignmentId);
+            const response = await requirementsAPI.removeUserAssignment(assignmentid);
             if (response.success) {
                 await fetchData();
                 if (onSuccess) onSuccess();
@@ -130,9 +130,9 @@ export default function AssignUserModal({ isOpen, onClose, requirement, officeId
         }
     };
 
-    const handleToggleUploadStatus = async (assignmentId, currentStatus) => {
+    const handleToggleUploadStatus = async (assignmentid, currentStatus) => {
         try {
-            const response = await requirementsAPI.updateUserUploadStatus(assignmentId, !currentStatus);
+            const response = await requirementsAPI.updateUserUploadStatus(assignmentid, !currentStatus);
             if (response.success) {
                 await fetchData();
                 if (onSuccess) onSuccess();
@@ -152,8 +152,8 @@ export default function AssignUserModal({ isOpen, onClose, requirement, officeId
                 <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-t-lg">
                     <div className="flex-1 min-w-0">
                         <h2 className="text-lg font-semibold truncate">Assign Users</h2>
-                        <p className="text-sm text-indigo-100 truncate" title={requirement.RequirementCode}>
-                            {requirement.RequirementCode}
+                        <p className="text-sm text-indigo-100 truncate" title={requirement.requirementcode}>
+                            {requirement.requirementcode}
                         </p>
                     </div>
                     <button
@@ -238,13 +238,13 @@ export default function AssignUserModal({ isOpen, onClose, requirement, officeId
                                 ) : (
                                     <div className="space-y-1.5">
                                         {filteredUsers.map(user => {
-                                            const isSelected = selectedUserIds.includes(user.UserID);
-                                            const fullName = `${user.FirstName} ${user.MiddleInitial ? user.MiddleInitial + '.' : ''} ${user.LastName}`;
+                                            const isSelected = selectedUserIds.includes(user.userid);
+                                            const fullName = `${user.firstname} ${user.middleinitial ? user.middleinitial + '.' : ''} ${user.lastname}`;
                                             const isDisabled = !isSelected && !canSelectMore;
                                             
                                             return (
                                                 <label
-                                                    key={user.UserID}
+                                                    key={user.userid}
                                                     className={`flex items-center p-2.5 rounded-lg border cursor-pointer transition-all ${
                                                         isSelected 
                                                             ? 'bg-indigo-50 border-indigo-300 ring-1 ring-indigo-300' 
@@ -256,7 +256,7 @@ export default function AssignUserModal({ isOpen, onClose, requirement, officeId
                                                     <input
                                                         type="checkbox"
                                                         checked={isSelected}
-                                                        onChange={() => !isDisabled && toggleUserSelection(user.UserID)}
+                                                        onChange={() => !isDisabled && toggleUserSelection(user.userid)}
                                                         disabled={isDisabled}
                                                         className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-brand-500"
                                                     />
@@ -343,13 +343,13 @@ export default function AssignUserModal({ isOpen, onClose, requirement, officeId
                             ) : (
                                 <div className="space-y-2">
                                     {assignedUsers.map(user => {
-                                        const fullName = `${user.FirstName} ${user.MiddleInitial ? user.MiddleInitial + '.' : ''} ${user.LastName}`;
-                                        const hasUploaded = user.HasUploaded === 1 || user.HasUploaded === true;
+                                        const fullName = `${user.firstname} ${user.middleinitial ? user.middleinitial + '.' : ''} ${user.lastname}`;
+                                        const hasuploaded = user.hasuploaded === 1 || user.hasuploaded === true;
                                         
                                         return (
                                             <div
-                                                key={user.AssignmentID}
-                                                className={`flex items-center p-2.5 rounded-lg border bg-white ${hasUploaded ? 'border-green-300 bg-green-50' : 'border-gray-200'}`}
+                                                key={user.assignmentid}
+                                                className={`flex items-center p-2.5 rounded-lg border bg-white ${hasuploaded ? 'border-green-300 bg-green-50' : 'border-gray-200'}`}
                                             >
                                                 <div className="flex-shrink-0 relative">
                                                     <SmartUserAvatar
@@ -357,10 +357,10 @@ export default function AssignUserModal({ isOpen, onClose, requirement, officeId
                                                         fullName={fullName}
                                                         size="w-8 h-8"
                                                         textSize="text-xs font-bold"
-                                                        ring={`border-2 ${hasUploaded ? 'border-green-500' : 'border-gray-300'}`}
+                                                        ring={`border-2 ${hasuploaded ? 'border-green-500' : 'border-gray-300'}`}
                                                     />
                                                     {/* Upload status indicator */}
-                                                    {hasUploaded && (
+                                                    {hasuploaded && (
                                                         <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full flex items-center justify-center">
                                                             <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
                                                                 <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
@@ -375,28 +375,28 @@ export default function AssignUserModal({ isOpen, onClose, requirement, officeId
                                                 {/* Upload Status - Toggle for admin, read-only for users */}
                                                 {isAdmin ? (
                                                     <button
-                                                        onClick={() => handleToggleUploadStatus(user.AssignmentID, hasUploaded)}
+                                                        onClick={() => handleToggleUploadStatus(user.assignmentid, hasuploaded)}
                                                         className={`ml-2 px-2 py-1 text-xs font-medium rounded transition-colors ${
-                                                            hasUploaded 
+                                                            hasuploaded 
                                                                 ? 'bg-green-100 text-green-700 hover:bg-green-200' 
                                                                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                                                         }`}
-                                                        title={hasUploaded ? 'Click to mark as not uploaded' : 'Click to mark as uploaded'}
+                                                        title={hasuploaded ? 'Click to mark as not uploaded' : 'Click to mark as uploaded'}
                                                     >
-                                                        {hasUploaded ? 'Uploaded' : 'Not Uploaded'}
+                                                        {hasuploaded ? 'Uploaded' : 'Not Uploaded'}
                                                     </button>
                                                 ) : (
                                                     <span className={`ml-2 px-2 py-1 text-xs font-medium rounded ${
-                                                        hasUploaded 
+                                                        hasuploaded 
                                                             ? 'bg-green-100 text-green-700' 
                                                             : 'bg-gray-100 text-gray-600'
                                                     }`}>
-                                                        {hasUploaded ? 'Uploaded' : 'Not Uploaded'}
+                                                        {hasuploaded ? 'Uploaded' : 'Not Uploaded'}
                                                     </span>
                                                 )}
                                                 {isAdmin && (
                                                     <button
-                                                        onClick={() => handleRemoveAssignment(user.AssignmentID)}
+                                                        onClick={() => handleRemoveAssignment(user.assignmentid)}
                                                         className="ml-2 p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors"
                                                         title="Remove assignment"
                                                     >

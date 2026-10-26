@@ -31,7 +31,17 @@ import {
     Calendar,
     Layers,
     ListChecks,
+    Award,
 } from "lucide-react";
+import {
+    actionStyles,
+    normalizeActionLabel,
+    resolveLogContext,
+    buildInDepthMessage,
+    roleIdToName,
+    stripEmojis,
+    formatTimestamp,
+} from "../utils/auditLogHelpers";
 
 const unwrapArray = (payload) => {
     if (Array.isArray(payload)) return payload;
@@ -39,30 +49,8 @@ const unwrapArray = (payload) => {
     if (Array.isArray(payload?.logs)) return payload.logs;
     if (Array.isArray(payload?.users)) return payload.users;
     if (Array.isArray(payload?.events)) return payload.events;
+    if (Array.isArray(payload?.areas)) return payload.areas;
     return [];
-};
-
-const normalizeAction = (rawAction) => {
-    const action = String(rawAction || "").trim();
-    if (/^POST\s+/i.test(action)) return "Created";
-    if (/^(PUT|PATCH)\s+/i.test(action)) return "Updated";
-    if (/^DELETE\s+/i.test(action)) return "Deleted";
-    if (/^GET\s+/i.test(action)) return "Viewed";
-    if (/login/i.test(action)) return "Login";
-    if (/logout/i.test(action)) return "Logout";
-    if (/(added|created|registered|copied)$/i.test(action)) return "Created";
-    if (/(updated|relocated)$/i.test(action)) return "Updated";
-    if (/(deleted|canceled|cancelled|removed)$/i.test(action)) return "Deleted";
-    return "Updated";
-};
-
-const statusBadgeStyles = {
-    Created: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    Updated: "bg-blue-50 text-blue-700 border-blue-200",
-    Deleted: "bg-rose-50 text-rose-700 border-rose-200",
-    Viewed: "bg-amber-50 text-amber-700 border-amber-200",
-    Login: "bg-slate-100 text-slate-700 border-slate-200",
-    Logout: "bg-slate-100 text-slate-600 border-slate-200",
 };
 
 export default function Home() {
@@ -72,6 +60,7 @@ export default function Home() {
     const [events, setEvents] = useState([]);
     const [requirements, setRequirements] = useState([]);
     const [criteria, setCriteria] = useState([]);
+    const [areas, setAreas] = useState([]);
     const [users, setUsers] = useState([]);
     const [logs, setLogs] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -80,9 +69,10 @@ export default function Home() {
     const [currentUser, setCurrentUser] = useState(null);
     const [inspectOffice, setInspectOffice] = useState(null);
     const [isViewReqModalOpen, setIsViewReqModalOpen] = useState(false);
+    const [expandedLogId, setExpandedLogId] = useState(null);
 
     // Default to admin (show features) until we confirm otherwise
-    const isAdmin = !!(currentUser && (currentUser.RoleName === 'admin' || currentUser.RoleID === 1));
+    const isAdmin = !!(currentUser && (currentUser.rolename === 'admin' || currentUser.roleid === 1));
 
     useEffect(() => {
         const fetchCurrentUser = async () => {
@@ -110,6 +100,7 @@ export default function Home() {
                 requirementsPayload,
                 criteriaPayload,
                 usersPayload,
+                areasPayload,
                 logsResponse,
             ] = await Promise.all([
                 complianceStatusOfficesAPI.getAll().catch(() => []),
@@ -119,6 +110,7 @@ export default function Home() {
                 requirementsAPI.getAllRequirements().catch(() => ({ data: [] })),
                 criteriaAPI.getAll().catch(() => ({ data: [] })),
                 usersAPI.getAllUsers().catch(() => ({ users: [] })),
+                api.get("/api/areas").catch(() => ({ data: [] })),
                 api.get("/api/logs").catch(() => ({ data: { logs: [] } })),
             ]);
 
@@ -129,6 +121,7 @@ export default function Home() {
             const nextRequirements = unwrapArray(requirementsPayload);
             const nextCriteria = unwrapArray(criteriaPayload);
             const nextUsers = unwrapArray(usersPayload);
+            const nextAreas = unwrapArray(areasPayload);
             const nextLogs = unwrapArray(logsResponse?.data)
                 .slice()
                 .sort((a, b) => new Date(b.Timestamp || 0) - new Date(a.Timestamp || 0));
@@ -140,6 +133,7 @@ export default function Home() {
             setRequirements(nextRequirements);
             setCriteria(nextCriteria);
             setUsers(nextUsers);
+            setAreas(nextAreas);
             setLogs(nextLogs);
             setError(null);
         } catch (err) {
@@ -172,23 +166,23 @@ export default function Home() {
         completionRate,
     } = useMemo(() => {
         const getOfficeId = (office) =>
-            office?.OfficeID ?? office?.id ?? office?.office_id ?? null;
+            office?.officeid ?? office?.id ?? office?.officeid ?? null;
         const getOfficeEventId = (office) =>
-            office?.EventID ?? office?.EventId ?? office?.event_id ?? null;
+            office?.eventid ?? office?.EventId ?? office?.eventid ?? null;
         const getOfficeName = (office) =>
-            office?.OfficeName ?? office?.office_name ?? office?.OfficeCode ?? office?.office_code ?? null;
+            office?.officename ?? office?.officename ?? office?.OfficeCode ?? office?.office_code ?? null;
         const getEventId = (entity) =>
-            entity?.EventID ?? entity?.EventId ?? entity?.event_id ?? entity?.eventId ?? null;
+            entity?.eventid ?? entity?.EventId ?? entity?.eventid ?? entity?.eventid ?? null;
         const getCriteriaId = (criterion) =>
-            criterion?.CriteriaID ?? criterion?.CriteriaId ?? criterion?.criteria_id ?? criterion?.id ?? null;
+            criterion?.criteriaid ?? criterion?.CriteriaId ?? criterion?.criteriaid ?? criterion?.id ?? null;
         const getRequirementId = (requirement) =>
-            requirement?.RequirementID ?? requirement?.RequirementId ?? requirement?.requirement_id ?? requirement?.id ?? null;
+            requirement?.requirementid ?? requirement?.RequirementId ?? requirement?.requirementid ?? requirement?.id ?? null;
         const getRequirementCriteriaId = (requirement) =>
-            requirement?.CriteriaID ?? requirement?.CriteriaId ?? requirement?.criteria_id ?? null;
+            requirement?.criteriaid ?? requirement?.CriteriaId ?? requirement?.criteriaid ?? null;
         const getComplianceOfficeId = (row) =>
-            row?.OfficeID ?? row?.office_id ?? row?.officeId ?? null;
+            row?.officeid ?? row?.officeid ?? row?.officeid ?? null;
         const getComplianceRequirementId = (row) =>
-            row?.RequirementID ?? row?.requirement_id ?? row?.requirementId ?? null;
+            row?.requirementid ?? row?.requirementid ?? row?.requirementid ?? null;
         const getComplianceStatus = (row) =>
             row?.Status ?? row?.status ?? null;
 
@@ -199,61 +193,61 @@ export default function Home() {
         const officeByIdMap = new Map();
 
         for (const office of offices) {
-            const officeId = getOfficeId(office);
-            if (officeId !== undefined && officeId !== null) {
-                const idStr = String(officeId);
+            const officeid = getOfficeId(office);
+            if (officeid !== undefined && officeid !== null) {
+                const idStr = String(officeid);
                 officeByIdMap.set(idStr, office);
-                officeNameMap[idStr] = getOfficeName(office) || `Office ${officeId}`;
+                officeNameMap[idStr] = getOfficeName(office) || `Office ${officeid}`;
             }
         }
 
         for (const event of events) {
-            if (event?.EventID !== undefined && event?.EventID !== null) {
-                eventNameMap[String(event.EventID)] =
-                    event.EventName || event.EventCode || `Event ${event.EventID}`;
+            if (event?.eventid !== undefined && event?.eventid !== null) {
+                eventNameMap[String(event.eventid)] =
+                    event.eventname || event.eventcode || `Event ${event.eventid}`;
             }
         }
 
         const criteriaCountByEvent = {};
         const criteriaEventById = {};
         for (const criterion of criteria) {
-            const criteriaId = getCriteriaId(criterion);
-            const eventId = getEventId(criterion);
-            if (criteriaId !== undefined && criteriaId !== null && eventId !== undefined && eventId !== null) {
-                criteriaEventById[String(criteriaId)] = String(eventId);
+            const criteriaid = getCriteriaId(criterion);
+            const eventid = getEventId(criterion);
+            if (criteriaid !== undefined && criteriaid !== null && eventid !== undefined && eventid !== null) {
+                criteriaEventById[String(criteriaid)] = String(eventid);
             }
-            if (eventId !== undefined && eventId !== null) {
-                const key = String(eventId);
+            if (eventid !== undefined && eventid !== null) {
+                const key = String(eventid);
                 criteriaCountByEvent[key] = (criteriaCountByEvent[key] || 0) + 1;
             }
         }
 
         for (const item of complianceData) {
-            const officeId = item?.OfficeID;
-            const eventId = item?.EventID;
+            const officeid = item?.officeid;
+            const eventid = item?.eventid;
             const status = Number(item?.Status);
 
-            if (officeId !== undefined && officeId !== null) {
-                if (!byOffice[officeId]) byOffice[officeId] = [];
-                byOffice[officeId].push(status);
-                if (!officeNameMap[String(officeId)]) {
-                    officeNameMap[String(officeId)] = item?.OfficeName || `Office ${officeId}`;
+            if (officeid !== undefined && officeid !== null) {
+                if (!byOffice[officeid]) byOffice[officeid] = [];
+                byOffice[officeid].push(status);
+                if (!officeNameMap[String(officeid)]) {
+                    officeNameMap[String(officeid)] = item?.officename || `Office ${officeid}`;
                 }
             }
 
-            if (eventId !== undefined && eventId !== null) {
-                if (!byEvent[eventId]) byEvent[eventId] = [];
-                byEvent[eventId].push(status);
-                if (!eventNameMap[String(eventId)]) {
-                    eventNameMap[String(eventId)] = item?.EventName || `Event ${eventId}`;
+            if (eventid !== undefined && eventid !== null) {
+                if (!byEvent[eventid]) byEvent[eventid] = [];
+                byEvent[eventid].push(status);
+                if (!eventNameMap[String(eventid)]) {
+                    eventNameMap[String(eventid)] = item?.eventname || `Event ${eventid}`;
                 }
             }
         }
 
         // Helper to accurately classify any entity into: 'compiled' | 'partial' | 'notCompiled'
         const classifyOffice = (office, statuses = []) => {
-            const statusStr = String(office?.overall_status || office?.OverallStatus || '').trim().toLowerCase();
-            const percent = Number(office?.compliance_percent ?? office?.CompliancePercent ?? -1);
+            const statusStr = String(office?.overallstatus || office?.overallstatus || '').trim().toLowerCase();
+            const percent = Number(office?.compliancepercent ?? office?.compliancepercent ?? -1);
 
             if (statusStr === 'complied' || statusStr === 'fully complied' || percent >= 100) {
                 return 'compiled';
@@ -287,7 +281,7 @@ export default function Home() {
         // Classify all monitored entities (combining Academic Programs and Non-Academic Offices)
         const allEvaluatedOffices = offices.length > 0
             ? offices
-            : Object.keys(byOffice).map((id) => ({ OfficeID: id, id }));
+            : Object.keys(byOffice).map((id) => ({ officeid: id, id }));
 
         let done = 0;
         let partial = 0;
@@ -331,10 +325,10 @@ export default function Home() {
         });
 
         const activeEventProgressList = activeEvents.map((event) => {
-            const eventId = String(getEventId(event) ?? '');
+            const eventid = String(getEventId(event) ?? '');
 
             const eventOffices = offices.filter(
-                (office) => String(getOfficeEventId(office) ?? '') === eventId
+                (office) => String(getOfficeEventId(office) ?? '') === eventid
             );
 
             const eventOfficeIds = eventOffices
@@ -342,7 +336,7 @@ export default function Home() {
                 .filter(Boolean);
 
             const eventCriteriaIds = criteria
-                .filter((criterion) => String(getEventId(criterion) ?? '') === eventId)
+                .filter((criterion) => String(getEventId(criterion) ?? '') === eventid)
                 .map((criterion) => String(getCriteriaId(criterion) ?? ''))
                 .filter(Boolean);
 
@@ -351,7 +345,7 @@ export default function Home() {
                 .filter((requirement) => {
                     const directEventId = getEventId(requirement);
                     if (directEventId !== undefined && directEventId !== null) {
-                        return String(directEventId) === eventId;
+                        return String(directEventId) === eventid;
                     }
 
                     const requirementCriteriaId = getRequirementCriteriaId(requirement);
@@ -365,13 +359,13 @@ export default function Home() {
             const eventOfficeSet = new Set(eventOfficeIds);
             const eventRequirementSet = new Set(eventRequirementIds);
             const rowsForEvent = complianceData.filter((row) => {
-                const officeId = String(getComplianceOfficeId(row) ?? '');
-                if (!eventOfficeSet.has(officeId)) return false;
+                const officeid = String(getComplianceOfficeId(row) ?? '');
+                if (!eventOfficeSet.has(officeid)) return false;
 
                 if (eventRequirementSet.size === 0) return true;
 
-                const requirementId = String(getComplianceRequirementId(row) ?? '');
-                return eventRequirementSet.has(requirementId);
+                const requirementid = String(getComplianceRequirementId(row) ?? '');
+                return eventRequirementSet.has(requirementid);
             });
 
             let compiledOfficeCount = 0;
@@ -383,20 +377,20 @@ export default function Home() {
             let eventNonAcademicPartial = 0;
 
             const officeStatusesMap = new Map();
-            for (const officeId of eventOfficeIds) {
-                officeStatusesMap.set(officeId, []);
+            for (const officeid of eventOfficeIds) {
+                officeStatusesMap.set(officeid, []);
             }
 
             for (const row of rowsForEvent) {
-                const officeId = String(getComplianceOfficeId(row) ?? '');
-                if (!officeStatusesMap.has(officeId)) continue;
+                const officeid = String(getComplianceOfficeId(row) ?? '');
+                if (!officeStatusesMap.has(officeid)) continue;
                 const status = Number(getComplianceStatus(row));
-                officeStatusesMap.get(officeId).push(Number.isFinite(status) ? status : 3);
+                officeStatusesMap.get(officeid).push(Number.isFinite(status) ? status : 3);
             }
 
             for (const office of eventOffices) {
-                const officeId = String(getOfficeId(office));
-                const statusesForOffice = officeStatusesMap.get(officeId) || [];
+                const officeid = String(getOfficeId(office));
+                const statusesForOffice = officeStatusesMap.get(officeid) || [];
                 const officeBucket = classifyOffice(office, statusesForOffice);
                 const isAcademic = isAcademicEntity(office);
 
@@ -437,13 +431,13 @@ export default function Home() {
                 : (rawEventScore % 1 === 0 ? Number(rawEventScore.toFixed(0)) : Number(rawEventScore.toFixed(1)));
 
             return {
-                id: eventId,
-                name: event?.EventName || eventNameMap[eventId] || `Event ${eventId}`,
-                code: event?.EventCode || '-',
+                id: eventid,
+                name: event?.eventname || eventNameMap[eventid] || `Event ${eventid}`,
+                code: event?.eventcode || '-',
                 totalOffices: totalOfficesForEvent,
                 totalEvents: 1,
-                totalCriteria: criteriaCountByEvent[eventId] || 0,
-                totalRequirements: rowsForEvent.length,
+                totalCriteria: criteriaCountByEvent[eventid] || 0,
+                totalrequirements: rowsForEvent.length,
                 completionPercent,
                 officeStatus: {
                     compiled: compiledOfficeCount,
@@ -504,35 +498,95 @@ export default function Home() {
     }, [complianceData, offices, events, criteria, requirements]);
 
     const officesCount = Math.max(offices.length, Object.keys(officeMap).length);
-    const recentLogs = useMemo(() => logs.slice(0, 6), [logs]);
 
-    const activityByDay = useMemo(() => {
-        const today = new Date();
-        const buckets = [];
-        for (let i = 6; i >= 0; i -= 1) {
-            const d = new Date(today);
-            d.setDate(today.getDate() - i);
-            const key = d.toISOString().slice(0, 10);
-            buckets.push({
-                key,
-                label: d.toLocaleDateString("en-US", { weekday: "short" }),
-                dateLabel: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-                count: 0,
-            });
-        }
-
-        const indexByKey = Object.fromEntries(buckets.map((item, idx) => [item.key, idx]));
-        for (const log of logs) {
-            if (!log?.Timestamp) continue;
-            const key = new Date(log.Timestamp).toISOString().slice(0, 10);
-            if (indexByKey[key] !== undefined) {
-                buckets[indexByKey[key]].count += 1;
+    // Context lookups identical to AuditLogs.jsx
+    const lookups = useMemo(() => {
+        const eventLookup = {};
+        for (const item of events) {
+            if (item?.eventid != null) {
+                eventLookup[String(item.eventid)] = {
+                    eventname: item.eventname || "",
+                    eventcode: item.eventcode || "",
+                    Year: item.Year || ""
+                };
             }
         }
-        return buckets;
-    }, [logs]);
 
-    const maxActivityCount = Math.max(...activityByDay.map((item) => item.count), 1);
+        const areaLookup = {};
+        for (const item of areas) {
+            if (item?.areaid != null) {
+                areaLookup[String(item.areaid)] = {
+                    areaname: item.areaname || "",
+                    eventid: item.eventid || null
+                };
+            }
+        }
+
+        const criteriaLookup = {};
+        for (const item of criteria) {
+            if (item?.criteriaid != null) {
+                criteriaLookup[String(item.criteriaid)] = {
+                    criteriacode: item.criteriacode || "",
+                    criterianame: item.criterianame || "",
+                    areaid: item.areaid || null
+                };
+            }
+        }
+
+        const requirementLookup = {};
+        for (const item of requirements) {
+            if (item?.requirementid != null) {
+                requirementLookup[String(item.requirementid)] = {
+                    requirementcode: item.requirementcode || "",
+                    Description: item.Description || "",
+                    criteriaid: item.criteriaid || null
+                };
+            }
+        }
+
+        const officeLookup = {};
+        for (const item of offices) {
+            if (item?.officeid != null) {
+                officeLookup[String(item.officeid)] = {
+                    officename: item.officename || "",
+                    OfficeCode: item.OfficeCode || "",
+                    eventid: item.eventid || null
+                };
+            }
+        }
+
+        const userLookup = {};
+        for (const u of users) {
+            if (u?.userid != null) {
+                const name = String(
+                    u.FullName ||
+                    `${u.firstname || ""}${u.middleinitial ? ` ${u.middleinitial}.` : ""} ${u.lastname || ""}`
+                ).replace(/\s+/g, " ").trim();
+                userLookup[String(u.userid)] = name || u.Email || "User";
+            }
+        }
+
+        return { eventLookup, areaLookup, criteriaLookup, requirementLookup, officeLookup, userLookup };
+    }, [events, areas, criteria, requirements, offices, users]);
+
+    // Format recent logs with in-depth messages & lookups matching AuditLogs page
+    const preparedRecentLogs = useMemo(() => {
+        return logs.slice(0, 8).map((log) => {
+            const rawAction = log?.Action || log?.action || '';
+            const normalizedAction = normalizeActionLabel(rawAction);
+            const ctx = resolveLogContext(log, lookups);
+            const rawMessage = buildInDepthMessage(log, normalizedAction, ctx);
+            return {
+                ...log,
+                Action: stripEmojis(rawAction),
+                Timestamp: log?.Timestamp || log?.timestamp,
+                normalizedAction,
+                context: ctx,
+                readableMessage: stripEmojis(rawMessage),
+                displayname: stripEmojis(log?.displayname || log?.FullName),
+            };
+        });
+    }, [logs, lookups]);
 
     const totalOfficeUnits = compiledOffices + partialOffices + notCompiledOffices || officesCount || 1;
     const compiledOfficePct = Math.round((compiledOffices / totalOfficeUnits) * 100);
@@ -721,134 +775,7 @@ export default function Home() {
                 </div>
             </div>
 
-            {/* ── Operational Visualizers: Status Split & Activity Pulse ── */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 mb-6">
-                {/* Status Distribution (5 cols) */}
-                <div className="lg:col-span-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm flex flex-col justify-between">
-                    <div>
-                        <div className="flex items-center justify-between mb-4">
-                            <div>
-                                <h2 className="text-base font-bold text-slate-900">Institutional Compliance Ratio</h2>
-                                <p className="text-xs text-slate-500">
-                                    Distribution across {academicSummary?.totalAcademic || 0} academic & {academicSummary?.totalNonAcademic || 0} non-academic units
-                                </p>
-                            </div>
-                            <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded-md">
-                                {officesCount} Offices
-                            </span>
-                        </div>
 
-                        <div className="flex items-center gap-6 py-2">
-                            {/* Visual Donut Chart */}
-                            <div className="relative h-32 w-32 shrink-0 rounded-full shadow-inner" style={donutStyle}>
-                                <div className="absolute inset-3 rounded-full bg-white flex flex-col items-center justify-center shadow-sm">
-                                    <span className="text-xl font-extrabold tracking-tight text-slate-900">{completionRate}%</span>
-                                    <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Compliant</span>
-                                </div>
-                            </div>
-
-                            {/* Legend Breakdown */}
-                            <div className="flex-1 space-y-2.5">
-                                <div className="flex items-center justify-between text-xs">
-                                    <div className="flex items-center gap-2">
-                                        <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shrink-0" />
-                                        <span className="font-medium text-slate-700">Fully Complied</span>
-                                    </div>
-                                    <div className="flex items-center gap-1.5 font-semibold text-slate-900">
-                                        <span>{compiledOffices}</span>
-                                        <span className="text-slate-400 text-[11px] font-normal">({compiledOfficePct}%)</span>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center justify-between text-xs">
-                                    <div className="flex items-center gap-2">
-                                        <span className="h-2.5 w-2.5 rounded-full bg-amber-500 shrink-0" />
-                                        <span className="font-medium text-slate-700">Partially Complied</span>
-                                    </div>
-                                    <div className="flex items-center gap-1.5 font-semibold text-slate-900">
-                                        <span>{partialOffices}</span>
-                                        <span className="text-slate-400 text-[11px] font-normal">({partialOfficePct}%)</span>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center justify-between text-xs">
-                                    <div className="flex items-center gap-2">
-                                        <span className="h-2.5 w-2.5 rounded-full bg-rose-500 shrink-0" />
-                                        <span className="font-medium text-slate-700">Not Complied</span>
-                                    </div>
-                                    <div className="flex items-center gap-1.5 font-semibold text-slate-900">
-                                        <span>{notCompiledOffices}</span>
-                                        <span className="text-slate-400 text-[11px] font-normal">({notCompiledOfficePct}%)</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="mt-4 rounded-lg bg-slate-50 p-3 text-xs text-slate-600 border border-slate-100 flex items-center justify-between">
-                        <span>Total evaluated requirements: <strong>{complianceSummary.totalRecords}</strong></span>
-                        <span className="text-emerald-700 font-semibold">
-                            {complianceSummary.compiledRecords} Verified{complianceSummary.partialRecords > 0 ? ` · ${complianceSummary.partialRecords} Partial` : ''}
-                        </span>
-                    </div>
-                </div>
-
-                {/* 7-Day Activity Velocity (7 cols) */}
-                <div className="lg:col-span-7 rounded-xl border border-slate-200 bg-white p-5 shadow-sm flex flex-col justify-between">
-                    <div>
-                        <div className="flex items-center justify-between mb-4">
-                            <div>
-                                <h2 className="text-base font-bold text-slate-900">Audit Activity Velocity</h2>
-                                <p className="text-xs text-slate-500">System actions and submissions over the past 7 days</p>
-                            </div>
-                            <div className="flex items-center gap-1 text-xs text-slate-500 bg-slate-50 px-2 py-1 rounded border border-slate-200/60">
-                                <Activity size={13} className="text-blue-600" />
-                                <span className="font-medium text-slate-700">{logs.length}</span>
-                                <span>total logged</span>
-                            </div>
-                        </div>
-
-                        {/* Velocity Bar Chart */}
-                        <div className="h-36 pt-2">
-                            <div className="flex h-full items-end justify-between gap-3">
-                                {activityByDay.map((day) => {
-                                    const heightPercent = day.count > 0 ? Math.max((day.count / maxActivityCount) * 100, 14) : 0;
-                                    return (
-                                        <div key={day.key} className="group relative flex h-full flex-1 flex-col items-center justify-end">
-                                            {/* Tooltip on hover */}
-                                            <div className="absolute -top-7 hidden group-hover:flex items-center gap-1 rounded bg-slate-900 px-2 py-0.5 text-[10px] font-medium text-white shadow z-20 whitespace-nowrap">
-                                                <span>{day.count} actions</span>
-                                            </div>
-
-                                            <span className="mb-1.5 text-[11px] font-semibold text-slate-500 transition-colors group-hover:text-blue-600">
-                                                {day.count}
-                                            </span>
-
-                                            <div className="w-full max-w-[32px] h-20 flex flex-col justify-end rounded-t-md bg-slate-100 transition-all duration-200 overflow-hidden group-hover:bg-blue-100/70">
-                                                <div
-                                                    className="w-full rounded-t-md bg-blue-600 transition-all duration-300 group-hover:bg-blue-700"
-                                                    style={{ height: `${heightPercent}%` }}
-                                                />
-                                            </div>
-
-                                            <span className="mt-2 text-[11px] font-medium text-slate-500">
-                                                {day.label}
-                                            </span>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-xs text-slate-500">
-                        <span>Past 7 days volume</span>
-                        <Link to="/home/audit-logs" className="font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1">
-                            Explore full audit trail <ArrowUpRight size={12} />
-                        </Link>
-                    </div>
-                </div>
-            </div>
 
             {/* ── Active Audit Standards Progress (Clean Card Grid) ── */}
             <div className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -916,7 +843,7 @@ export default function Home() {
                                         </div>
                                         <div className="rounded-lg border border-slate-200/70 bg-white py-2 px-1">
                                             <span className="block text-[11px] text-slate-400">Requirements</span>
-                                            <span className="font-bold text-slate-800 text-sm">{eventItem.totalRequirements}</span>
+                                            <span className="font-bold text-slate-800 text-sm">{eventItem.totalrequirements}</span>
                                             <span className="block text-[9px] text-slate-400">Standards</span>
                                         </div>
                                     </div>
@@ -952,6 +879,10 @@ export default function Home() {
                     offices={offices}
                     events={events}
                     complianceData={complianceData}
+                    requirements={requirements}
+                    criteria={criteria}
+                    areas={areas}
+                    users={users}
                     onInspectOffice={(office) => {
                         setInspectOffice(office);
                         setIsViewReqModalOpen(true);
@@ -987,40 +918,206 @@ export default function Home() {
                 </div>
 
                 <div className="divide-y divide-slate-100">
-                    {recentLogs.length === 0 ? (
+                    {preparedRecentLogs.length === 0 ? (
                         <p className="py-6 text-center text-xs text-slate-400">No activity recorded yet.</p>
                     ) : (
-                        recentLogs.map((log) => {
-                            const action = normalizeAction(log.Action);
-                            const badgeClass = statusBadgeStyles[action] || "bg-slate-50 text-slate-700 border-slate-200";
-                            const message = String(log.Message || log.Action || "Activity recorded").trim();
-                            const actor = log.displayName || log.FullName || (log.UserID ? `User #${log.UserID}` : "System");
-                            const timestamp = log.Timestamp
-                                ? new Date(log.Timestamp).toLocaleString("en-US", {
-                                    month: "short",
-                                    day: "numeric",
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                })
-                                : "";
+                        preparedRecentLogs.map((log) => {
+                            const action = log.normalizedAction;
+                            const style = actionStyles[action] || actionStyles.default;
+                            const readableMessage = log.readableMessage;
+                            const { time, date } = formatTimestamp(log.Timestamp);
+                            const isExpanded = expandedLogId === log.logid;
+                            const userDisplayName = log.displayname || (log.userid ? `User #${log.userid}` : 'System');
+                            const roleLabel = log.rolename ? roleIdToName(log.rolename) : '';
+                            const ctx = log.context;
 
                             return (
                                 <div
-                                    key={log.LogID || `${log.Action}-${log.Timestamp}`}
-                                    className="flex items-center justify-between gap-4 py-2.5 px-1 hover:bg-slate-50/80 rounded-lg transition"
+                                    key={log.logid || `${log.Action}-${log.Timestamp}`}
+                                    className="group transition-colors hover:bg-slate-50/80 rounded-xl"
                                 >
-                                    <div className="flex items-center gap-3 min-w-0">
-                                        <span className={`inline-flex shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold ${badgeClass}`}>
-                                            {action}
-                                        </span>
-                                        <p className="truncate text-xs font-medium text-slate-800">
-                                            {message}
-                                        </p>
+                                    <div
+                                        className="flex items-center justify-between px-3 py-2.5 text-xs cursor-pointer gap-3"
+                                        onClick={() => setExpandedLogId(prev => prev === log.logid ? null : log.logid)}
+                                    >
+                                        {/* Left: Icon + Action Badge + Message */}
+                                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                            <div className={`h-7 w-7 shrink-0 rounded-lg flex items-center justify-center shadow-2xs ${style.iconBg}`}>
+                                                {style.icon}
+                                            </div>
+
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[9px] font-bold ${style.badge}`}>
+                                                        {action}
+                                                    </span>
+                                                    <p className="text-xs font-bold text-slate-900 truncate">
+                                                        {readableMessage}
+                                                    </p>
+                                                </div>
+
+                                                <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-slate-500 font-medium">
+                                                    <span>By <strong className="text-slate-700">{userDisplayName}</strong></span>
+                                                    {roleLabel && (
+                                                        <>
+                                                            <span>•</span>
+                                                            <span className="rounded bg-slate-100 px-1 py-0.2 text-[9px] font-semibold text-slate-600">{roleLabel}</span>
+                                                        </>
+                                                    )}
+                                                    {ctx.eventname && (
+                                                        <>
+                                                            <span>•</span>
+                                                            <span className="text-blue-600 font-semibold truncate max-w-[180px] inline-flex items-center gap-1" title={ctx.eventname}>
+                                                                <Award className="w-3 h-3 text-blue-500 shrink-0" />
+                                                                <span>{ctx.eventname}</span>
+                                                            </span>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Right: Timestamp & Details Toggle */}
+                                        <div className="flex items-center gap-2.5 shrink-0">
+                                            <div className="text-right text-[10px] text-slate-500 font-medium leading-tight">
+                                                <div className="font-bold text-slate-700">{time}</div>
+                                                <div className="text-slate-400 text-[9px] mt-0.5">{date}</div>
+                                            </div>
+                                            <div className="text-slate-400 group-hover:text-slate-600 transition-colors">
+                                                <svg
+                                                    className={`w-3.5 h-3.5 transition-transform duration-200 ${isExpanded ? 'rotate-180 text-blue-600' : ''}`}
+                                                    fill="none"
+                                                    viewBox="0 0 24 24"
+                                                    stroke="currentColor"
+                                                    strokeWidth={2}
+                                                >
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                                                </svg>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="flex items-center gap-3 shrink-0 text-xs text-slate-400">
-                                        <span className="hidden sm:inline font-medium text-slate-600">{actor}</span>
-                                        <span>{timestamp}</span>
-                                    </div>
+
+                                    {/* Rich In-Depth Context Card (Tree Labeled Pills) */}
+                                    {isExpanded && (
+                                        <div className="px-5 py-4 bg-slate-50/90 border-t border-slate-100 text-xs text-slate-700 transition-all animate-in fade-in duration-150">
+                                            <div className="mb-2 flex items-center justify-between text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                                                <span>Detailed Activity Breakdown (Log ID #{log.logid})</span>
+                                                <span>Action: {log.Action}</span>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                                                {ctx.eventname && (
+                                                    <div className="rounded-xl border border-blue-200/80 bg-white p-3 shadow-2xs">
+                                                        <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 flex items-center gap-1">
+                                                            Accreditation Event
+                                                        </span>
+                                                        <span className="text-xs font-bold text-slate-900 mt-1 block">{ctx.eventname}</span>
+                                                    </div>
+                                                )}
+
+                                                {ctx.areaname && (
+                                                    <div className="rounded-xl border border-indigo-200/80 bg-white p-3 shadow-2xs">
+                                                        <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 flex items-center gap-1">
+                                                            Area
+                                                        </span>
+                                                        <span className="text-xs font-bold text-slate-900 mt-1 block">{ctx.areaname}</span>
+                                                    </div>
+                                                )}
+
+                                                {ctx.critLabel && (
+                                                    <div className="rounded-xl border border-purple-200/80 bg-white p-3 shadow-2xs">
+                                                        <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 flex items-center gap-1">
+                                                            Criteria
+                                                        </span>
+                                                        <span className="text-xs font-bold text-slate-900 mt-1 block">{ctx.critLabel}</span>
+                                                    </div>
+                                                )}
+
+                                                {(ctx.reqCode || ctx.reqDesc) && (
+                                                    <div className="rounded-xl border border-sky-200/80 bg-white p-3 shadow-2xs">
+                                                        <span className="text-[10px] font-bold uppercase tracking-wider text-sky-600 flex items-center gap-1">
+                                                            Requirement
+                                                        </span>
+                                                        <span className="text-xs font-bold text-slate-900 mt-1 block">
+                                                            {ctx.reqCode} {ctx.reqDesc ? `— ${ctx.reqDesc}` : ''}
+                                                        </span>
+                                                    </div>
+                                                )}
+
+                                                {ctx.officename && (
+                                                    <div className="rounded-xl border border-emerald-200/80 bg-white p-3 shadow-2xs">
+                                                        <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 flex items-center gap-1">
+                                                            Office / Program
+                                                        </span>
+                                                        <span className="text-xs font-bold text-slate-900 mt-1 block">{ctx.officename}</span>
+                                                    </div>
+                                                )}
+
+                                                {ctx.filename && (
+                                                    <div className="rounded-xl border border-amber-200/80 bg-white p-3 shadow-2xs">
+                                                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 flex items-center gap-1">
+                                                            Standard File
+                                                        </span>
+                                                        <span className="text-xs font-bold text-slate-900 mt-1 block truncate" title={ctx.filename}>
+                                                            {ctx.filename}
+                                                        </span>
+                                                    </div>
+                                                )}
+
+                                                <div className="rounded-xl border border-slate-200/80 bg-white p-3 shadow-2xs">
+                                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
+                                                        Performed By
+                                                    </span>
+                                                    <span className="text-xs font-bold text-slate-900 mt-1 block">
+                                                        {userDisplayName} ({roleLabel || 'User'})
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            {/* Before / After Changes Diff Table */}
+                                            {(() => {
+                                                const d = ctx.rawDetails || {};
+                                                const changes = d.changes || {};
+                                                const entries = Object.entries(changes);
+                                                if (entries.length === 0) return null;
+                                                return (
+                                                    <div className="mt-3 rounded-xl border border-orange-200/80 bg-white overflow-hidden shadow-2xs">
+                                                        <div className="px-3 py-2 bg-orange-50 border-b border-orange-100 text-[10px] font-bold uppercase tracking-wider text-orange-700">
+                                                            Field Changes
+                                                        </div>
+                                                        <table className="w-full text-xs">
+                                                            <thead>
+                                                                <tr className="bg-slate-50 border-b border-slate-100">
+                                                                    <th className="text-left px-3 py-1.5 text-[10px] font-bold text-slate-500 uppercase w-1/4">Field</th>
+                                                                    <th className="text-left px-3 py-1.5 text-[10px] font-bold text-rose-500 uppercase w-[37.5%]">Before</th>
+                                                                    <th className="text-left px-3 py-1.5 text-[10px] font-bold text-emerald-600 uppercase w-[37.5%]">After</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody className="divide-y divide-slate-100">
+                                                                {entries.map(([field, val]) => {
+                                                                    if (typeof val !== 'object' || val === null) {
+                                                                        return (
+                                                                            <tr key={field}>
+                                                                                <td className="px-3 py-1.5 font-medium text-slate-700">{field}</td>
+                                                                                <td className="px-3 py-1.5 text-slate-400 italic" colSpan={2}>{String(val)}</td>
+                                                                            </tr>
+                                                                        );
+                                                                    }
+                                                                    return (
+                                                                        <tr key={field}>
+                                                                            <td className="px-3 py-1.5 font-medium text-slate-700">{field}</td>
+                                                                            <td className="px-3 py-1.5 text-rose-600 font-mono text-[11px] bg-rose-50/30">{String(val.from ?? 'None')}</td>
+                                                                            <td className="px-3 py-1.5 text-emerald-700 font-semibold font-mono text-[11px] bg-emerald-50/30">{String(val.to ?? 'None')}</td>
+                                                                        </tr>
+                                                                    );
+                                                                })}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                );
+                                            })()}
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })

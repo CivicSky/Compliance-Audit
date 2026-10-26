@@ -6,11 +6,11 @@ import SmartUserAvatar from "../UI/SmartUserAvatar";
 
 const EditProfileModal = ({ user, isOpen, onClose, onUpdate }) => {
     const [formData, setFormData] = useState({
-        firstName: "",
-        middleInitial: "",
-        lastName: "",
+        firstname: "",
+        middleinitial: "",
+        lastname: "",
         email: "",
-        profilePic: null
+        profilepic: null
     });
     const [profilePicPreview, setProfilePicPreview] = useState("");
     const [rawImageForCrop, setRawImageForCrop] = useState("");
@@ -21,14 +21,14 @@ const EditProfileModal = ({ user, isOpen, onClose, onUpdate }) => {
     useEffect(() => {
         if (user) {
             setFormData({
-                firstName: user.FirstName || "",
-                middleInitial: user.MiddleInitial || "",
-                lastName: user.LastName || "",
+                firstname: user.firstname || "",
+                middleinitial: user.middleinitial || "",
+                lastname: user.lastname || "",
                 email: user.Email || "",
-                profilePic: null
+                profilepic: null
             });
-            // If ProfilePic exists, use /uploads/profile-pics/filename, else null
-            setProfilePicPreview(user.ProfilePic ? `/uploads/profile-pics/${user.ProfilePic}` : null);
+            // If profilepic exists, use /uploads/profile-pics/filename, else null
+            setProfilePicPreview(user.profilepic ? `/uploads/profile-pics/${user.profilepic}` : null);
             setRawImageForCrop("");
             setIsCropModalOpen(false);
         }
@@ -52,7 +52,7 @@ const EditProfileModal = ({ user, isOpen, onClose, onUpdate }) => {
     };
 
     const handleCropComplete = (croppedFile, finalPreview) => {
-        setFormData(prev => ({ ...prev, profilePic: croppedFile }));
+        setFormData(prev => ({ ...prev, profilepic: croppedFile }));
         setProfilePicPreview(finalPreview);
         setIsCropModalOpen(false);
     };
@@ -63,20 +63,20 @@ const EditProfileModal = ({ user, isOpen, onClose, onUpdate }) => {
 
         try {
             const formDataObj = new FormData();
-            formDataObj.append('FirstName', formData.firstName);
-            formDataObj.append('MiddleInitial', formData.middleInitial || '');
-            formDataObj.append('LastName', formData.lastName);
+            formDataObj.append('firstname', formData.firstname);
+            formDataObj.append('middleinitial', formData.middleinitial || '');
+            formDataObj.append('lastname', formData.lastname);
             formDataObj.append('Email', formData.email);
 
-            if (formData.profilePic instanceof File) {
-                formDataObj.append('profilePic', formData.profilePic);
+            if (formData.profilepic instanceof File) {
+                formDataObj.append('profilepic', formData.profilepic);
             }
 
-            const response = await usersAPI.updateUser(user.UserID, formDataObj);
+            const response = await usersAPI.updateUser(user.userid, formDataObj);
             if (response.success) {
                 // If a new profile pic was uploaded, use the new path from backend
-                if (response.user && response.user.ProfilePic) {
-                    setProfilePicPreview(`/uploads/profile-pics/${response.user.ProfilePic}`);
+                if (response.user && response.user.profilepic) {
+                    setProfilePicPreview(`/uploads/profile-pics/${response.user.profilepic}`);
                 }
                 onUpdate(response.user);
                 // Emit a custom event to trigger navbar refresh
@@ -119,8 +119,8 @@ const EditProfileModal = ({ user, isOpen, onClose, onUpdate }) => {
                         <label className="block text-xs font-semibold text-slate-700 mb-1.5">First Name *</label>
                         <input
                             type="text"
-                            name="firstName"
-                            value={formData.firstName}
+                            name="firstname"
+                            value={formData.firstname}
                             onChange={handleInputChange}
                             className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
                             required
@@ -133,8 +133,8 @@ const EditProfileModal = ({ user, isOpen, onClose, onUpdate }) => {
                         <label className="block text-xs font-semibold text-slate-700 mb-1.5">Middle Initial</label>
                         <input
                             type="text"
-                            name="middleInitial"
-                            value={formData.middleInitial}
+                            name="middleinitial"
+                            value={formData.middleinitial}
                             onChange={handleInputChange}
                             maxLength={1}
                             className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
@@ -147,8 +147,8 @@ const EditProfileModal = ({ user, isOpen, onClose, onUpdate }) => {
                         <label className="block text-xs font-semibold text-slate-700 mb-1.5">Last Name *</label>
                         <input
                             type="text"
-                            name="lastName"
-                            value={formData.lastName}
+                            name="lastname"
+                            value={formData.lastname}
                             onChange={handleInputChange}
                             className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
                             required
@@ -178,7 +178,7 @@ const EditProfileModal = ({ user, isOpen, onClose, onUpdate }) => {
                                 <SmartUserAvatar
                                     user={user}
                                     src={profilePicPreview}
-                                    fullName={`${formData.firstName} ${formData.lastName}`.trim() || user?.full_name || 'User'}
+                                    fullName={`${formData.firstname} ${formData.lastname}`.trim() || user?.full_name || 'User'}
                                     size="w-12 h-12"
                                     textSize="text-sm font-bold"
                                     ring="border border-slate-200 shadow-2xs"

@@ -31,10 +31,10 @@ export default function Navbar({ isMobileMenuOpen: propIsMobileMenuOpen, setIsMo
 
     const isAdmin = Boolean(
         currentUser && (
-            Number(currentUser.RoleID) === 1 ||
-            String(currentUser.RoleName || '').toLowerCase() === 'admin' ||
-            String(currentUser.role_name || '').toLowerCase() === 'admin' ||
-            String(currentUser.RoleName || '').toLowerCase() === 'administrator'
+            Number(currentUser.roleid) === 1 ||
+            String(currentUser.rolename || '').toLowerCase() === 'admin' ||
+            String(currentUser.rolename || '').toLowerCase() === 'admin' ||
+            String(currentUser.rolename || '').toLowerCase() === 'administrator'
         )
     );
 
@@ -158,11 +158,11 @@ export default function Navbar({ isMobileMenuOpen: propIsMobileMenuOpen, setIsMo
     }, []);
 
     // NavLink style function matching user design
-    const navLinkClass = ({ isActive }) =>
+    const navLinkClass = ({ isactive }) =>
         `flex items-center rounded-xl transition-all duration-150 text-xs font-semibold ${
             effectiveExpanded ? 'gap-3 px-3.5 py-2.5 justify-start' : 'h-10 w-10 mx-auto px-0 justify-center'
         } ${
-            isActive
+            isactive
                 ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25 font-bold'
                 : 'text-slate-200 hover:text-white hover:bg-white/5 font-semibold'
         }`;
@@ -231,9 +231,9 @@ export default function Navbar({ isMobileMenuOpen: propIsMobileMenuOpen, setIsMo
         </svg>
     );
 
-    const mobileNavLinkClass = ({ isActive }) =>
+    const mobileNavLinkClass = ({ isactive }) =>
         `flex items-center gap-3 py-2.5 px-3.5 rounded-xl transition-all duration-150 text-xs font-semibold ${
-            isActive
+            isactive
                 ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25 font-bold'
                 : 'text-slate-200 hover:text-white hover:bg-white/5'
         }`;
@@ -282,7 +282,7 @@ export default function Navbar({ isMobileMenuOpen: propIsMobileMenuOpen, setIsMo
                     </div>
 
                     {/* Section: ANALYZE */}
-                    {currentUser && currentUser.RoleID === 1 && (
+                    {currentUser && currentUser.roleid === 1 && (
                         <div className="space-y-1">
                             <div className={sectionClass} style={sectionStyle}>
                                 <span className="text-[11px] font-extrabold uppercase tracking-wider text-blue-500">Analyze</span>
@@ -381,7 +381,7 @@ export default function Navbar({ isMobileMenuOpen: propIsMobileMenuOpen, setIsMo
                     )}
 
                     {/* Section: LOGS */}
-                    {currentUser && currentUser.RoleID === 1 && (
+                    {currentUser && currentUser.roleid === 1 && (
                         <div className="space-y-1">
                             <div className={sectionClass} style={sectionStyle}>
                                 <span className="text-[11px] font-extrabold uppercase tracking-wider text-blue-500">Logs</span>
@@ -441,7 +441,7 @@ export default function Navbar({ isMobileMenuOpen: propIsMobileMenuOpen, setIsMo
                             >
                                 <span className="text-xs font-bold text-white leading-tight truncate">
                                     {currentUser
-                                        ? `${currentUser.FirstName}${currentUser.MiddleInitial ? ' ' + currentUser.MiddleInitial + '.' : ''} ${currentUser.LastName}`
+                                        ? `${currentUser.firstname}${currentUser.middleinitial ? ' ' + currentUser.middleinitial + '.' : ''} ${currentUser.lastname}`
                                         : 'Loading...'}
                                 </span>
                                 <span className="text-[10px] text-slate-400 font-medium leading-tight truncate mt-0.5">View Profile</span>
@@ -512,7 +512,7 @@ export default function Navbar({ isMobileMenuOpen: propIsMobileMenuOpen, setIsMo
 
                     <div className="flex-1 overflow-y-auto flex flex-col space-y-4 py-3 min-h-0">
                         {/* Analyze */}
-                        {currentUser && currentUser.RoleID === 1 && (
+                        {currentUser && currentUser.roleid === 1 && (
                             <div className="space-y-1">
                                 <div className={mobileSectionClass}>
                                     <span className="text-[11px] font-extrabold uppercase tracking-wider text-blue-500">Analyze</span>
@@ -616,7 +616,7 @@ export default function Navbar({ isMobileMenuOpen: propIsMobileMenuOpen, setIsMo
                         )}
 
                         {/* Logs */}
-                        {currentUser && currentUser.RoleID === 1 && (
+                        {currentUser && currentUser.roleid === 1 && (
                             <div className="space-y-1">
                                 <div className={mobileSectionClass}>
                                     <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: '#60a5fa' }}>Logs</span>
@@ -650,11 +650,11 @@ export default function Navbar({ isMobileMenuOpen: propIsMobileMenuOpen, setIsMo
                                 <div className="flex flex-col min-w-0">
                                     <span className="text-xs font-semibold text-white truncate">
                                         {currentUser
-                                            ? `${currentUser.FirstName || ''}${currentUser.MiddleInitial ? ' ' + currentUser.MiddleInitial + '.' : ''} ${currentUser.LastName || ''}`.trim() || currentUser.FullName || 'User'
+                                            ? `${currentUser.firstname || ''}${currentUser.middleinitial ? ' ' + currentUser.middleinitial + '.' : ''} ${currentUser.lastname || ''}`.trim() || currentUser.FullName || 'User'
                                             : 'Loading...'}
                                     </span>
                                     <span className="text-[10px] text-blue-300 truncate">
-                                        {currentUser?.RoleName || 'View Profile'}
+                                        {currentUser?.rolename || 'View Profile'}
                                     </span>
                                 </div>
                             </NavLink>

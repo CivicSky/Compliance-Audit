@@ -40,6 +40,7 @@ export default function AuditLogs() {
         logs: "Audit Log",
         officedocuments: "Office Document",
         compliancestatusoffices: "Compliance Status",
+        personnelassignments: "Personnel Assignment",
     };
 
     const toTitle = (value) => {
@@ -89,7 +90,7 @@ export default function AuditLogs() {
         const body = parsed.body || parsed;
         if (!body || typeof body !== "object") return "";
 
-        const keys = ["EventName", "AreaName", "CriteriaName", "RequirementCode", "OfficeName", "deletedCount"];
+        const keys = ["eventname", "areaname", "criterianame", "requirementcode", "officename", "deletedCount"];
         for (const key of keys) {
             if (body[key] !== undefined && body[key] !== null && String(body[key]).trim()) {
                 return String(body[key]).trim();
@@ -121,14 +122,14 @@ export default function AuditLogs() {
     const getCriteriaLabel = (details) => {
         if (!details || typeof details !== "object") return "";
 
-        let code = details.CriteriaCode;
-        let name = details.CriteriaName;
+        let code = details.criteriacode;
+        let name = details.criterianame;
 
-        if ((!code || !name) && details.CriteriaID !== undefined && details.CriteriaID !== null) {
-            const fallback = criteriaLookup[String(details.CriteriaID)];
+        if ((!code || !name) && details.criteriaid !== undefined && details.criteriaid !== null) {
+            const fallback = criteriaLookup[String(details.criteriaid)];
             if (fallback) {
-                code = code || fallback.CriteriaCode;
-                name = name || fallback.CriteriaName;
+                code = code || fallback.criteriacode;
+                name = name || fallback.criterianame;
             }
         }
 
@@ -137,9 +138,9 @@ export default function AuditLogs() {
 
     const getEventLabel = (details) => {
         if (!details || typeof details !== "object") return "";
-        if (details.EventName) return String(details.EventName).trim();
-        if (details.EventID !== undefined && details.EventID !== null) {
-            return eventLookup[String(details.EventID)] || "";
+        if (details.eventname) return String(details.eventname).trim();
+        if (details.eventid !== undefined && details.eventid !== null) {
+            return eventLookup[String(details.eventid)] || "";
         }
         return "";
     };
@@ -161,7 +162,7 @@ export default function AuditLogs() {
         const explicitName = String(details?.userName || details?.FullName || "").trim();
         if (explicitName) return explicitName;
 
-        const idFromDetails = details?.userId ?? details?.UserID ?? details?.targetUserId ?? details?.TargetUserID;
+        const idFromDetails = details?.userid ?? details?.userid ?? details?.targetUserId ?? details?.TargetUserID;
         const resolvedId = idFromDetails !== undefined && idFromDetails !== null
             ? String(idFromDetails)
             : extractLegacyUserId(fallbackText);
@@ -190,12 +191,12 @@ export default function AuditLogs() {
             return parts.join(" | ");
         }
 
-        const roleValue = details.roleName || details.RoleName || details.roleId || details.RoleID;
+        const roleValue = details.rolename || details.rolename || details.roleid || details.roleid;
         if (roleValue !== undefined && roleValue !== null && String(roleValue).trim()) {
             return `Role to ${roleIdToName(roleValue)}`;
         }
 
-        const approvalValue = details.approval_status || details.approvalStatus;
+        const approvalValue = details.approvalstatus || details.approvalstatus;
         if (approvalValue) return `Approval to ${toTitle(approvalValue)}`;
 
         return "";
@@ -208,6 +209,13 @@ export default function AuditLogs() {
 
         if (/login/i.test(action)) return "Login";
         if (/logout/i.test(action)) return "Logout";
+        if (/PersonnelAssigned|ASSIGN_PERSONNEL/i.test(action)) return "Created";
+        if (/PersonnelScopeUpdated/i.test(action)) return "Updated";
+        if (/PersonnelUnassigned/i.test(action)) return "Deleted";
+        if (/ComplianceStatusUpdated/i.test(action)) return "Updated";
+        if (/OfficeProofUploaded/i.test(action)) return "Created";
+        if (/OfficeProofDeleted/i.test(action)) return "Deleted";
+        if (/OfficeRequirementRemoved/i.test(action)) return "Deleted";
         if (/(added|created|registered|copied)$/i.test(action)) return "Created";
         if (/(updated|relocated)$/i.test(action)) return "Updated";
         if (/(deleted|canceled|cancelled|removed)$/i.test(action)) return "Deleted";
@@ -226,6 +234,56 @@ export default function AuditLogs() {
 
         if (actionLabel === "Login") return "User logged in";
         if (actionLabel === "Logout") return "User logged out";
+
+        const d = details || {};
+        if (/PersonnelAssigned|ASSIGN_PERSONNEL/i.test(rawAction)) {
+            const users = Array.isArray(d.assignedUserNames) && d.assignedUserNames.length > 0
+                ? d.assignedUserNames.join(', ')
+                : (d.count ? `${d.count} personnel` : 'personnel');
+            const target = d.targetLabel || (d.targetType ? `${d.targetType} #${d.requirementid || d.criteriaid || d.areaid}` : 'target');
+            const ev = d.eventname ? ` under "${d.eventname}"` : '';
+            return `Assigned ${users} to ${target}${ev}`;
+        }
+
+        if (/PersonnelScopeUpdated/i.test(rawAction)) {
+            const user = d.targetUserName || (d.targetUserId ? `User #${d.targetUserId}` : 'Personnel');
+            const ev = d.eventname ? ` under "${d.eventname}"` : '';
+            return `Updated accreditation scope for ${user}${ev}`;
+        }
+
+        if (/PersonnelUnassigned/i.test(rawAction)) {
+            const user = d.targetUserName || (d.targetUserId ? `User #${d.targetUserId}` : 'Personnel');
+            const target = d.targetLabel || 'assignment';
+            const ev = d.eventname ? ` in "${d.eventname}"` : '';
+            return `Unassigned ${user} from ${target}${ev}`;
+        }
+
+        if (/ComplianceStatusUpdated/i.test(rawAction)) {
+            const code = d.requirementcode || 'Standard';
+            const office = d.officename || 'Office';
+            const stName = d.statusName || (d.newStatus === 5 ? 'Complied' : (d.newStatus === 4 ? 'Partially Complied' : 'Not Complied'));
+            const commentStr = d.comments ? ` (Comment: "${d.comments.slice(0, 60)}${d.comments.length > 60 ? '...' : ''}")` : '';
+            return `Updated Compliance Status of ${code} in ${office} to "${stName}"${commentStr}`;
+        }
+
+        if (/OfficeProofUploaded/i.test(rawAction)) {
+            const fName = d.filename || d.FileName || 'document';
+            const office = d.officename || 'Office';
+            const ev = d.eventname ? ` under "${d.eventname}"` : '';
+            return `Uploaded office proof document "${fName}" for ${office}${ev}`;
+        }
+
+        if (/OfficeProofDeleted/i.test(rawAction)) {
+            const fName = d.filename || d.FileName || 'document';
+            const office = d.officename || 'Office';
+            return `Deleted office proof document "${fName}" from ${office}`;
+        }
+
+        if (/OfficeRequirementRemoved/i.test(rawAction)) {
+            const code = d.requirementcode || 'Standard';
+            const office = d.officename || 'Office';
+            return `Removed standard ${code} from ${office}`;
+        }
 
         if (/^User(RoleUpdated|ApprovalUpdated|Updated)$/i.test(rawAction)) {
             const userLabel = getUserLabel(details, `${detailsText} ${log.Message || ""}`);
@@ -258,7 +316,7 @@ export default function AuditLogs() {
         }
 
         if (/^RequirementAdded$/i.test(rawAction)) {
-            const requirementLabel = details?.RequirementCode || details?.RequirementID || "Standard";
+            const requirementLabel = details?.requirementcode || details?.requirementid || "Standard";
             const eventLabel = getEventLabel(details);
             const criteriaLabel = getCriteriaLabel(details);
             const underLabel = [eventLabel, criteriaLabel].filter(Boolean).join(" / ");
@@ -317,10 +375,10 @@ export default function AuditLogs() {
                     const criteriaArr = toArrayPayload(criteriaPayload);
                     const nextCriteriaLookup = {};
                     for (const item of criteriaArr) {
-                        if (item?.CriteriaID !== undefined && item?.CriteriaID !== null) {
-                            nextCriteriaLookup[String(item.CriteriaID)] = {
-                                CriteriaCode: item.CriteriaCode || "",
-                                CriteriaName: item.CriteriaName || ""
+                        if (item?.criteriaid !== undefined && item?.criteriaid !== null) {
+                            nextCriteriaLookup[String(item.criteriaid)] = {
+                                criteriacode: item.criteriacode || "",
+                                criterianame: item.criterianame || ""
                             };
                         }
                     }
@@ -332,8 +390,8 @@ export default function AuditLogs() {
                     const eventsArr = toArrayPayload(eventsPayload);
                     const nextEventLookup = {};
                     for (const event of eventsArr) {
-                        if (event?.EventID !== undefined && event?.EventID !== null) {
-                            nextEventLookup[String(event.EventID)] = String(event.EventName || "").trim();
+                        if (event?.eventid !== undefined && event?.eventid !== null) {
+                            nextEventLookup[String(event.eventid)] = String(event.eventname || "").trim();
                         }
                     }
                     setEventLookup(nextEventLookup);
@@ -344,12 +402,12 @@ export default function AuditLogs() {
                     const usersArr = toArrayPayload(usersPayload?.users ? { data: usersPayload.users } : usersPayload);
                     const nextUserLookup = {};
                     for (const user of usersArr) {
-                        if (user?.UserID !== undefined && user?.UserID !== null) {
+                        if (user?.userid !== undefined && user?.userid !== null) {
                             const fullName = String(
                                 user.FullName ||
-                                `${user.FirstName || ""}${user.MiddleInitial ? ` ${user.MiddleInitial}.` : ""} ${user.LastName || ""}`
+                                `${user.firstname || ""}${user.middleinitial ? ` ${user.middleinitial}.` : ""} ${user.lastname || ""}`
                             ).replace(/\s+/g, " ").trim();
-                            nextUserLookup[String(user.UserID)] = fullName || user.Email || "User";
+                            nextUserLookup[String(user.userid)] = fullName || user.Email || "User";
                         }
                     }
                     setUserLookup(nextUserLookup);
@@ -404,7 +462,7 @@ export default function AuditLogs() {
 
                             return (
                                 <div
-                                    key={log.LogID}
+                                    key={log.logid}
                                     className="flex items-start justify-between px-4 py-3 text-sm hover:bg-gray-50 transition"
                                 >
                                     {/* Left: status + message */}
@@ -421,9 +479,9 @@ export default function AuditLogs() {
                                             <p className="text-xs text-gray-500 mt-0.5">
                                                 By{" "}
                                                 <span className="font-medium">
-                                                    {log.displayName || (log.UserID ? `User #${log.UserID}` : 'System')}
+                                                    {log.displayname || (log.userid ? `User #${log.userid}` : 'System')}
                                                 </span>
-                                                {log.RoleName ? ` — ${log.RoleName}` : ''}
+                                                {log.rolename ? ` — ${log.rolename}` : ''}
                                             </p>
                                         </div>
                                     </div>

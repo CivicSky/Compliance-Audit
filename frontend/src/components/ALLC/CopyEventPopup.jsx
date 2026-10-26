@@ -8,17 +8,17 @@ export default function CopyEventPopup({
 	onCancel,
 	onConfirm
 }) {
-	const [eventName, setEventName] = useState(defaultName);
-	const [eventCode, setEventCode] = useState(defaultCode);
+	const [eventname, setEventName] = useState(defaultName);
+	const [eventcode, setEventCode] = useState(defaultCode);
 	const [submitting, setSubmitting] = useState(false);
 
 	if (!open) return null;
 
 	const handleCopy = async () => {
-		if (!eventName.trim() || !eventCode.trim() || submitting) return;
+		if (!eventname.trim() || !eventcode.trim() || submitting) return;
 		setSubmitting(true);
 		try {
-			await onConfirm({ eventName, eventCode, description: null });
+			await onConfirm({ eventname, eventcode, description: null });
 		} catch (e) {
 			console.error(e);
 		} finally {
@@ -34,7 +34,7 @@ export default function CopyEventPopup({
 					<label className="block text-sm font-medium mb-1">Accreditation Name</label>
 					<input
 						className="w-full border rounded px-3 py-2 text-sm disabled:opacity-50"
-						value={eventName}
+						value={eventname}
 						onChange={e => setEventName(e.target.value)}
 						disabled={submitting}
 						autoFocus
@@ -44,7 +44,7 @@ export default function CopyEventPopup({
 					<label className="block text-sm font-medium mb-1">Accreditation Code</label>
 					<input
 						className="w-full border rounded px-3 py-2 text-sm disabled:opacity-50"
-						value={eventCode}
+						value={eventcode}
 						onChange={e => setEventCode(e.target.value)}
 						disabled={submitting}
 					/>
@@ -60,7 +60,7 @@ export default function CopyEventPopup({
 					<button
 						className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 inline-flex items-center gap-2 font-medium text-sm"
 						onClick={handleCopy}
-						disabled={!eventName.trim() || !eventCode.trim() || submitting}
+						disabled={!eventname.trim() || !eventcode.trim() || submitting}
 					>
 						{submitting ? (
 							<>

@@ -6,10 +6,10 @@ import { API_BASE_URL } from '../../utils/apiBase';
 function displayNameFromUser(user) {
   if (!user || typeof user !== 'object') return '';
   if (user.FullName && String(user.FullName).trim()) return String(user.FullName).trim();
-  const { FirstName, MiddleInitial, LastName } = user;
-  if (!FirstName && !LastName) return '';
-  const mid = MiddleInitial ? ` ${MiddleInitial}.` : '';
-  return `${FirstName || ''}${mid} ${LastName || ''}`.replace(/\s+/g, ' ').trim();
+  const { firstname, middleinitial, lastname } = user;
+  if (!firstname && !lastname) return '';
+  const mid = middleinitial ? ` ${middleinitial}.` : '';
+  return `${firstname || ''}${mid} ${lastname || ''}`.replace(/\s+/g, ' ').trim();
 }
 
 function readStoredDisplayName() {
@@ -34,19 +34,19 @@ export default function Header() {
   useEffect(() => {
     // Get current user from localStorage
     const token = localStorage.getItem('token');
-    let userId = null;
+    let userid = null;
     if (token) {
       const userData = localStorage.getItem('user');
       if (userData) {
         try {
-          userId = JSON.parse(userData).UserID;
+          userid = JSON.parse(userData).userid;
         } catch {}
       }
     }
-    if (!userId) return;
+    if (!userid) return;
     const fetchUnread = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/notifications/user/${userId}/counts`, {
+        const response = await fetch(`${API_BASE_URL}/api/notifications/user/${userid}/counts`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         const data = await response.json();

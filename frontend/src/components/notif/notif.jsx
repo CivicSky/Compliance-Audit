@@ -24,20 +24,20 @@ export default function NotificationPopup({ onClose }) {
 	}, []);
 
 	useEffect(() => {
-		if (currentUser && currentUser.UserID) {
+		if (currentUser && currentUser.userid) {
 			fetchNotifications();
 			fetchNotificationCounts();
 		}
 	}, [currentUser, filterStatus]);
 
 	const fetchNotifications = async () => {
-		if (!currentUser?.UserID) return;
+		if (!currentUser?.userid) return;
 
 		setLoading(true);
 		try {
 			const token = localStorage.getItem('token');
 			const response = await axios.get(
-				`${API_BASE_URL}/api/notifications/user/${currentUser.UserID}?filter=${filterStatus}`,
+				`${API_BASE_URL}/api/notifications/user/${currentUser.userid}?filter=${filterStatus}`,
 				{ headers: { Authorization: `Bearer ${token}` } }
 			);
 
@@ -52,12 +52,12 @@ export default function NotificationPopup({ onClose }) {
 	};
 
 	const fetchNotificationCounts = async () => {
-		if (!currentUser?.UserID) return;
+		if (!currentUser?.userid) return;
 
 		try {
 			const token = localStorage.getItem('token');
 			const response = await axios.get(
-				`${API_BASE_URL}/api/notifications/user/${currentUser.UserID}/counts`,
+				`${API_BASE_URL}/api/notifications/user/${currentUser.userid}/counts`,
 				{ headers: { Authorization: `Bearer ${token}` } }
 			);
 
@@ -74,19 +74,19 @@ export default function NotificationPopup({ onClose }) {
 		}
 	};
 
-	const markAsRead = async (notificationId) => {
+	const markAsRead = async (notificationid) => {
 		try {
 			const token = localStorage.getItem('token');
 			await axios.put(
-				`${API_BASE_URL}/api/notifications/${notificationId}/read`,
+				`${API_BASE_URL}/api/notifications/${notificationid}/read`,
 				{},
 				{ headers: { Authorization: `Bearer ${token}` } }
 			);
 
 			setNotifications((prev) =>
 				prev.map((notif) =>
-					notif.NotificationID === notificationId
-						? { ...notif, IsRead: 1, ReadAt: new Date().toISOString() }
+					notif.notificationid === notificationid
+						? { ...notif, isread: 1, readat: new Date().toISOString() }
 						: notif
 				)
 			);
@@ -97,18 +97,18 @@ export default function NotificationPopup({ onClose }) {
 	};
 
 	const markAllAsRead = async () => {
-		if (!currentUser?.UserID) return;
+		if (!currentUser?.userid) return;
 
 		try {
 			const token = localStorage.getItem('token');
 			await axios.put(
-				`${API_BASE_URL}/api/notifications/user/${currentUser.UserID}/read-all`,
+				`${API_BASE_URL}/api/notifications/user/${currentUser.userid}/read-all`,
 				{},
 				{ headers: { Authorization: `Bearer ${token}` } }
 			);
 
 			setNotifications((prev) =>
-				prev.map((notif) => ({ ...notif, IsRead: 1, ReadAt: new Date().toISOString() }))
+				prev.map((notif) => ({ ...notif, isread: 1, readat: new Date().toISOString() }))
 			);
 			fetchNotificationCounts();
 		} catch (error) {
@@ -138,7 +138,7 @@ export default function NotificationPopup({ onClose }) {
 	};
 
 	const getCategoryBadge = (notification) => {
-		const table = String(notification?.RelatedTable || '').toLowerCase();
+		const table = String(notification?.relatedtable || '').toLowerCase();
 		const type = String(notification?.Type || '').toLowerCase();
 
 		if (table.includes('requirement') || table.includes('file')) {
@@ -221,8 +221,8 @@ export default function NotificationPopup({ onClose }) {
 	const handleNotificationClick = async (notification) => {
 		if (!notification) return;
 
-		if (!notification.IsRead) {
-			await markAsRead(notification.NotificationID);
+		if (!notification.isread) {
+			await markAsRead(notification.notificationid);
 		}
 
 		const target = buildNotificationRedirect(notification);
@@ -316,11 +316,15 @@ export default function NotificationPopup({ onClose }) {
 						const hasLink = Boolean(buildNotificationRedirect(notification)?.path);
 						const displayMessage = getDisplayMessage(notification);
 						const badge = getCategoryBadge(notification);
-						const isUnread = !notification.IsRead;
+						const isUnread = !notification.isread;
+
+						const adminFirst = notification.AdminFirstName || notification.adminfirstname || notification.adminFirstName || '';
+						const adminLast = notification.AdminLastName || notification.adminlastname || notification.adminLastName || '';
+						const notifTitle = notification.Title || notification.title || 'Notification';
 
 						return (
 							<div
-								key={notification.NotificationID}
+								key={notification.notificationid}
 								role={hasLink ? 'button' : undefined}
 								tabIndex={hasLink ? 0 : undefined}
 								onClick={() => handleNotificationClick(notification)}
@@ -359,15 +363,15 @@ export default function NotificationPopup({ onClose }) {
 												<span className={`inline-flex items-center rounded px-1.5 py-0.2 text-[9px] font-bold border ${badge.bg}`}>
 													{badge.label}
 												</span>
-												{notification.AdminFirstName && (
+												{adminFirst && (
 													<span className="text-[10px] text-slate-400 truncate">
-														• by {notification.AdminFirstName} {notification.AdminLastName || ''}
+														• by {adminFirst} {adminLast}
 													</span>
 												)}
 											</div>
 											<div className="flex items-center gap-1.5 shrink-0">
 												<span className="text-[10px] font-medium text-slate-400">
-													{formatTimestamp(notification.CreatedAt)}
+													{formatTimestamp(notification.createdat)}
 												</span>
 												{isUnread && (
 													<span className="h-2 w-2 rounded-full bg-blue-600 ring-2 ring-blue-200" title="Unread" />
@@ -379,7 +383,7 @@ export default function NotificationPopup({ onClose }) {
 										<h4 className={`text-xs font-semibold mb-0.5 leading-snug line-clamp-1 ${
 											isUnread ? 'text-slate-900 font-bold' : 'text-slate-700'
 										}`}>
-											{notification.Title}
+											{notifTitle}
 										</h4>
 
 										{/* Detailed Message Text */}

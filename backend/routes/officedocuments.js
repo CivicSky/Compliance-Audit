@@ -7,6 +7,7 @@ const OfficesController = require('../controllers/OfficesController');
 const { saveOfficeProofDocument } = require('../utils/officeProof');
 const db = require('../db');
 const auth = require('../middleware/auth');
+const { recordLog } = require('../controllers/logsController');
 
 // Multer config for proof document uploads (matches requirements upload pattern)
 const tempProofUploadDir = path.join(__dirname, '../uploads/tmp-proof-uploads');
@@ -37,34 +38,34 @@ router.post('/:id/proof', auth, upload.single('file'), async (req, res) => {
     console.log('Temp upload path:', req.file && req.file.path);
 
     if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
-    const officeId = req.params.id;
+    const officeid = req.params.id;
     // Get office name and event ID from database
-    const [officeRows] = await db.query('SELECT OfficeName, EventID FROM offices WHERE OfficeID = ?', [officeId]);
+    const [officeRows] = await db.query('SELECT officename, eventid FROM offices WHERE officeid = ?', [officeid]);
     if (officeRows.length === 0) {
       if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
       return res.status(404).json({ success: false, message: 'Office not found' });
     }
-    const officeName = officeRows[0].OfficeName;
-    const eventId = officeRows[0].EventID;
-    console.log('Office name from DB:', officeName);
-    console.log('Event ID from DB:', eventId);
-    if (!eventId) {
+    const officename = officeRows[0].officename;
+    const eventid = officeRows[0].eventid;
+    console.log('Office name from DB:', officename);
+    console.log('Event ID from DB:', eventid);
+    if (!eventid) {
       if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
       return res.status(400).json({ success: false, message: 'Office is not assigned to an event' });
     }
     // Get event code/name from database
-    const [eventRows] = await db.query('SELECT EventName, EventCode FROM events WHERE EventID = ?', [eventId]);
+    const [eventRows] = await db.query('SELECT eventname, eventcode FROM events WHERE eventid = ?', [eventid]);
     if (eventRows.length === 0) {
       if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
       return res.status(404).json({ success: false, message: 'Event not found' });
     }
-    const eventName = eventRows[0].EventName;
-    const eventCode = eventRows[0].EventCode;
-    console.log('Event name from DB:', eventName);
+    const eventname = eventRows[0].eventname;
+    const eventcode = eventRows[0].eventcode;
+    console.log('Event name from DB:', eventname);
     // Sanitize event name and office name for folder and filename
     // Prefer event code for the folder name if present
-    const safeEventName = (eventCode || eventName).replace(/[^a-zA-Z0-9-_]/g, '_').substring(0, 40);
-    const safeOfficeName = officeName.replace(/[^a-zA-Z0-9-]/g, '.').substring(0, 40);
+    const safeEventName = (eventcode || eventname).replace(/[^a-zA-Z0-9-_]/g, '_').substring(0, 40);
+    const safeOfficeName = officename.replace(/[^a-zA-Z0-9-]/g, '.').substring(0, 40);
     console.log('Sanitized event name:', safeEventName);
     console.log('Sanitized office name:', safeOfficeName);
     // Get file extension from original file
@@ -74,12 +75,12 @@ router.post('/:id/proof', auth, upload.single('file'), async (req, res) => {
     let safeUserName = 'UnknownUser';
     try {
       const db = require('../db');
-      const uploaderId = Number(req.user?.userId || 0);
+      const uploaderId = Number(req.user?.userid || 0);
       if (uploaderId && uploaderId > 0) {
-        const [uRows] = await db.query('SELECT FirstName, LastName, Email FROM users WHERE UserID = ?', [uploaderId]);
+        const [uRows] = await db.query('SELECT firstname, lastname, Email FROM users WHERE userid = ?', [uploaderId]);
         if (uRows && uRows.length > 0) {
           const u = uRows[0];
-          const display = `${u.FirstName || ''}${u.LastName ? ' ' + u.LastName : ''}`.trim() || u.Email || `user${uploaderId}`;
+          const display = `${u.firstname || ''}${u.lastname ? ' ' + u.lastname : ''}`.trim() || u.Email || `user${uploaderId}`;
           safeUserName = String(display).replace(/[^a-zA-Z0-9-]/g, '.').substring(0, 40) || 'UnknownUser';
         }
       }
@@ -99,11 +100,11 @@ router.post('/:id/proof', auth, upload.single('file'), async (req, res) => {
     // Delete old proof document if exists (both from database and filesystem)
     try {
       const [oldDocs] = await db.query(
-        'SELECT file_path FROM office_proof_documents WHERE office_id = ? AND requirement_id IS NULL ORDER BY uploaded_at DESC LIMIT 1',
-        [officeId]
+        'SELECT filepath FROM officeproofdocuments WHERE officeid = ? AND requirementid IS NULL ORDER BY uploadedat DESC LIMIT 1',
+        [officeid]
       );
-      if (oldDocs.length > 0 && oldDocs[0].file_path) {
-        const oldFilePath = path.join(__dirname, '..', oldDocs[0].file_path);
+      if (oldDocs.length > 0 && oldDocs[0].filepath) {
+        const oldFilePath = path.join(__dirname, '..', oldDocs[0].filepath);
         if (fs.existsSync(oldFilePath)) {
           fs.unlinkSync(oldFilePath);
         }
@@ -119,7 +120,7 @@ router.post('/:id/proof', auth, upload.single('file'), async (req, res) => {
       return res.status(500).json({ success: false, message: 'Temp file not found' });
     }
     const { uploadToSupabaseBucket } = require('../utils/supabaseStorage');
-    let filePath = `/uploads/events/${safeEventName}/${finalFileName}`;
+    let filepath = `/uploads/events/${safeEventName}/${finalFileName}`;
 
     try {
       const supabaseRes = await uploadToSupabaseBucket(
@@ -128,7 +129,7 @@ router.post('/:id/proof', auth, upload.single('file'), async (req, res) => {
         req.file.mimetype
       );
       if (supabaseRes && supabaseRes.publicUrl) {
-        filePath = supabaseRes.publicUrl;
+        filepath = supabaseRes.publicUrl;
       }
     } catch (supabaseErr) {
       console.warn('Supabase cloud storage proof upload notice (falling back to local disk):', supabaseErr.message);
@@ -149,9 +150,9 @@ router.post('/:id/proof', auth, upload.single('file'), async (req, res) => {
       try { fs.unlinkSync(req.file.path); } catch (e) {}
     }
 
-    console.log('File path for DB/URL:', filePath);
+    console.log('File path for DB/URL:', filepath);
     // Save to database
-    await saveOfficeProofDocument(officeId, finalFileName, req.file.originalname, filePath);
+    await saveOfficeProofDocument(officeid, finalFileName, req.file.originalname, filepath);
     
     try {
       const { createNotifications, getAdminUserIds } = require('../utils/notificationService');
@@ -159,39 +160,39 @@ router.post('/:id/proof', auth, upload.single('file'), async (req, res) => {
       
       // Get office heads
       const [headRows] = await db.query(
-        `SELECT u.UserID 
+        `SELECT u.userid 
          FROM users u
-         JOIN headofoffice h ON u.UserID = h.UserID
-         JOIN office_head_assignments oha ON h.HeadID = oha.HeadID
-         WHERE oha.OfficeID = ?`,
-        [officeId]
+         JOIN headofoffice h ON u.userid = h.userid
+         JOIN officeheadassignments oha ON h.headid = oha.headid
+         WHERE oha.officeid = ?`,
+        [officeid]
       );
-      const headUserIds = headRows.map(r => Number(r.UserID));
+      const headUserIds = headRows.map(r => Number(r.userid));
       
       // Get auditors assigned to this office
       const [auditorRows] = await db.query(
-        `SELECT aaa.auditor_user_id as UserID
-         FROM auditor_area_assignments aaa
-         JOIN offices o ON o.OfficeID = ?
-         JOIN criteria c ON c.EventID = o.EventID
-         WHERE aaa.area_id = c.AreaID`,
-        [officeId]
+        `SELECT aaa.auditoruserid as userid
+         FROM auditorareaassignments aaa
+         JOIN offices o ON o.officeid = ?
+         JOIN criteria c ON c.eventid = o.eventid
+         WHERE aaa.areaid = c.areaid`,
+        [officeid]
       );
-      const auditorUserIds = auditorRows.map(r => Number(r.UserID));
+      const auditorUserIds = auditorRows.map(r => Number(r.userid));
       
       const allRecipientIds = [...new Set([...adminIds, ...headUserIds, ...auditorUserIds])];
-      const uploaderId = Number(req.user?.userId || 0);
+      const uploaderId = Number(req.user?.userid || 0);
 
       await createNotifications({
         userIds: allRecipientIds.filter(id => id !== uploaderId),
-        adminId: uploaderId,
+        adminid: uploaderId,
         title: 'New Office Proof Uploaded',
-        message: `Office proof document was uploaded for office "${officeName}" under event "${eventName}".`,
+        message: `Office proof document was uploaded for office "${officename}" under event "${eventname}".`,
         type: 'info',
-        relatedTable: 'office_proof_upload',
-        relatedId: Number(officeId),
+        relatedtable: 'office_proof_upload',
+        relatedid: Number(officeid),
         meta: {
-          officeId: Number(officeId),
+          officeid: Number(officeid),
           openSubmission: true
         }
       });
@@ -199,14 +200,30 @@ router.post('/:id/proof', auth, upload.single('file'), async (req, res) => {
       console.warn('Failed to notify about office proof upload:', notifErr.message);
     }
 
+    try {
+      const uploaderId = Number(req.user?.userid || req.user?.id || 0);
+      if (uploaderId) {
+        await recordLog(uploaderId, 'OfficeProofUploaded', {
+          officeid: Number(officeid),
+          officename,
+          eventname,
+          FileName: finalFileName,
+          filename: finalFileName,
+          originalname: req.file.originalname
+        });
+      }
+    } catch (logErr) {
+      console.warn('Failed to record log for office proof upload:', logErr.message);
+    }
+
     console.log('--- Proof Upload Debug End ---');
     res.json({ 
       success: true, 
       filename: finalFileName, 
-      url: filePath,
+      url: filepath,
       originalname: req.file.originalname,
-      officeName: officeName,
-      eventName: eventName
+      officename: officename,
+      eventname: eventname
     });
   } catch (err) {
     console.error('Upload error:', err);
@@ -223,45 +240,45 @@ router.post('/:id/proof', auth, upload.single('file'), async (req, res) => {
 });
 
 
-// Get the latest proof document for an office (filter by requirement_id IS NULL to only get proof documents, not requirement files)
+// Get the latest proof document for an office (filter by requirementid IS NULL to only get proof documents, not requirement files)
 router.get('/:id/proof', auth, async (req, res) => {
   try {
     const [rows] = await db.query(
-      `SELECT * FROM office_proof_documents WHERE office_id = ? AND requirement_id IS NULL ORDER BY uploaded_at DESC LIMIT 1`,
+      `SELECT * FROM officeproofdocuments WHERE officeid = ? AND requirementid IS NULL ORDER BY uploadedat DESC LIMIT 1`,
       [req.params.id]
     );
     if (rows.length === 0) {
       return res.json({ success: false, message: 'No proof document found' });
     }
     const doc = rows[0];
-    // Use file_path from database (should be the event-based path)
-    let fileUrl = doc.file_path;
+    // Use filepath from database (should be the event-based path)
+    let fileUrl = doc.filepath;
     
-    // Backwards compatibility: if file_path is old format or doesn't exist, try to construct it
+    // Backwards compatibility: if filepath is old format or doesn't exist, try to construct it
     if (!fileUrl || fileUrl.includes('/uploads/documents/')) {
       // Try to construct from event if we can find it
-      const [officeRows] = await db.query('SELECT EventID FROM offices WHERE OfficeID = ?', [req.params.id]);
-      if (officeRows.length > 0 && officeRows[0].EventID) {
-        const [eventRows] = await db.query('SELECT EventName FROM events WHERE EventID = ?', [officeRows[0].EventID]);
+      const [officeRows] = await db.query('SELECT eventid FROM offices WHERE officeid = ?', [req.params.id]);
+      if (officeRows.length > 0 && officeRows[0].eventid) {
+        const [eventRows] = await db.query('SELECT eventname FROM events WHERE eventid = ?', [officeRows[0].eventid]);
           if (eventRows.length > 0) {
-            const safeEventName = (eventRows[0].EventCode || eventRows[0].EventName).replace(/[^a-zA-Z0-9-_]/g, '_').substring(0, 40);
-          const safeOfficeName = doc.file_name.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9-]/g, '.');
-          const ext = path.extname(doc.file_name);
-          fileUrl = `/uploads/events/${safeEventName}/offices/${safeOfficeName}/proof/${doc.file_name}`;
+            const safeEventName = (eventRows[0].eventcode || eventRows[0].eventname).replace(/[^a-zA-Z0-9-_]/g, '_').substring(0, 40);
+          const safeOfficeName = doc.filename.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9-]/g, '.');
+          const ext = path.extname(doc.filename);
+          fileUrl = `/uploads/events/${safeEventName}/offices/${safeOfficeName}/proof/${doc.filename}`;
         } else {
-          fileUrl = fileUrl || `/uploads/documents/${doc.file_name}`;
+          fileUrl = fileUrl || `/uploads/documents/${doc.filename}`;
         }
       } else {
-        fileUrl = fileUrl || `/uploads/documents/${doc.file_name}`;
+        fileUrl = fileUrl || `/uploads/documents/${doc.filename}`;
       }
     }
     
     res.json({
       success: true,
-      file_name: doc.file_name,
-      file_path: doc.file_path || null,
+      filename: doc.filename,
+      filepath: doc.filepath || null,
       url: fileUrl,
-      uploaded_at: doc.uploaded_at
+      uploadedat: doc.uploadedat
     });
   } catch (err) {
     console.error('Error fetching proof document:', err);
@@ -272,11 +289,11 @@ router.get('/:id/proof', auth, async (req, res) => {
 // Delete latest proof document for an office (admin Unsubmit)
 router.delete('/:id/proof', auth, async (req, res) => {
   try {
-    const officeId = req.params.id;
-    // Find latest proof document (requirement_id IS NULL)
+    const officeid = req.params.id;
+    // Find latest proof document (requirementid IS NULL)
     const [rows] = await db.query(
-      'SELECT * FROM office_proof_documents WHERE office_id = ? AND requirement_id IS NULL ORDER BY uploaded_at DESC LIMIT 1',
-      [officeId]
+      'SELECT * FROM officeproofdocuments WHERE officeid = ? AND requirementid IS NULL ORDER BY uploadedat DESC LIMIT 1',
+      [officeid]
     );
     if (!rows || rows.length === 0) {
       return res.status(404).json({ success: false, message: 'No proof document found for this office' });
@@ -285,18 +302,30 @@ router.delete('/:id/proof', auth, async (req, res) => {
     // Delete file from Supabase Storage bucket and disk
     try {
       const { deleteFromSupabaseBucket } = require('../utils/supabaseStorage');
-      await deleteFromSupabaseBucket(doc.file_path, 'proof-documents');
+      await deleteFromSupabaseBucket(doc.filepath, 'proof-documents');
 
-      const filePath = path.join(__dirname, '..', doc.file_path.replace(/^\//, ''));
-      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      const filepath = path.join(__dirname, '..', doc.filepath.replace(/^\//, ''));
+      if (fs.existsSync(filepath)) fs.unlinkSync(filepath);
     } catch (fsErr) {
       console.warn('Failed to delete proof file:', fsErr);
     }
     // Delete DB record by primary key id
     await db.query(
-      'DELETE FROM office_proof_documents WHERE id = ?',
+      'DELETE FROM officeproofdocuments WHERE id = ?',
       [doc.id]
     );
+
+    try {
+      const actorId = Number(req.user?.userid || req.user?.id || 0);
+      if (actorId) {
+        await recordLog(actorId, 'OfficeProofDeleted', {
+          officeid: Number(officeid),
+          FileName: doc.filename,
+          filename: doc.filename
+        });
+      }
+    } catch (logErr) {}
+
     res.json({ success: true, message: 'Proof document deleted' });
   } catch (err) {
     console.error('Error deleting proof document:', err);

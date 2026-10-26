@@ -8,14 +8,14 @@ export default function AuditorDetailsModal({ isOpen, onClose, auditor, onAssign
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!isOpen || !auditor?.UserID) return;
+        if (!isOpen || !auditor?.userid) return;
         let mounted = true;
         setLoading(true);
 
         const fetchAssignments = async () => {
             try {
                 const token = localStorage.getItem('token');
-                const res = await fetch(`${API_BASE_URL}/api/areas/assignments/${auditor.UserID}`, {
+                const res = await fetch(`${API_BASE_URL}/api/areas/assignments/${auditor.userid}`, {
                     headers: token ? { 'Authorization': `Bearer ${token}` } : {}
                 });
                 const data = await res.json();
@@ -38,16 +38,16 @@ export default function AuditorDetailsModal({ isOpen, onClose, auditor, onAssign
 
     if (!isOpen || !auditor) return null;
 
-    const avatarSrc = auditor.ProfilePic
-        ? `${API_BASE_URL}/uploads/profile-pics/${auditor.ProfilePic}`
+    const avatarSrc = auditor.profilepic
+        ? `${API_BASE_URL}/uploads/profile-pics/${auditor.profilepic}`
         : null;
 
-    const fullName = `${auditor.FirstName || ''} ${auditor.LastName || ''}`.trim() || 'External Auditor';
-    const initialLetter = (auditor.FirstName || auditor.Email || 'A').charAt(0).toUpperCase();
+    const fullName = `${auditor.firstname || ''} ${auditor.lastname || ''}`.trim() || 'External Auditor';
+    const initialLetter = (auditor.firstname || auditor.Email || 'A').charAt(0).toUpperCase();
 
-    // Group assignments by EventName / EventID
+    // Group assignments by eventname / eventid
     const groupedByEvent = assignments.reduce((acc, curr) => {
-        const eventKey = curr.EventName || curr.EventCode || 'General / Unassigned Event';
+        const eventKey = curr.eventname || curr.eventcode || 'General / Unassigned Event';
         if (!acc[eventKey]) {
             acc[eventKey] = [];
         }
@@ -160,12 +160,12 @@ export default function AuditorDetailsModal({ isOpen, onClose, auditor, onAssign
                         </div>
                     ) : (
                         <div className="space-y-4 max-h-[380px] overflow-y-auto pr-1">
-                            {Object.entries(groupedByEvent).map(([eventName, items]) => {
-                                const codeMatch = eventName.match(/\(([^)]+)\)/);
-                                const displayTitle = codeMatch ? `${codeMatch[1]} — ${eventName.replace(/\([^)]+\)/, '').trim()}` : eventName;
+                            {Object.entries(groupedByEvent).map(([eventname, items]) => {
+                                const codeMatch = eventname.match(/\(([^)]+)\)/);
+                                const displayTitle = codeMatch ? `${codeMatch[1]} — ${eventname.replace(/\([^)]+\)/, '').trim()}` : eventname;
 
                                 return (
-                                    <div key={eventName} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs transition hover:shadow-xs">
+                                    <div key={eventname} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs transition hover:shadow-xs">
                                         {/* Event Header */}
                                         <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
                                             <div className="flex items-center gap-2 min-w-0">
@@ -187,7 +187,7 @@ export default function AuditorDetailsModal({ isOpen, onClose, auditor, onAssign
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                                             {items.map((item) => (
                                                 <div 
-                                                    key={item.id || item.area_id} 
+                                                    key={item.id || item.areaid} 
                                                     className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/50 p-3 text-xs transition hover:bg-blue-50/40 hover:border-blue-200"
                                                 >
                                                     <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white text-blue-600 shadow-2xs border border-slate-200">
@@ -198,10 +198,10 @@ export default function AuditorDetailsModal({ isOpen, onClose, auditor, onAssign
                                                     </div>
                                                     <div className="min-w-0">
                                                         <span className="font-extrabold text-slate-900 block truncate">
-                                                            {item.AreaCode || `Area ${item.area_id}`}
+                                                            {item.areacode || `Area ${item.areaid}`}
                                                         </span>
                                                         <span className="text-[11px] text-slate-500 block truncate font-medium">
-                                                            {item.AreaName}
+                                                            {item.areaname}
                                                         </span>
                                                     </div>
                                                 </div>

@@ -24,7 +24,7 @@ const ROLE_FILTER_OPTIONS = [
 export default function Users() {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterOptions, setFilterOptions] = useState({
-        approvalStatus: [],
+        approvalstatus: [],
         roles: []
     });
     const [approvalFilter, setApprovalFilter] = useState('all');
@@ -137,7 +137,7 @@ export default function Users() {
         setApprovalFilter(value);
         setFilterOptions((prev) => ({
             ...prev,
-            approvalStatus: value === 'all' ? [] : [value],
+            approvalstatus: value === 'all' ? [] : [value],
         }));
     };
 

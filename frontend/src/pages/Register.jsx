@@ -16,12 +16,12 @@ export default function Register() {
     const inviteToken = new URLSearchParams(location.search).get("invite") || "";
     const inviteExpiredRef = useRef(false);
     const [formData, setFormData] = useState({
-        firstName: "",
-        middleInitial: "",
-        lastName: "",
+        firstname: "",
+        middleinitial: "",
+        lastname: "",
         email: "",
         password: "",
-        roleId: "2"
+        roleid: "2"
     });
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
@@ -55,7 +55,7 @@ export default function Register() {
                 setFormData((current) => ({
                     ...current,
                     email: invite?.email || current.email,
-                    roleId: String(invite?.roleId || current.roleId || "2"),
+                    roleid: String(invite?.roleid || current.roleid || "2"),
                 }));
 
                 const remainingMs = Math.max(0, Number(invite?.expiresAt || 0) - Date.now());
@@ -122,12 +122,12 @@ export default function Register() {
         try {
             navigate("/otp", {
                 state: {
-                    firstName: formData.firstName,
-                    middleInitial: formData.middleInitial,
-                    lastName: formData.lastName,
+                    firstname: formData.firstname,
+                    middleinitial: formData.middleinitial,
+                    lastname: formData.lastname,
                     email: formData.email,
                     password: formData.password,
-                    roleId: parseInt(inviteInfo?.roleId || formData.roleId, 10) || 2,
+                    roleid: parseInt(inviteInfo?.roleid || formData.roleid, 10) || 2,
                     inviteToken: inviteToken || null,
                 },
             });
@@ -299,10 +299,10 @@ export default function Register() {
                             {/* Name row */}
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                                 <div>
-                                    <label htmlFor="firstName" style={labelStyle}>First Name *</label>
+                                    <label htmlFor="firstname" style={labelStyle}>First Name *</label>
                                     <input
-                                        type="text" id="firstName" name="firstName" required
-                                        value={formData.firstName} onChange={handleChange}
+                                        type="text" id="firstname" name="firstname" required
+                                        value={formData.firstname} onChange={handleChange}
                                         placeholder="First name"
                                         style={inputStyle()}
                                         onFocus={e => { e.target.style.borderColor = '#2563eb'; e.target.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.12)'; }}
@@ -310,10 +310,10 @@ export default function Register() {
                                     />
                                 </div>
                                 <div>
-                                    <label htmlFor="lastName" style={labelStyle}>Last Name *</label>
+                                    <label htmlFor="lastname" style={labelStyle}>Last Name *</label>
                                     <input
-                                        type="text" id="lastName" name="lastName" required
-                                        value={formData.lastName} onChange={handleChange}
+                                        type="text" id="lastname" name="lastname" required
+                                        value={formData.lastname} onChange={handleChange}
                                         placeholder="Last name"
                                         style={inputStyle()}
                                         onFocus={e => { e.target.style.borderColor = '#2563eb'; e.target.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.12)'; }}
@@ -324,10 +324,10 @@ export default function Register() {
 
                             {/* Middle initial */}
                             <div>
-                                <label htmlFor="middleInitial" style={labelStyle}>Middle Initial</label>
+                                <label htmlFor="middleinitial" style={labelStyle}>Middle Initial</label>
                                 <input
-                                    type="text" id="middleInitial" name="middleInitial" maxLength="1"
-                                    value={formData.middleInitial} onChange={handleChange}
+                                    type="text" id="middleinitial" name="middleinitial" maxLength="1"
+                                    value={formData.middleinitial} onChange={handleChange}
                                     placeholder="e.g. A"
                                     style={inputStyle()}
                                     onFocus={e => { e.target.style.borderColor = '#2563eb'; e.target.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.12)'; }}

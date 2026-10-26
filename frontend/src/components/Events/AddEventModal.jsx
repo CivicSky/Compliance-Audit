@@ -5,9 +5,9 @@ import CustomSelect from "../UI/CustomSelect";
 
 export default function AddEventModal({ isOpen, onClose, onSuccess }) {
     const [formData, setFormData] = useState({
-        EventCode: '',
-        EventName: '',
-        accreditation_level: 'N/A'
+        eventcode: '',
+        eventname: '',
+        accreditationlevel: 'N/A'
     });
 
     const [errors, setErrors] = useState({});
@@ -32,11 +32,11 @@ export default function AddEventModal({ isOpen, onClose, onSuccess }) {
     const validateForm = () => {
         const newErrors = {};
         
-        if (!formData.EventCode.trim()) {
-            newErrors.EventCode = 'Accreditation code is required';
+        if (!formData.eventcode.trim()) {
+            newErrors.eventcode = 'Accreditation code is required';
         }
-        if (!formData.EventName.trim()) {
-            newErrors.EventName = 'Accreditation name is required';
+        if (!formData.eventname.trim()) {
+            newErrors.eventname = 'Accreditation name is required';
         }
 
         setErrors(newErrors);
@@ -58,10 +58,10 @@ export default function AddEventModal({ isOpen, onClose, onSuccess }) {
             
             // Add accreditation to database
             const response = await eventsAPI.addEvent({
-                EventCode: formData.EventCode,
-                EventName: formData.EventName,
+                eventcode: formData.eventcode,
+                eventname: formData.eventname,
                 Description: null,
-                accreditation_level: formData.accreditation_level || 'N/A'
+                accreditationlevel: formData.accreditationlevel || 'N/A'
             });
 
             if (response.success) {
@@ -69,9 +69,9 @@ export default function AddEventModal({ isOpen, onClose, onSuccess }) {
                 
                 // Reset form and close modal
                 setFormData({
-                    EventCode: '',
-                    EventName: '',
-                    accreditation_level: 'N/A'
+                    eventcode: '',
+                    eventname: '',
+                    accreditationlevel: 'N/A'
                 });
                 
                 // Call onSuccess callback if provided
@@ -97,9 +97,9 @@ export default function AddEventModal({ isOpen, onClose, onSuccess }) {
         if (!isSubmitting) {
             // Reset form when closing
             setFormData({
-                EventCode: '',
-                EventName: '',
-                accreditation_level: 'N/A'
+                eventcode: '',
+                eventname: '',
+                accreditationlevel: 'N/A'
             });
             setErrors({});
             onClose();
@@ -131,57 +131,57 @@ export default function AddEventModal({ isOpen, onClose, onSuccess }) {
                 <form onSubmit={handleSubmit} className="p-6 space-y-4">
                     {/* Accreditation Code */}
                     <div>
-                        <label htmlFor="EventCode" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                        <label htmlFor="eventcode" className="block text-xs font-semibold text-slate-700 mb-1.5">
                             Accreditation Code *
                         </label>
                         <input
                             type="text"
-                            id="EventCode"
-                            name="EventCode"
-                            value={formData.EventCode}
+                            id="eventcode"
+                            name="eventcode"
+                            value={formData.eventcode}
                             onChange={handleInputChange}
                             className={`w-full px-3 py-2 text-xs border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ${
-                                errors.EventCode ? 'border-red-400' : 'border-slate-200'
+                                errors.eventcode ? 'border-red-400' : 'border-slate-200'
                             }`}
                             placeholder="e.g., PAASCU, PACUCOA, CHED RQAT"
                             disabled={isSubmitting}
                         />
-                        {errors.EventCode && (
-                            <p className="text-red-500 text-[11px] mt-1">{errors.EventCode}</p>
+                        {errors.eventcode && (
+                            <p className="text-red-500 text-[11px] mt-1">{errors.eventcode}</p>
                         )}
                     </div>
 
                     {/* Accreditation Name */}
                     <div>
-                        <label htmlFor="EventName" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                        <label htmlFor="eventname" className="block text-xs font-semibold text-slate-700 mb-1.5">
                             Accreditation Name *
                         </label>
                         <input
                             type="text"
-                            id="EventName"
-                            name="EventName"
-                            value={formData.EventName}
+                            id="eventname"
+                            name="eventname"
+                            value={formData.eventname}
                             onChange={handleInputChange}
                             className={`w-full px-3 py-2 text-xs border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors ${
-                                errors.EventName ? 'border-red-400' : 'border-slate-200'
+                                errors.eventname ? 'border-red-400' : 'border-slate-200'
                             }`}
                             placeholder="e.g., Philippine Accrediting Association of Schools, Colleges and Universities"
                             disabled={isSubmitting}
                         />
-                        {errors.EventName && (
-                            <p className="text-red-500 text-[11px] mt-1">{errors.EventName}</p>
+                        {errors.eventname && (
+                            <p className="text-red-500 text-[11px] mt-1">{errors.eventname}</p>
                         )}
                     </div>
 
                     {/* Accreditation Level */}
                     <div>
-                        <label htmlFor="accreditation_level" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                        <label htmlFor="accreditationlevel" className="block text-xs font-semibold text-slate-700 mb-1.5">
                             Accreditation Level
                         </label>
                         <CustomSelect
                             size="md"
-                            value={formData.accreditation_level || 'N/A'}
-                            onChange={(val) => setFormData(prev => ({ ...prev, accreditation_level: val }))}
+                            value={formData.accreditationlevel || 'N/A'}
+                            onChange={(val) => setFormData(prev => ({ ...prev, accreditationlevel: val }))}
                             disabled={isSubmitting}
                             options={[
                                 { value: 'Level I', label: 'Level I' },
