@@ -12,7 +12,7 @@ import OfficesP from "../components/OfficesP/OfficesP";
 import AddOfficeModal from "../components/Organization/AddOfficeModal";
 import EditOfficeModal from "../components/Organization/EditOfficeModal";
 import ViewReqPasscuModal from "../components/ViewReqPasscuModal/ViewReqPasscuModal";
-import ViewReqPASSCUModal from "../components/ViewReqPASSCUModal/ViewReqPASSCUModal";
+import ViewReqPASSCUModal from "../components/ViewReqPasscuModal/ViewReqPasscuModal";
 import AddReqOffModal from "../components/AddReqOffModal/AddReqOffModal";
 import { Building2, Plus, Search, LayoutGrid, List } from "lucide-react";
 import { useModal } from "../components/UI/ModalProvider";

@@ -4,7 +4,7 @@ import CriteriaP from "../components/CriteriaP/CriteriaP";
 import AddCriteriaModal from "../components/Criteria/AddCriteriaModal";
 import EditOfficeModal from "../components/Organization/EditOfficeModal";
 import ViewReqPasscuModal from "../components/ViewReqPasscuModal/ViewReqPasscuModal";
-import ViewReqPASSCUModal from "../components/ViewReqPASSCUModal/ViewReqPASSCUModal";
+import ViewReqPASSCUModal from "../components/ViewReqPasscuModal/ViewReqPasscuModal";
 import AddReqOffModal from "../components/AddReqOffModal/AddReqOffModal";
 import EditCriteriaModal from "../components/Criteria/EditCriteriaModal";
 import UnifiedSetupWizard from "../components/UnifiedSetupWizard/UnifiedSetupWizard";
