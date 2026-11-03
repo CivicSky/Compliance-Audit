@@ -36,6 +36,10 @@ router.get('/:requirementid/user-file/:userid', auth, async (req, res) => {
             queryParams.push(officeid);
         }
 
+        if (req.user && Number(req.user.roleid) === 4) {
+            whereClause += " AND opd.reviewstatus = 'approved'";
+        }
+
         try {
             const [r] = await db.query(
                 `SELECT opd.id, opd.filename, opd.displayname, opd.comment, opd.filepath, opd.uploadedat, opd.sortorder, opd.uploadedby, opd.officeid,

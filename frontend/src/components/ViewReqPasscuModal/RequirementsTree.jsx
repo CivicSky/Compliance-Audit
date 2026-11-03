@@ -680,7 +680,7 @@ export default function RequirementsTree({
                                                                         Active
                                                                     </span>
                                                                 )}
-                                                                {assignedUsersMap[req.requirementid]?.some((u) => u.hasrejected || Number(u.rejectedcount) > 0) && (
+                                                                {!isAuditor && assignedUsersMap[req.requirementid]?.some((u) => u.hasrejected || Number(u.rejectedcount) > 0) && (
                                                                     <span className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700 shadow-sm">
                                                                         <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
                                                                         Needs Revision
@@ -941,34 +941,38 @@ export default function RequirementsTree({
                                                                         <div className="flex items-center space-x-1">
                                                                             {visibleReqUsers.slice(0, 4).map((user) => {
                                                                                 const displayname = `${user.firstname || ''}${user.lastname ? ' ' + user.lastname : ''}`.trim() || user.Username || '';
-                                                                                const hasuploaded = user.hasuploaded === 1 || user.hasuploaded === true;
-                                                                                const hasrejected = user.hasrejected === true || Number(user.rejectedcount) > 0;
-                                                                                const isallapproved = user.isallapproved === true;
+                                                                                const hasuploaded = isAuditor
+                                                                                    ? Number(user.approvedcount ?? user.totalfiles ?? 0) > 0
+                                                                                    : (user.hasuploaded === 1 || user.hasuploaded === true);
+                                                                                const hasrejected = !isAuditor && (user.hasrejected === true || Number(user.rejectedcount) > 0);
+                                                                                const isallapproved = !isAuditor && user.isallapproved === true;
                                                                                 return (
                                                                                     <div key={user.userid} className="relative">
                                                                                         <SmartUserAvatar
                                                                                             user={user}
                                                                                             size="h-7 w-7"
                                                                                             textSize="text-[10px]"
-                                                                                            title={`${displayname}${displayname ? ' • ' : ''}${hasrejected ? 'Needs Revision (Rejected files)' : isallapproved ? 'All Approved' : hasuploaded ? 'Uploaded' : 'Not uploaded'}`}
+                                                                                            title={isAuditor ? displayname : `${displayname}${displayname ? ' • ' : ''}${hasrejected ? 'Needs Revision (Rejected files)' : isallapproved ? 'All Approved' : hasuploaded ? 'Uploaded' : 'Not uploaded'}`}
                                                                                             onClick={(e) => {
                                                                                                 e.stopPropagation();
                                                                                                 handleUserAvatarClick(e, user, req.requirementid);
                                                                                             }}
-                                                                                            ring={`border-2 ring-1 ring-slate-200/50 ${hasrejected ? 'border-rose-500' : hasuploaded ? 'border-emerald-500' : 'border-white'}`}
+                                                                                            ring={isAuditor ? 'border-2 border-white ring-1 ring-slate-200/50' : `border-2 ring-1 ring-slate-200/50 ${hasrejected ? 'border-rose-500' : hasuploaded ? 'border-emerald-500' : 'border-white'}`}
                                                                                             className="cursor-pointer"
                                                                                         />
-                                                                                        {hasrejected ? (
-                                                                                            <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white bg-rose-500 leading-none text-white shadow-xs" title="Needs Revision">
-                                                                                                <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                                                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                                                                                </svg>
-                                                                                            </span>
-                                                                                        ) : hasuploaded ? (
-                                                                                            <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white bg-emerald-500 leading-none text-white shadow-xs" title={isallapproved ? "All approved" : "Uploaded"}>
-                                                                                                <Check className="w-2.5 h-2.5" />
-                                                                                            </span>
-                                                                                        ) : null}
+                                                                                        {!isAuditor && (
+                                                                                            hasrejected ? (
+                                                                                                <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white bg-rose-500 leading-none text-white shadow-xs" title="Needs Revision">
+                                                                                                    <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                                                                                    </svg>
+                                                                                                </span>
+                                                                                            ) : hasuploaded ? (
+                                                                                                <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white bg-emerald-500 leading-none text-white shadow-xs" title={isallapproved ? "All approved" : "Uploaded"}>
+                                                                                                    <Check className="w-2.5 h-2.5" />
+                                                                                                </span>
+                                                                                            ) : null
+                                                                                        )}
                                                                                     </div>
                                                                                 );
                                                                             })}

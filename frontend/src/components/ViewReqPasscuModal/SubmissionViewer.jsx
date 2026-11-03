@@ -256,8 +256,9 @@ export default function SubmissionViewer({
 			const cacheKey = CacheKeys.userFiles(requirementid, id, officeid);
 			const cached = dataCache.get(cacheKey);
 			if (cached && Array.isArray(cached) && cached.length > 0) {
-				initialFilesMap[id] = cached;
-				initialFileMap[id] = cached[cached.length - 1];
+				const filteredCached = isViewerAuditor ? cached.filter((f) => f.reviewstatus === 'approved') : cached;
+				initialFilesMap[id] = filteredCached;
+				initialFileMap[id] = filteredCached[filteredCached.length - 1] || null;
 				initialLoadingMap[id] = false;
 			} else {
 				initialLoadingMap[id] = true;
@@ -286,16 +287,17 @@ export default function SubmissionViewer({
 				const data = await res.json();
 				if (cancelled) return;
 				if (data?.success) {
-					const list = Array.isArray(data.files) && data.files.length > 0 
+					const rawList = Array.isArray(data.files) && data.files.length > 0 
 						? data.files 
 						: (data.file ? [data.file] : []);
+					const list = isViewerAuditor ? rawList.filter((f) => f.reviewstatus === 'approved') : rawList;
 					
 					// Save in dataCache
 					dataCache.set(CacheKeys.userFiles(requirementid, userid, officeid), list);
 
 					setFilesByUserId((prev) => ({ ...prev, [userid]: list }));
-					if (data.file || list.length > 0) {
-						setFileByUserId((prev) => ({ ...prev, [userid]: data.file || list[list.length - 1] }));
+					if (list.length > 0) {
+						setFileByUserId((prev) => ({ ...prev, [userid]: list[list.length - 1] }));
 					}
 				}
 			} catch (e) {
@@ -325,7 +327,7 @@ export default function SubmissionViewer({
 			cancelled = true;
 			controller.abort();
 		};
-	}, [show, requirementid, officeid, uploadedUserIdsKey]);
+	}, [show, requirementid, officeid, uploadedUserIdsKey, isViewerAuditor]);
 
 	// Real-time live synchronization for evidence files while drawer is open
 	useLiveRefresh(async () => {
@@ -341,13 +343,14 @@ export default function SubmissionViewer({
 				if (res.ok) {
 					const data = await res.json();
 					if (data?.success) {
-						const list = Array.isArray(data.files) && data.files.length > 0 
+						const rawList = Array.isArray(data.files) && data.files.length > 0 
 							? data.files 
 							: (data.file ? [data.file] : []);
+						const list = isViewerAuditor ? rawList.filter((f) => f.reviewstatus === 'approved') : rawList;
 						dataCache.set(CacheKeys.userFiles(requirementid, userid, officeid), list);
 						setFilesByUserId((prev) => ({ ...prev, [userid]: list }));
-						if (data.file || list.length > 0) {
-							setFileByUserId((prev) => ({ ...prev, [userid]: data.file || list[list.length - 1] }));
+						if (list.length > 0) {
+							setFileByUserId((prev) => ({ ...prev, [userid]: list[list.length - 1] }));
 						}
 					}
 				}
@@ -355,7 +358,7 @@ export default function SubmissionViewer({
 				// ignore
 			}
 		}
-	}, { entityTypes: ['requirements', 'compliance', 'documents', 'all'], deps: [show, requirementid, officeid, uploadedUserIdsKey] });
+	}, { entityTypes: ['requirements', 'compliance', 'documents', 'all'], deps: [show, requirementid, officeid, uploadedUserIdsKey, isViewerAuditor] });
 
 	// Listen for immediate local review and update events to update file review statuses with 0ms delay
 	useEffect(() => {
@@ -899,16 +902,23 @@ export default function SubmissionViewer({
 										const displayname = `${u?.firstname || ''}${u?.lastname ? ' ' + u.lastname : ''}`.trim() || u?.Username || 'User';
 										const userid = u?.userid ? Number(u.userid) : null;
 										const cachedFiles = (userid && requirementid) ? dataCache.get(CacheKeys.userFiles(requirementid, userid)) : null;
-										const userFiles = (userid && filesByUserId[userid] && filesByUserId[userid].length > 0)
+										const rawUserFiles = (userid && filesByUserId[userid] && filesByUserId[userid].length > 0)
 											? filesByUserId[userid]
 											: (cachedFiles && Array.isArray(cachedFiles) && cachedFiles.length > 0)
 											? cachedFiles
 											: (u?.userFiles && Array.isArray(u.userFiles) && u.userFiles.length > 0)
 											? u.userFiles
 											: (userid && fileByUserId[userid] ? [fileByUserId[userid]] : []);
-										const hasuploaded = (userid && filesByUserId[userid] !== undefined)
-											? filesByUserId[userid].length > 0
-											: (userFiles.length > 0 || u?.hasuploaded === 1 || u?.hasuploaded === true);
+										const userFiles = isViewerAuditor
+											? rawUserFiles.filter((f) => f && f.reviewstatus === 'approved')
+											: rawUserFiles;
+										const hasuploaded = isViewerAuditor
+											? ((userid && filesByUserId[userid] !== undefined)
+												? userFiles.length > 0
+												: (userFiles.length > 0 || Number(u?.approvedcount || 0) > 0))
+											: ((userid && filesByUserId[userid] !== undefined)
+												? filesByUserId[userid].length > 0
+												: (userFiles.length > 0 || u?.hasuploaded === 1 || u?.hasuploaded === true));
 
 										return (
 											<div

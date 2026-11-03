@@ -110,14 +110,26 @@ export default function ViewReqPASSCUModal({
     const [expandedReqs, setExpandedReqs] = useState([]);
     const [gridModalData, setGridModalData] = useState(null);
 
+    const currentRoleId = Number(currentUser?.roleid || 0);
+    const isAdmin = currentRoleId === 1;
+    const isOfficeHead = currentRoleId === 3;
+    const isStandardUser = currentRoleId === 2;
+    const isAuditor = currentRoleId === 4 || 
+                      String(currentUser?.rolename || '').toLowerCase().includes('auditor') || 
+                      currentUser?.isExternalAuditor;
+    const isPersonnel = !isAdmin && !isAuditor;
+
     const handleOpenUserFilesGridModal = async (user, requirementid, initialFiles) => {
         const req = requirements.find((r) => Number(r.requirementid) === Number(requirementid)) || selectedSubmissionRequirement;
         const cacheKey = CacheKeys.userFiles(requirementid, user.userid, office?.id);
-        const cachedFiles = (Array.isArray(initialFiles) && initialFiles.length > 0) 
+        const rawCachedFiles = (Array.isArray(initialFiles) && initialFiles.length > 0) 
             ? initialFiles 
             : dataCache.get(cacheKey);
+        const cachedFiles = Array.isArray(rawCachedFiles)
+            ? (isAuditor ? rawCachedFiles.filter(f => f && f.reviewstatus === 'approved') : rawCachedFiles)
+            : [];
 
-        if (Array.isArray(cachedFiles) && cachedFiles.length > 0) {
+        if (cachedFiles.length > 0) {
             setGridModalData({ user, requirement: req, files: cachedFiles });
         }
 
@@ -127,7 +139,10 @@ export default function ViewReqPASSCUModal({
                 headers: { Authorization: token ? `Bearer ${token}` : '' }
             });
             if (res.data && res.data.success) {
-                const freshFiles = res.data.files || (res.data.file ? [res.data.file] : []);
+                const rawFreshFiles = res.data.files || (res.data.file ? [res.data.file] : []);
+                const freshFiles = isAuditor
+                    ? rawFreshFiles.filter(f => f && f.reviewstatus === 'approved')
+                    : rawFreshFiles;
                 dataCache.set(cacheKey, freshFiles);
                 setGridModalData({ user, requirement: req, files: freshFiles });
             } else if (!cachedFiles || cachedFiles.length === 0) {
@@ -160,21 +175,12 @@ export default function ViewReqPASSCUModal({
 
     const { showAlert, showConfirm } = useModal();
 
-    const currentRoleId = Number(currentUser?.roleid || 0);
     const toggleExpandReq = (requirementid) => {
         setExpandedReqs(prev => {
             if (prev.includes(requirementid)) return prev.filter(id => id !== requirementid);
             return [...prev, requirementid];
         });
     };
-
-    const isAdmin = currentRoleId === 1;
-    const isOfficeHead = currentRoleId === 3;
-    const isStandardUser = currentRoleId === 2;
-    const isAuditor = currentRoleId === 4 || 
-                      String(currentUser?.rolename || '').toLowerCase().includes('auditor') || 
-                      currentUser?.isExternalAuditor;
-    const isPersonnel = !isAdmin && !isAuditor;
 
     const [officeAuditors, setOfficeAuditors] = useState([]);
     const [auditorAssignedAreaIds, setAuditorAssignedAreaIds] = useState(new Set());

@@ -494,15 +494,16 @@ export default function UserFilesGridModal({
     const { toast } = useToast();
     const [expandedComments, setExpandedComments] = useState({});
     const [visibleCount, setVisibleCount] = useState(9);
-    const [localFiles, setLocalFiles] = useState(files);
+    const filterForAuditor = (arr) => isViewerAuditor ? (arr || []).filter(f => f && f.reviewstatus === 'approved') : (arr || []);
+    const [localFiles, setLocalFiles] = useState(() => filterForAuditor(files));
     const [draggedIdx, setDraggedIdx] = useState(null);
     const [dragOverIdx, setDragOverIdx] = useState(null);
     const [isSubmittingReview, setIsSubmittingReview] = useState(false);
     const sentinelRef = useRef(null);
 
     useEffect(() => {
-        setLocalFiles(files || []);
-    }, [files]);
+        setLocalFiles(filterForAuditor(files));
+    }, [files, isViewerAuditor]);
 
     const pageSize = isViewerAuditor ? 15 : 9;
 
@@ -527,13 +528,13 @@ export default function UserFilesGridModal({
                     const fresh = Array.isArray(data.files) && data.files.length > 0 
                         ? data.files 
                         : (data.file ? [data.file] : []);
-                    setLocalFiles(fresh);
+                    setLocalFiles(filterForAuditor(fresh));
                 }
             }
         } catch (err) {
             console.warn('Live refresh error in UserFilesGridModal:', err);
         }
-    }, { entityTypes: ['requirements', 'compliance', 'documents', 'all'], deps: [show, requirement?.requirementid, user?.userid, officeid] });
+    }, { entityTypes: ['requirements', 'compliance', 'documents', 'all'], deps: [show, requirement?.requirementid, user?.userid, officeid, isViewerAuditor] });
 
     // Native IntersectionObserver for zero JS scroll overhead
     useEffect(() => {

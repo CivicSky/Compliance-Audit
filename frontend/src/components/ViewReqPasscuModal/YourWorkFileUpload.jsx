@@ -75,10 +75,11 @@ export default function YourWorkFileUpload({
 
     // Normalize files list: support either files array or single file prop
     const rawFileList = useMemo(() => {
-        return Array.isArray(files) && files.length > 0 
+        const list = Array.isArray(files) && files.length > 0 
             ? files 
             : (file ? [file] : []);
-    }, [files, file]);
+        return isAuditorUser ? list.filter(f => f && f.reviewstatus === 'approved') : list;
+    }, [files, file, isAuditorUser]);
 
     const [localFiles, setLocalFiles] = useState(rawFileList);
     const [draggedIdx, setDraggedIdx] = useState(null);

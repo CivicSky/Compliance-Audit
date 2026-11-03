@@ -1099,6 +1099,9 @@ const getAssignedUsers = async (req, res) => {
     const legacyParams = numOfficeId ? [numReqId, numOfficeId] : [numReqId];
     const [legacyAssignments] = await db.query(legacyQuery, legacyParams);
 
+    const actorRole = Number(req.user?.roleid || 0);
+    const actorId = Number(req.user?.userid || req.user?.id || 0);
+
     // 4. Fetch users who uploaded files in officeproofdocuments
     const uploaderQuery = `
       SELECT 
@@ -1115,7 +1118,7 @@ const getAssignedUsers = async (req, res) => {
         u.profilepic
       FROM officeproofdocuments opd
       JOIN users u ON opd.uploadedby = u.userid
-      WHERE opd.requirementid = ? ${numOfficeId ? 'AND opd.officeid = ?' : ''}
+      WHERE opd.requirementid = ? ${numOfficeId ? 'AND opd.officeid = ?' : ''} ${actorRole === 4 ? "AND opd.reviewstatus = 'approved'" : ''}
       GROUP BY opd.requirementid, opd.officeid, opd.uploadedby, u.firstname, u.middleinitial, u.lastname, u.Email, u.profilepic
     `;
     const uploaderParams = numOfficeId ? [numReqId, numOfficeId] : [numReqId];
@@ -1155,23 +1158,33 @@ const getAssignedUsers = async (req, res) => {
       if (!uid) return;
       if (!userMap.has(uid)) {
         const stats = fileStatsMap.get(uid) || { totalfiles: 0, approvedcount: 0, rejectedcount: 0, pendingcount: 0 };
-        userMap.set(uid, {
-          ...u,
-          totalfiles: stats.totalfiles,
-          approvedcount: stats.approvedcount,
-          rejectedcount: stats.rejectedcount,
-          pendingcount: stats.pendingcount,
-          hasuploaded: stats.totalfiles > 0,
-          hasrejected: stats.rejectedcount > 0,
-          isallapproved: stats.totalfiles > 0 && stats.approvedcount === stats.totalfiles,
-        });
+        if (actorRole === 4) {
+          userMap.set(uid, {
+            ...u,
+            totalfiles: stats.approvedcount,
+            approvedcount: stats.approvedcount,
+            rejectedcount: 0,
+            pendingcount: 0,
+            hasuploaded: stats.approvedcount > 0,
+            hasrejected: false,
+            isallapproved: false,
+          });
+        } else {
+          userMap.set(uid, {
+            ...u,
+            totalfiles: stats.totalfiles,
+            approvedcount: stats.approvedcount,
+            rejectedcount: stats.rejectedcount,
+            pendingcount: stats.pendingcount,
+            hasuploaded: stats.totalfiles > 0,
+            hasrejected: stats.rejectedcount > 0,
+            isallapproved: stats.totalfiles > 0 && stats.approvedcount === stats.totalfiles,
+          });
+        }
       }
     });
 
     const merged = Array.from(userMap.values());
-
-    const actorRole = Number(req.user?.roleid || 0);
-    const actorId = Number(req.user?.userid || req.user?.id || 0);
 
     let filtered = merged;
     if (actorRole !== 1 && actorRole !== 4) {

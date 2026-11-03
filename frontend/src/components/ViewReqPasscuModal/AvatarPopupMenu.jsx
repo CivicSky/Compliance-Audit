@@ -13,7 +13,9 @@ export default function AvatarPopupMenu({
 }) {
     if ((!isAdmin && !isOfficeHead && !isAuditor) || !avatarPopup || !avatarPopup.rect) return null;
 
-    const hasuploaded = avatarPopup.user.hasuploaded === 1 || avatarPopup.user.hasuploaded === true;
+    const hasuploaded = isAuditor
+        ? (Number(avatarPopup.user.approvedcount ?? avatarPopup.user.totalfiles ?? 0) > 0 && (avatarPopup.user.hasuploaded === 1 || avatarPopup.user.hasuploaded === true))
+        : (avatarPopup.user.hasuploaded === 1 || avatarPopup.user.hasuploaded === true);
 
     return createPortal(
         <div className="fixed inset-0 z-[9999]" onClick={onClose}>
@@ -30,9 +32,11 @@ export default function AvatarPopupMenu({
                     <p className="truncate text-xs font-semibold text-slate-900">
                         {avatarPopup.user.firstname} {avatarPopup.user.lastname}
                     </p>
-                    <p className={`mt-0.5 text-[10px] font-medium ${hasuploaded ? 'text-emerald-600' : 'text-rose-500'}`}>
-                        {hasuploaded ? 'Uploaded' : 'Not uploaded'}
-                    </p>
+                    {!isAuditor && (
+                        <p className={`mt-0.5 text-[10px] font-medium ${hasuploaded ? 'text-emerald-600' : 'text-rose-500'}`}>
+                            {hasuploaded ? 'Uploaded' : 'Not uploaded'}
+                        </p>
+                    )}
                 </div>
 
                 {hasuploaded && (
