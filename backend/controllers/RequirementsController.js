@@ -154,7 +154,7 @@ const addRequirement = async (req, res) => {
     if (!description || !criteriaid) {
       return res.status(400).json({
         success: false,
-        message: 'Description and criteria are required'
+        message: 'Description and sub area are required'
       });
     }
 
@@ -162,7 +162,7 @@ const addRequirement = async (req, res) => {
     if (!Number.isInteger(criteriaid) || criteriaid <= 0) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid criteria selected'
+        message: 'Invalid sub area selected'
       });
     }
 
@@ -178,7 +178,7 @@ const addRequirement = async (req, res) => {
     if (criteria.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid criteria selected'
+        message: 'Invalid sub area selected'
       });
     }
 
@@ -628,7 +628,7 @@ const updateRequirement = async (req, res) => {
     if (!description || !criteriaid) {
       return res.status(400).json({
         success: false,
-        message: 'Description and criteria are required'
+        message: 'Description and sub area are required'
       });
     }
 
@@ -636,7 +636,7 @@ const updateRequirement = async (req, res) => {
     if (!Number.isInteger(criteriaid) || criteriaid <= 0) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid criteria selected'
+        message: 'Invalid sub area selected'
       });
     }
 
@@ -652,7 +652,7 @@ const updateRequirement = async (req, res) => {
     if (criteria.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid criteria selected'
+        message: 'Invalid sub area selected'
       });
     }
 

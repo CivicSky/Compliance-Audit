@@ -674,7 +674,7 @@ export default function AssignToOfficesModal({
                                     className="h-3.5 w-3.5 rounded border-amber-400 text-amber-600 focus:ring-amber-500/30 cursor-pointer"
                                   />
                                   <span className="px-2 py-0.5 rounded text-[10px] font-bold tracking-wide uppercase bg-amber-600 text-white shrink-0 shadow-2xs">
-                                    CRITERIA
+                                    SUB AREA
                                   </span>
                                   <span
                                     onClick={() => toggleExpandCriteria(critId)}

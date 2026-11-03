@@ -932,7 +932,7 @@ export default function UnifiedSetupWizard({ isOpen, onClose, onSuccess }) {
                                                 name="criteriacode"
                                                 value={criteriaData.criteriacode}
                                                 onChange={handleCriteriaChange}
-                                                placeholder="CRIT-001"
+                                                placeholder="A.1"
                                                 className={`
                                                     w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2
                                                     ${errors.criteriaData?.criteriacode

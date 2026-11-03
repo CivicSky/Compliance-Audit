@@ -171,7 +171,7 @@ export default function AddRequirementModal({ isOpen, onClose, onSuccess }) {
             newErrors.Description = 'Description is required';
         }
         if (!formData.criteriaid) {
-            newErrors.criteriaid = 'Criteria is required';
+            newErrors.criteriaid = 'Sub Area is required';
         }
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;

@@ -266,10 +266,10 @@ export default function AddReqOffModal({ isOpen, onClose, office, onSave }) {
                                 {(() => {
                                     // Group requirements by Criteria
                                     const criteriaGroups = filteredRequirements.reduce((acc, req) => {
-                                        const criteriacode = req.criteriacode || 'No Criteria';
+                                        const criteriacode = req.criteriacode || 'No Sub Area';
                                         if (!acc[criteriacode]) {
                                             acc[criteriacode] = {
-                                                criterianame: req.criterianame || 'Unknown Criteria',
+                                                criterianame: req.criterianame || 'Unknown Sub Area',
                                                 requirements: []
                                             };
                                         }
@@ -370,10 +370,10 @@ export default function AddReqOffModal({ isOpen, onClose, office, onSave }) {
                                                 {/* Group by Criteria within this Area */}
                                                 {(() => {
                                                     const criteriaGroups = areaData.requirements.reduce((acc, req) => {
-                                                        const criteriacode = req.criteriacode || 'No Criteria';
+                                                        const criteriacode = req.criteriacode || 'No Sub Area';
                                                         if (!acc[criteriacode]) {
                                                             acc[criteriacode] = {
-                                                                criterianame: req.criterianame || 'Unknown Criteria',
+                                                                criterianame: req.criterianame || 'Unknown Sub Area',
                                                                 requirements: []
                                                             };
                                                         }
@@ -422,10 +422,10 @@ export default function AddReqOffModal({ isOpen, onClose, office, onSave }) {
                                         
                                         // Group by Criteria
                                         const criteriaGroups = selectedReqs.reduce((acc, req) => {
-                                            const criteriacode = req.criteriacode || 'No Criteria';
+                                            const criteriacode = req.criteriacode || 'No Sub Area';
                                             if (!acc[criteriacode]) {
                                                 acc[criteriacode] = {
-                                                    criterianame: req.criterianame || 'Unknown Criteria',
+                                                    criterianame: req.criterianame || 'Unknown Sub Area',
                                                     requirements: []
                                                 };
                                             }
