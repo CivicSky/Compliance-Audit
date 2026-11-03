@@ -28,14 +28,24 @@ export default function Otp() {
         setError("");
 
         try {
-            const response = await axios.post(`${API_BASE_URL}/api/user/send-registration-otp`, {
-                ...registrationData,
-                email,
-            });
+            const response = await axios.post(
+                `${API_BASE_URL}/api/user/send-registration-otp`,
+                {
+                    ...registrationData,
+                    email,
+                },
+                { timeout: 20000 }
+            );
 
             setMessage(response.data.message || "We sent a one-time PIN to your email.");
         } catch (err) {
-            setError(err.response?.data?.message || "Failed to send one-time PIN.");
+            const isTimeout = err.code === "ECONNABORTED" || err.message?.toLowerCase().includes("timeout");
+            setError(
+                err.response?.data?.message ||
+                (isTimeout
+                    ? "Request timed out while sending OTP. Please click Resend OTP."
+                    : "Failed to send one-time PIN.")
+            );
         } finally {
             setSending(false);
         }

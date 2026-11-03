@@ -82,6 +82,7 @@ app.use('/uploads', (req, res, next) => {
 app.use('/uploads/profile-pics', express.static('uploads/profile-pics'));
 app.use('/api/uploads/profile-pics', express.static('uploads/profile-pics'));
 app.use('/api/uploads', express.static('uploads'));
+app.use('/assets', express.static(path.join(__dirname, 'assets')));
 /*const rolesRoutes = require('./routes/roles');
 const requirementsRoutes = require('./routes/requirements');
 const officetypesRoutes = require('./routes/officetypes');

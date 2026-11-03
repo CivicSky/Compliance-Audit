@@ -326,6 +326,147 @@ const generatePasswordChangeOtpEmailHtml = (otp, userName) => {
 };
 
 const sendOtpEmail = async (email, otp, customSubject, customHtml, customText) => {
+  const subject = customSubject || `${otp} is your Auditrack verification code`;
+  const text = customText || `Your Auditrack registration one-time PIN is ${otp}. It expires in 10 minutes.`;
+  const rawHtml = customHtml || generateOtpEmailHtml(otp);
+
+  const logoCandidates = [
+    path.join(__dirname, '../assets/logo.png'),
+    path.join(__dirname, '../../frontend/public/logo.png'),
+    path.join(__dirname, '../../../Compliance-audit-mobile/assets/images/logo.png'),
+  ];
+  const logoPath = logoCandidates.find((p) => fs.existsSync(p));
+  const publicBackendUrl = (process.env.RENDER_EXTERNAL_URL || process.env.BACKEND_URL || 'https://compliance-audit.onrender.com').replace(/\/$/, '');
+  const htmlWithPublicLogo = rawHtml.replace(/cid:auditrack-logo/g, `${publicBackendUrl}/assets/logo.png`);
+
+  const user = process.env.SMTP_USER || process.env.GMAIL_USER;
+  const senderEmail = process.env.BREVO_SENDER_EMAIL || process.env.SMTP_FROM_EMAIL || user || 'noreply@auditrack.com';
+  const senderName = process.env.BREVO_SENDER_NAME || 'Auditrack Compliance';
+
+  // 1. Google Apps Script Gmail Webhook (works on Render Free Tier over HTTPS port 443 using your Gmail)
+  const DEFAULT_GMAIL_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbxQcj2VJCYvkAtjTlR1KZ1P889fbDBIQGLoW4RzAIrFeyFq6mHFYXBoPAolpIkTa-o/exec';
+  const gmailWebhookUrl = String(process.env.GMAIL_WEBHOOK_URL || process.env.GAS_WEBHOOK_URL || DEFAULT_GMAIL_WEBHOOK_URL).trim();
+  if (gmailWebhookUrl) {
+    try {
+      const logoBase64 = logoPath ? fs.readFileSync(logoPath).toString('base64') : null;
+      const response = await fetch(gmailWebhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8',
+        },
+        body: JSON.stringify({
+          to: email,
+          subject,
+          text,
+          html: logoBase64 ? rawHtml : htmlWithPublicLogo,
+          senderName,
+          logoBase64,
+        }),
+        redirect: 'follow',
+        signal: AbortSignal.timeout(15000),
+      });
+
+      const respText = await response.text();
+      let parsed = null;
+      try {
+        parsed = JSON.parse(respText);
+      } catch {}
+
+      if (!response.ok || (parsed && parsed.sent === false)) {
+        const errDetail = parsed?.error || respText || `HTTP ${response.status}`;
+        console.warn(`[OTP] Gmail Webhook send failed for ${email}:`, errDetail);
+        return { sent: false, reason: `Gmail Webhook error: ${errDetail}` };
+      }
+
+      return { sent: true };
+    } catch (error) {
+      const errorMsg = error?.message || String(error);
+      console.warn(`[OTP] Gmail Webhook request failed for ${email}:`, errorMsg);
+      return { sent: false, reason: `Gmail Webhook request failed: ${errorMsg}` };
+    }
+  }
+
+  // 2. Brevo HTTP API (works on Render Free Tier over HTTPS port 443)
+  const brevoApiKey = String(process.env.BREVO_API_KEY || '').trim();
+  if (brevoApiKey) {
+    try {
+      const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          accept: 'application/json',
+          'api-key': brevoApiKey,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          sender: { name: senderName, email: senderEmail },
+          to: [{ email }],
+          subject,
+          textContent: text,
+          htmlContent: htmlWithPublicLogo,
+        }),
+        signal: AbortSignal.timeout(10000),
+      });
+
+      if (!response.ok) {
+        const errBody = await response.text();
+        console.warn(`[OTP] Brevo API send failed (${response.status}) for ${email}:`, errBody);
+        return { sent: false, reason: `Brevo API error (${response.status}): ${errBody}` };
+      }
+
+      return { sent: true };
+    } catch (error) {
+      const errorMsg = error?.message || String(error);
+      console.warn(`[OTP] Brevo API request failed for ${email}:`, errorMsg);
+      return { sent: false, reason: `Brevo API request failed: ${errorMsg}` };
+    }
+  }
+
+  // 2. Resend HTTP API (works on Render Free Tier over HTTPS port 443)
+  const resendApiKey = String(process.env.RESEND_API_KEY || '').trim();
+  if (resendApiKey) {
+    try {
+      const resendFrom = process.env.RESEND_FROM || `${senderName} <onboarding@resend.dev>`;
+      const attachments = [];
+      if (logoPath) {
+        attachments.push({
+          filename: 'logo.png',
+          content: fs.readFileSync(logoPath).toString('base64'),
+          content_id: 'auditrack-logo',
+        });
+      }
+
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${resendApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: resendFrom,
+          to: [email],
+          subject,
+          text,
+          html: attachments.length > 0 ? rawHtml : htmlWithPublicLogo,
+          ...(attachments.length > 0 ? { attachments } : {}),
+        }),
+        signal: AbortSignal.timeout(10000),
+      });
+
+      if (!response.ok) {
+        const errBody = await response.text();
+        console.warn(`[OTP] Resend API send failed (${response.status}) for ${email}:`, errBody);
+        return { sent: false, reason: `Resend API error (${response.status}): ${errBody}` };
+      }
+
+      return { sent: true };
+    } catch (error) {
+      const errorMsg = error?.message || String(error);
+      console.warn(`[OTP] Resend API request failed for ${email}:`, errorMsg);
+      return { sent: false, reason: `Resend API request failed: ${errorMsg}` };
+    }
+  }
+
+  // 3. Fallback: Nodemailer SMTP (for local development or paid hosting with open SMTP ports)
   let nodemailer;
   try {
     nodemailer = require('nodemailer');
@@ -336,11 +477,10 @@ const sendOtpEmail = async (email, otp, customSubject, customHtml, customText) =
 
   const host = process.env.SMTP_HOST || 'smtp.gmail.com';
   const port = Number(process.env.SMTP_PORT || 465);
-  const user = process.env.SMTP_USER || process.env.GMAIL_USER;
   const pass = String(process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD || '').replace(/\s+/g, '');
 
   if (!user || !pass) {
-    return { sent: false, reason: 'SMTP is not configured' };
+    return { sent: false, reason: 'Email service is not configured (set GMAIL_WEBHOOK_URL, BREVO_API_KEY, RESEND_API_KEY, or SMTP credentials)' };
   }
 
   const transporter = nodemailer.createTransport({
@@ -349,14 +489,12 @@ const sendOtpEmail = async (email, otp, customSubject, customHtml, customText) =
     secure: port === 465,
     auth: { user, pass },
     tls: { rejectUnauthorized: false },
+    family: 4,
+    connectionTimeout: 8000,
+    greetingTimeout: 8000,
+    socketTimeout: 10000,
   });
 
-  const logoCandidates = [
-    path.join(__dirname, '../assets/logo.png'),
-    path.join(__dirname, '../../frontend/public/logo.png'),
-    path.join(__dirname, '../../../Compliance-audit-mobile/assets/images/logo.png'),
-  ];
-  const logoPath = logoCandidates.find((p) => fs.existsSync(p));
   const attachments = [];
   if (logoPath) {
     attachments.push({
@@ -370,9 +508,9 @@ const sendOtpEmail = async (email, otp, customSubject, customHtml, customText) =
     await transporter.sendMail({
       from: process.env.SMTP_FROM || `"Auditrack Compliance" <${user}>`,
       to: email,
-      subject: customSubject || `${otp} is your Auditrack verification code`,
-      text: customText || `Your Auditrack registration one-time PIN is ${otp}. It expires in 10 minutes.`,
-      html: customHtml || generateOtpEmailHtml(otp),
+      subject,
+      text,
+      html: rawHtml,
       attachments,
     });
     return { sent: true };
@@ -384,6 +522,13 @@ const sendOtpEmail = async (email, otp, customSubject, customHtml, customText) =
       return {
         sent: false,
         reason: 'Gmail SMTP Authentication Failed (534-5.7.9). Please update the GMAIL_APP_PASSWORD in backend/.env with a valid 16-character Google App Password.',
+      };
+    }
+
+    if (error?.code === 'ETIMEDOUT' || errorMsg.toLowerCase().includes('timeout')) {
+      return {
+        sent: false,
+        reason: 'SMTP connection timed out (Render Free Tier blocks SMTP ports 465/587). Add GMAIL_WEBHOOK_URL to your Render environment variables.',
       };
     }
 
