@@ -344,8 +344,7 @@ const sendOtpEmail = async (email, otp, customSubject, customHtml, customText) =
   const senderName = process.env.BREVO_SENDER_NAME || 'Auditrack Compliance';
 
   // 1. Google Apps Script Gmail Webhook (works on Render Free Tier over HTTPS port 443 using your Gmail)
-  const DEFAULT_GMAIL_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbxQcj2VJCYvkAtjTlR1KZ1P889fbDBIQGLoW4RzAIrFeyFq6mHFYXBoPAolpIkTa-o/exec';
-  const gmailWebhookUrl = String(process.env.GMAIL_WEBHOOK_URL || process.env.GAS_WEBHOOK_URL || DEFAULT_GMAIL_WEBHOOK_URL).trim();
+  const gmailWebhookUrl = String(process.env.GMAIL_WEBHOOK_URL || process.env.GAS_WEBHOOK_URL || '').trim();
   if (gmailWebhookUrl) {
     try {
       const logoBase64 = logoPath ? fs.readFileSync(logoPath).toString('base64') : null;
