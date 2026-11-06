@@ -195,7 +195,7 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
     const totalPages = Math.max(1, Math.ceil(filteredUsers.length / itemsPerPage));
     const startIdx = (currentPage - 1) * itemsPerPage;
     const paginatedUsers = filteredUsers.slice(startIdx, startIdx + itemsPerPage);
-    const visibleUsers = viewMode === 'list' ? paginatedUsers : filteredUsers;
+    const visibleUsers = paginatedUsers;
 
     // Handle selection changes and notify parent component
     useEffect(() => {
@@ -608,17 +608,15 @@ const UsersP = forwardRef(({ searchTerm = '', filterOptions = {}, deleteMode = f
                     document.body
                 );
             })()}
-            {viewMode === 'list' && (
-                <div className="pt-1">
-                    <Pagination
-                        currentPage={currentPage}
-                        totalPages={totalPages}
-                        onPageChange={(p) => setCurrentPage(p)}
-                        fixed={false}
-                        showWhenSinglePage={true}
-                    />
-                </div>
-            )}
+            <div className="pt-1">
+                <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={(p) => setCurrentPage(p)}
+                    fixed={true}
+                    showWhenSinglePage={true}
+                />
+            </div>
         </div>
     );
 });
