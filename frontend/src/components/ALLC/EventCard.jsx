@@ -134,6 +134,7 @@ export default function EventCard({
                             </button>
                             {showOptions && (
                                 <EventOptionsPopup
+                                    onOpenStructure={() => onClick?.(event)}
                                     onEdit={() => onEdit?.(event)}
                                     onCopy={() => onCopy?.(event)}
                                     onDelete={() => onDelete?.(event)}

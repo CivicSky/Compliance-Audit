@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 
-export default function EventOptionsPopup({ onEdit, onCopy, onDelete, onAssignPersonnel, onClose, anchorRef }) {
+export default function EventOptionsPopup({ onOpenStructure, onEdit, onCopy, onDelete, onAssignPersonnel, onClose, anchorRef }) {
     const [anchorRect, setAnchorRect] = useState(null);
     const menuRef = useRef(null);
 
@@ -54,6 +54,22 @@ export default function EventOptionsPopup({ onEdit, onCopy, onDelete, onAssignPe
             style={{ position: 'fixed', top: position.top, left: position.left, zIndex: 9999 }}
             className="w-48 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl animate-in fade-in zoom-in-95 duration-100"
         >
+            {onOpenStructure && (
+                <button
+                    type="button"
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-blue-700 hover:bg-blue-50 transition whitespace-nowrap cursor-pointer"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onClose();
+                        onOpenStructure?.();
+                    }}
+                >
+                    <svg className="h-4 w-4 text-blue-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                    <span>View Structure</span>
+                </button>
+            )}
             {onAssignPersonnel && (
                 <button
                     type="button"

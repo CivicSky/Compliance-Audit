@@ -17,6 +17,45 @@ import ServerOfflineState from '../components/UI/ServerOfflineState';
 import { useLiveRefresh } from '../utils/liveSync';
 import ViewModeToggle from '../components/UI/ViewModeToggle';
 import { getDeadlineInfo } from '../utils/deadlineHelpers';
+import EventOptionsPopup from '../components/ALLC/eventsoptions';
+
+function EventRowOptionsMenu({ event, onOpenStructure, onEdit, onCopy, onDelete, onAssignPersonnel }) {
+    const [showOptions, setShowOptions] = useState(false);
+    const dotBtnRef = useRef(null);
+
+    return (
+        <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
+            <button
+                ref={dotBtnRef}
+                type="button"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200/80 bg-white text-slate-500 transition-all hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 shadow-2xs cursor-pointer"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    setShowOptions(v => !v);
+                }}
+                aria-label="Options"
+                title="Options"
+            >
+                <svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="12" cy="5" r="2" />
+                    <circle cx="12" cy="12" r="2" />
+                    <circle cx="12" cy="19" r="2" />
+                </svg>
+            </button>
+            {showOptions && (
+                <EventOptionsPopup
+                    onOpenStructure={() => onOpenStructure?.(event)}
+                    onEdit={() => onEdit?.(event)}
+                    onCopy={() => onCopy?.(event)}
+                    onDelete={() => onDelete?.(event)}
+                    onAssignPersonnel={() => onAssignPersonnel?.(event)}
+                    onClose={() => setShowOptions(false)}
+                    anchorRef={dotBtnRef}
+                />
+            )}
+        </div>
+    );
+}
 
 function ALL() {
     const [sortStatus, setSortStatus] = useState('active');
@@ -116,7 +155,7 @@ function ALL() {
     const [loadingNoAreaCriteria, setLoadingNoAreaCriteria] = useState(new Set());
 
     const abortControllersRef = useRef({});
-    const itemsPerPage = viewMode === 'list' ? 8 : 4;
+    const itemsPerPage = 30;
 
     useEffect(() => {
         setCurrentPage(1);
@@ -598,7 +637,7 @@ function ALL() {
 
     const totalPages = Math.max(1, Math.ceil(filteredEvents.length / itemsPerPage));
     const startIdx = (currentPage - 1) * itemsPerPage;
-    const visibleEvents = viewMode === 'list' ? filteredEvents : filteredEvents.slice(startIdx, startIdx + itemsPerPage);
+    const visibleEvents = filteredEvents.slice(startIdx, startIdx + itemsPerPage);
     const activeCount = events.filter(e => String(e.status || e.Status || '').toLowerCase().trim() !== 'inactive').length;
 
     const handleDeleteEvent = async (targetEvent) => {
@@ -843,7 +882,7 @@ function ALL() {
                     </div>
                 ) : viewMode === 'grid' ? (
                     /* Grid Layout (2x2 / responsive cards) */
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 min-h-0 overflow-hidden">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 min-h-0 overflow-y-auto pb-14">
                         {visibleEvents.map((event) => {
                             const eventAssignments = (auditorAssignments?.rawList || []).filter(a => Number(a.eventid) === Number(event.eventid));
                             return (
@@ -893,21 +932,21 @@ function ALL() {
                 ) : (
                     /* Standard Card Rows List View (Matching MasterList, Events & OfficeHeads) */
                     <div className="flex-1 min-h-0 app-list-scroll overflow-x-auto pr-1">
-                        <div className="flex flex-col min-w-[800px] pb-3">
+                        <div className="flex flex-col min-w-[800px] pb-14">
                             {/* Sticky Header Row */}
                             <div className="grid grid-cols-12 items-center gap-3 px-5 py-3 bg-white border border-slate-200 rounded-xl shadow-xs text-xs font-semibold text-slate-700 sticky top-0 z-20 mb-2">
-                                <div className="col-span-4 flex items-center gap-2">
+                                <div className="col-span-5 flex items-center gap-2">
                                     {deleteMode && <span>Select</span>}
                                     <span>Accreditation & Code</span>
                                 </div>
                                 <div className="col-span-2 flex items-center">Level</div>
                                 <div className="col-span-1 flex items-center">Status</div>
                                 {isAuditor ? (
-                                    <div className="col-span-2 flex items-center">Assigned Areas</div>
+                                    <div className="col-span-3 flex items-center">Assigned Areas</div>
                                 ) : (
-                                    <div className="col-span-2 flex items-center justify-start">Timestamps</div>
+                                    <div className="col-span-3 flex items-center justify-start">Timestamps</div>
                                 )}
-                                <div className="col-span-3 flex items-center justify-end">Actions</div>
+                                <div className="col-span-1 flex items-center justify-end pr-1">Options</div>
                             </div>
 
                             {/* Separated Card Rows */}
@@ -943,7 +982,7 @@ function ALL() {
                                         >
                                             <div className="grid grid-cols-12 items-center gap-3 px-5 py-3.5">
                                                 {/* Accreditation Name & Code */}
-                                                <div className="col-span-4 flex items-center gap-3 min-w-0">
+                                                <div className="col-span-5 flex items-center gap-3 min-w-0">
                                                     {deleteMode && (
                                                         <input
                                                             type="checkbox"
@@ -1006,7 +1045,7 @@ function ALL() {
 
                                                 {/* Timestamps or Assigned Areas */}
                                                 {isAuditor ? (
-                                                    <div className="col-span-2 flex items-center">
+                                                    <div className="col-span-3 flex items-center">
                                                         {eventAssignments.length > 0 ? (
                                                             <div className="flex flex-wrap gap-1 max-w-xs">
                                                                 {eventAssignments.slice(0, 2).map(a => (
@@ -1025,7 +1064,7 @@ function ALL() {
                                                         )}
                                                     </div>
                                                 ) : (
-                                                    <div className="col-span-2 flex flex-col justify-center min-w-0">
+                                                    <div className="col-span-3 flex flex-col justify-center min-w-0">
                                                         {(() => {
                                                             const dl = getDeadlineInfo(event.deadline, event);
                                                             return dl.hasDeadline ? (
@@ -1046,62 +1085,16 @@ function ALL() {
                                                     </div>
                                                 )}
 
-                                                {/* Actions */}
-                                                <div className="col-span-3 flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => openEventModal(event)}
-                                                        className="inline-flex items-center gap-1 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200/80 px-3 py-1.5 text-xs font-semibold text-blue-700 transition cursor-pointer shadow-2xs hover:shadow-xs active:scale-95"
-                                                    >
-                                                        Structure
-                                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                                                        </svg>
-                                                    </button>
-                                                    {isAdmin && (
-                                                        <>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setAssignScopeEvent(event)}
-                                                                title="Assign Personnel"
-                                                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 transition cursor-pointer shadow-2xs active:scale-95"
-                                                            >
-                                                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                                                                </svg>
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setEditPopup({ open: true, event })}
-                                                                title="Edit Standard"
-                                                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-blue-600 hover:border-slate-300 transition cursor-pointer shadow-2xs active:scale-95"
-                                                            >
-                                                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                                                </svg>
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => openCopyModal(event)}
-                                                                title="Copy Standard"
-                                                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 transition cursor-pointer shadow-2xs active:scale-95"
-                                                            >
-                                                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
-                                                                </svg>
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleDeleteEvent(event)}
-                                                                title="Delete Standard"
-                                                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-rose-600 hover:bg-rose-50 hover:border-rose-200 transition cursor-pointer shadow-2xs active:scale-95"
-                                                            >
-                                                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
-                                                                </svg>
-                                                            </button>
-                                                        </>
-                                                    )}
+                                                {/* Options */}
+                                                <div className="col-span-1 flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
+                                                    <EventRowOptionsMenu
+                                                        event={event}
+                                                        onOpenStructure={() => openEventModal(event)}
+                                                        onEdit={isAdmin ? () => setEditPopup({ open: true, event }) : undefined}
+                                                        onCopy={isAdmin ? () => openCopyModal(event) : undefined}
+                                                        onDelete={isAdmin ? () => handleDeleteEvent(event) : undefined}
+                                                        onAssignPersonnel={isAdmin ? () => setAssignScopeEvent(event) : undefined}
+                                                    />
                                                 </div>
                                             </div>
                                         </div>
@@ -1113,8 +1106,8 @@ function ALL() {
                 )}
             </div>
 
-            {/* Pagination Controls (Grid mode only - removed in list mode per request) */}
-            {viewMode === 'grid' && !loading && !error && filteredEvents.length > 0 && (
+            {/* Pagination Controls (Grid and List mode) */}
+            {!loading && !error && filteredEvents.length > 0 && (
                 <Pagination
                     currentPage={currentPage}
                     totalPages={totalPages}
