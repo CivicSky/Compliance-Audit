@@ -111,17 +111,37 @@ export default function EventTabs({ selectedEventId, onChange }) {
 
         {/* Far-right Deadline Capsule matching Header Clock Pill */}
         <div
-          className="inline-flex items-center gap-2 px-3 py-1 mb-1 rounded-lg bg-slate-50/80 border border-slate-200/70 text-xs text-slate-600 font-medium select-none shadow-2xs shrink-0"
+          className={`inline-flex items-center gap-2 px-3 py-1 mb-1 rounded-lg border text-xs font-medium select-none shadow-2xs shrink-0 transition-colors ${
+            !dlInfo.hasDeadline
+              ? 'bg-slate-50/80 border-slate-200/70 text-slate-500'
+              : dlInfo.status === 'completed'
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                : dlInfo.status === 'overdue' || dlInfo.status === 'due-today'
+                  ? 'bg-rose-50/80 border-rose-200 text-rose-800'
+                  : dlInfo.status === 'urgent' || dlInfo.status === 'upcoming'
+                    ? 'bg-amber-50/80 border-amber-200 text-amber-800'
+                    : 'bg-slate-50/80 border-slate-200/70 text-slate-600'
+          }`}
           title={dlInfo.hasDeadline ? `Target submission deadline: ${dlInfo.label}` : 'No target submission deadline set for this accreditation'}
         >
           <span
             className={`inline-block h-1.5 w-1.5 rounded-full ${
               dlInfo.hasDeadline
-                ? `${dlInfo.dotClasses} shadow-[0_0_6px_rgba(16,185,129,0.35)]`
+                ? dlInfo.status === 'completed'
+                  ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.45)]'
+                  : dlInfo.status === 'overdue' || dlInfo.status === 'due-today'
+                    ? 'bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.45)]'
+                    : `${dlInfo.dotClasses} shadow-[0_0_6px_rgba(245,158,11,0.35)]`
                 : 'bg-slate-400'
             }`}
           />
-          <span className="text-slate-700 font-semibold">
+          <span className={`font-semibold ${
+            dlInfo.status === 'completed'
+              ? 'text-emerald-900'
+              : dlInfo.status === 'overdue' || dlInfo.status === 'due-today'
+                ? 'text-rose-900'
+                : 'text-slate-700'
+          }`}>
             {dlInfo.hasDeadline ? dlInfo.formattedDate : 'No Deadline'}
           </span>
           {dlInfo.hasDeadline && (
@@ -129,11 +149,11 @@ export default function EventTabs({ selectedEventId, onChange }) {
               <span className="text-slate-300 font-light">·</span>
               <span className={`font-medium ${
                 dlInfo.status === 'completed'
-                  ? 'text-emerald-600 font-semibold'
+                  ? 'text-emerald-700 font-bold'
                   : dlInfo.status === 'overdue' || dlInfo.status === 'due-today'
-                    ? 'text-rose-600 font-semibold'
+                    ? 'text-rose-700 font-bold'
                     : dlInfo.status === 'urgent' || dlInfo.status === 'upcoming'
-                      ? 'text-amber-600 font-semibold'
+                      ? 'text-amber-700 font-semibold'
                       : 'text-slate-500'
               }`}>
                 {dlInfo.shortLabel}

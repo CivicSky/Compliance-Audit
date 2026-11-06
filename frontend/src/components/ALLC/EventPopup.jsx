@@ -61,7 +61,7 @@ export default function EventPopup({
     const [selectedCriteriaIds, setSelectedCriteriaIds] = useState(new Set());
     const [sendingReminder, setSendingReminder] = useState(false);
 
-    const deadlineInfo = useMemo(() => getDeadlineInfo(selectedEvent?.deadline), [selectedEvent?.deadline]);
+    const deadlineInfo = useMemo(() => getDeadlineInfo(selectedEvent?.deadline, selectedEvent), [selectedEvent]);
 
     const handleSendManualReminder = async () => {
         if (!selectedEvent?.eventid || sendingReminder) return;

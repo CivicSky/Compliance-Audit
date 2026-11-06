@@ -94,7 +94,8 @@ export default function ModalHeader({
                             {(() => {
                                 const eventDisplay = String(officeData.eventcode || officeData.eventcode || officeData.eventname || officeData.eventname || '').trim();
                                 if (!eventDisplay) return null;
-                                const dlInfo = getDeadlineInfo(officeData?.event_deadline ?? office?.event_deadline);
+                                const isOfficeComplied = Number(officeData?.compliancepercent ?? office?.compliancepercent ?? 0) >= 100 || officeData?.overallstatus === 'Complied' || office?.overallstatus === 'Complied';
+                                const dlInfo = getDeadlineInfo(officeData?.event_deadline ?? office?.event_deadline, isOfficeComplied);
                                 return (
                                     <>
                                         <span className="text-slate-300">·</span>

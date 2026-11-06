@@ -253,8 +253,16 @@ const getAllEvents = async (req, res) => {
         const [stats] = await db.query(`
           SELECT 
             o.eventid,
-            COUNT(cso.id) AS totalstandards,
-            ROUND( (SUM(CASE WHEN cso.Status = 5 THEN 100 WHEN cso.Status = 4 THEN 50 ELSE 0 END) * 1.0) / NULLIF(COUNT(cso.id), 0), 1) AS completionpercent
+            COUNT(cso.csofficeid) AS totalstandards,
+            SUM(CASE WHEN cso.status::text = '5' THEN 1 ELSE 0 END) AS compliedstandards,
+            SUM(CASE WHEN cso.status::text = '4' THEN 1 ELSE 0 END) AS partialstandards,
+            SUM(CASE WHEN cso.status::text = '3' THEN 1 ELSE 0 END) AS notcompliedstandards,
+            ROUND(
+              (((SUM(CASE WHEN cso.status::text = '5' THEN 1.0 ELSE 0.0 END) * 100.0) +
+                (SUM(CASE WHEN cso.status::text = '4' THEN 1.0 ELSE 0.0 END) * 50.0)) /
+               NULLIF(COUNT(cso.csofficeid), 0))::numeric,
+              1
+            ) AS completionpercent
           FROM offices o
           JOIN compliancestatusoffices cso ON o.officeid = cso.officeid
           WHERE o.eventid IS NOT NULL
@@ -262,12 +270,32 @@ const getAllEvents = async (req, res) => {
         `);
         const map = new Map();
         for (const s of stats) {
-          map.set(Number(s.eventid), Number(s.completionpercent || 0));
+          const total = Number(s.totalstandards || 0);
+          const complied = Number(s.compliedstandards || 0);
+          const pct = Number(s.completionpercent || 0);
+          const isAllComplied = total > 0 && complied === total;
+          const finalPct = isAllComplied ? 100 : pct;
+          map.set(Number(s.eventid), {
+            completionpercent: finalPct,
+            totalstandards: total,
+            compliedstandards: complied,
+            iscompleted: isAllComplied
+          });
         }
-        return eventList.map(ev => ({
-          ...ev,
-          completionpercent: map.has(Number(ev.eventid)) ? map.get(Number(ev.eventid)) : 0
-        }));
+        return eventList.map(ev => {
+          const evData = map.get(Number(ev.eventid));
+          const pct = evData ? evData.completionpercent : 0;
+          const isDone = evData ? evData.iscompleted : false;
+          return {
+            ...ev,
+            completionpercent: pct,
+            completionPercent: pct,
+            totalstandards: evData ? evData.totalstandards : 0,
+            compliedstandards: evData ? evData.compliedstandards : 0,
+            iscompleted: isDone,
+            isCompleted: isDone
+          };
+        });
       } catch (err) {
         console.warn('Enrich events completion warning:', err.message);
         return eventList;
@@ -875,8 +903,8 @@ const sendEventReminder = async (req, res) => {
     try {
       const [[compRow]] = await db.query(`
         SELECT 
-          COUNT(cso.id) AS total,
-          SUM(CASE WHEN cso.Status = 5 THEN 1 ELSE 0 END) AS complied
+          COUNT(cso.csofficeid) AS total,
+          SUM(CASE WHEN cso.status::text = '5' THEN 1 ELSE 0 END) AS complied
         FROM offices o
         JOIN compliancestatusoffices cso ON o.officeid = cso.officeid
         WHERE o.eventid = ?
