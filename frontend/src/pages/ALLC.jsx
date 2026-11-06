@@ -932,19 +932,20 @@ function ALL() {
                 ) : (
                     /* Standard Card Rows List View (Matching MasterList, Events & OfficeHeads) */
                     <div className="flex-1 min-h-0 app-list-scroll overflow-x-auto pr-1">
-                        <div className="flex flex-col min-w-[800px] pb-14">
+                        <div className="flex flex-col min-w-[880px] pb-14">
                             {/* Sticky Header Row */}
                             <div className="grid grid-cols-12 items-center gap-3 px-5 py-3 bg-white border border-slate-200 rounded-xl shadow-xs text-xs font-semibold text-slate-700 sticky top-0 z-20 mb-2">
-                                <div className="col-span-5 flex items-center gap-2">
+                                <div className="col-span-4 flex items-center gap-2">
                                     {deleteMode && <span>Select</span>}
                                     <span>Accreditation & Code</span>
                                 </div>
-                                <div className="col-span-2 flex items-center">Level</div>
+                                <div className="col-span-1 flex items-center">Level</div>
                                 <div className="col-span-1 flex items-center">Status</div>
+                                <div className="col-span-3 flex items-center">Due</div>
                                 {isAuditor ? (
-                                    <div className="col-span-3 flex items-center">Assigned Areas</div>
+                                    <div className="col-span-2 flex items-center">Assigned Areas</div>
                                 ) : (
-                                    <div className="col-span-3 flex items-center justify-start">Timestamps</div>
+                                    <div className="col-span-2 flex items-center justify-start">Timestamps</div>
                                 )}
                                 <div className="col-span-1 flex items-center justify-end pr-1">Options</div>
                             </div>
@@ -982,7 +983,7 @@ function ALL() {
                                         >
                                             <div className="grid grid-cols-12 items-center gap-3 px-5 py-3.5">
                                                 {/* Accreditation Name & Code */}
-                                                <div className="col-span-5 flex items-center gap-3 min-w-0">
+                                                <div className="col-span-4 flex items-center gap-3 min-w-0">
                                                     {deleteMode && (
                                                         <input
                                                             type="checkbox"
@@ -1021,9 +1022,9 @@ function ALL() {
                                                 </div>
 
                                                 {/* Level */}
-                                                <div className="col-span-2 flex items-center">
+                                                <div className="col-span-1 flex items-center">
                                                     {event.accreditationlevel && event.accreditationlevel.toUpperCase() !== 'N/A' ? (
-                                                        <span className="inline-flex items-center rounded-lg bg-indigo-50 border border-indigo-200/60 px-2.5 py-1 text-xs font-bold text-indigo-700 shadow-2xs">
+                                                        <span className="inline-flex items-center rounded-lg bg-indigo-50 border border-indigo-200/60 px-2.5 py-1 text-xs font-bold text-indigo-700 shadow-2xs whitespace-nowrap">
                                                             {event.accreditationlevel}
                                                         </span>
                                                     ) : (
@@ -1033,7 +1034,7 @@ function ALL() {
 
                                                 {/* Status */}
                                                 <div className="col-span-1 flex items-center">
-                                                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold border ${
+                                                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold border whitespace-nowrap ${
                                                         isactive
                                                             ? 'bg-emerald-50 text-emerald-700 border-emerald-200/70'
                                                             : 'bg-slate-100 text-slate-600 border-slate-200'
@@ -1043,9 +1044,24 @@ function ALL() {
                                                     </span>
                                                 </div>
 
+                                                {/* Due */}
+                                                <div className="col-span-3 flex items-center min-w-0">
+                                                    {(() => {
+                                                        const dl = getDeadlineInfo(event.deadline, event);
+                                                        return dl.hasDeadline ? (
+                                                            <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${dl.badgeClasses} max-w-full truncate`}>
+                                                                <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${dl.dotClasses}`} />
+                                                                <span className="truncate">Due {dl.formattedDate} {dl.shortLabel ? `(${dl.shortLabel})` : ''}</span>
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-slate-400 text-xs">—</span>
+                                                        );
+                                                    })()}
+                                                </div>
+
                                                 {/* Timestamps or Assigned Areas */}
                                                 {isAuditor ? (
-                                                    <div className="col-span-3 flex items-center">
+                                                    <div className="col-span-2 flex items-center">
                                                         {eventAssignments.length > 0 ? (
                                                             <div className="flex flex-wrap gap-1 max-w-xs">
                                                                 {eventAssignments.slice(0, 2).map(a => (
@@ -1064,18 +1080,7 @@ function ALL() {
                                                         )}
                                                     </div>
                                                 ) : (
-                                                    <div className="col-span-3 flex flex-col justify-center min-w-0">
-                                                        {(() => {
-                                                            const dl = getDeadlineInfo(event.deadline, event);
-                                                            return dl.hasDeadline ? (
-                                                                <div className="mb-0.5 flex items-center gap-1">
-                                                                    <span className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.2 text-[10px] font-bold ${dl.badgeClasses}`}>
-                                                                        <span className={`h-1.5 w-1.5 rounded-full ${dl.dotClasses}`} />
-                                                                        Due {dl.formattedDate} ({dl.shortLabel})
-                                                                    </span>
-                                                                </div>
-                                                            ) : null;
-                                                        })()}
+                                                    <div className="col-span-2 flex flex-col justify-center min-w-0">
                                                         <div className="text-xs font-semibold text-slate-700">
                                                             {new Date(event.createdat).toLocaleDateString()}
                                                         </div>
