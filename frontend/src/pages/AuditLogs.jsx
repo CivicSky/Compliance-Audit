@@ -36,7 +36,7 @@ export default function AuditLogs() {
     const [actionFilter, setActionFilter] = useState("all");
     const [currentPage, setCurrentPage] = useState(1);
     const [expandedLogId, setExpandedLogId] = useState(null);
-    const itemsPerPage = 7;
+    const itemsPerPage = 15;
 
     const preparedLogs = useMemo(() => {
         const lookups = { eventLookup, areaLookup, criteriaLookup, requirementLookup, officeLookup, userLookup };
@@ -448,7 +448,7 @@ export default function AuditLogs() {
 
                     {loading ? (
                         <div className="flex-1 overflow-y-auto">
-                            <CardListSkeleton count={7} />
+                            <CardListSkeleton count={15} />
                         </div>
                     ) : serverError ? (
                         <ServerOfflineState
