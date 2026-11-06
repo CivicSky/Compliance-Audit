@@ -16,6 +16,7 @@ import { StandardsSkeleton } from '../components/UI/Skeleton';
 import ServerOfflineState from '../components/UI/ServerOfflineState';
 import { useLiveRefresh } from '../utils/liveSync';
 import ViewModeToggle from '../components/UI/ViewModeToggle';
+import { getDeadlineInfo } from '../utils/deadlineHelpers';
 
 function ALL() {
     const [sortStatus, setSortStatus] = useState('active');
@@ -647,7 +648,7 @@ function ALL() {
             <div className="px-4 sm:px-6 pt-4 pb-3 shrink-0 border-b border-slate-200/70 bg-white shadow-2xs">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-md shadow-blue-500/20 shrink-0">
+                        <div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-500/20 shrink-0">
                             <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
                             </svg>
@@ -961,7 +962,7 @@ function ALL() {
                                                             className="h-4 w-4 rounded border-rose-300 text-rose-600 focus:ring-rose-500 cursor-pointer shrink-0"
                                                         />
                                                     )}
-                                                    <div className="h-9 w-9 shrink-0 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex items-center justify-center font-bold text-xs shadow-xs">
+                                                    <div className="h-9 w-9 shrink-0 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">
                                                         {event.eventcode ? event.eventcode.slice(0, 2).toUpperCase() : 'ST'}
                                                     </div>
                                                     <div className="min-w-0 flex-1">
@@ -1025,6 +1026,17 @@ function ALL() {
                                                     </div>
                                                 ) : (
                                                     <div className="col-span-2 flex flex-col justify-center min-w-0">
+                                                        {(() => {
+                                                            const dl = getDeadlineInfo(event.deadline, event);
+                                                            return dl.hasDeadline ? (
+                                                                <div className="mb-0.5 flex items-center gap-1">
+                                                                    <span className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.2 text-[10px] font-bold ${dl.badgeClasses}`}>
+                                                                        <span className={`h-1.5 w-1.5 rounded-full ${dl.dotClasses}`} />
+                                                                        Due {dl.formattedDate} ({dl.shortLabel})
+                                                                    </span>
+                                                                </div>
+                                                            ) : null;
+                                                        })()}
                                                         <div className="text-xs font-semibold text-slate-700">
                                                             {new Date(event.createdat).toLocaleDateString()}
                                                         </div>
@@ -1128,7 +1140,8 @@ function ALL() {
                             eventcode: eventData.eventcode,
                             description: eventData.description,
                             status: eventData.status,
-                            accreditationlevel: eventData.accreditationlevel
+                            accreditationlevel: eventData.accreditationlevel,
+                            deadline: eventData.deadline ?? null
                         });
                         await fetchEvents();
                         setEditPopup({ open: false, event: null });
@@ -1138,7 +1151,8 @@ function ALL() {
                             eventcode: eventData.eventcode,
                             description: eventData.description,
                             status: eventData.status,
-                            accreditationlevel: eventData.accreditationlevel
+                            accreditationlevel: eventData.accreditationlevel,
+                            deadline: eventData.deadline ?? null
                         } : prev);
                         await showAlert('Event updated successfully!', 'success');
                     } catch (err) {

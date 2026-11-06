@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
-import bg from "../../assets/images/bglogins.jpg"
-import logo from "../../assets/images/lccb_logo.png"
-import auditrackLogo from "../../assets/images/logo.png"
+import logo from "../../assets/images/lccb_logo.png";
+import auditrackLogo from "../../assets/images/logo.png";
 
 const COMPANY_EMAIL_DOMAIN = "@lccbonline.edu.ph";
 
@@ -86,14 +85,6 @@ export default function Register() {
         }
 
         try {
-            console.log('Submitting registration with data:', {
-                firstname: formData.firstname,
-                middleinitial: formData.middleinitial,
-                lastname: formData.lastname,
-                email: formData.email,
-                roleid: parseInt(formData.roleid)
-            });
-
             navigate("/otp", {
                 state: {
                     firstname: formData.firstname,
@@ -105,8 +96,6 @@ export default function Register() {
                 },
             });
         } catch (err) {
-            console.error('Registration error full:', err);
-            console.error('Error response:', err.response);
             setError(err.response?.data?.message || "An error occurred during registration");
         } finally {
             setLoading(false);
@@ -114,49 +103,20 @@ export default function Register() {
     };
 
     return (
-        <div className="flex h-screen overflow-hidden">
-            {/* Left side - Background Image */}
-            <div 
-                className="w-1/2 flex items-center justify-center relative overflow-hidden transition-all duration-700 ease-in-out bg-cover bg-center bg-no-repeat"
-                style={{
-                    backgroundImage: `url(${bg})`,
-                    backgroundPosition: 'center',
-                    backgroundSize: 'cover'
-                }}
-            >
-                {/* Subtle blue overlay */}
-                <div className="absolute inset-0 bg-blue-800 bg-opacity-60"></div>
-
-                {/* Main illustration content */}
-                <div className="relative z-10 text-center text-white max-w-md animate-fade-in-left">
-                    <div className="mb-6">
-                        {/* Auditrack Logo */}
-                        <div className="relative mx-auto w-40 h-40 flex items-center justify-center mb-4">
-                            <img
-                                src={auditrackLogo}
-                                alt="Auditrack Logo"
-                                className="w-32 h-32 object-contain transition-all duration-500 hover:scale-105 drop-shadow-2xl"
-                            />
-                        </div>
-                    </div>
-                    
-                    <h2 className="text-4xl font-bold mb-4 animate-slide-up drop-shadow-lg">Auditrack</h2>
-                    <p className="text-white text-lg animate-fade-in-delayed drop-shadow-md px-4">
-                        Create your account and start managing compliance processes efficiently.
-                    </p>
-                </div>
-            </div>
-
-            {/* Right side - Registration form */}
-            <div className="w-1/2 flex items-center justify-center bg-white transition-all duration-700 ease-in-out transform">
+        <div className="flex h-screen overflow-hidden bg-white">
+            {/* Centered Registration form */}
+            <div className="w-full flex items-center justify-center bg-white transition-all duration-700 ease-in-out transform">
                 <div className="w-full max-w-md px-8 animate-fade-in-right">
                     {/* Logo and title */}
                     <div className="text-center mb-8 animate-slide-down">
-                        <img
-                            src={logo}
-                            alt="App Logo"
-                            className="w-16 h-16 mx-auto mb-4 transition-transform duration-500 hover:scale-110"
-                        />
+                        <div className="inline-flex items-center justify-center gap-2.5 mb-3">
+                            <img
+                                src={auditrackLogo}
+                                alt="Auditrack Logo"
+                                className="w-11 h-11 object-contain transition-transform duration-500 hover:scale-110"
+                            />
+                            <span className="text-2xl font-bold text-slate-900 tracking-tight">Auditrack</span>
+                        </div>
                         <h1 className="text-2xl font-bold text-gray-900 mb-2 transition-all duration-300">
                             Create Account
                         </h1>
@@ -317,4 +277,4 @@ export default function Register() {
             </div>
         </div>
     );
-};
+}

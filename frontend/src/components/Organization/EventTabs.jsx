@@ -1,67 +1,70 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { eventsAPI, usersAPI } from '../../utils/api';
 import { API_BASE_URL } from '../../utils/apiBase';
+import { getDeadlineInfo } from '../../utils/deadlineHelpers';
+import { useLiveRefresh } from '../../utils/liveSync';
 
 export default function EventTabs({ selectedEventId, onChange }) {
   const [events, setEvents] = useState([]);
 
-  useEffect(() => {
-    let mounted = true;
-    const load = async () => {
-      try {
-        const userRes = await usersAPI.getLoggedInUser().catch(() => null);
-        const currentUser = userRes?.user || userRes?.data || userRes;
-        const isAuditor = Number(currentUser?.roleid) === 4 || 
-                          String(currentUser?.rolename || '').toLowerCase().includes('auditor') || 
-                          Boolean(currentUser?.isExternalAuditor);
+  const loadEvents = useCallback(async () => {
+    try {
+      const userRes = await usersAPI.getLoggedInUser().catch(() => null);
+      const currentUser = userRes?.user || userRes?.data || userRes;
+      const isAuditor = Number(currentUser?.roleid) === 4 || 
+                        String(currentUser?.rolename || '').toLowerCase().includes('auditor') || 
+                        Boolean(currentUser?.isExternalAuditor);
 
-        let assignedEventIds = null;
-        if (isAuditor && currentUser?.userid) {
-          const token = localStorage.getItem('token');
-          const assignRes = await fetch(`${API_BASE_URL}/api/areas/assignments/${currentUser.userid}`, {
-            headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-          }).then(r => r.json()).catch(() => null);
-          if (assignRes?.success && Array.isArray(assignRes.assignments)) {
-            assignedEventIds = new Set(assignRes.assignments.map(a => Number(a.eventid)));
-          }
+      let assignedEventIds = null;
+      if (isAuditor && currentUser?.userid) {
+        const token = localStorage.getItem('token');
+        const assignRes = await fetch(`${API_BASE_URL}/api/areas/assignments/${currentUser.userid}`, {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        }).then(r => r.json()).catch(() => null);
+        if (assignRes?.success && Array.isArray(assignRes.assignments)) {
+          assignedEventIds = new Set(assignRes.assignments.map(a => Number(a.eventid)));
         }
-
-        const res = await eventsAPI.getAllEvents();
-        const list = Array.isArray(res) ? res : (res?.data || res?.events || []);
-        
-        // Filter active events (exclude only explicitly inactive events)
-        let active = list.filter(e => {
-          const status = String(e.Status || e.status || '').toLowerCase().trim();
-          return status !== 'inactive';
-        });
-
-        // Auditor Scoping: if user is auditor, only show events they are assigned to!
-        if (isAuditor && assignedEventIds) {
-          active = active.filter(e => assignedEventIds.has(Number(e.eventid || e.id)));
-        }
-
-        const toShow = Array.isArray(active) ? active : [];
-        if (mounted) setEvents(toShow);
-
-        // If current selectedEventId is not in toShow list (or empty), pick persisted or first available
-        const currentValid = toShow.some(e => String(e.eventid || e.id) === String(selectedEventId));
-        if (!currentValid && toShow.length > 0 && typeof onChange === 'function') {
-          const savedEventId = localStorage.getItem('acc_selected_event_id') || localStorage.getItem('selected_audit_event_id');
-          const validSaved = toShow.find(e => String(e.eventid || e.id) === String(savedEventId));
-          const target = validSaved || toShow[0];
-          const targetId = target.eventid || target.id || '';
-          localStorage.setItem('acc_selected_event_id', String(targetId));
-          localStorage.setItem('selected_audit_event_id', String(targetId));
-          onChange(targetId);
-        }
-      } catch (err) {
-        console.error('Failed to load events for tabs', err);
-        if (mounted) setEvents([]);
       }
-    };
-    load();
-    return () => { mounted = false; };
-  }, []);
+
+      const res = await eventsAPI.getAllEvents();
+      const list = Array.isArray(res) ? res : (res?.data || res?.events || []);
+      
+      // Filter active events (exclude only explicitly inactive events)
+      let active = list.filter(e => {
+        const status = String(e.Status || e.status || '').toLowerCase().trim();
+        return status !== 'inactive';
+      });
+
+      // Auditor Scoping: if user is auditor, only show events they are assigned to!
+      if (isAuditor && assignedEventIds) {
+        active = active.filter(e => assignedEventIds.has(Number(e.eventid || e.id)));
+      }
+
+      const toShow = Array.isArray(active) ? active : [];
+      setEvents(toShow);
+
+      // If current selectedEventId is not in toShow list (or empty), pick persisted or first available
+      const currentValid = toShow.some(e => String(e.eventid || e.id) === String(selectedEventId));
+      if (!currentValid && toShow.length > 0 && typeof onChange === 'function') {
+        const savedEventId = localStorage.getItem('acc_selected_event_id') || localStorage.getItem('selected_audit_event_id');
+        const validSaved = toShow.find(e => String(e.eventid || e.id) === String(savedEventId));
+        const target = validSaved || toShow[0];
+        const targetId = target.eventid || target.id || '';
+        localStorage.setItem('acc_selected_event_id', String(targetId));
+        localStorage.setItem('selected_audit_event_id', String(targetId));
+        onChange(targetId);
+      }
+    } catch (err) {
+      console.error('Failed to load events for tabs', err);
+      setEvents([]);
+    }
+  }, [selectedEventId, onChange]);
+
+  useEffect(() => {
+    loadEvents();
+  }, [loadEvents]);
+
+  useLiveRefresh(loadEvents);
 
   const handleSelect = (ev) => {
     const id = ev.eventid || ev.id || ev.eventcode || ev.eventname || ev.name || '';
@@ -80,23 +83,64 @@ export default function EventTabs({ selectedEventId, onChange }) {
     );
   }
 
+  const activeEvent = events.find(ev => {
+    const id = ev.eventid || ev.id || ev.eventcode || '';
+    return String(id) === String(selectedEventId);
+  }) || events[0];
+  const dlInfo = getDeadlineInfo(activeEvent?.deadline, activeEvent);
+
   return (
     <div className="w-full border-b-2 border-slate-300 px-1">
-      <div className="flex items-end justify-start gap-4 flex-nowrap overflow-x-auto">
-        {events.map(ev => {
-          const id = ev.eventid || ev.id || ev.eventcode || '';
-          const isactive = String(id) === String(selectedEventId);
-          const fullName = ev.eventcode || ev.eventname || ev.name || '';
-          return (
-            <button
-              key={id || JSON.stringify(ev)}
-              onClick={() => handleSelect(ev)}
-              className={`relative -mb-[2px] h-8 whitespace-nowrap border-b-4 px-0.5 text-xs transition-colors ${isactive ? 'border-blue-600 font-medium text-slate-900' : 'border-transparent font-normal text-slate-600 hover:text-slate-800'}`}
-            >
-              <span>{fullName}</span>
-            </button>
-          );
-        })}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-end justify-start gap-4 flex-nowrap overflow-x-auto">
+          {events.map(ev => {
+            const id = ev.eventid || ev.id || ev.eventcode || '';
+            const isactive = String(id) === String(selectedEventId);
+            const fullName = ev.eventcode || ev.eventname || ev.name || '';
+            return (
+              <button
+                key={id || JSON.stringify(ev)}
+                onClick={() => handleSelect(ev)}
+                className={`relative -mb-[2px] h-8 whitespace-nowrap border-b-4 px-0.5 text-xs transition-colors cursor-pointer ${isactive ? 'border-blue-600 font-medium text-slate-900' : 'border-transparent font-normal text-slate-600 hover:text-slate-800'}`}
+              >
+                <span>{fullName}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Far-right Deadline Capsule matching Header Clock Pill */}
+        <div
+          className="inline-flex items-center gap-2 px-3 py-1 mb-1 rounded-lg bg-slate-50/80 border border-slate-200/70 text-xs text-slate-600 font-medium select-none shadow-2xs shrink-0"
+          title={dlInfo.hasDeadline ? `Target submission deadline: ${dlInfo.label}` : 'No target submission deadline set for this accreditation'}
+        >
+          <span
+            className={`inline-block h-1.5 w-1.5 rounded-full ${
+              dlInfo.hasDeadline
+                ? `${dlInfo.dotClasses} shadow-[0_0_6px_rgba(16,185,129,0.35)]`
+                : 'bg-slate-400'
+            }`}
+          />
+          <span className="text-slate-700 font-semibold">
+            {dlInfo.hasDeadline ? dlInfo.formattedDate : 'No Deadline'}
+          </span>
+          {dlInfo.hasDeadline && (
+            <>
+              <span className="text-slate-300 font-light">·</span>
+              <span className={`font-medium ${
+                dlInfo.status === 'completed'
+                  ? 'text-emerald-600 font-semibold'
+                  : dlInfo.status === 'overdue' || dlInfo.status === 'due-today'
+                    ? 'text-rose-600 font-semibold'
+                    : dlInfo.status === 'urgent' || dlInfo.status === 'upcoming'
+                      ? 'text-amber-600 font-semibold'
+                      : 'text-slate-500'
+              }`}>
+                {dlInfo.shortLabel}
+              </span>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 
 const SORT_OPTIONS = [
-    { value: 'all', label: 'All Offices', dot: 'bg-slate-400' },
+    { value: 'all', label: 'All Offices', dot: 'bg-blue-500' },
     { value: 'compiled', label: 'Complied', dot: 'bg-emerald-500' },
     { value: 'partially_compiled', label: 'Partially Complied', dot: 'bg-amber-500' },
     { value: 'not_compiled', label: 'Not Complied', dot: 'bg-rose-500' },
+    { value: 'no_standards', label: 'No Standards', dot: 'bg-slate-400' },
 ];
 
 export default function Sortoffice({ value = 'all', onChange }) {

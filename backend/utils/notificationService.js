@@ -43,13 +43,21 @@ const createNotifications = async ({
 }) => {
   const recipients = normalizeUserIds(userIds);
   let senderId = Number(adminid);
-  if (!Number.isInteger(senderId) || senderId <= 0) {
-    try {
-      const [adminRows] = await db.query(`SELECT userid FROM users WHERE roleid = 1 ORDER BY userid ASC LIMIT 1`);
-      senderId = adminRows[0]?.userid || null;
-    } catch (e) {
+  try {
+    if (Number.isInteger(senderId) && senderId > 0) {
+      const [checkRows] = await db.query(`SELECT userid FROM users WHERE userid = ? LIMIT 1`, [senderId]);
+      if (!checkRows || checkRows.length === 0) {
+        senderId = null;
+      }
+    } else {
       senderId = null;
     }
+    if (!senderId) {
+      const [adminRows] = await db.query(`SELECT userid FROM users WHERE roleid = 1 ORDER BY userid ASC LIMIT 1`);
+      senderId = adminRows?.[0]?.userid || null;
+    }
+  } catch (e) {
+    senderId = null;
   }
 
   if (recipients.length === 0 || !title || !message) {

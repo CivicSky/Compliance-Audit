@@ -507,68 +507,67 @@ export default function YourWorkFileUpload({
             )}
 
             {/* Active Uploading Files (Only show items still uploading or failed since done ones are already posted above) */}
-            {/* Active Uploading Files (Only show items still uploading or failed since done ones are already posted above) */}
-            {activeUploadItems.length > 0 &&
-                activeUploadItems.map((item, idx) => {
-                    const ext = getExtension(item.name);
-                    const isDone = item.percent >= 100 || item.status === 'done';
-                    const isError = item.status === 'error';
+            {activeUploadItems.length > 0 && (
+                <div className="space-y-3 mb-3">
+                    {activeUploadItems.map((item, idx) => {
+                        const ext = getExtension(item.name);
+                        const isDone = item.percent >= 100 || item.status === 'done';
+                        const isError = item.status === 'error';
 
-                    return (
-                        <div
-                            key={item.name || idx}
-                            className="rounded-xl border border-slate-200 bg-white p-3 shadow-2xs transition-all space-y-2"
-                        >
-                            <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-2.5 min-w-0">
-                                    <div className="h-8 w-8 rounded-lg bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center shrink-0 font-bold text-[10px] uppercase shadow-2xs">
-                                        {ext.slice(0, 3) || 'DOC'}
+                        return (
+                            <div
+                                key={item.name || idx}
+                                className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs transition-all space-y-2.5"
+                            >
+                                <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                        <div className="h-8 w-8 rounded-lg bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center shrink-0 font-bold text-[10px] uppercase shadow-2xs">
+                                            {ext.slice(0, 3) || 'DOC'}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-xs font-semibold text-slate-800 truncate max-w-[220px]" title={item.name}>
+                                                {item.name}
+                                            </p>
+                                            <p className="text-[10px] text-slate-400">
+                                                {item.size ? formatBytes(item.size) : 'File'}
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div className="min-w-0">
-                                        <p className="text-xs font-semibold text-slate-800 truncate max-w-[220px]" title={item.name}>
-                                            {item.name}
-                                        </p>
-                                        <p className="text-[10px] text-slate-400">
-                                            {item.size ? formatBytes(item.size) : 'File'}
-                                        </p>
+
+                                    <div className="shrink-0 flex items-center gap-1.5">
+                                        {isError ? (
+                                            <span className="inline-flex items-center gap-1 rounded-md bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-700 border border-rose-200">
+                                                Failed
+                                            </span>
+                                        ) : isDone ? (
+                                            <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
+                                                <Check className="w-3 h-3 text-emerald-600 inline" />
+                                                <span>Ready</span>
+                                            </span>
+                                        ) : (
+                                            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200/80">
+                                                <span className="h-1.5 w-1.5 rounded-full bg-blue-600 animate-pulse" />
+                                                <span>Uploading...</span>
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
 
-                                <div className="shrink-0 flex items-center gap-1.5">
+                                {/* Indeterminate Infinite Loop Progress Bar Track */}
+                                <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-slate-100 border border-slate-200/60">
                                     {isError ? (
-                                        <span className="inline-flex items-center gap-1 rounded-md bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-700 border border-rose-200">
-                                            Failed
-                                        </span>
+                                        <div className="h-full w-full rounded-full bg-rose-500 transition-all duration-300" />
                                     ) : isDone ? (
-                                        <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
-                                            <Check className="w-3 h-3 text-emerald-600 inline" />
-                                            <span>Ready</span>
-                                        </span>
+                                        <div className="h-full w-full rounded-full bg-emerald-500 transition-all duration-300" />
                                     ) : (
-                                        <span className="text-[11px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
-                                            {item.percent || 0}%
-                                        </span>
+                                        <div className="h-full rounded-full bg-gradient-to-r from-blue-500 via-indigo-600 to-blue-500 animate-indeterminate-bar" />
                                     )}
                                 </div>
                             </div>
-
-                            {/* Progress Bar Track */}
-                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 border border-slate-200/50">
-                                <div
-                                    className={`h-full rounded-full transition-all duration-300 ${
-                                        isError
-                                            ? 'bg-rose-500'
-                                            : isDone
-                                                ? 'bg-emerald-500'
-                                                : 'bg-gradient-to-r from-blue-500 to-indigo-600'
-                                    }`}
-                                    style={{ width: `${Math.max(4, item.percent || 0)}%` }}
-                                />
-                            </div>
-                        </div>
-                    );
-                })
-            }
+                        );
+                    })}
+                </div>
+            )}
 
             {/* Upload Button */}
             {!readOnly && (

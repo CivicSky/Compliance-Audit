@@ -475,6 +475,7 @@ router.delete('/:requirementid/file/:userid', auth, async (req, res) => {
 
         const file = rows[0];
         const resolvedFileOfficeId = file.officeid || officeid || null;
+
         const filepath = file.filepath || file.filepath || file.filename;
         const absPath = path.join(__dirname, '..', filepath.replace(/^\//, ''));
 

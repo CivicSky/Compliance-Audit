@@ -611,7 +611,6 @@ export default function SubmissionViewer({
 				dataCache.set(CacheKeys.userFiles(requirementid, userid, officeid), list);
 				setFilesByUserId((prev) => ({ ...prev, [userid]: list }));
 				if (list.length > 0) setFileByUserId((prev) => ({ ...prev, [userid]: list[list.length - 1] }));
-				toast?.({ title: 'Upload complete', description: 'Your files are now available', variant: 'success', duration: 1800 });
 			}
 		} catch (err) {
 			console.error('Failed to refresh files after upload', err);

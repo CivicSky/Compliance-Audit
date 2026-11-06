@@ -910,7 +910,7 @@ export default function UserFilesGridModal({
                                     </div>
                                     <p className="text-xs text-slate-500 truncate mt-0.5">
                                         <span className="font-semibold text-slate-700">{reqCode}</span>
-                                        {reqDesc ? ` — ${reqDesc}` : ''}
+                                        {reqDesc ? `: ${reqDesc}` : ''}
                                     </p>
                                 </div>
                             </div>
@@ -952,6 +952,19 @@ export default function UserFilesGridModal({
                     </button>
                     </div>
                 </div>
+
+                {/* Indeterminate Infinite Loop Bar when uploading in Grid Modal */}
+                {uploading && (
+                    <div className="px-5 py-2 bg-blue-50/70 border-b border-blue-100 flex flex-col gap-1.5 shrink-0">
+                        <div className="flex items-center justify-between text-[11px] font-semibold text-blue-700">
+                            <span>Uploading standard file(s)...</span>
+                            <span className="text-[10px] text-blue-600">Please wait</span>
+                        </div>
+                        <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-blue-100/80">
+                            <div className="h-full rounded-full bg-gradient-to-r from-blue-500 via-indigo-600 to-blue-500 animate-indeterminate-bar" />
+                        </div>
+                    </div>
+                )}
 
                 {/* Body: 3-Column 3x2 Grid */}
                 <div className="flex-1 overflow-y-auto p-3.5 sm:p-4 bg-slate-50/70 [contain:content]">

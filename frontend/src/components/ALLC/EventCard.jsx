@@ -1,7 +1,8 @@
 import { useState, useRef } from "react";
 import EventOptionsPopup from "./eventsoptions";
 import { formatDateTime } from "../../utils/formatDateTime";
-import { Check } from "lucide-react";
+import { getDeadlineInfo } from "../../utils/deadlineHelpers";
+import { Check, Lock, CalendarClock } from "lucide-react";
 
 export default function EventCard({
     event,
@@ -20,6 +21,7 @@ export default function EventCard({
     const dotBtnRef = useRef(null);
 
     const isactive = String(event.status || event.Status || '').toLowerCase().trim() !== 'inactive';
+    const deadlineInfo = getDeadlineInfo(event.deadline, event);
     const accLevel = event.accreditationlevel && String(event.accreditationlevel).toUpperCase() !== 'N/A'
         ? event.accreditationlevel
         : null;
@@ -90,6 +92,16 @@ export default function EventCard({
                                 <span className={`h-1.5 w-1.5 rounded-full ${isactive ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
                                 {isactive ? 'Active' : 'Inactive'}
                             </span>
+
+                            {deadlineInfo.hasDeadline && (
+                                <span
+                                    title={`Target submission deadline: ${deadlineInfo.label}`}
+                                    className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${deadlineInfo.badgeClasses}`}
+                                >
+                                    <CalendarClock className="w-2.5 h-2.5 shrink-0" />
+                                    {deadlineInfo.shortLabel}
+                                </span>
+                            )}
                         </div>
 
                         <h3 className="text-base sm:text-lg font-bold leading-snug text-slate-900 group-hover:text-blue-600 transition-colors line-clamp-1">
@@ -159,24 +171,67 @@ export default function EventCard({
 
                 {/* Meta Details & Footer */}
                 <div className="mt-4 pt-3 border-t border-slate-100 flex flex-col gap-2.5 shrink-0">
-                    <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-500">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                            <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                            <div className="min-w-0">
-                                <span className="block text-[9px] font-semibold uppercase tracking-wider text-slate-400">Created</span>
-                                <span className="text-slate-700 font-medium truncate block">{formatDateTime(event.createdat)}</span>
+                    <div className="flex items-center justify-between gap-2 text-[11px] text-slate-500">
+                        <div className="flex items-center gap-4 min-w-0">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                                <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                                <div className="min-w-0">
+                                    <span className="block text-[9px] font-semibold uppercase tracking-wider text-slate-400">Created</span>
+                                    <span className="text-slate-700 font-medium truncate block">{formatDateTime(event.createdat)}</span>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-1.5 min-w-0">
+                                <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <div className="min-w-0">
+                                    <span className="block text-[9px] font-semibold uppercase tracking-wider text-slate-400">Updated</span>
+                                    <span className="text-slate-700 font-medium truncate block">{formatDateTime(event.updatedat || event.createdat)}</span>
+                                </div>
                             </div>
                         </div>
-                        <div className="flex items-center gap-1.5 min-w-0">
-                            <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            <div className="min-w-0">
-                                <span className="block text-[9px] font-semibold uppercase tracking-wider text-slate-400">Updated</span>
-                                <span className="text-slate-700 font-medium truncate block">{formatDateTime(event.updatedat || event.createdat)}</span>
-                            </div>
+
+                        {/* Far-Right Deadline Capsule (matching Header Clock Pill) */}
+                        <div
+                            onClick={(e) => {
+                                if (isAdmin && onEdit) {
+                                    e.stopPropagation();
+                                    onEdit(event);
+                                }
+                            }}
+                            title={deadlineInfo.hasDeadline ? `Target submission deadline: ${deadlineInfo.label}` : (isAdmin ? 'Click to set submission deadline' : 'No deadline set')}
+                            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-50/80 border border-slate-200/70 text-xs text-slate-600 font-medium select-none shadow-2xs shrink-0 ${
+                                isAdmin ? 'hover:bg-slate-100 hover:border-slate-300 transition cursor-pointer' : ''
+                            }`}
+                        >
+                            <span
+                                className={`inline-block h-1.5 w-1.5 rounded-full ${
+                                    deadlineInfo.hasDeadline
+                                        ? `${deadlineInfo.dotClasses} shadow-[0_0_6px_rgba(16,185,129,0.35)]`
+                                        : 'bg-slate-400'
+                                }`}
+                            />
+                            <span className="text-slate-700 font-semibold">
+                                {deadlineInfo.hasDeadline ? deadlineInfo.formattedDate : 'No Deadline'}
+                            </span>
+                            {deadlineInfo.hasDeadline && (
+                                <>
+                                    <span className="text-slate-300 font-light">·</span>
+                                    <span className={`font-medium ${
+                                        deadlineInfo.status === 'completed'
+                                            ? 'text-emerald-600 font-semibold'
+                                            : deadlineInfo.status === 'overdue' || deadlineInfo.status === 'due-today'
+                                                ? 'text-rose-600 font-semibold'
+                                                : deadlineInfo.status === 'urgent' || deadlineInfo.status === 'upcoming'
+                                                    ? 'text-amber-600 font-semibold'
+                                                    : 'text-slate-500'
+                                    }`}>
+                                        {deadlineInfo.shortLabel}
+                                    </span>
+                                </>
+                            )}
                         </div>
                     </div>
 

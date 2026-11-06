@@ -289,7 +289,7 @@ export default function MasterList() {
       <div className="px-4 sm:px-6 pt-3 pb-2.5 shrink-0 border-b border-slate-200/70 bg-white shadow-2xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-600 to-blue-700 text-white shadow-md shadow-cyan-500/20 shrink-0">
+            <div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-500/20 shrink-0">
               <Layers className="w-5 h-5 sm:w-5.5 sm:h-5.5" />
             </div>
             <div>

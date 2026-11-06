@@ -1,10 +1,83 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react';
 import { Check } from 'lucide-react';
 import StatusBadge from './StatusBadge';
 import StatusSlider from './StatusSlider';
 import SmartUserAvatar from './SmartUserAvatar';
 import { API_BASE_URL } from '../../utils/apiBase';
 import { useModal } from '../UI/ModalProvider';
+
+function RequirementHeaderAndDescription({
+    req,
+    isAssignedToMe,
+    isAuditor,
+    hasRejected,
+    isExpanded,
+    onToggleExpand,
+}) {
+    const textRef = useRef(null);
+    const [isOverflowing, setIsOverflowing] = useState(false);
+    const reqDesc = req.description || req.Description || '';
+
+    useLayoutEffect(() => {
+        const el = textRef.current;
+        if (!el) return;
+
+        const checkOverflow = () => {
+            if (!isExpanded && textRef.current) {
+                setIsOverflowing(textRef.current.scrollHeight > textRef.current.clientHeight + 2);
+            }
+        };
+
+        checkOverflow();
+
+        if (typeof ResizeObserver !== 'undefined') {
+            const observer = new ResizeObserver(checkOverflow);
+            observer.observe(el);
+            return () => observer.disconnect();
+        }
+    }, [reqDesc, isExpanded]);
+
+    const showToggle = isOverflowing || isExpanded;
+
+    return (
+        <>
+            <div className="flex items-center gap-2 flex-wrap">
+                <h5 className="text-sm font-semibold text-slate-900">{req.requirementcode}</h5>
+                {isAssignedToMe && (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-cyan-200/80 bg-cyan-50 px-2 py-0.5 text-[10px] font-semibold text-cyan-800 shadow-sm">
+                        <span className="h-1.5 w-1.5 rounded-full bg-cyan-500" />
+                        Active
+                    </span>
+                )}
+                {!isAuditor && hasRejected && (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700 shadow-sm">
+                        <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+                        Needs Revision
+                    </span>
+                )}
+                {showToggle && (
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onToggleExpand();
+                        }}
+                        className="text-[11px] font-medium text-indigo-600 hover:text-indigo-700 hover:underline cursor-pointer leading-none"
+                        aria-expanded={isExpanded}
+                    >
+                        {isExpanded ? 'Show less' : 'Show more'}
+                    </button>
+                )}
+            </div>
+            <p
+                ref={textRef}
+                className={`mt-1 text-xs leading-relaxed text-slate-600 ${isExpanded ? '' : 'line-clamp-2'}`}
+            >
+                {reqDesc}
+            </p>
+        </>
+    );
+}
 
 export default function RequirementsTree({
     loading,
@@ -672,43 +745,14 @@ export default function RequirementsTree({
                                                         </div>
 
                                                         <div className="flex-1 min-w-0">
-                                                            <div className="flex items-center gap-2">
-                                                                <h5 className="text-sm font-semibold text-slate-900">{req.requirementcode}</h5>
-                                                                {isAssignedToMe && (
-                                                                    <span className="inline-flex items-center gap-1 rounded-full border border-cyan-200/80 bg-cyan-50 px-2 py-0.5 text-[10px] font-semibold text-cyan-800 shadow-sm">
-                                                                        <span className="h-1.5 w-1.5 rounded-full bg-cyan-500" />
-                                                                        Active
-                                                                    </span>
-                                                                )}
-                                                                {!isAuditor && assignedUsersMap[req.requirementid]?.some((u) => u.hasrejected || Number(u.rejectedcount) > 0) && (
-                                                                    <span className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700 shadow-sm">
-                                                                        <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
-                                                                        Needs Revision
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            {(() => {
-                                                                const isExpanded = expandedReqs.includes(req.requirementid);
-                                                                const reqDesc = req.description || req.Description || '';
-                                                                const shouldShowToggle = reqDesc.length > 140;
-                                                                return (
-                                                                    <>
-                                                                        <p className={`mt-1 text-xs leading-relaxed text-slate-600 ${isExpanded ? '' : 'line-clamp-2'}`}>{reqDesc}</p>
-                                                                        {shouldShowToggle && (
-                                                                            <button
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    toggleExpandReq(req.requirementid);
-                                                                                }}
-                                                                                className="mt-1.5 text-[11px] font-medium text-indigo-600 hover:text-indigo-700 hover:underline"
-                                                                                aria-expanded={isExpanded}
-                                                                            >
-                                                                                {isExpanded ? 'Show less' : 'Show more'}
-                                                                            </button>
-                                                                        )}
-                                                                    </>
-                                                                );
-                                                            })()}
+                                                            <RequirementHeaderAndDescription
+                                                                req={req}
+                                                                isAssignedToMe={isAssignedToMe}
+                                                                isAuditor={isAuditor}
+                                                                hasRejected={Boolean(assignedUsersMap[req.requirementid]?.some((u) => u.hasrejected || Number(u.rejectedcount) > 0))}
+                                                                isExpanded={expandedReqs.includes(req.requirementid)}
+                                                                onToggleExpand={() => toggleExpandReq(req.requirementid)}
+                                                            />
 
                                                             {/* Comments display / edit */}
                                                             {editingCommentId === req.requirementid && isAdmin ? (

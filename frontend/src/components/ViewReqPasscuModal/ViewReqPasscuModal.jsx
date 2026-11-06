@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import { renderAsync } from 'docx-preview';
-import api, { usersAPI, requirementsAPI, officesAPI, personnelAssignmentsAPI } from '../../utils/api';
+import api, { usersAPI, requirementsAPI, officesAPI, personnelAssignmentsAPI, eventsAPI } from '../../utils/api';
+import { Lock, Unlock } from 'lucide-react';
 import { API_BASE_URL } from '../../utils/apiBase';
 import { dataCache, CacheKeys } from '../../utils/dataCache';
 import { useLiveRefresh } from '../../utils/liveSync';
@@ -304,13 +305,17 @@ export default function ViewReqPASSCUModal({
                     setProofFileUrl(fullUrl);
                     setProofFileName(data.filename);
                     setPersistedProof({ filename: data.filename, url: fullUrl });
-                    await fetchOfficeRequirements();
                     toast?.({
-                        title: 'Proof Uploaded',
-                        description: 'Office proof document uploaded successfully.',
+                        title: 'Upload Successful',
+                        description: 'Proof document uploaded successfully.',
                         variant: 'success',
                         duration: 3000
                     });
+                    try {
+                        await fetchOfficeRequirements();
+                    } catch (fetchErr) {
+                        console.warn('Post-proof fetchOfficeRequirements warning:', fetchErr);
+                    }
                 } else {
                     toast?.({
                         title: 'Upload Failed',
@@ -855,6 +860,15 @@ export default function ViewReqPASSCUModal({
         }
         
         if (successCount > 0) {
+            toast?.({
+                title: 'Upload Successful',
+                description: successCount > 1 
+                    ? `Successfully uploaded ${successCount} files.` 
+                    : `Successfully uploaded ${fileList[0]?.name || 'file'}.`,
+                variant: 'success',
+                duration: 3000
+            });
+
             // Background sync: update assigned users badge and refresh requirements without blocking upload UI
             requirementsAPI.getAssignedUsers(requirementid, office?.id)
                 .then(assignedRes => {
@@ -871,7 +885,12 @@ export default function ViewReqPASSCUModal({
                 console.warn('Post-upload fetchOfficeRequirements warning:', rErr);
             });
         } else if (fileList.length > 0) {
-            await showAlert(lastUploadErrMsg || 'Failed to upload file(s)');
+            toast?.({
+                title: 'Upload Failed',
+                description: lastUploadErrMsg || 'Failed to upload file(s).',
+                variant: 'error',
+                duration: 3500
+            });
         }
     };
 
@@ -913,18 +932,38 @@ export default function ViewReqPASSCUModal({
 
     // Remove a requirement from this office (admin action)
     const handleRemoveRequirement = async (requirementid) => {
-        const ok = await showConfirm('Remove this requirement from the office? This cannot be undone.');
+        const targetReq = requirements.find(r => Number(r.requirementid || r.id) === Number(requirementid));
+        const standardCode = targetReq?.requirementcode || targetReq?.code || '';
+        const confirmMsg = standardCode
+            ? `Remove standard "${standardCode}" from this office? This cannot be undone.`
+            : 'Remove this requirement from the office? This cannot be undone.';
+        const ok = await showConfirm(confirmMsg);
         if (!ok) return;
         try {
             setRemovingReqId(requirementid);
             const token = localStorage.getItem('token');
-            await axios.delete(`${API_BASE_URL}/api/offices/${office.id}/requirements/${requirementid}`, {
+            const targetOfficeId = officeData?.id || officeData?.officeid || office?.id || office?.officeid;
+            await axios.delete(`${API_BASE_URL}/api/offices/${targetOfficeId}/requirements/${requirementid}`, {
                 headers: token ? { Authorization: `Bearer ${token}` } : {}
             });
+            dataCache.invalidate(CacheKeys.officeReqs(targetOfficeId));
             await fetchOfficeRequirements();
+            toast?.({
+                title: 'Standard Removed',
+                description: standardCode
+                    ? `Standard ${standardCode} was successfully removed from this office.`
+                    : 'Standard removed from office successfully.',
+                variant: 'success',
+                duration: 3000
+            });
         } catch (err) {
             console.error('Failed to remove requirement from office', err);
-            await showAlert(err?.response?.data?.message || 'Failed to remove requirement from office');
+            toast?.({
+                title: 'Removal Failed',
+                description: err?.response?.data?.message || 'Failed to remove requirement from office',
+                variant: 'error',
+                duration: 3000
+            });
         } finally {
             setRemovingReqId(null);
         }

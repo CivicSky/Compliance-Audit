@@ -165,8 +165,11 @@ export default function AccreditationOfficesView({
     // Filter by Status
     if (statusFilter !== 'all') {
       list = list.filter(o => {
+        const reqCount = Number(o.totalrequirements || 0);
         const rawPct = Number(o.compliancepercent ?? o.compliancepercent ?? o.compliance_percentage ?? o.compliancePercentage ?? 0);
         const pct = isNaN(rawPct) ? 0 : rawPct;
+        if (statusFilter === 'no_standards') return reqCount === 0;
+        if (reqCount === 0) return false;
         if (statusFilter === 'complied') return pct >= 100 || o.overallstatus === 'Complied' || o.overallstatus === 'Complied';
         if (statusFilter === 'partial') return (pct > 0 && pct < 100) || o.overallstatus === 'Partially Complied' || o.overallstatus === 'Partially Complied';
         if (statusFilter === 'not') return pct === 0 && (o.overallstatus === 'Not Complied' || o.overallstatus === 'Not Complied' || !o.overallstatus);

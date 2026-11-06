@@ -40,14 +40,12 @@ export default function Navbar({ isMobileMenuOpen: propIsMobileMenuOpen, setIsMo
 
     const getInitialSidebarExpanded = () => {
         if (typeof window === 'undefined') return false;
-        const stored = window.localStorage.getItem('sidebarExpanded');
-        const expanded = stored === null ? false : stored === 'true';
         if (isAdmin) {
             document.documentElement.style.setProperty('--sidebar-width', 'calc(4rem / 0.9)');
         } else {
             document.documentElement.style.setProperty('--sidebar-width', '0px');
         }
-        return expanded;
+        return false;
     };
 
     const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
@@ -254,31 +252,17 @@ export default function Navbar({ isMobileMenuOpen: propIsMobileMenuOpen, setIsMo
                 style={{ background: '#090e1a' }}
             >
                 <div className="flex flex-col space-y-1.5">
-                    {/* Logo & Collapse Header */}
-                    <div className="mb-2 flex items-center gap-2.5 px-0.5">
-                        <button
-                            onClick={() => setIsSidebarExpanded((prev) => !prev)}
-                            className="p-1.5 rounded-lg border border-slate-700/60 bg-slate-800/50 hover:bg-slate-700/60 text-slate-300 hover:text-white transition-colors duration-200 shrink-0 cursor-pointer"
-                            aria-label={effectiveExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
-                            title={effectiveExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
+                    {/* Logo Header */}
+                    <div className={`mb-2 flex items-center py-1 ${effectiveExpanded ? 'gap-2.5 px-2 justify-start' : 'justify-center'}`}>
+                        <img src={auditrackLogo} alt="Auditrack Logo" className="w-7 h-7 object-contain shrink-0" />
+                        <span
+                            className={`font-bold text-white text-base truncate whitespace-nowrap overflow-hidden tracking-wide transition-[max-width,opacity,transform] duration-200 ${
+                                effectiveExpanded ? 'opacity-100 translate-x-0 delay-150' : 'opacity-0 -translate-x-2 delay-0'
+                            }`}
+                            style={{ maxWidth: effectiveExpanded ? '10rem' : '0px' }}
                         >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                {effectiveExpanded ? (
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                                ) : (
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                )}
-                            </svg>
-                        </button>
-                        <div className="flex items-center gap-2 min-w-0">
-                            <img src={auditrackLogo} alt="Auditrack Logo" className="w-7 h-7 object-contain shrink-0" />
-                            <span
-                                className="font-bold text-white text-base truncate whitespace-nowrap overflow-hidden tracking-wide transition-[max-width,opacity,transform] duration-200"
-                                style={{ maxWidth: effectiveExpanded ? '10rem' : '0px' }}
-                            >
-                                Auditrack
-                            </span>
-                        </div>
+                            Auditrack
+                        </span>
                     </div>
 
                     {/* Section: ANALYZE */}

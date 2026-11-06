@@ -1,8 +1,9 @@
 import React from 'react';
 import { officesAPI } from '../../utils/api';
 import { useModal } from '../UI/ModalProvider';
-import { Award } from 'lucide-react';
+import { Award, Lock, CalendarClock } from 'lucide-react';
 import { isAcademicEntity } from '../../utils/entityHelpers';
+import { getDeadlineInfo } from '../../utils/deadlineHelpers';
 
 const ACCREDITATION_LEVELS = [
     'None',
@@ -93,12 +94,19 @@ export default function ModalHeader({
                             {(() => {
                                 const eventDisplay = String(officeData.eventcode || officeData.eventcode || officeData.eventname || officeData.eventname || '').trim();
                                 if (!eventDisplay) return null;
+                                const dlInfo = getDeadlineInfo(officeData?.event_deadline ?? office?.event_deadline);
                                 return (
                                     <>
                                         <span className="text-slate-300">·</span>
                                         <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 border border-indigo-100">
                                             Event: {eventDisplay}
                                         </span>
+                                        {dlInfo.hasDeadline && (
+                                            <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${dlInfo.badgeClasses}`}>
+                                                <CalendarClock className="h-3 w-3 shrink-0" />
+                                                {dlInfo.shortLabel}
+                                            </span>
+                                        )}
                                     </>
                                 );
                             })()}

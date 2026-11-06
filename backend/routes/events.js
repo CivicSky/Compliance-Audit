@@ -19,6 +19,15 @@ router.post('/delete', auth, restrictAuditor, eventsController.deleteEvents);
 // Update event
 router.put('/update/:id', auth, restrictAuditor, eventsController.updateEvent);
 
+// Toggle Audit Freeze / Lock on event
+router.patch('/:id/lock', auth, restrictAuditor, eventsController.toggleEventLock);
+
+// Update Event Deadline
+router.patch('/:id/deadline', auth, restrictAuditor, eventsController.updateEventDeadline);
+
+// Send manual countdown reminder to assigned personnel
+router.post('/:id/remind', auth, restrictAuditor, eventsController.sendEventReminder);
+
 // Get downloadable folders
 router.get('/downloadable-folders', auth, restrictAuditorDownloads, eventsController.getDownloadableFolders);
 

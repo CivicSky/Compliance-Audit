@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Loader2 } from 'lucide-react';
+import { X, Loader2, Lock, Calendar } from 'lucide-react';
 import { useModal } from "../UI/ModalProvider";
 import CustomSelect from "../UI/CustomSelect";
 
@@ -7,7 +7,8 @@ export default function AddEventModal({ isOpen, onClose, onSuccess }) {
     const [formData, setFormData] = useState({
         eventcode: '',
         eventname: '',
-        accreditationlevel: 'N/A'
+        accreditationlevel: 'N/A',
+        deadline: ''
     });
 
     const [errors, setErrors] = useState({});
@@ -61,7 +62,8 @@ export default function AddEventModal({ isOpen, onClose, onSuccess }) {
                 eventcode: formData.eventcode,
                 eventname: formData.eventname,
                 Description: null,
-                accreditationlevel: formData.accreditationlevel || 'N/A'
+                accreditationlevel: formData.accreditationlevel || 'N/A',
+                deadline: formData.deadline ? formData.deadline : null
             });
 
             if (response.success) {
@@ -71,7 +73,8 @@ export default function AddEventModal({ isOpen, onClose, onSuccess }) {
                 setFormData({
                     eventcode: '',
                     eventname: '',
-                    accreditationlevel: 'N/A'
+                    accreditationlevel: 'N/A',
+                    deadline: ''
                 });
                 
                 // Call onSuccess callback if provided
@@ -99,7 +102,8 @@ export default function AddEventModal({ isOpen, onClose, onSuccess }) {
             setFormData({
                 eventcode: '',
                 eventname: '',
-                accreditationlevel: 'N/A'
+                accreditationlevel: 'N/A',
+                deadline: ''
             });
             setErrors({});
             onClose();
@@ -173,24 +177,43 @@ export default function AddEventModal({ isOpen, onClose, onSuccess }) {
                         )}
                     </div>
 
-                    {/* Accreditation Level */}
-                    <div>
-                        <label htmlFor="accreditationlevel" className="block text-xs font-semibold text-slate-700 mb-1.5">
-                            Accreditation Level
-                        </label>
-                        <CustomSelect
-                            size="md"
-                            value={formData.accreditationlevel || 'N/A'}
-                            onChange={(val) => setFormData(prev => ({ ...prev, accreditationlevel: val }))}
-                            disabled={isSubmitting}
-                            options={[
-                                { value: 'Level I', label: 'Level I' },
-                                { value: 'Level II', label: 'Level II' },
-                                { value: 'Level III', label: 'Level III' },
-                                { value: 'Level IV', label: 'Level IV' },
-                                { value: 'N/A', label: 'N/A' },
-                            ]}
-                        />
+                    {/* Accreditation Level & Target Deadline */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label htmlFor="accreditationlevel" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                                Accreditation Level
+                            </label>
+                            <CustomSelect
+                                size="md"
+                                value={formData.accreditationlevel || 'N/A'}
+                                onChange={(val) => setFormData(prev => ({ ...prev, accreditationlevel: val }))}
+                                disabled={isSubmitting}
+                                options={[
+                                    { value: 'Level I', label: 'Level I' },
+                                    { value: 'Level II', label: 'Level II' },
+                                    { value: 'Level III', label: 'Level III' },
+                                    { value: 'Level IV', label: 'Level IV' },
+                                    { value: 'N/A', label: 'N/A' },
+                                ]}
+                            />
+                        </div>
+
+                        <div>
+                            <label htmlFor="deadline" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                                Target Submission Deadline
+                            </label>
+                            <div className="relative">
+                                <input
+                                    type="date"
+                                    id="deadline"
+                                    name="deadline"
+                                    value={formData.deadline}
+                                    onChange={handleInputChange}
+                                    disabled={isSubmitting}
+                                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors text-slate-700"
+                                />
+                            </div>
+                        </div>
                     </div>
 
                     {/* Form Actions */}

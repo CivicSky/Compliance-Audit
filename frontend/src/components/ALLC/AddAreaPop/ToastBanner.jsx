@@ -7,10 +7,10 @@ export default function ToastBanner({ error, success, toastVisible }) {
 			style={{ transition: 'opacity 400ms ease', opacity: (error || success) ? (toastVisible ? 1 : 0) : 0 }}
 		>
 			{error ? (
-				<p className="rounded-lg border border-rose-300 bg-rose-100 px-3 py-2 text-sm text-rose-800 shadow-sm">{error}</p>
+				<p className="rounded-full border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-800 shadow-md shadow-rose-100/80">{error}</p>
 			) : (
 				<p
-					className="rounded-lg border border-emerald-300 bg-emerald-100 px-3 py-2 text-sm text-emerald-800 shadow-sm"
+					className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-800 shadow-md shadow-emerald-100/80"
 					aria-live="polite"
 				>
 					{success}

@@ -234,13 +234,13 @@ export default function OfficeInfoBar({
                         if (visibleHeads.length > 1) {
                             return (
                                 <div className="flex items-center gap-2.5">
-                                    <div className="flex -space-x-2 overflow-hidden">
+                                    <div className="flex -space-x-2">
                                         {visibleHeads.map((head) => (
                                             <SmartUserAvatar
                                                 key={head.headid || head.userid || head.id || Math.random()}
                                                 user={head}
                                                 size="h-8 w-8"
-                                                ring="border-2 border-white"
+                                                ring="border-2 border-white shadow-2xs"
                                             />
                                         ))}
                                     </div>
@@ -261,7 +261,7 @@ export default function OfficeInfoBar({
                                 <SmartUserAvatar
                                     user={primaryHead}
                                     size="h-8 w-8"
-                                    ring="border-2 border-white ring-1 ring-slate-200"
+                                    ring="border border-white shadow-2xs"
                                 />
                                 <div>
                                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Personnel</p>
@@ -281,13 +281,13 @@ export default function OfficeInfoBar({
                         <div className="flex items-center gap-2.5">
                             {visibleAuditors.length > 0 ? (
                                 <>
-                                    <div className="flex -space-x-2 overflow-hidden">
+                                    <div className="flex -space-x-2">
                                         {visibleAuditors.map(aud => (
                                             <SmartUserAvatar
                                                 key={aud.userid ?? aud.id}
                                                 user={aud}
                                                 size="h-8 w-8"
-                                                ring="border-2 border-white ring-1 ring-sky-300"
+                                                ring="border border-white shadow-2xs"
                                             />
                                         ))}
                                     </div>

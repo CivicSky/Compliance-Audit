@@ -147,6 +147,10 @@ const OfficesController = {
   // ================================
   getAll: async (req, res) => {
     try {
+      try {
+        await db.query('ALTER TABLE Events ADD COLUMN IF NOT EXISTS islocked BOOLEAN DEFAULT FALSE');
+        await db.query('ALTER TABLE Events ADD COLUMN IF NOT EXISTS deadline TIMESTAMP DEFAULT NULL');
+      } catch (e) {}
       const roleid = Number(req.user?.roleid || 0);
       const userid = Number(req.user?.userid || 0);
       const isAuditor = roleid === 4;
@@ -198,6 +202,8 @@ const OfficesController = {
           END AS category_name,
           e.eventname,
           e.eventcode,
+          e.islocked AS event_islocked,
+          e.deadline AS event_deadline,
           ot.typename,
           os.overallstatus,
           os.compliancepercent,
@@ -383,9 +389,9 @@ const OfficesController = {
             : null,
           eventid: r.eventid,
           eventname: r.eventname || null,
-          eventname: r.eventname || null,
           eventcode: r.eventcode || r.eventname || null,
-          eventcode: r.eventcode || r.eventname || null,
+          event_islocked: Boolean(r.event_islocked),
+          event_deadline: r.event_deadline || null,
           overallstatus: (Number(r.totalrequirements || 0) === 0 ? 'No Standards' : (r.overallstatus || 'Not Complied')),
           compliancepercent: r.compliancepercent || 0,
           totalrequirements: r.totalrequirements || 0,
@@ -460,7 +466,9 @@ const OfficesController = {
           os.compliancepercent,
           os.totalrequirements,
           e.eventname,
-          e.eventcode
+          e.eventcode,
+          e.islocked AS event_islocked,
+          e.deadline AS event_deadline
         FROM offices o
         LEFT JOIN masterlist m ON o.masterlistid = m.id
         LEFT JOIN departments d ON m.departmentid = d.id
@@ -576,6 +584,8 @@ const OfficesController = {
         eventid: r.eventid,
         eventname: r.eventname || null,
         eventcode: r.eventcode || null,
+        event_islocked: Boolean(r.event_islocked),
+        event_deadline: r.event_deadline || null,
         overallstatus: (Number(r.totalrequirements || 0) === 0 ? 'No Standards' : (r.overallstatus || 'Not Complied')),
         compliancepercent: r.compliancepercent || 0,
         totalrequirements: r.totalrequirements || 0
@@ -1216,16 +1226,16 @@ const OfficesController = {
         `SELECT
           r.requirementid,
           r.requirementcode,
-          r.Description,
+          r.Description AS "Description",
           c.criteriaid,
           c.parentcriteriaid,
           c.criteriacode,
           c.criterianame,
           pc.criteriacode AS "ParentCriteriaCode",
           pc.criterianame AS "ParentCriteriaName",
-          a.areaid,
-          a.areacode,
-          a.areaname,
+          COALESCE(a.areaid, pa.areaid) AS areaid,
+          COALESCE(a.areacode, pa.areacode) AS areacode,
+          COALESCE(a.areaname, pa.areaname) AS areaname,
           cso.status AS "ComplianceStatusID",
           cst.statusname AS "ComplianceStatusName",
           cso.comments AS "Comments"
@@ -1234,11 +1244,12 @@ const OfficesController = {
         LEFT JOIN criteria c ON r.criteriaid = c.criteriaid
         LEFT JOIN criteria pc ON c.parentcriteriaid = pc.criteriaid
         LEFT JOIN areas a ON c.areaid = a.areaid
+        LEFT JOIN areas pa ON pc.areaid = pa.areaid
         LEFT JOIN compliancestatustypes cst ON cso.Status = cst.statusid
         WHERE cso.officeid = ?
         ORDER BY
-          COALESCE(a.areacode, 'ZZZ') ASC,
-          COALESCE(a.areaname, 'ZZZ') ASC,
+          COALESCE(a.areacode, pa.areacode, 'ZZZ') ASC,
+          COALESCE(a.areaname, pa.areaname, 'ZZZ') ASC,
           COALESCE(COALESCE(pc.criteriacode, c.criteriacode), 'ZZZ') ASC,
           COALESCE(c.criteriacode, 'ZZZ') ASC,
           COALESCE(r.requirementcode, 'ZZZ') ASC,
@@ -1344,10 +1355,13 @@ const OfficesController = {
           }
 
           areaEntry.criteriaMap.get(critId).requirements.push({
-            status: normalizeComplianceStatus(row.ComplianceStatusID, row.ComplianceStatusName),
+            status: normalizeComplianceStatus(
+              row.ComplianceStatusID ?? row.compliancestatusid,
+              row.ComplianceStatusName ?? row.compliancestatusname
+            ),
             requirementcode: row.requirementcode || 'N/A',
-            description: row.Description || '',
-            comments: row.Comments || ''
+            description: row.Description ?? row.description ?? '',
+            comments: row.Comments ?? row.comments ?? ''
           });
         });
 
@@ -1445,12 +1459,15 @@ const OfficesController = {
         .trim();
 
       const filename = `${safeName || `office_${officeid}`}_export.xlsx`;
+      const buffer = await workbook.xlsx.writeBuffer();
+      const outputBuffer = Buffer.from(buffer);
 
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', outputBuffer.length);
+      res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
 
-      await workbook.xlsx.write(res);
-      return res.end();
+      return res.status(200).send(outputBuffer);
     } catch (err) {
       console.error('Error exporting office excel:', err);
       return res.status(500).json({ success: false, message: 'Failed to export office excel', details: err.message });
@@ -1787,433 +1804,6 @@ const OfficesController = {
         console.warn('Notice: Error in logging or notifying for status update:', logOrNotifErr.message);
       }
 
-      try {
-        const { emitDataChange } = require('../socket');
-        emitDataChange('compliance', {
-          action: 'status_updated',
-          officeid: Number(officeid),
-          requirementid: Number(requirementid),
-          statusid: nextStatusId,
-          statusName,
-          comments: hasCommentPayload ? comments : undefined
-        });
-        emitDataChange('requirements', {
-          action: 'status_updated',
-          officeid: Number(officeid),
-          requirementid: Number(requirementid),
-          statusid: nextStatusId,
-          statusName,
-          comments: hasCommentPayload ? comments : undefined
-        });
-      } catch (sErr) {}
-
-      res.json({
-        success: true,
-        message: "Compliance status and comment updated successfully"
-      });
-    } catch (err) {
-      console.error("Error updating requirement status:", err);
-      res.status(500).json({
-        success: false,
-        error: "Database error",
-        details: err.message
-      });
-    }
-  },
-
-  // ================================
-  // EXPORT OFFICE REQUIREMENTS (EXCEL TABLE FORMAT)
-  // ================================
-  exportOfficeExcel: async (req, res) => {
-    const officeid = Number(req.params.id);
-
-    if (!Number.isInteger(officeid) || officeid <= 0) {
-      return res.status(400).json({ success: false, message: 'Invalid office id' });
-    }
-
-    try {
-      const [officeRows] = await db.query(
-        `SELECT o.officeid, o.officename
-         FROM offices o
-         WHERE o.officeid = ?
-         LIMIT 1`,
-        [officeid]
-      );
-
-      if (!officeRows.length) {
-        return res.status(404).json({ success: false, message: 'Office not found' });
-      }
-
-      const officename = officeRows[0].officename || `Office ${officeid}`;
-
-      const [requirementsRows] = await db.query(
-        `SELECT
-          r.requirementid,
-          r.requirementcode,
-          r.Description,
-          c.criteriaid,
-          c.parentcriteriaid,
-          c.criteriacode,
-          c.criterianame,
-          pc.criteriacode AS "ParentCriteriaCode",
-          pc.criterianame AS "ParentCriteriaName",
-          r.areaid AS areaid,
-          a.areacode,
-          a.areaname,
-          cso.status AS "ComplianceStatusID",
-          cst.statusname AS "ComplianceStatusName",
-          cso.comments AS "Comments"
-        FROM compliancestatusoffices cso
-        INNER JOIN requirements r ON cso.requirementid = r.requirementid
-        LEFT JOIN criteria c ON r.criteriaid = c.criteriaid
-        LEFT JOIN criteria pc ON c.parentcriteriaid = pc.criteriaid
-        LEFT JOIN areas a ON r.areaid = a.areaid
-        LEFT JOIN compliancestatustypes cst ON cso.Status = cst.statusid
-        WHERE cso.officeid = ?
-        ORDER BY
-          r.requirementid ASC`,
-        [officeid]
-      );
-
-      const workbook = new ExcelJS.Workbook();
-      workbook.creator = 'Compliance Audit';
-      workbook.created = new Date();
-
-      const sheet = workbook.addWorksheet('Office Export');
-      sheet.columns = [
-        { key: 'status', width: 20 },
-        { key: 'requirement', width: 140 },
-        { key: 'comments', width: 64 },
-      ];
-
-      const thinBorder = {
-        top: { style: 'thin' },
-        left: { style: 'thin' },
-        bottom: { style: 'thin' },
-        right: { style: 'thin' },
-      };
-
-      const areaHeaderStyle = {
-        font: { bold: true, size: 13 },
-        alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
-      };
-
-      const criteriaHeaderStyle = {
-        font: { bold: true, size: 12 },
-        alignment: { horizontal: 'left', vertical: 'middle', wrapText: true },
-      };
-
-      let rowIndex = 1;
-
-      sheet.mergeCells(`A${rowIndex}:C${rowIndex}`);
-      const officeCell = sheet.getCell(`A${rowIndex}`);
-      officeCell.value = String(officename).toUpperCase();
-      officeCell.font = { bold: true, size: 14 };
-      officeCell.alignment = { horizontal: 'center', vertical: 'middle' };
-      officeCell.border = thinBorder;
-      sheet.getCell(`B${rowIndex}`).border = thinBorder;
-      sheet.getCell(`C${rowIndex}`).border = thinBorder;
-      rowIndex += 1;
-
-      if (!requirementsRows.length) {
-        sheet.mergeCells(`A${rowIndex}:B${rowIndex}`);
-        const emptyCell = sheet.getCell(`A${rowIndex}`);
-        emptyCell.value = 'No requirements assigned to this office.';
-        emptyCell.alignment = { horizontal: 'center', vertical: 'middle' };
-        emptyCell.border = thinBorder;
-        sheet.getCell(`B${rowIndex}`).border = thinBorder;
-      } else {
-        const areasMap = new Map();
-
-        requirementsRows.forEach((row) => {
-          const areacode = row.areacode || 'N/A';
-          const areaname = row.areaname || 'No Area';
-          const areaKey = `${areacode}__${areaname}`;
-
-          if (!areasMap.has(areaKey)) {
-            areasMap.set(areaKey, {
-              areacode,
-              areaname,
-              criteriaMap: new Map(),
-            });
-          }
-
-          const areaEntry = areasMap.get(areaKey);
-          const critId = row.criteriaid != null ? Number(row.criteriaid) : `req_${row.requirementid}`;
-          const parentId = row.parentcriteriaid != null ? Number(row.parentcriteriaid) : null;
-
-          if (!areaEntry.criteriaMap.has(critId)) {
-            areaEntry.criteriaMap.set(critId, {
-              id: critId,
-              code: row.criteriacode || '',
-              name: row.criterianame || '',
-              parentId: parentId,
-              children: [],
-              requirements: [],
-            });
-          }
-
-          if (parentId && !areaEntry.criteriaMap.has(parentId)) {
-            areaEntry.criteriaMap.set(parentId, {
-              id: parentId,
-              code: row.ParentCriteriaCode || row.parentcriteriacode || '',
-              name: row.ParentCriteriaName || row.parentcriterianame || '',
-              parentId: null,
-              children: [],
-              requirements: [],
-            });
-          }
-
-          areaEntry.criteriaMap.get(critId).requirements.push({
-            status: normalizeComplianceStatus(row.ComplianceStatusID, row.ComplianceStatusName),
-            requirementcode: row.requirementcode || 'N/A',
-            description: row.Description || '',
-            comments: row.Comments || ''
-          });
-        });
-
-        for (const area of areasMap.values()) {
-          for (const node of area.criteriaMap.values()) {
-            if (node.parentId && area.criteriaMap.has(node.parentId)) {
-              area.criteriaMap.get(node.parentId).children.push(node);
-            }
-          }
-        }
-
-        for (const area of areasMap.values()) {
-          sheet.mergeCells(`A${rowIndex}:C${rowIndex}`);
-          const areaTitleCell = sheet.getCell(`A${rowIndex}`);
-          areaTitleCell.value = `${area.areacode} - ${area.areaname}`;
-          areaTitleCell.font = areaHeaderStyle.font;
-          areaTitleCell.alignment = areaHeaderStyle.alignment;
-          areaTitleCell.border = thinBorder;
-          sheet.getCell(`B${rowIndex}`).border = thinBorder;
-          sheet.getCell(`C${rowIndex}`).border = thinBorder;
-          rowIndex += 1;
-
-          const allNodes = Array.from(area.criteriaMap.values());
-          const roots = allNodes.filter(n => !n.parentId || !area.criteriaMap.has(n.parentId));
-          roots.sort((a, b) => (String(a.code || a.name)).localeCompare(String(b.code || b.name)));
-
-          for (const root of roots) {
-            sheet.mergeCells(`A${rowIndex}:C${rowIndex}`);
-            const criteriaLabel = root.code ? `${String(root.code).trim().replace(/\.+$/, '').toUpperCase()}. ${root.name}` : root.name || 'No Criteria';
-            const criteriaCell = sheet.getCell(`A${rowIndex}`);
-            criteriaCell.value = criteriaLabel;
-            criteriaCell.font = criteriaHeaderStyle.font;
-            criteriaCell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
-            criteriaCell.border = thinBorder;
-            sheet.getCell(`B${rowIndex}`).border = thinBorder;
-            sheet.getCell(`C${rowIndex}`).border = thinBorder;
-            rowIndex += 1;
-
-            for (const req of root.requirements) {
-              sheet.getCell(`A${rowIndex}`).value = req.status;
-              sheet.getCell(`B${rowIndex}`).value = `${req.requirementcode} - ${req.description}`;
-              sheet.getCell(`C${rowIndex}`).value = req.comments || '';
-              sheet.getCell(`A${rowIndex}`).alignment = { horizontal: 'left', vertical: 'middle' };
-              sheet.getCell(`B${rowIndex}`).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
-              sheet.getCell(`C${rowIndex}`).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
-              sheet.getCell(`A${rowIndex}`).border = thinBorder;
-              sheet.getCell(`B${rowIndex}`).border = thinBorder;
-              sheet.getCell(`C${rowIndex}`).border = thinBorder;
-              rowIndex += 1;
-            }
-
-            const children = (root.children || []).slice().sort((a,b) => (String(a.code || a.name)).localeCompare(String(b.code || b.name)));
-            for (const child of children) {
-              sheet.mergeCells(`A${rowIndex}:C${rowIndex}`);
-              const childLabel = child.code ? `${String(child.code).trim().replace(/\.+$/, '').toUpperCase()}. ${child.name}` : child.name || 'No Criteria';
-              const childCell = sheet.getCell(`A${rowIndex}`);
-              childCell.value = childLabel;
-              childCell.font = { bold: true, size: 11 };
-              childCell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
-              childCell.border = thinBorder;
-              sheet.getCell(`B${rowIndex}`).border = thinBorder;
-              sheet.getCell(`C${rowIndex}`).border = thinBorder;
-              rowIndex += 1;
-
-              for (const req of child.requirements) {
-                sheet.getCell(`A${rowIndex}`).value = req.status;
-                sheet.getCell(`B${rowIndex}`).value = `${req.requirementcode} - ${req.description}`;
-                sheet.getCell(`C${rowIndex}`).value = req.comments || '';
-                sheet.getCell(`A${rowIndex}`).alignment = { horizontal: 'left', vertical: 'middle' };
-                sheet.getCell(`B${rowIndex}`).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
-                sheet.getCell(`C${rowIndex}`).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
-                sheet.getCell(`A${rowIndex}`).border = thinBorder;
-                sheet.getCell(`B${rowIndex}`).border = thinBorder;
-                sheet.getCell(`C${rowIndex}`).border = thinBorder;
-                rowIndex += 1;
-              }
-            }
-          }
-        }
-      }
-
-      const safeName = String(officename)
-        .replace(/[\\/:*?"<>|]+/g, '_')
-        .replace(/\s+/g, '_')
-        .trim();
-
-      const filename = `${safeName || `office_${officeid}`}_export.xlsx`;
-
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-
-      await workbook.xlsx.write(res);
-      return res.end();
-    } catch (err) {
-      console.error('Error exporting office excel:', err);
-      return res.status(500).json({ success: false, message: 'Failed to export office excel', details: err.message });
-    }
-    try {
-      const [result] = await db.query(
-        "DELETE FROM compliancestatusoffices WHERE officeid = ? AND requirementid = ?",
-        [officeid, requirementid]
-      );
-
-      if (result.affectedRows === 0) {
-        return res.status(404).json({ 
-          success: false, 
-          message: "Requirement not found for this office" 
-        });
-      }
-
-      // Update the overall office status after removal
-      await updateOverallOfficeStatus(officeid);
-
-      // Remove any user assignments for this requirement in this office
-      try {
-        await db.execute('DELETE FROM requirementuserassignments WHERE requirementid = ? AND officeid = ?', [requirementid, officeid]);
-      } catch (cleanupErr) {
-        console.error('Failed to cleanup requirementuserassignments after removing office requirement:', cleanupErr);
-      }
-
-      // Also remove any uploaded proof documents (disk + DB) related to this requirement for the office
-      try {
-        const [files] = await db.query(
-          'SELECT id, filepath FROM officeproofdocuments WHERE requirementid = ? AND officeid = ?',
-          [requirementid, officeid]
-        );
-
-        if (files && files.length > 0) {
-          for (const f of files) {
-            try {
-              const absPath = path.join(__dirname, '..', (f.filepath || '').replace(/^\//, ''));
-              if (fs.existsSync(absPath)) {
-                fs.unlinkSync(absPath);
-              }
-            } catch (fsErr) {
-              console.warn('Failed to delete requirement proof file from disk during removeOfficeRequirement:', fsErr);
-            }
-          }
-
-          await db.query('DELETE FROM officeproofdocuments WHERE requirementid = ? AND officeid = ?', [requirementid, officeid]);
-        }
-      } catch (docErr) {
-        console.error('Failed to cleanup officeproofdocuments after removing office requirement:', docErr);
-      }
-
-      res.json({ 
-        success: true, 
-        message: "Requirement removed successfully" 
-      });
-    } catch (err) {
-      console.error("Error removing office requirement:", err);
-      res.status(500).json({ 
-        success: false, 
-        error: "Database error", 
-        details: err.message 
-      });
-    }
-  },
-
-  // ================================
-  // UPDATE REQUIREMENT STATUS
-  // ================================
-  updateRequirementStatus: async (req, res) => {
-    const { id: officeid, requirementid } = req.params;
-    const { statusid, comments } = req.body;
-    const nextStatusId = Number(statusid);
-
-    if (!nextStatusId || ![3, 4, 5].includes(nextStatusId)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid status. Must be 3 (Not Complied), 4 (Partially Complied), or 5 (Complied)"
-      });
-    }
-
-    try {
-      // Check existing status to see if statusid is changing
-      const [existingStatusRows] = await db.query(
-        `SELECT status AS "Status" FROM compliancestatusoffices WHERE officeid = ? AND requirementid = ?`,
-        [officeid, requirementid]
-      );
-      const rawCurrentStatus = existingStatusRows[0]?.Status;
-      const currentStatus = rawCurrentStatus != null ? Number(rawCurrentStatus) : 3;
-
-      // If compliance status is actually being elevated to Partially Complied (4) or Complied (5), ensure evidence exists
-      if (nextStatusId !== 3 && nextStatusId !== currentStatus) {
-        const [userUploads] = await db.query(
-          `SELECT COUNT(*) as cnt FROM requirementuserassignments 
-           WHERE officeid = ? AND requirementid = ? AND hasuploaded = TRUE`,
-          [officeid, requirementid]
-        );
-        const [proofDocs] = await db.query(
-          `SELECT COUNT(*) as cnt FROM officeproofdocuments 
-           WHERE officeid = ? AND (requirementid = ? OR requirementid IS NULL)`,
-          [officeid, requirementid]
-        );
-
-        const hasEvidence = (userUploads[0]?.cnt > 0) || (proofDocs[0]?.cnt > 0);
-
-        if (!hasEvidence) {
-          return res.status(400).json({
-            success: false,
-            message: "Cannot set compliance status to Partially Complied or Complied: No evidence or proof document has been uploaded for this requirement yet."
-          });
-        }
-      }
-
-      const hasCommentPayload = Object.prototype.hasOwnProperty.call(req.body, 'comments');
-      if (hasCommentPayload) {
-        let userRoleId = Number(req.user?.roleid || 0);
-        if (!userRoleId && req.user?.userid) {
-          const [[userRow]] = await db.query("SELECT roleid FROM users WHERE userid = ?", [req.user.userid]);
-          if (userRow) userRoleId = Number(userRow.roleid);
-        }
-        if (userRoleId !== 1) {
-          return res.status(403).json({
-            success: false,
-            message: "Forbidden: Only Administrators are permitted to add or edit comments on standards."
-          });
-        }
-      }
-
-      const updateSql = hasCommentPayload
-        ? `UPDATE compliancestatusoffices
-           SET Status = ?, comments = ?, lastupdated = CURRENT_TIMESTAMP
-           WHERE officeid = ? AND requirementid = ?`
-        : `UPDATE compliancestatusoffices
-           SET Status = ?, lastupdated = CURRENT_TIMESTAMP
-           WHERE officeid = ? AND requirementid = ?`;
-      const updateParams = hasCommentPayload
-        ? [nextStatusId, comments || null, officeid, requirementid]
-        : [nextStatusId, officeid, requirementid];
-      const [updateResult] = await db.query(updateSql, updateParams);
-
-      if (!updateResult?.affectedRows) {
-        await db.query(
-          `INSERT INTO compliancestatusoffices (officeid, requirementid, Status, comments)
-           VALUES (?, ?, ?, ?)`,
-          [officeid, requirementid, nextStatusId, hasCommentPayload ? (comments || null) : null]
-        );
-      }
-
-      // Update the overall office status
-      await updateOverallOfficeStatus(officeid);
-
-      const statusName = nextStatusId === 5 ? 'Complied' : (nextStatusId === 4 ? 'Partially Complied' : 'Not Complied');
       try {
         const { emitDataChange } = require('../socket');
         emitDataChange('compliance', {

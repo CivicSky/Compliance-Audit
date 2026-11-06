@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
-import { Eye, EyeOff, CheckCircle2, Circle, ShieldCheck, ClipboardList, TrendingUp } from "lucide-react";
+import { Eye, EyeOff, CheckCircle2, Circle } from "lucide-react";
 import logo from "../assets/images/lccb_logo.png";
 import auditrackLogo from "../assets/images/logo.png";
-import aboutImg from "../assets/images/about.jpg";
 import { usersAPI } from "../utils/api";
 import { useModal } from "../components/UI/ModalProvider";
 
@@ -172,79 +171,15 @@ export default function Register() {
     const pwHasNums = (formData.password.match(/\d/g) || []).length >= 3;
 
     return (
-        <div style={{ display: 'flex', height: '100%', overflow: 'hidden', fontFamily: "'Poppins', 'Inter', sans-serif" }}>
+        <div style={{ display: 'flex', height: '100%', overflow: 'hidden', fontFamily: "'Poppins', 'Inter', sans-serif", background: '#ffffff' }}>
 
-            {/* ─── LEFT PANEL ─── */}
+            {/* ─── CENTERED FORM PANEL ─── */}
             <div style={{
-                width: '50%',
-                position: 'relative',
-                overflow: 'hidden',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: '3rem 2.5rem',
-            }}>
-                {/* Full-bleed background image */}
-                <img
-                    src={aboutImg}
-                    alt="LCCB Campus"
-                    style={{
-                        position: 'absolute', inset: 0,
-                        width: '100%', height: '100%',
-                        objectFit: 'cover', objectPosition: 'center',
-                        display: 'block',
-                    }}
-                />
-                {/* Blue tint overlay */}
-                <div style={{
-                    position: 'absolute', inset: 0,
-                    background: 'linear-gradient(145deg, rgba(10,20,50,0.82) 0%, rgba(29,78,216,0.75) 100%)',
-                    backdropFilter: 'blur(1px)',
-                }} />
-
-                {/* Brand block */}
-                <div style={{ textAlign: 'center', color: '#fff', zIndex: 1 }} className="animate-fade-in-left">
-                    <img src={auditrackLogo} alt="Auditrack"
-                        style={{ width: '60px', height: '60px', objectFit: 'contain', margin: '0 auto 0.75rem', filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.4))' }} />
-                    <h2 style={{ fontSize: '1.75rem', fontWeight: 700, margin: '0 0 0.5rem', letterSpacing: '-0.5px' }}>
-                        Join Auditrack
-                    </h2>
-                    <p style={{ fontSize: '0.875rem', color: 'rgba(255,255,255,0.65)', marginBottom: '2rem', lineHeight: 1.6 }}>
-                        Create your account and start managing compliance processes efficiently.
-                    </p>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', alignItems: 'flex-start', textAlign: 'left' }}>
-                        {[
-                            { icon: <ShieldCheck size={16} />, text: 'Secure institutional registration' },
-                            { icon: <ClipboardList size={16} />, text: 'Compliance audit access control' },
-                            { icon: <TrendingUp size={16} />, text: 'Instant onboarding & setup' },
-                        ].map(({ icon, text }, i) => (
-                            <div key={i} style={{
-                                display: 'flex', alignItems: 'center', gap: '0.6rem',
-                                background: 'rgba(255,255,255,0.08)',
-                                border: '1px solid rgba(255,255,255,0.14)',
-                                borderRadius: '999px',
-                                padding: '0.45rem 1rem',
-                                fontSize: '0.78rem',
-                                color: 'rgba(255,255,255,0.85)',
-                                backdropFilter: 'blur(6px)',
-                            }}>
-                                <span style={{ color: '#93c5fd' }}>{icon}</span>
-                                {text}
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
-
-            {/* ─── RIGHT PANEL ─── */}
-            <div style={{
-                width: '50%',
+                width: '100%',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                background: '#f8fafc',
+                background: '#ffffff',
                 padding: '1.5rem 2rem',
                 overflowY: 'auto',
             }}>
@@ -252,9 +187,14 @@ export default function Register() {
 
                     {/* Header */}
                     <div style={{ textAlign: 'center', marginBottom: '1.5rem' }} className="animate-slide-down">
-                        <img src={logo} alt="LCCB Logo"
-                            style={{ width: '58px', height: '58px', objectFit: 'contain', margin: '0 auto 0.75rem', filter: 'drop-shadow(0 2px 8px rgba(37,99,235,0.18))' }} />
-                        <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#0f172a', margin: '0 0 0.25rem', letterSpacing: '-0.4px' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.65rem', marginBottom: '0.75rem' }}>
+                            <img src={auditrackLogo} alt="Auditrack Logo"
+                                style={{ width: '44px', height: '44px', objectFit: 'contain', filter: 'drop-shadow(0 2px 8px rgba(37,99,235,0.18))' }} />
+                            <span style={{ fontSize: '1.65rem', fontWeight: 700, color: '#0f172a', letterSpacing: '-0.5px' }}>
+                                Auditrack
+                            </span>
+                        </div>
+                        <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: '#0f172a', margin: '0 0 0.25rem', letterSpacing: '-0.4px' }}>
                             Create Account
                         </h1>
                         <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0 }}>
@@ -291,8 +231,8 @@ export default function Register() {
                                     borderRadius: '10px', color: '#1d4ed8', fontSize: '0.77rem',
                                 }}>
                                     {inviteInfo.allowAnyEmail
-                                        ? "Standard Email Invite verified — any valid email accepted."
-                                        : "Institutional Invite verified — @lccbonline.edu.ph required."}
+                                        ? "Standard Email Invite verified: any valid email accepted."
+                                        : "Institutional Invite verified: @lccbonline.edu.ph required."}
                                 </div>
                             )}
 

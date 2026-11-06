@@ -3,6 +3,89 @@ const fs = require('fs');
 const path = require('path');
 const archiver = require('archiver');
 const { recordLog } = require('./logsController');
+const { createNotifications } = require('../utils/notificationService');
+
+let eventColumnsEnsured = false;
+const ensureEventColumns = async () => {
+  if (eventColumnsEnsured) return;
+  try {
+    await db.query('ALTER TABLE Events ADD COLUMN IF NOT EXISTS islocked BOOLEAN DEFAULT FALSE');
+    await db.query('ALTER TABLE Events ADD COLUMN IF NOT EXISTS lockedat TIMESTAMP DEFAULT NULL');
+    await db.query('ALTER TABLE Events ADD COLUMN IF NOT EXISTS lockedby INT DEFAULT NULL');
+    await db.query('ALTER TABLE Events ADD COLUMN IF NOT EXISTS deadline TIMESTAMP DEFAULT NULL');
+    await db.query('ALTER TABLE Events ADD COLUMN IF NOT EXISTS lastreminderdate DATE DEFAULT NULL');
+    eventColumnsEnsured = true;
+  } catch (e) {
+    console.warn('ensureEventColumns warning:', e.message);
+  }
+};
+
+const getAssignedUserIdsForEvent = async (eventid) => {
+  try {
+    const [rows] = await db.query(
+      `SELECT DISTINCT userid FROM (
+         SELECT h.userid
+         FROM officeheadassignments oha
+         JOIN headofoffice h ON oha.headid = h.headid
+         JOIN offices o ON oha.officeid = o.officeid
+         WHERE o.eventid = ? AND h.userid IS NOT NULL
+         UNION
+         SELECT rua.userid
+         FROM requirementuserassignments rua
+         JOIN offices o ON rua.officeid = o.officeid
+         WHERE o.eventid = ? AND rua.userid IS NOT NULL
+         UNION
+         SELECT pa.userid
+         FROM personnelassignments pa
+         WHERE pa.eventid = ? AND pa.userid IS NOT NULL
+       ) assigned_users`,
+      [eventid, eventid, eventid]
+    );
+    return (rows || []).map(r => Number(r.userid)).filter(id => Number.isInteger(id) && id > 0);
+  } catch (err) {
+    console.warn('getAssignedUserIdsForEvent warning:', err.message);
+    return [];
+  }
+};
+
+const checkAndSendAutomatedDeadlineReminders = async (eventsList) => {
+  try {
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10);
+    for (const ev of (eventsList || [])) {
+      if (!ev.deadline || String(ev.status || 'active').toLowerCase() === 'inactive') continue;
+      // Never send overdue/countdown reminders if the accreditation is already 100% complied
+      if (Number(ev.completionpercent || 0) >= 100) continue;
+      const deadlineDate = new Date(ev.deadline);
+      if (isNaN(deadlineDate.getTime())) continue;
+      const diffMs = deadlineDate.getTime() - now.getTime();
+      const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      // Send automated daily countdown reminder when 1 to 7 days remain, or if due today (0)
+      if (diffDays >= 0 && diffDays <= 7) {
+        const lastRem = ev.lastreminderdate ? new Date(ev.lastreminderdate).toISOString().slice(0, 10) : null;
+        if (lastRem !== todayStr) {
+          await db.query('UPDATE Events SET lastreminderdate = CURRENT_DATE WHERE eventid = ?', [ev.eventid]);
+          const userIds = await getAssignedUserIdsForEvent(ev.eventid);
+          if (userIds.length > 0) {
+            const label = ev.eventcode || ev.eventname || 'Accreditation';
+            const dayText = diffDays === 0 ? 'is due TODAY' : `has ${diffDays} day${diffDays === 1 ? '' : 's'} remaining until the submission deadline`;
+            await createNotifications({
+              userIds,
+              adminid: null,
+              title: `Deadline Countdown: ${label}`,
+              message: `${label} ${dayText} (${deadlineDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}). Please ensure all assigned compliance files are uploaded.`,
+              type: diffDays <= 2 ? 'warning' : 'info',
+              relatedtable: 'events_deadline',
+              relatedid: Number(ev.eventid)
+            });
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Automated deadline reminder check error:', e.message);
+  }
+};
 
 const sanitizeFolderName = (s) =>
   String(s || '')
@@ -152,6 +235,7 @@ const copyEvent = async (req, res) => {
 // Get all events (with role-based scoping for Personnel and Auditors)
 const getAllEvents = async (req, res) => {
   try {
+    await ensureEventColumns();
     const userid = Number(req.user?.userid);
     let roleid = Number(req.user?.roleid);
 
@@ -163,12 +247,41 @@ const getAllEvents = async (req, res) => {
 
     const isAdmin = roleid === 1;
 
+    const enrichEventsWithCompletion = async (eventList) => {
+      if (!Array.isArray(eventList) || eventList.length === 0) return eventList;
+      try {
+        const [stats] = await db.query(`
+          SELECT 
+            o.eventid,
+            COUNT(cso.id) AS totalstandards,
+            ROUND( (SUM(CASE WHEN cso.Status = 5 THEN 100 WHEN cso.Status = 4 THEN 50 ELSE 0 END) * 1.0) / NULLIF(COUNT(cso.id), 0), 1) AS completionpercent
+          FROM offices o
+          JOIN compliancestatusoffices cso ON o.officeid = cso.officeid
+          WHERE o.eventid IS NOT NULL
+          GROUP BY o.eventid
+        `);
+        const map = new Map();
+        for (const s of stats) {
+          map.set(Number(s.eventid), Number(s.completionpercent || 0));
+        }
+        return eventList.map(ev => ({
+          ...ev,
+          completionpercent: map.has(Number(ev.eventid)) ? map.get(Number(ev.eventid)) : 0
+        }));
+      } catch (err) {
+        console.warn('Enrich events completion warning:', err.message);
+        return eventList;
+      }
+    };
+
     // Admins see all events
     if (isAdmin || !userid) {
       const [events] = await db.query('SELECT * FROM Events ORDER BY createdat DESC');
+      const enriched = await enrichEventsWithCompletion(events);
+      checkAndSendAutomatedDeadlineReminders(enriched).catch(() => {});
       return res.json({
         success: true,
-        data: events
+        data: enriched
       });
     }
 
@@ -183,9 +296,10 @@ const getAllEvents = async (req, res) => {
          ORDER BY e.createdat DESC`,
         [userid]
       );
+      const enriched = await enrichEventsWithCompletion(events);
       return res.json({
         success: true,
-        data: events
+        data: enriched
       });
     }
 
@@ -265,9 +379,10 @@ const getAllEvents = async (req, res) => {
       [userid, userid, userid, userid, userid, userid, userid, userid]
     );
 
+    const enriched = await enrichEventsWithCompletion(events);
     return res.json({
       success: true,
-      data: events
+      data: enriched
     });
   } catch (error) {
     console.error('Error fetching events:', error);
@@ -281,7 +396,8 @@ const getAllEvents = async (req, res) => {
 // Add new event
 const addEvent = async (req, res) => {
   try {
-    const { eventname, eventcode, Description, accreditationlevel } = req.body;
+    await ensureEventColumns();
+    const { eventname, eventcode, Description, accreditationlevel, deadline, islocked } = req.body;
 
     // Validate required fields
     if (!eventname || !eventcode) {
@@ -291,10 +407,23 @@ const addEvent = async (req, res) => {
       });
     }
 
+    const parsedDeadline = deadline && String(deadline).trim() ? new Date(deadline) : null;
+    const validDeadline = parsedDeadline && !isNaN(parsedDeadline.getTime()) ? parsedDeadline.toISOString() : null;
+    const lockedVal = Boolean(islocked);
+
     // Insert new event
     const [result] = await db.query(
-      'INSERT INTO Events (eventname, eventcode, Description, createdat, updatedat, accreditationlevel) VALUES (?, ?, ?, NOW(), NOW(), ?)',
-      [eventname, eventcode, Description || null, accreditationlevel || 'N/A']
+      'INSERT INTO Events (eventname, eventcode, Description, createdat, updatedat, accreditationlevel, deadline, islocked, lockedat, lockedby) VALUES (?, ?, ?, NOW(), NOW(), ?, ?, ?, ?, ?)',
+      [
+        eventname,
+        eventcode,
+        Description || null,
+        accreditationlevel || 'N/A',
+        validDeadline,
+        lockedVal,
+        lockedVal ? new Date().toISOString() : null,
+        lockedVal && req.user?.userid ? Number(req.user.userid) : null
+      ]
     );
 
     // Create folder for the event inside uploads/events using eventcode (preferred for shorter, stable folder names)
@@ -322,6 +451,8 @@ const addEvent = async (req, res) => {
         eventcode,
         Description,
         accreditationlevel: accreditationlevel || 'N/A',
+        deadline: validDeadline,
+        islocked: lockedVal,
         FolderPath: sanitizedName
       }
     });
@@ -454,11 +585,12 @@ const deleteEvents = async (req, res) => {
 // Update event
 const updateEvent = async (req, res) => {
   try {
+    await ensureEventColumns();
     const { id } = req.params;
-    const { eventname, eventcode, Description, status, accreditationlevel } = req.body;
+    const { eventname, eventcode, Description, status, accreditationlevel, deadline, islocked } = req.body;
 
     // Debug logging
-    console.log('updateEvent called with:', { id, eventname, eventcode, Description, accreditationlevel });
+    console.log('updateEvent called with:', { id, eventname, eventcode, Description, accreditationlevel, deadline, islocked });
 
     // Validate required fields
     if (!eventname || !eventcode) {
@@ -471,9 +603,11 @@ const updateEvent = async (req, res) => {
     // Fetch existing event to determine if folder rename is needed (get both name and code)
     let existingEventName = null;
     let existingEventCode = null;
+    let existingEventRow = null;
     try {
-      const [existingRows] = await db.query('SELECT eventname, eventcode FROM Events WHERE eventid = ?', [id]);
+      const [existingRows] = await db.query('SELECT * FROM Events WHERE eventid = ?', [id]);
       if (existingRows && existingRows.length > 0) {
+        existingEventRow = existingRows[0];
         existingEventName = existingRows[0].eventname;
         existingEventCode = existingRows[0].eventcode;
       }
@@ -481,10 +615,18 @@ const updateEvent = async (req, res) => {
       console.warn('Could not fetch existing event name/code for folder rename check:', err.message || err);
     }
 
-    // Update event, including status and accreditationlevel (do not touch createdat)
+    const nextDeadline = deadline !== undefined
+      ? (deadline && String(deadline).trim() ? new Date(deadline).toISOString() : null)
+      : (existingEventRow?.deadline ?? null);
+    const nextLocked = islocked !== undefined ? Boolean(islocked) : Boolean(existingEventRow?.islocked);
+    const wasLocked = Boolean(existingEventRow?.islocked);
+    const nextLockedAt = nextLocked ? (wasLocked ? existingEventRow?.lockedat : new Date().toISOString()) : null;
+    const nextLockedBy = nextLocked ? (wasLocked ? existingEventRow?.lockedby : (req.user?.userid ? Number(req.user.userid) : null)) : null;
+
+    // Update event, including status, accreditationlevel, deadline, and islocked
     const [result] = await db.query(
-      'UPDATE Events SET eventname = ?, eventcode = ?, Description = ?, status = ?, accreditationlevel = ?, updatedat = NOW() WHERE eventid = ?',
-      [eventname, eventcode, Description || null, status || 'active', accreditationlevel || 'N/A', id]
+      'UPDATE Events SET eventname = ?, eventcode = ?, Description = ?, status = ?, accreditationlevel = ?, deadline = ?, islocked = ?, lockedat = ?, lockedby = ?, updatedat = NOW() WHERE eventid = ?',
+      [eventname, eventcode, Description || null, status || 'active', accreditationlevel || 'N/A', nextDeadline, nextLocked, nextLockedAt, nextLockedBy, id]
     );
 
     if (result.affectedRows === 0) {
@@ -550,7 +692,12 @@ const updateEvent = async (req, res) => {
         eventname,
         eventcode,
         Description,
-        status
+        status,
+        accreditationlevel: accreditationlevel || 'N/A',
+        deadline: nextDeadline,
+        islocked: nextLocked,
+        lockedat: nextLockedAt,
+        lockedby: nextLockedBy
       }
     });
   } catch (error) {
@@ -559,6 +706,226 @@ const updateEvent = async (req, res) => {
       success: false,
       message: 'Error updating event'
     });
+  }
+};
+
+// Toggle Audit Freeze / Lock on an event
+const toggleEventLock = async (req, res) => {
+  try {
+    await ensureEventColumns();
+    const { id } = req.params;
+    const { islocked } = req.body;
+    const actorId = req.user?.userid ? Number(req.user.userid) : null;
+
+    const [rows] = await db.query('SELECT * FROM Events WHERE eventid = ? LIMIT 1', [id]);
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Event not found' });
+    }
+    const ev = rows[0];
+    const nextLocked = islocked !== undefined ? Boolean(islocked) : !Boolean(ev.islocked);
+    const lockedAt = nextLocked ? new Date().toISOString() : null;
+    const lockedBy = nextLocked ? actorId : null;
+
+    await db.query(
+      'UPDATE Events SET islocked = ?, lockedat = ?, lockedby = ?, updatedat = NOW() WHERE eventid = ?',
+      [nextLocked, lockedAt, lockedBy, id]
+    );
+
+    if (actorId) {
+      try {
+        recordLog(actorId, nextLocked ? 'EventLocked' : 'EventUnlocked', {
+          eventid: Number(id),
+          eventname: ev.eventname,
+          eventcode: ev.eventcode,
+          islocked: nextLocked
+        });
+      } catch (e) {}
+    }
+
+    // Notify assigned users about Audit Freeze status change
+    try {
+      const userIds = await getAssignedUserIdsForEvent(id);
+      if (userIds.length > 0) {
+        const label = ev.eventcode || ev.eventname || 'Accreditation';
+        await createNotifications({
+          userIds: userIds.filter(uid => uid !== actorId),
+          adminid: actorId,
+          title: nextLocked ? `Audit Freeze Active: ${label}` : `Audit Freeze Lifted: ${label}`,
+          message: nextLocked
+            ? `${label} has been placed under Audit Freeze for evaluation. Evidence uploads and removals are temporarily locked.`
+            : `${label} is now unlocked. You may resume uploading and updating compliance documents.`,
+          type: nextLocked ? 'warning' : 'info',
+          relatedtable: 'events_lock',
+          relatedid: Number(id)
+        });
+      }
+    } catch (nErr) {
+      console.warn('Notification error on toggleEventLock:', nErr.message);
+    }
+
+    return res.json({
+      success: true,
+      message: nextLocked ? 'Audit Freeze activated for this accreditation' : 'Audit Freeze lifted for this accreditation',
+      data: {
+        ...ev,
+        islocked: nextLocked,
+        lockedat: lockedAt,
+        lockedby: lockedBy
+      }
+    });
+  } catch (error) {
+    console.error('Error toggling event lock:', error);
+    return res.status(500).json({ success: false, message: 'Failed to update audit lock state' });
+  }
+};
+
+// Update Event Deadline
+const updateEventDeadline = async (req, res) => {
+  try {
+    await ensureEventColumns();
+    const { id } = req.params;
+    const { deadline } = req.body;
+    const actorId = req.user?.userid ? Number(req.user.userid) : null;
+
+    const [rows] = await db.query('SELECT * FROM Events WHERE eventid = ? LIMIT 1', [id]);
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Event not found' });
+    }
+    const ev = rows[0];
+    const parsedDeadline = deadline && String(deadline).trim() ? new Date(deadline) : null;
+    const validDeadline = parsedDeadline && !isNaN(parsedDeadline.getTime()) ? parsedDeadline.toISOString() : null;
+
+    await db.query(
+      'UPDATE Events SET deadline = ?, updatedat = NOW() WHERE eventid = ?',
+      [validDeadline, id]
+    );
+
+    if (actorId) {
+      try {
+        recordLog(actorId, 'EventDeadlineUpdated', {
+          eventid: Number(id),
+          eventname: ev.eventname,
+          eventcode: ev.eventcode,
+          deadline: validDeadline
+        });
+      } catch (e) {}
+    }
+
+    if (validDeadline) {
+      try {
+        const userIds = await getAssignedUserIdsForEvent(id);
+        if (userIds.length > 0) {
+          const label = ev.eventcode || ev.eventname || 'Accreditation';
+          const formatted = new Date(validDeadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+          await createNotifications({
+            userIds: userIds.filter(uid => uid !== actorId),
+            adminid: actorId,
+            title: `Target Deadline Set: ${label}`,
+            message: `The submission deadline for ${label} has been set to ${formatted}.`,
+            type: 'info',
+            relatedtable: 'events_deadline',
+            relatedid: Number(id)
+          });
+        }
+      } catch (nErr) {
+        console.warn('Notification error on updateEventDeadline:', nErr.message);
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: validDeadline ? 'Submission deadline updated' : 'Submission deadline cleared',
+      data: {
+        ...ev,
+        deadline: validDeadline
+      }
+    });
+  } catch (error) {
+    console.error('Error updating event deadline:', error);
+    return res.status(500).json({ success: false, message: 'Failed to update deadline' });
+  }
+};
+
+// Trigger a manual countdown reminder notification for an event
+const sendEventReminder = async (req, res) => {
+  try {
+    await ensureEventColumns();
+    const { id } = req.params;
+    const actorId = req.user?.userid ? Number(req.user.userid) : null;
+
+    const [rows] = await db.query('SELECT * FROM Events WHERE eventid = ? LIMIT 1', [id]);
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Event not found' });
+    }
+    const ev = rows[0];
+    const userIds = await getAssignedUserIdsForEvent(id);
+    if (userIds.length === 0) {
+      return res.json({
+        success: true,
+        notifiedCount: 0,
+        message: 'No personnel or office heads are currently assigned to this accreditation.'
+      });
+    }
+
+    const label = ev.eventcode || ev.eventname || 'Accreditation';
+    let deadlineNote = 'Please review your assigned compliance standards and upload any pending documents.';
+    
+    // Check if event has already reached 100% compliance
+    let isFullyComplied = false;
+    try {
+      const [[compRow]] = await db.query(`
+        SELECT 
+          COUNT(cso.id) AS total,
+          SUM(CASE WHEN cso.Status = 5 THEN 1 ELSE 0 END) AS complied
+        FROM offices o
+        JOIN compliancestatusoffices cso ON o.officeid = cso.officeid
+        WHERE o.eventid = ?
+      `, [id]);
+      if (compRow && Number(compRow.total) > 0 && Number(compRow.total) === Number(compRow.complied)) {
+        isFullyComplied = true;
+      }
+    } catch (e) {}
+
+    if (isFullyComplied) {
+      deadlineNote = `${label} has reached 100% compliance! All required standards and evidence documents have been satisfied.`;
+    } else if (ev.deadline) {
+      const d = new Date(ev.deadline);
+      if (!isNaN(d.getTime())) {
+        const now = new Date();
+        const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const deadlineMidnight = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        const diffDays = Math.round((deadlineMidnight.getTime() - todayMidnight.getTime()) / (1000 * 60 * 60 * 24));
+        const formatted = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        if (diffDays < 0) {
+          deadlineNote = `The target deadline (${formatted}) has passed by ${Math.abs(diffDays)} day${Math.abs(diffDays) === 1 ? '' : 's'}. Immediate submission of remaining documents is required.`;
+        } else if (diffDays === 0) {
+          deadlineNote = `Submissions are due TODAY (${formatted}). Please finalize all pending files.`;
+        } else {
+          deadlineNote = `${diffDays} day${diffDays === 1 ? '' : 's'} remaining until the ${formatted} deadline. Please complete your assigned evidence uploads.`;
+        }
+      }
+    }
+
+    await createNotifications({
+      userIds,
+      adminid: actorId,
+      title: `Compliance Reminder: ${label}`,
+      message: deadlineNote,
+      type: 'warning',
+      relatedtable: 'events_reminder',
+      relatedid: Number(id)
+    });
+
+    await db.query('UPDATE Events SET lastreminderdate = CURRENT_DATE WHERE eventid = ?', [id]);
+
+    return res.json({
+      success: true,
+      notifiedCount: userIds.length,
+      message: `Countdown reminder sent to ${userIds.length} assigned personnel.`
+    });
+  } catch (error) {
+    console.error('Error sending event reminder:', error);
+    return res.status(500).json({ success: false, message: 'Failed to send reminder' });
   }
 };
 
@@ -766,6 +1133,9 @@ module.exports = {
   addEvent,
   deleteEvents,
   updateEvent,
+  toggleEventLock,
+  updateEventDeadline,
+  sendEventReminder,
   getDownloadableFolders,
   downloadEventZip,
   copyEvent,

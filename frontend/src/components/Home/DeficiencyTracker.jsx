@@ -25,7 +25,7 @@ import SmartUserAvatar from "../UI/SmartUserAvatar";
 const sortOptions = [
     { value: "lowest_compliance", label: "Lowest Compliance" },
     { value: "highest_deficiencies", label: "Most Deficiencies" },
-    { value: "name_asc", label: "Name (A–Z)" },
+    { value: "name_asc", label: "Name (A-Z)" },
 ];
 
 export default function DeficiencyTracker({
@@ -296,13 +296,14 @@ export default function DeficiencyTracker({
             const req = requirementMap[reqId] || {};
             const critId = String(req.criteriaid ?? "");
             const crit = criteriaMap[critId] || {};
-            const areaId = String(crit.areaid ?? req.areaid ?? "");
+            const parentCrit = crit.parentcriteriaid ? (criteriaMap[String(crit.parentcriteriaid)] || {}) : {};
+            const areaId = String(crit.areaid ?? parentCrit.areaid ?? req.areaid ?? "");
             const area = areaMap[areaId] || {};
 
             const reqCode = req.requirementcode || req.req_code || req.code || `REQ-${reqId}`;
-            const reqDesc = req.description || req.RequirementName || req.requirementname || `Standard #${reqId}`;
+            const reqDesc = req.description || req.Description || req.RequirementName || req.requirementname || `Standard #${reqId}`;
             const criteriaCode = crit.criteriacode || crit.criterianame || req.criteriacode || "";
-            const areaCode = area.areaname || area.areacode || req.areaname || req.areacode || (crit.areaid ? `Area ${crit.areaid}` : "");
+            const areaCode = area.areaname || area.areacode || req.areaname || req.areacode || (areaId ? `Area ${areaId}` : "");
 
             // Build evaluated offices list for this requirement
             const officesList = [];
@@ -480,17 +481,15 @@ export default function DeficiencyTracker({
     const filteredAndSortedOffices = useMemo(() => {
         let result = eventFilteredOffices.filter((unit) => {
             if (activeTab === "deficiencies") {
-                if (unit.percent === 100 && unit.totalrequirements > 0) return false;
+                if (unit.totalrequirements === 0 || unit.percent === 100) return false;
             } else if (activeTab === "critical") {
-                if (unit.percent >= 50 || (unit.percent === 100 && unit.totalrequirements > 0)) return false;
+                if (unit.totalrequirements === 0 || unit.percent >= 50) return false;
             } else if (activeTab === "moderate") {
-                if (unit.percent < 50 || unit.percent >= 100) return false;
+                if (unit.totalrequirements === 0 || unit.percent < 50 || unit.percent >= 100) return false;
             } else if (activeTab === "academic") {
-                if (!unit.isAcademic) return false;
-                if (unit.percent === 100 && unit.totalrequirements > 0) return false;
+                if (!unit.isAcademic || unit.totalrequirements === 0 || unit.percent === 100) return false;
             } else if (activeTab === "non_academic") {
-                if (unit.isAcademic) return false;
-                if (unit.percent === 100 && unit.totalrequirements > 0) return false;
+                if (unit.isAcademic || unit.totalrequirements === 0 || unit.percent === 100) return false;
             }
 
             if (searchTerm.trim()) {
@@ -566,315 +565,338 @@ export default function DeficiencyTracker({
     };
 
     return (
-        <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all">
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-all">
             {/* Top Header & Main Mode Toggle Switcher */}
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between border-b border-slate-100 pb-4">
-                <div>
-                    <div className="flex items-center gap-2.5">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 border border-blue-100 shadow-sm">
-                            <FileText size={20} />
-                        </div>
-                        <div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <h2 className="text-xl font-bold text-slate-800">
-                                    {mainViewMode === "standards" ? "Detailed Standards Compliance Tracker" : "Programs & Offices Compliance Tracker"}
-                                </h2>
-                                {standardKPIs.notComplied > 0 && mainViewMode === "standards" && (
-                                    <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-bold text-rose-700">
-                                        <AlertTriangle size={12} /> {standardKPIs.notComplied} Missing Standard(s)
-                                    </span>
-                                )}
-                            </div>
-                            <p className="text-xs text-slate-500 mt-0.5">
-                                {mainViewMode === "standards"
-                                    ? "Track standard-by-standard progress (e.g. A.1, B.7) and assigned personnel across each accreditation event."
-                                    : "Monitor program and office unit-level compliance scores and deficiencies."}
-                            </p>
-                        </div>
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between border-b border-slate-100 pb-4">
+                <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <h2 className="text-base font-bold text-slate-900">
+                            {mainViewMode === "standards" ? "Detailed Standards Compliance Tracker" : "Programs & Offices Compliance Tracker"}
+                        </h2>
+                        {standardKPIs.notComplied > 0 && mainViewMode === "standards" && (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-[11px] font-semibold text-rose-700">
+                                <AlertTriangle size={11} className="shrink-0" />
+                                {standardKPIs.notComplied} {standardKPIs.notComplied === 1 ? "Deficient Standard" : "Deficient Standards"}
+                            </span>
+                        )}
                     </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                        {mainViewMode === "standards"
+                            ? "Standard-by-standard readiness across accreditation areas and assigned offices"
+                            : "Unit-level compliance scores and deficiency breakdown across programs and offices"}
+                    </p>
                 </div>
 
                 {/* Right Actions: View Mode Switcher + Refresh */}
                 <div className="flex items-center gap-2 flex-wrap self-start lg:self-center">
-                    <div className="flex items-center rounded-xl bg-slate-100 p-1 border border-slate-200">
+                    <div className="inline-flex items-center rounded-lg bg-slate-100 p-0.5 border border-slate-200/80">
                         <button
+                            type="button"
                             onClick={() => {
                                 setMainViewMode("standards");
                                 setCurrentPage(1);
                             }}
-                            className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-bold transition cursor-pointer ${
+                            className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition cursor-pointer ${
                                 mainViewMode === "standards"
-                                    ? "bg-white text-blue-700 shadow-xs border border-slate-200/60"
+                                    ? "bg-white text-blue-600 shadow-2xs"
                                     : "text-slate-600 hover:text-slate-900"
                             }`}
                         >
-                            <FileText size={14} /> Standards Matrix
+                            <FileText size={13} />
+                            <span>Standards Matrix</span>
                         </button>
                         <button
+                            type="button"
                             onClick={() => {
                                 setMainViewMode("offices");
                                 setCurrentPage(1);
                             }}
-                            className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-bold transition cursor-pointer ${
+                            className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition cursor-pointer ${
                                 mainViewMode === "offices"
-                                    ? "bg-white text-blue-700 shadow-xs border border-slate-200/60"
+                                    ? "bg-white text-blue-600 shadow-2xs"
                                     : "text-slate-600 hover:text-slate-900"
                             }`}
                         >
-                            <Building2 size={14} /> Programs & Offices
+                            <Building2 size={13} />
+                            <span>Programs &amp; Offices</span>
                         </button>
                     </div>
 
                     {onRefresh && (
                         <button
+                            type="button"
                             onClick={onRefresh}
                             title="Refresh data"
-                            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition shadow-sm cursor-pointer"
+                            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition cursor-pointer"
                         >
-                            <RefreshCw size={13} /> Refresh
+                            <RefreshCw size={13} />
+                            <span>Refresh</span>
                         </button>
                     )}
                 </div>
             </div>
 
-            {/* Accreditation Events Pill Tabs Bar */}
-            {events.length > 0 && (
-                <div className="mt-3.5 flex items-center gap-2 overflow-x-auto pb-1 app-list-scroll">
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1">
-                        Accreditation:
-                    </span>
-                    {events.map((ev) => {
-                        const isSelected = String(ev.eventid) === String(selectedEventFilter);
-                        return (
-                            <button
-                                key={ev.eventid}
-                                type="button"
-                                onClick={() => handleEventFilterChange(String(ev.eventid))}
-                                className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all cursor-pointer shrink-0 border ${
-                                    isSelected
-                                        ? "bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-500/20"
-                                        : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300"
-                                }`}
-                            >
-                                <ShieldCheck size={14} className={isSelected ? "text-white" : "text-blue-600"} />
-                                <span>{ev.eventcode || ev.eventname}</span>
-                            </button>
-                        );
-                    })}
-                </div>
-            )}
+            {/* Unified Toolbar: Accreditation Event Pills + Search & Filter */}
+            <div className="mt-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                {/* Accreditation Events Pill Tabs */}
+                {events.length > 0 ? (
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0 app-list-scroll">
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1">
+                            Accreditation:
+                        </span>
+                        {events.map((ev) => {
+                            const isSelected = String(ev.eventid) === String(selectedEventFilter);
+                            return (
+                                <button
+                                    key={ev.eventid}
+                                    type="button"
+                                    onClick={() => handleEventFilterChange(String(ev.eventid))}
+                                    className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-all cursor-pointer shrink-0 border ${
+                                        isSelected
+                                            ? "bg-blue-600 text-white border-blue-600 shadow-2xs"
+                                            : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300"
+                                    }`}
+                                >
+                                    <ShieldCheck size={13} className={isSelected ? "text-white" : "text-blue-600"} />
+                                    <span>{ev.eventcode || ev.eventname}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                ) : <div />}
 
-            {/* VIEW MODE 1: STANDARD-BY-STANDARD MATRIX (USER PREFERRED) */}
+                {/* Right: Search Input + Status / Sort Dropdown */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                    <div className="relative flex-1 sm:w-72 md:w-80">
+                        <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                            type="text"
+                            placeholder={mainViewMode === "standards" ? "Search code, standard title, or office..." : "Search program, office, or personnel..."}
+                            value={searchTerm}
+                            onChange={(e) => {
+                                setSearchTerm(e.target.value);
+                                setCurrentPage(1);
+                            }}
+                            className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50/60 pl-9 pr-8 text-xs text-slate-800 placeholder-slate-400 transition focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none"
+                        />
+                        {searchTerm && (
+                            <button
+                                type="button"
+                                onClick={() => setSearchTerm("")}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                            >
+                                <X size={13} />
+                            </button>
+                        )}
+                    </div>
+
+                    {mainViewMode === "standards" ? (
+                        <CustomDropdown
+                            value={standardStatusFilter}
+                            onChange={(val) => {
+                                setStandardStatusFilter(val);
+                                setCurrentPage(1);
+                            }}
+                            options={[
+                                { value: "all", label: `All Statuses (${standardKPIs.total})`, dot: "bg-blue-500" },
+                                { value: "not_complied", label: `Not Complied (${standardKPIs.notComplied})`, dot: "bg-rose-500" },
+                                { value: "partial", label: `Partially Complied (${standardKPIs.partial})`, dot: "bg-amber-500" },
+                                { value: "complied", label: `Fully Complied (${standardKPIs.complied})`, dot: "bg-emerald-500" },
+                            ]}
+                            className="w-full sm:w-48"
+                            size="sm"
+                        />
+                    ) : (
+                        <CustomDropdown
+                            options={sortOptions}
+                            value={sortBy}
+                            onChange={(val) => setSortBy(val)}
+                            className="w-full sm:w-44 text-xs font-semibold"
+                            size="sm"
+                        />
+                    )}
+                </div>
+            </div>
+
+            {/* VIEW MODE 1: STANDARD-BY-STANDARD MATRIX */}
             {mainViewMode === "standards" && (
                 <div className="mt-4 space-y-4">
-                    {/* Top KPI Cards for Standards */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        <div
+                    {/* Restrained KPI Filter Cards */}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                        <button
+                            type="button"
                             onClick={() => {
                                 setStandardStatusFilter("all");
                                 setCurrentPage(1);
                             }}
-                            className={`cursor-pointer rounded-xl border p-3.5 transition-all ${
+                            className={`text-left cursor-pointer rounded-xl border p-3.5 transition-all ${
                                 standardStatusFilter === "all"
-                                    ? "border-blue-500 bg-blue-50/90 shadow-sm ring-2 ring-blue-500/20"
-                                    : "border-slate-200 bg-slate-50/70 hover:bg-slate-100"
+                                    ? "border-blue-600 bg-blue-50/30 ring-2 ring-blue-500/15"
+                                    : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60"
                             }`}
                         >
                             <div className="flex items-center justify-between">
-                                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700">Total Standards</span>
-                                <FileText size={15} className="text-slate-500" />
+                                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Total Standards</span>
+                                <span className="h-2 w-2 rounded-full bg-blue-500" />
                             </div>
-                            <p className="mt-1.5 text-2xl font-bold text-slate-900">{standardKPIs.total}</p>
-                            <p className="text-[10px] text-slate-500 mt-0.5">Under current event</p>
-                        </div>
+                            <div className="mt-1 flex items-baseline gap-2">
+                                <span className="text-2xl font-extrabold tracking-tight text-slate-900">{standardKPIs.total}</span>
+                                <span className="text-[11px] text-slate-400">in event</span>
+                            </div>
+                        </button>
 
-                        <div
+                        <button
+                            type="button"
                             onClick={() => {
                                 setStandardStatusFilter("not_complied");
                                 setCurrentPage(1);
                             }}
-                            className={`cursor-pointer rounded-xl border p-3.5 transition-all ${
+                            className={`text-left cursor-pointer rounded-xl border p-3.5 transition-all ${
                                 standardStatusFilter === "not_complied"
-                                    ? "border-rose-500 bg-rose-50/90 shadow-sm ring-2 ring-rose-500/20"
-                                    : "border-rose-200 bg-rose-50/40 hover:bg-rose-50/70"
+                                    ? "border-rose-500 bg-rose-50/30 ring-2 ring-rose-500/15"
+                                    : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60"
                             }`}
                         >
                             <div className="flex items-center justify-between">
-                                <span className="text-[11px] font-bold uppercase tracking-wider text-rose-700">Not Complied</span>
-                                <AlertTriangle size={15} className="text-rose-500" />
+                                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Not Complied</span>
+                                <span className="h-2 w-2 rounded-full bg-rose-500" />
                             </div>
-                            <p className="mt-1.5 text-2xl font-bold text-rose-800">{standardKPIs.notComplied}</p>
-                            <p className="text-[10px] text-rose-600 font-semibold mt-0.5">Missing evidence / Action needed</p>
-                        </div>
+                            <div className="mt-1 flex items-baseline gap-2">
+                                <span className="text-2xl font-extrabold tracking-tight text-rose-600">{standardKPIs.notComplied}</span>
+                                <span className="text-[11px] text-slate-400">needs evidence</span>
+                            </div>
+                        </button>
 
-                        <div
+                        <button
+                            type="button"
                             onClick={() => {
                                 setStandardStatusFilter("partial");
                                 setCurrentPage(1);
                             }}
-                            className={`cursor-pointer rounded-xl border p-3.5 transition-all ${
+                            className={`text-left cursor-pointer rounded-xl border p-3.5 transition-all ${
                                 standardStatusFilter === "partial"
-                                    ? "border-amber-500 bg-amber-50/90 shadow-sm ring-2 ring-amber-500/20"
-                                    : "border-amber-200 bg-amber-50/40 hover:bg-amber-50/70"
+                                    ? "border-amber-500 bg-amber-50/30 ring-2 ring-amber-500/15"
+                                    : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60"
                             }`}
                         >
                             <div className="flex items-center justify-between">
-                                <span className="text-[11px] font-bold uppercase tracking-wider text-amber-700">Partially Complied</span>
-                                <AlertCircle size={15} className="text-amber-500" />
+                                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Partially Complied</span>
+                                <span className="h-2 w-2 rounded-full bg-amber-500" />
                             </div>
-                            <p className="mt-1.5 text-2xl font-bold text-amber-800">{standardKPIs.partial}</p>
-                            <p className="text-[10px] text-amber-600 mt-0.5">Pending review or uploads</p>
-                        </div>
+                            <div className="mt-1 flex items-baseline gap-2">
+                                <span className="text-2xl font-extrabold tracking-tight text-amber-600">{standardKPIs.partial}</span>
+                                <span className="text-[11px] text-slate-400">in progress</span>
+                            </div>
+                        </button>
 
-                        <div
+                        <button
+                            type="button"
                             onClick={() => {
                                 setStandardStatusFilter("complied");
                                 setCurrentPage(1);
                             }}
-                            className={`cursor-pointer rounded-xl border p-3.5 transition-all ${
+                            className={`text-left cursor-pointer rounded-xl border p-3.5 transition-all ${
                                 standardStatusFilter === "complied"
-                                    ? "border-emerald-500 bg-emerald-50/90 shadow-sm ring-2 ring-emerald-500/20"
-                                    : "border-emerald-200 bg-emerald-50/40 hover:bg-emerald-50/70"
+                                    ? "border-emerald-500 bg-emerald-50/30 ring-2 ring-emerald-500/15"
+                                    : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60"
                             }`}
                         >
                             <div className="flex items-center justify-between">
-                                <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">Fully Complied</span>
-                                <CheckCircle2 size={15} className="text-emerald-500" />
+                                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Fully Complied</span>
+                                <span className="h-2 w-2 rounded-full bg-emerald-500" />
                             </div>
-                            <p className="mt-1.5 text-2xl font-bold text-emerald-800">{standardKPIs.complied}</p>
-                            <p className="text-[10px] text-emerald-600 mt-0.5">Requirements met</p>
-                        </div>
-                    </div>
-
-                    {/* Filter Bar */}
-                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-50/80 p-3 rounded-xl border border-slate-200">
-                        {/* Search Input */}
-                        <div className="relative w-full sm:w-72">
-                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <input
-                                type="text"
-                                placeholder="Search standard (e.g. A.1, B.7), title, program..."
-                                value={searchTerm}
-                                onChange={(e) => {
-                                    setSearchTerm(e.target.value);
-                                    setCurrentPage(1);
-                                }}
-                                className="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
-                            />
-                            {searchTerm && (
-                                <button
-                                    onClick={() => setSearchTerm("")}
-                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                                >
-                                    <X size={12} />
-                                </button>
-                            )}
-                        </div>
-
-                        {/* Status Filter */}
-                        <div className="flex items-center gap-2 w-full sm:w-auto">
-                            <CustomDropdown
-                                value={standardStatusFilter}
-                                onChange={(val) => {
-                                    setStandardStatusFilter(val);
-                                    setCurrentPage(1);
-                                }}
-                                options={[
-                                    { value: "all", label: `All Statuses (${standardKPIs.total})`, dot: "bg-blue-500" },
-                                    { value: "not_complied", label: `Not Complied (${standardKPIs.notComplied})`, dot: "bg-rose-500" },
-                                    { value: "partial", label: `Partially Complied (${standardKPIs.partial})`, dot: "bg-amber-500" },
-                                    { value: "complied", label: `Fully Complied (${standardKPIs.complied})`, dot: "bg-emerald-500" },
-                                ]}
-                                className="w-56"
-                                size="sm"
-                            />
-                        </div>
+                            <div className="mt-1 flex items-baseline gap-2">
+                                <span className="text-2xl font-extrabold tracking-tight text-emerald-600">{standardKPIs.complied}</span>
+                                <span className="text-[11px] text-slate-400">verified</span>
+                            </div>
+                        </button>
                     </div>
 
                     {/* Standard-by-Standard Data Table */}
-                    <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-2xs">
+                    <div className="overflow-x-auto rounded-xl border border-slate-200">
                         <table className="w-full text-left text-xs text-slate-700">
-                            <thead className="bg-slate-50 border-b border-slate-200 font-bold uppercase tracking-wider text-[11px] text-slate-500">
+                            <thead className="bg-slate-50/90 border-b border-slate-200 font-semibold uppercase tracking-wider text-[11px] text-slate-500">
                                 <tr>
-                                    <th className="px-4 py-3">Standard Code</th>
-                                    <th className="px-4 py-3">Standard Title & Scope</th>
-                                    <th className="px-4 py-3">Program / Office</th>
-                                    <th className="px-4 py-3">% Progress</th>
-                                    <th className="px-4 py-3">Compliance Status</th>
+                                    <th className="px-4 py-3 w-28">Code</th>
+                                    <th className="px-4 py-3">Standard Title &amp; Scope</th>
+                                    <th className="px-4 py-3 w-56">Program / Office</th>
+                                    <th className="px-4 py-3 w-44">Progress</th>
+                                    <th className="px-4 py-3 w-40">Status</th>
+                                    <th className="px-4 py-3 w-24 text-right">Action</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 bg-white">
                                 {paginatedStandardRows.length === 0 ? (
                                     <tr>
-                                        <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
-                                            No standards found matching current filters.
+                                        <td colSpan={6} className="px-4 py-10 text-center text-slate-400">
+                                            No standards found matching the current filters.
                                         </td>
                                     </tr>
                                 ) : (
                                     paginatedStandardRows.map((row) => (
-                                        <tr key={row.id} className="hover:bg-slate-50/80 transition-colors">
+                                        <tr key={row.id} className="hover:bg-slate-50/70 transition-colors">
                                             {/* Standard Code */}
-                                            <td className="px-4 py-3 font-mono font-bold whitespace-nowrap">
-                                                <span className="inline-flex items-center rounded-md bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 border border-blue-200/60 shadow-2xs">
+                                            <td className="px-4 py-3.5 font-mono font-bold whitespace-nowrap align-middle">
+                                                <span className="inline-flex items-center rounded-md bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 border border-blue-200/70">
                                                     {row.reqCode}
                                                 </span>
                                             </td>
 
                                             {/* Standard Title & Scope */}
-                                            <td className="px-4 py-3 min-w-[240px]">
-                                                <p className="font-bold text-slate-900 line-clamp-2" title={row.reqDesc}>
+                                            <td className="px-4 py-3.5 min-w-[240px] align-middle">
+                                                <p className="font-semibold text-slate-900 line-clamp-2 leading-snug" title={row.reqDesc}>
                                                     {row.reqDesc}
                                                 </p>
                                                 {(row.criteriaCode || row.areaCode) && (
-                                                    <p className="text-[10px] text-slate-500 mt-0.5 truncate">
-                                                        {row.areaCode && <span className="font-semibold text-slate-600">{row.areaCode}</span>}
-                                                        {row.areaCode && row.criteriaCode && <span> &bull; </span>}
+                                                    <p className="text-[11px] text-slate-500 mt-0.5 truncate">
+                                                        {row.areaCode && <span className="font-medium text-slate-600">{row.areaCode}</span>}
+                                                        {row.areaCode && row.criteriaCode && <span className="mx-1 text-slate-300">&bull;</span>}
                                                         {row.criteriaCode && <span>{row.criteriaCode}</span>}
                                                     </p>
                                                 )}
                                             </td>
 
                                             {/* Program / Office */}
-                                            <td className="px-4 py-3 min-w-[160px]">
+                                            <td className="px-4 py-3.5 min-w-[180px] align-middle">
                                                 {row.officesList.length === 1 ? (
-                                                    <div>
-                                                        <p className="font-bold text-slate-900 line-clamp-1" title={row.officesList[0].office?.officename}>
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className="font-semibold text-slate-900 truncate max-w-[140px]" title={row.officesList[0].office?.officename}>
                                                             {row.officesList[0].office?.officename}
-                                                        </p>
-                                                        <span className={`inline-block text-[9px] font-bold px-1.5 py-0.5 rounded mt-0.5 ${
+                                                        </span>
+                                                        <span className={`inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
                                                             row.officesList[0].office?.isAcademic
-                                                                ? "bg-purple-50 text-purple-700 border border-purple-200/60"
+                                                                ? "bg-blue-50 text-blue-700 border-blue-200/60"
                                                                 : "bg-slate-100 text-slate-600 border border-slate-200"
                                                         }`}>
-                                                            {row.officesList[0].office?.categoryName || "Office"}
+                                                            {row.officesList[0].office?.isAcademic ? "Academic" : "Non-Academic"}
                                                         </span>
                                                     </div>
                                                 ) : row.officesList.length > 1 ? (
                                                     <div>
-                                                        <p className="font-bold text-slate-800 text-xs">
+                                                        <p className="font-semibold text-slate-900 text-xs">
                                                             {row.officesList.length} Units Evaluated
                                                         </p>
-                                                        <p className="text-[10px] text-slate-500 mt-0.5 truncate" title={row.officesList.map((o) => o.office?.officename).filter(Boolean).join(", ")}>
+                                                        <p className="text-[11px] text-slate-500 mt-0.5 truncate max-w-[200px]" title={row.officesList.map((o) => o.office?.officename).filter(Boolean).join(", ")}>
                                                             {row.officesList.slice(0, 2).map((o) => o.office?.officename).filter(Boolean).join(", ")}
                                                             {row.officesList.length > 2 && ` +${row.officesList.length - 2} more`}
                                                         </p>
                                                     </div>
                                                 ) : (
-                                                    <span className="text-slate-400 text-xs italic">All Units</span>
+                                                    <span className="text-slate-400 text-xs">All Units</span>
                                                 )}
                                             </td>
 
-                                            {/* % Progress (Replacing Assigned Personnel) */}
-                                            <td className="px-4 py-3 min-w-[140px]">
-                                                <div className="flex items-center justify-between gap-2 mb-1">
+                                            {/* Progress */}
+                                            <td className="px-4 py-3.5 min-w-[150px] align-middle">
+                                                <div className="flex items-center justify-between gap-2 mb-1.5">
                                                     <span className="text-xs font-bold text-slate-800">
                                                         {row.percent}%
                                                     </span>
-                                                    <span className="text-[10px] font-semibold text-slate-500">
-                                                        {row.compliedCount}/{row.totalUnits} Met
+                                                    <span className="text-[11px] font-medium text-slate-500">
+                                                        {row.compliedCount}/{row.totalUnits} met
                                                     </span>
                                                 </div>
-                                                <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                                                <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200/80">
                                                     <div
                                                         className={`h-full rounded-full transition-all duration-300 ${
                                                             row.percent === 100
@@ -891,13 +913,29 @@ export default function DeficiencyTracker({
                                             </td>
 
                                             {/* Compliance Status */}
-                                            <td className="px-4 py-3 whitespace-nowrap">
-                                                <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-bold ${row.statusBadgeClass}`}>
-                                                    {row.statusKey === "complied" && <CheckCircle2 size={12} className="text-emerald-600" />}
-                                                    {row.statusKey === "partial" && <AlertCircle size={12} className="text-amber-600" />}
-                                                    {row.statusKey === "not_complied" && <AlertTriangle size={12} className="text-rose-600" />}
+                                            <td className="px-4 py-3.5 whitespace-nowrap align-middle">
+                                                <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${row.statusBadgeClass}`}>
+                                                    {row.statusKey === "complied" && <CheckCircle2 size={12} className="text-emerald-600 shrink-0" />}
+                                                    {row.statusKey === "partial" && <AlertCircle size={12} className="text-amber-600 shrink-0" />}
+                                                    {row.statusKey === "not_complied" && <AlertTriangle size={12} className="text-rose-600 shrink-0" />}
                                                     <span>{row.statusLabel}</span>
                                                 </span>
+                                            </td>
+
+                                            {/* Action */}
+                                            <td className="px-4 py-3.5 whitespace-nowrap text-right align-middle">
+                                                {row.firstDeficientOffice && onInspectOffice ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => onInspectOffice(row.firstDeficientOffice)}
+                                                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-blue-600 hover:border-blue-200 transition cursor-pointer"
+                                                    >
+                                                        <Eye size={12} />
+                                                        <span>Inspect</span>
+                                                    </button>
+                                                ) : (
+                                                    <span className="text-slate-300 text-xs">-</span>
+                                                )}
                                             </td>
                                         </tr>
                                     ))
@@ -911,113 +949,92 @@ export default function DeficiencyTracker({
             {/* VIEW MODE 2: PROGRAM & OFFICE CARDS VIEW */}
             {mainViewMode === "offices" && (
                 <div className="mt-4 space-y-4">
-                    {/* Top Stat Cards - 5 Columns */}
+                    {/* Restrained Stat Filter Cards - 5 Columns */}
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-                        <div
+                        <button
+                            type="button"
                             onClick={() => setActiveTab("deficiencies")}
-                            className={`cursor-pointer rounded-xl border p-3.5 transition-all ${
+                            className={`text-left cursor-pointer rounded-xl border p-3.5 transition-all ${
                                 activeTab === "deficiencies"
-                                    ? "border-blue-500 bg-blue-50/90 shadow-sm ring-2 ring-blue-500/20"
-                                    : "border-slate-200 bg-slate-50/70 hover:bg-slate-100"
+                                    ? "border-blue-600 bg-blue-50/30 ring-2 ring-blue-500/15"
+                                    : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60"
                             }`}
                         >
                             <div className="flex items-center justify-between">
-                                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700">All Deficiencies</span>
-                                <AlertTriangle size={15} className="text-slate-500" />
+                                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">All Deficiencies</span>
+                                <span className="h-2 w-2 rounded-full bg-blue-500" />
                             </div>
-                            <p className="mt-1.5 text-2xl font-bold text-slate-900">{kpis.deficientUnits}</p>
-                            <p className="text-[10px] text-slate-500 mt-0.5">{kpis.totalDeficientItems} total unmet items</p>
-                        </div>
+                            <p className="mt-1 text-2xl font-extrabold tracking-tight text-slate-900">{kpis.deficientUnits}</p>
+                            <p className="text-[11px] text-slate-400 mt-0.5">{kpis.totalDeficientItems} unmet items</p>
+                        </button>
 
-                        <div
+                        <button
+                            type="button"
                             onClick={() => setActiveTab("critical")}
-                            className={`cursor-pointer rounded-xl border p-3.5 transition-all ${
+                            className={`text-left cursor-pointer rounded-xl border p-3.5 transition-all ${
                                 activeTab === "critical"
-                                    ? "border-rose-500 bg-rose-50/90 shadow-sm ring-2 ring-rose-500/20"
-                                    : "border-rose-100 bg-rose-50/40 hover:bg-rose-50/70"
+                                    ? "border-rose-500 bg-rose-50/30 ring-2 ring-rose-500/15"
+                                    : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60"
                             }`}
                         >
                             <div className="flex items-center justify-between">
-                                <span className="text-[11px] font-bold uppercase tracking-wider text-rose-700">Critical (&lt;50%)</span>
-                                <AlertCircle size={15} className="text-rose-500" />
+                                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Critical (&lt;50%)</span>
+                                <span className="h-2 w-2 rounded-full bg-rose-500" />
                             </div>
-                            <p className="mt-1.5 text-2xl font-bold text-rose-800">{kpis.criticalCount}</p>
-                            <p className="text-[10px] text-rose-600 mt-0.5">Urgent compliance needed</p>
-                        </div>
+                            <p className="mt-1 text-2xl font-extrabold tracking-tight text-rose-600">{kpis.criticalCount}</p>
+                            <p className="text-[11px] text-slate-400 mt-0.5">Urgent action</p>
+                        </button>
 
-                        <div
+                        <button
+                            type="button"
                             onClick={() => setActiveTab("moderate")}
-                            className={`cursor-pointer rounded-xl border p-3.5 transition-all ${
+                            className={`text-left cursor-pointer rounded-xl border p-3.5 transition-all ${
                                 activeTab === "moderate"
-                                    ? "border-amber-500 bg-amber-50/90 shadow-sm ring-2 ring-amber-500/20"
-                                    : "border-amber-100 bg-amber-50/40 hover:bg-amber-50/70"
+                                    ? "border-amber-500 bg-amber-50/30 ring-2 ring-amber-500/15"
+                                    : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60"
                             }`}
                         >
                             <div className="flex items-center justify-between">
-                                <span className="text-[11px] font-bold uppercase tracking-wider text-amber-700">In Progress (50-99%)</span>
-                                <AlertCircle size={15} className="text-amber-500" />
+                                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">In Progress (50-99%)</span>
+                                <span className="h-2 w-2 rounded-full bg-amber-500" />
                             </div>
-                            <p className="mt-1.5 text-2xl font-bold text-amber-800">{kpis.moderateCount}</p>
-                            <p className="text-[10px] text-amber-600 mt-0.5">Near completion</p>
-                        </div>
+                            <p className="mt-1 text-2xl font-extrabold tracking-tight text-amber-600">{kpis.moderateCount}</p>
+                            <p className="text-[11px] text-slate-400 mt-0.5">Near completion</p>
+                        </button>
 
-                        <div
+                        <button
+                            type="button"
                             onClick={() => setActiveTab("academic")}
-                            className={`cursor-pointer rounded-xl border p-3.5 transition-all ${
+                            className={`text-left cursor-pointer rounded-xl border p-3.5 transition-all ${
                                 activeTab === "academic"
-                                    ? "border-purple-500 bg-purple-50/90 shadow-sm ring-2 ring-purple-500/20"
-                                    : "border-purple-100 bg-purple-50/40 hover:bg-purple-50/70"
+                                    ? "border-blue-600 bg-blue-50/30 ring-2 ring-blue-500/15"
+                                    : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60"
                             }`}
                         >
                             <div className="flex items-center justify-between">
-                                <span className="text-[11px] font-bold uppercase tracking-wider text-purple-700">Academic Programs</span>
-                                <GraduationCap size={15} className="text-purple-500" />
+                                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Academic Programs</span>
+                                <GraduationCap size={14} className="text-slate-400" />
                             </div>
-                            <p className="mt-1.5 text-2xl font-bold text-purple-800">{kpis.academicDeficientCount}</p>
-                            <p className="text-[10px] text-purple-600 mt-0.5">Deficient programs</p>
-                        </div>
+                            <p className="mt-1 text-2xl font-extrabold tracking-tight text-slate-900">{kpis.academicDeficientCount}</p>
+                            <p className="text-[11px] text-slate-400 mt-0.5">Deficient programs</p>
+                        </button>
 
-                        <div
+                        <button
+                            type="button"
                             onClick={() => setActiveTab("non_academic")}
-                            className={`cursor-pointer rounded-xl border p-3.5 transition-all ${
+                            className={`text-left cursor-pointer rounded-xl border p-3.5 transition-all ${
                                 activeTab === "non_academic"
-                                    ? "border-teal-500 bg-teal-50/90 shadow-sm ring-2 ring-teal-500/20"
-                                    : "border-teal-100 bg-teal-50/40 hover:bg-teal-50/70"
+                                    ? "border-blue-600 bg-blue-50/30 ring-2 ring-blue-500/15"
+                                    : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60"
                             }`}
                         >
                             <div className="flex items-center justify-between">
-                                <span className="text-[11px] font-bold uppercase tracking-wider text-teal-700">Non-Academic</span>
-                                <Building2 size={15} className="text-teal-500" />
+                                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Non-Academic</span>
+                                <Building2 size={14} className="text-slate-400" />
                             </div>
-                            <p className="mt-1.5 text-2xl font-bold text-teal-800">{kpis.nonAcademicDeficientCount}</p>
-                            <p className="text-[10px] text-teal-600 mt-0.5">Deficient offices</p>
-                        </div>
-                    </div>
-
-                    {/* Filter Bar for Office Cards */}
-                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-50/80 p-3 rounded-xl border border-slate-200">
-                        <div className="relative w-full sm:w-72">
-                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <input
-                                type="text"
-                                placeholder="Search program or office..."
-                                value={searchTerm}
-                                onChange={(e) => {
-                                    setSearchTerm(e.target.value);
-                                    setCurrentPage(1);
-                                }}
-                                className="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
-                            />
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                            <CustomDropdown
-                                options={sortOptions}
-                                value={sortBy}
-                                onChange={(val) => setSortBy(val)}
-                                className="w-44 text-xs font-semibold"
-                            />
-                        </div>
+                            <p className="mt-1 text-2xl font-extrabold tracking-tight text-slate-900">{kpis.nonAcademicDeficientCount}</p>
+                            <p className="text-[11px] text-slate-400 mt-0.5">Deficient offices</p>
+                        </button>
                     </div>
 
                     {/* Office Cards Grid */}

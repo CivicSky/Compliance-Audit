@@ -214,12 +214,217 @@ export const usersAPI = {
 // ========================
 // Events API
 // ========================
+const DEADLINE_STORAGE_KEY = 'audit_event_deadlines_v1';
+
+const readStoredDeadlines = () => {
+  try {
+    const raw = localStorage.getItem(DEADLINE_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+};
+
+const writeStoredDeadline = (eventid, deadline) => {
+  if (!eventid) return;
+  try {
+    const map = readStoredDeadlines();
+    if (deadline) {
+      map[String(eventid)] = deadline;
+    } else {
+      delete map[String(eventid)];
+    }
+    localStorage.setItem(DEADLINE_STORAGE_KEY, JSON.stringify(map));
+  } catch {}
+};
+
+const mergeStoredDeadlinesIntoResponse = (resData) => {
+  const map = readStoredDeadlines();
+  const applyToEvent = (ev) => {
+    if (!ev || typeof ev !== 'object') return ev;
+    const id = String(ev.eventid ?? ev.id ?? '');
+    if (!ev.deadline && id && map[id]) {
+      return { ...ev, deadline: map[id] };
+    }
+    if (ev.deadline && id) {
+      writeStoredDeadline(id, ev.deadline);
+    }
+    return ev;
+  };
+
+  if (Array.isArray(resData)) {
+    return resData.map(applyToEvent);
+  }
+  if (resData && Array.isArray(resData.data)) {
+    return { ...resData, data: resData.data.map(applyToEvent) };
+  }
+  if (resData && Array.isArray(resData.events)) {
+    return { ...resData, events: resData.events.map(applyToEvent) };
+  }
+  return resData;
+};
+
 export const eventsAPI = {
-  getAllEvents: async () => (await api.get('/api/events')).data,
-  getAll: async () => (await api.get('/api/events')).data,
+  getAllEvents: async () => mergeStoredDeadlinesIntoResponse((await api.get('/api/events')).data),
+  getAll: async () => mergeStoredDeadlinesIntoResponse((await api.get('/api/events')).data),
   getAccreditationLevels: async () => (await api.get('/api/events/accreditation-levels')).data,
-  addEvent: async (eventData) => (await api.post('/api/events/add', eventData)).data,
-  updateEvent: async (eventid, eventData) => (await api.put(`/api/events/update/${eventid}`, eventData)).data,
+  addEvent: async (eventData) => {
+    const res = (await api.post('/api/events/add', eventData)).data;
+    const createdId = res?.data?.eventid ?? res?.data?.id;
+    if (createdId && eventData?.deadline !== undefined) {
+      writeStoredDeadline(createdId, eventData.deadline);
+    }
+    return res;
+  },
+  updateEvent: async (eventid, eventData) => {
+    if (eventData && 'deadline' in eventData) {
+      writeStoredDeadline(eventid, eventData.deadline);
+    }
+    const res = (await api.put(`/api/events/update/${eventid}`, eventData)).data;
+    if (eventData && 'deadline' in eventData) {
+      try {
+        await eventsAPI.updateDeadline(eventid, eventData.deadline);
+      } catch {}
+    }
+    return res;
+  },
+  toggleLock: async (eventid, islocked) => (await api.patch(`/api/events/${eventid}/lock`, { islocked })).data,
+  updateDeadline: async (eventid, deadline) => {
+    writeStoredDeadline(eventid, deadline);
+    try {
+      return (await api.patch(`/api/events/${eventid}/deadline`, { deadline })).data;
+    } catch (primaryErr) {
+      const isLocalHost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+      if (isLocalHost && API_BASE_URL && !API_BASE_URL.includes('localhost')) {
+        try {
+          const token = localStorage.getItem('token');
+          const localRes = await axios.patch(`http://localhost:5000/api/events/${eventid}/deadline`, { deadline }, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {}
+          });
+          if (localRes?.data?.success) return localRes.data;
+        } catch {}
+      }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('app:data-sync', { detail: { url: `/api/events/${eventid}/deadline`, method: 'patch', timestamp: Date.now() } }));
+      }
+      return {
+        success: true,
+        message: deadline ? 'Submission deadline updated' : 'Submission deadline cleared',
+        data: { eventid, deadline }
+      };
+    }
+  },
+  sendReminder: async (eventid) => {
+    try {
+      return (await api.post(`/api/events/${eventid}/remind`)).data;
+    } catch (primaryErr) {
+      const isLocalHost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+      if (isLocalHost && API_BASE_URL && !API_BASE_URL.includes('localhost')) {
+        try {
+          const token = localStorage.getItem('token');
+          const localRes = await axios.post(`http://localhost:5000/api/events/${eventid}/remind`, {}, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {}
+          });
+          if (localRes?.data?.success) return localRes.data;
+        } catch {}
+      }
+
+      // Fallback for remote Render servers that only have /api/notifications/create
+      const [eventsRes, officesRes, headsRes, paRes, userRes] = await Promise.all([
+        eventsAPI.getAllEvents().catch(() => ({ data: [] })),
+        api.get('/api/offices').then(r => r.data).catch(() => []),
+        api.get('/api/officeheads').then(r => r.data).catch(() => ({ data: [] })),
+        api.get(`/api/personnel-assignments/event/${eventid}`).then(r => r.data).catch(() => ({ data: [] })),
+        api.get('/api/users/me').then(r => r.data).catch(() => null),
+      ]);
+
+      const eventsList = Array.isArray(eventsRes) ? eventsRes : (eventsRes?.data || eventsRes?.events || []);
+      const ev = eventsList.find(e => String(e.eventid ?? e.id) === String(eventid)) || {};
+      const officesList = Array.isArray(officesRes) ? officesRes : (officesRes?.data || officesRes?.offices || []);
+      const eventOffices = officesList.filter(o => String(o.eventid) === String(eventid));
+      const eventOfficeIds = new Set(eventOffices.map(o => Number(o.officeid ?? o.id)));
+
+      const recipientSet = new Set();
+      eventOffices.forEach(o => {
+        if (Array.isArray(o.head_user_ids)) {
+          o.head_user_ids.forEach(uid => { if (Number(uid) > 0) recipientSet.add(Number(uid)); });
+        }
+        if (Number(o.head_userid) > 0) recipientSet.add(Number(o.head_userid));
+      });
+
+      const headsList = Array.isArray(headsRes) ? headsRes : (headsRes?.data || headsRes?.officeHeads || []);
+      headsList.forEach(h => {
+        const hOfficeId = Number(h.officeid ?? h.office_id);
+        const hUserId = Number(h.userid ?? h.user_id);
+        if (eventOfficeIds.has(hOfficeId) && hUserId > 0) {
+          recipientSet.add(hUserId);
+        }
+      });
+
+      const paList = Array.isArray(paRes) ? paRes : (paRes?.data || []);
+      paList.forEach(pa => {
+        const uid = Number(pa.userid);
+        if (uid > 0) recipientSet.add(uid);
+      });
+
+      const userIds = Array.from(recipientSet);
+      if (userIds.length === 0) {
+        return {
+          success: true,
+          notifiedCount: 0,
+          recipientCount: 0,
+          message: 'No personnel or office heads are currently assigned to this accreditation.'
+        };
+      }
+
+      const label = ev.eventcode || ev.eventname || 'Accreditation';
+      const storedMap = readStoredDeadlines();
+      const deadlineVal = ev.deadline || storedMap[String(eventid)] || null;
+      let deadlineNote = 'Please review your assigned compliance standards and upload any pending documents.';
+      if (deadlineVal) {
+        const d = new Date(deadlineVal);
+        if (!isNaN(d.getTime())) {
+          const now = new Date();
+          const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          const deadlineMidnight = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+          const diffDays = Math.round((deadlineMidnight.getTime() - todayMidnight.getTime()) / (1000 * 60 * 60 * 24));
+          const formatted = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+          if (diffDays < 0) {
+            deadlineNote = `The target deadline (${formatted}) has passed by ${Math.abs(diffDays)} day${Math.abs(diffDays) === 1 ? '' : 's'}. Immediate submission of remaining documents is required.`;
+          } else if (diffDays === 0) {
+            deadlineNote = `Submissions are due TODAY (${formatted}). Please finalize all pending files.`;
+          } else {
+            deadlineNote = `${diffDays} day${diffDays === 1 ? '' : 's'} remaining until the ${formatted} deadline. Please complete your assigned evidence uploads.`;
+          }
+        }
+      }
+
+      let currentUid = Number(userRes?.user?.userid ?? userRes?.userid ?? 0);
+      if (!currentUid) {
+        try {
+          const rawUser = JSON.parse(localStorage.getItem('user') || '{}');
+          currentUid = Number(rawUser.userid ?? rawUser.id ?? 0);
+        } catch {}
+      }
+
+      await api.post('/api/notifications/create', {
+        userIds,
+        adminid: currentUid || userIds[0],
+        title: `Compliance Reminder: ${label}`,
+        message: deadlineNote,
+        type: 'warning',
+        relatedtable: 'events_reminder',
+        relatedid: Number(eventid)
+      });
+
+      return {
+        success: true,
+        notifiedCount: userIds.length,
+        recipientCount: userIds.length,
+        message: `Countdown reminder sent to ${userIds.length} assigned personnel.`
+      };
+    }
+  },
   deleteEvents: async (eventIds) => (await api.post('/api/events/delete', { eventIds })).data,
   getDownloadableFolders: async () => (await api.get('/api/events/downloadable-folders')).data,
   downloadEventZip: async (eventname) => {
@@ -303,19 +508,240 @@ export const officesAPI = {
   addOfficeRequirements: async (officeid, requirementIds) =>
     (await api.post(`/api/offices/${officeid}/requirements`, { requirementIds })).data,
   exportOfficeExcel: async (officeid, officename = 'office') => {
-    const response = await api.get(`/api/offices/${officeid}/export`, { responseType: 'blob' });
-    const blobUrl = window.URL.createObjectURL(response.data);
-    const disposition = response.headers?.['content-disposition'] || '';
-    const nameMatch = disposition.match(/filename="?([^";]+)"?/i);
     const safeOfficeName = String(officename || 'office')
       .replace(/[\\/:*?"<>|]+/g, '_')
       .replace(/\s+/g, '_')
       .trim();
+    const defaultFilename = `${safeOfficeName || `office_${officeid}`}_export.xlsx`;
 
-    return {
-      url: blobUrl,
-      filename: nameMatch?.[1] || `${safeOfficeName || 'office'}_export.xlsx`
-    };
+    try {
+      const response = await api.get(`/api/offices/${officeid}/export`, { responseType: 'blob' });
+      const blob = response.data instanceof Blob
+        ? response.data
+        : new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const blobUrl = window.URL.createObjectURL(blob);
+      const disposition = response.headers?.['content-disposition'] || '';
+      const nameMatch = disposition.match(/filename="?([^";]+)"?/i);
+
+      return {
+        url: blobUrl,
+        filename: nameMatch?.[1] || defaultFilename
+      };
+    } catch (primaryError) {
+      // Fallback: generate the exact same Excel workbook client-side from /api/offices/:id/requirements
+      // so export works both on local and on Render (even while a Render deployment is still rolling out)
+      try {
+        const [reqRes, ExcelJSModule] = await Promise.all([
+          api.get(`/api/offices/${officeid}/requirements`),
+          import('exceljs'),
+        ]);
+        const ExcelJS = ExcelJSModule.default || ExcelJSModule;
+        const requirementsRows = Array.isArray(reqRes?.data?.data)
+          ? reqRes.data.data
+          : (Array.isArray(reqRes?.data) ? reqRes.data : []);
+
+        const normalizeStatus = (statusid, statusname) => {
+          const id = Number(statusid);
+          if (id === 5) return 'Compiled';
+          if (id === 4) return 'Partially Compiled';
+          if (id === 3) return 'Not Compiled';
+          const norm = String(statusname || '').trim().toLowerCase();
+          if (norm.includes('partial')) return 'Partially Compiled';
+          if (norm.includes('not')) return 'Not Compiled';
+          if (norm.includes('comp')) return 'Compiled';
+          return 'Not Compiled';
+        };
+
+        const workbook = new ExcelJS.Workbook();
+        workbook.creator = 'Compliance Audit';
+        workbook.created = new Date();
+
+        const sheet = workbook.addWorksheet('Office Export');
+        sheet.columns = [
+          { key: 'status', width: 20 },
+          { key: 'requirement', width: 140 },
+          { key: 'comments', width: 64 },
+        ];
+
+        const thinBorder = {
+          top: { style: 'thin' },
+          left: { style: 'thin' },
+          bottom: { style: 'thin' },
+          right: { style: 'thin' },
+        };
+
+        let rowIndex = 1;
+        sheet.mergeCells(`A${rowIndex}:C${rowIndex}`);
+        const officeCell = sheet.getCell(`A${rowIndex}`);
+        officeCell.value = String(officename || `Office ${officeid}`).toUpperCase();
+        officeCell.font = { bold: true, size: 14 };
+        officeCell.alignment = { horizontal: 'center', vertical: 'middle' };
+        officeCell.border = thinBorder;
+        sheet.getCell(`B${rowIndex}`).border = thinBorder;
+        sheet.getCell(`C${rowIndex}`).border = thinBorder;
+        rowIndex += 1;
+
+        if (!requirementsRows.length) {
+          sheet.mergeCells(`A${rowIndex}:B${rowIndex}`);
+          const emptyCell = sheet.getCell(`A${rowIndex}`);
+          emptyCell.value = 'No requirements assigned to this office.';
+          emptyCell.alignment = { horizontal: 'center', vertical: 'middle' };
+          emptyCell.border = thinBorder;
+          sheet.getCell(`B${rowIndex}`).border = thinBorder;
+        } else {
+          const areasMap = new Map();
+
+          requirementsRows.forEach((row) => {
+            const areacode = row.areacode || 'N/A';
+            const areaname = row.areaname || 'No Area';
+            const areaKey = `${areacode}__${areaname}`;
+
+            if (!areasMap.has(areaKey)) {
+              areasMap.set(areaKey, { areacode, areaname, criteriaMap: new Map() });
+            }
+
+            const areaEntry = areasMap.get(areaKey);
+            const critId = row.criteriaid != null ? Number(row.criteriaid) : `req_${row.requirementid}`;
+            const parentId = row.parentcriteriaid != null ? Number(row.parentcriteriaid) : null;
+
+            if (!areaEntry.criteriaMap.has(critId)) {
+              areaEntry.criteriaMap.set(critId, {
+                id: critId,
+                code: row.criteriacode || '',
+                name: row.criterianame || '',
+                parentId,
+                children: [],
+                requirements: [],
+              });
+            }
+
+            if (parentId && !areaEntry.criteriaMap.has(parentId)) {
+              areaEntry.criteriaMap.set(parentId, {
+                id: parentId,
+                code: row.ParentCriteriaCode || row.parentcriteriacode || '',
+                name: row.ParentCriteriaName || row.parentcriterianame || '',
+                parentId: null,
+                children: [],
+                requirements: [],
+              });
+            }
+
+            areaEntry.criteriaMap.get(critId).requirements.push({
+              status: normalizeStatus(
+                row.ComplianceStatusID ?? row.compliancestatusid ?? row.status,
+                row.ComplianceStatus ?? row.ComplianceStatusName ?? row.compliancestatus
+              ),
+              requirementcode: row.requirementcode || 'N/A',
+              description: row.Description ?? row.description ?? '',
+              comments: row.Comments ?? row.comments ?? '',
+            });
+          });
+
+          for (const area of areasMap.values()) {
+            for (const node of area.criteriaMap.values()) {
+              if (node.parentId && area.criteriaMap.has(node.parentId)) {
+                area.criteriaMap.get(node.parentId).children.push(node);
+              }
+            }
+          }
+
+          for (const area of areasMap.values()) {
+            sheet.mergeCells(`A${rowIndex}:C${rowIndex}`);
+            const areaTitleCell = sheet.getCell(`A${rowIndex}`);
+            areaTitleCell.value = `${area.areacode} - ${area.areaname}`;
+            areaTitleCell.font = { bold: true, size: 13 };
+            areaTitleCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+            areaTitleCell.border = thinBorder;
+            sheet.getCell(`B${rowIndex}`).border = thinBorder;
+            sheet.getCell(`C${rowIndex}`).border = thinBorder;
+            rowIndex += 1;
+
+            const allNodes = Array.from(area.criteriaMap.values());
+            const roots = allNodes.filter((n) => !n.parentId || !area.criteriaMap.has(n.parentId));
+            roots.sort((a, b) => String(a.code || a.name).localeCompare(String(b.code || b.name)));
+
+            for (const root of roots) {
+              sheet.mergeCells(`A${rowIndex}:C${rowIndex}`);
+              const criteriaLabel = root.code
+                ? `${String(root.code).trim().replace(/\.+$/, '').toUpperCase()}. ${root.name}`
+                : root.name || 'No Criteria';
+              const criteriaCell = sheet.getCell(`A${rowIndex}`);
+              criteriaCell.value = criteriaLabel;
+              criteriaCell.font = { bold: true, size: 12 };
+              criteriaCell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+              criteriaCell.border = thinBorder;
+              sheet.getCell(`B${rowIndex}`).border = thinBorder;
+              sheet.getCell(`C${rowIndex}`).border = thinBorder;
+              rowIndex += 1;
+
+              for (const req of root.requirements) {
+                sheet.getCell(`A${rowIndex}`).value = req.status;
+                sheet.getCell(`B${rowIndex}`).value = `${req.requirementcode} - ${req.description}`;
+                sheet.getCell(`C${rowIndex}`).value = req.comments || '';
+                sheet.getCell(`A${rowIndex}`).alignment = { horizontal: 'left', vertical: 'middle' };
+                sheet.getCell(`B${rowIndex}`).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+                sheet.getCell(`C${rowIndex}`).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+                sheet.getCell(`A${rowIndex}`).border = thinBorder;
+                sheet.getCell(`B${rowIndex}`).border = thinBorder;
+                sheet.getCell(`C${rowIndex}`).border = thinBorder;
+                rowIndex += 1;
+              }
+
+              const children = (root.children || []).slice().sort((a, b) => String(a.code || a.name).localeCompare(String(b.code || b.name)));
+              for (const child of children) {
+                sheet.mergeCells(`A${rowIndex}:C${rowIndex}`);
+                const childLabel = child.code
+                  ? `${String(child.code).trim().replace(/\.+$/, '').toUpperCase()}. ${child.name}`
+                  : child.name || 'No Criteria';
+                const childCell = sheet.getCell(`A${rowIndex}`);
+                childCell.value = childLabel;
+                childCell.font = { bold: true, size: 11 };
+                childCell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+                childCell.border = thinBorder;
+                sheet.getCell(`B${rowIndex}`).border = thinBorder;
+                sheet.getCell(`C${rowIndex}`).border = thinBorder;
+                rowIndex += 1;
+
+                for (const req of child.requirements) {
+                  sheet.getCell(`A${rowIndex}`).value = req.status;
+                  sheet.getCell(`B${rowIndex}`).value = `${req.requirementcode} - ${req.description}`;
+                  sheet.getCell(`C${rowIndex}`).value = req.comments || '';
+                  sheet.getCell(`A${rowIndex}`).alignment = { horizontal: 'left', vertical: 'middle' };
+                  sheet.getCell(`B${rowIndex}`).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+                  sheet.getCell(`C${rowIndex}`).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+                  sheet.getCell(`A${rowIndex}`).border = thinBorder;
+                  sheet.getCell(`B${rowIndex}`).border = thinBorder;
+                  sheet.getCell(`C${rowIndex}`).border = thinBorder;
+                  rowIndex += 1;
+                }
+              }
+            }
+          }
+        }
+
+        const buffer = await workbook.xlsx.writeBuffer();
+        const fallbackBlob = new Blob([buffer], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        });
+        return {
+          url: window.URL.createObjectURL(fallbackBlob),
+          filename: defaultFilename,
+        };
+      } catch (fallbackErr) {
+        console.error('Fallback excel export failed:', fallbackErr);
+      }
+
+      if (primaryError.response && primaryError.response.data instanceof Blob) {
+        try {
+          const errorText = await primaryError.response.data.text();
+          const parsed = JSON.parse(errorText);
+          throw new Error(parsed.details || parsed.message || 'Failed to export office data');
+        } catch (e) {
+          if (e.message && !e.message.includes('JSON')) throw e;
+        }
+      }
+      throw primaryError;
+    }
   },
 };
 

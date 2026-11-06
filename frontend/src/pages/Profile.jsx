@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { User, KeyRound, Pencil } from 'lucide-react';
 import { usersAPI } from '../utils/api';
 import EditProfileModal from '../components/EditProfile/EditProfileModal.jsx';
 import ChangePasswordCard from '../components/Profile/ChangePasswordCard.jsx';
@@ -7,7 +8,7 @@ import SmartUserAvatar from '../components/UI/SmartUserAvatar';
 
 function DetailRow({ label, value }) {
 	return (
-		<div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+		<div className="rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-3">
 			<dt className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</dt>
 			<dd className="mt-1 break-words text-sm font-semibold text-slate-900">{value || '-'}</dd>
 		</div>
@@ -25,6 +26,7 @@ function ProfileShell({ children }) {
 export default function Profile() {
 	const [user, setUser] = useState(null);
 	const [modalOpen, setModalOpen] = useState(false);
+	const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'password'
 	const [loading, setLoading] = useState(true);
 
 	useEffect(() => {
@@ -98,8 +100,9 @@ export default function Profile() {
 
 	return (
 		<ProfileShell>
-			<div className="mx-auto mt-4 max-w-4xl space-y-6">
-				<article className="rounded-xl border border-slate-200 bg-white shadow-sm">
+			<div className="mx-auto mt-4 max-w-4xl">
+				<article className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+					{/* Top Profile Header */}
 					<div className="flex flex-col gap-5 border-b border-slate-200 px-6 py-6 sm:flex-row sm:items-center sm:justify-between">
 						<div className="flex min-w-0 items-center gap-4">
 							<SmartUserAvatar
@@ -123,40 +126,66 @@ export default function Profile() {
 							</div>
 						</div>
 
+						<div className="flex flex-wrap items-center gap-2.5 shrink-0">
+							<button
+								type="button"
+								onClick={() => setModalOpen(true)}
+								className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 cursor-pointer"
+							>
+								<Pencil className="h-4 w-4" />
+								<span>Edit profile</span>
+							</button>
+						</div>
+					</div>
+
+					{/* Profile Options Navigation Bar */}
+					<div className="flex items-center gap-1 border-b border-slate-200 bg-slate-50/70 px-6 pt-2">
 						<button
 							type="button"
-							onClick={() => setModalOpen(true)}
-							className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+							onClick={() => setActiveTab('overview')}
+							className={`inline-flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-semibold transition cursor-pointer ${
+								activeTab === 'overview'
+									? 'border-blue-600 text-blue-600 bg-white rounded-t-lg shadow-2xs'
+									: 'border-transparent text-slate-600 hover:text-slate-900'
+							}`}
 						>
-							<svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-								<path
-									strokeLinecap="round"
-									strokeLinejoin="round"
-									strokeWidth={2}
-									d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
-								/>
-							</svg>
-							Edit profile
+							<User className="h-3.5 w-3.5" />
+							<span>Account Information</span>
+						</button>
+
+						<button
+							type="button"
+							onClick={() => setActiveTab('password')}
+							className={`inline-flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-semibold transition cursor-pointer ${
+								activeTab === 'password'
+									? 'border-blue-600 text-blue-600 bg-white rounded-t-lg shadow-2xs'
+									: 'border-transparent text-slate-600 hover:text-slate-900'
+							}`}
+						>
+							<KeyRound className="h-3.5 w-3.5" />
+							<span>Password & Security</span>
 						</button>
 					</div>
 
-					<div className="px-6 py-6">
-						<div className="mb-4">
-							<h3 className="text-base font-semibold text-slate-900">Account information</h3>
-							<p className="mt-1 text-sm text-slate-500">Basic information connected to your login.</p>
+					{/* Tab Content */}
+					{activeTab === 'overview' ? (
+						<div className="px-6 py-6">
+							<div className="mb-4">
+								<h3 className="text-base font-semibold text-slate-900">Account information</h3>
+								<p className="mt-1 text-sm text-slate-500">Basic information connected to your login.</p>
+							</div>
+
+							<dl className="grid gap-3 sm:grid-cols-2">
+								<DetailRow label="Full name" value={fullName} />
+								<DetailRow label="Email address" value={user.Email || user.email} />
+								<DetailRow label="Role" value={getRoleName(user)} />
+								{user.Bio ? <DetailRow label="Bio" value={user.Bio} /> : null}
+							</dl>
 						</div>
-
-						<dl className="grid gap-3 sm:grid-cols-2">
-							<DetailRow label="Full name" value={fullName} />
-							<DetailRow label="Email address" value={user.Email || user.email} />
-							<DetailRow label="Role" value={getRoleName(user)} />
-							{user.Bio ? <DetailRow label="Bio" value={user.Bio} /> : null}
-						</dl>
-					</div>
+					) : (
+						<ChangePasswordCard user={user} embedded />
+					)}
 				</article>
-
-				{/* Change Password Settings with Email OTP */}
-				<ChangePasswordCard user={user} />
 			</div>
 
 			{modalOpen && (

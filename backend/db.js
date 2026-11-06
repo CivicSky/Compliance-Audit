@@ -1,17 +1,19 @@
+const path = require('path');
 const postgres = require('postgres');
-require('dotenv').config();
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
-const rawUrl = (process.env.DATABASE_URL || '').trim();
-const dbUrl = (rawUrl && rawUrl.startsWith('postgres'))
-  ? rawUrl
-  : 'postgresql://postgres.ylluxulqxkjircffndxg:gwapoakogwa@aws-0-ap-northeast-1.pooler.supabase.com:5432/postgres';
+const dbUrl = (process.env.DATABASE_URL || '').trim();
+
+if (!dbUrl) {
+  throw new Error('DATABASE_URL is not defined in environment variables. Please check your .env file.');
+}
 
 const isLocal = dbUrl.includes('localhost') || dbUrl.includes('127.0.0.1');
 
 const sql = postgres(dbUrl, {
   ssl: isLocal ? false : { rejectUnauthorized: false },
-  max: 10,
-  idle_timeout: 20,
+  max: 5,
+  idle_timeout: 10,
   connect_timeout: 30,
   onnotice: () => {},
   types: {

@@ -424,9 +424,13 @@ const OfficesP = forwardRef(
             ? filteredBySearch.filter((o) => String(o.eventid) === String(eventType))
             : filteredBySearch;
 
-        // Normalize office overallstatus to keys: 'compiled', 'partially_compiled', 'not_compiled'
-        const getStatusKey = (status) => {
-            const s = (status || '').toLowerCase().trim();
+        // Normalize office status to keys: 'compiled', 'partially_compiled', 'not_compiled', 'no_standards'
+        const getStatusKey = (office) => {
+            const totalReqs = Number(office?.totalrequirements ?? 0);
+            const s = (office?.overallstatus || '').toLowerCase().trim();
+            if (totalReqs === 0 || s.includes('no standard') || s.includes('no req') || s === 'n/a' || s === 'empty') {
+                return 'no_standards';
+            }
             // common variations from DB: 'Complied', 'Partially Complied', 'Not Complied',
             // also handle phrases like 'Partially Complied - 50%' or 'Not yet complied'
             if (!s) return 'not_compiled';
@@ -446,10 +450,10 @@ const OfficesP = forwardRef(
             console.debug('OfficesP: distinct overallstatus values:', statuses);
         }, [offices]);
 
-        // Filter by compile status if provided (compiled / partially_compiled / not_compiled)
+        // Filter by compile status if provided (compiled / partially_compiled / not_compiled / no_standards)
         // Treat 'all' as no filter
         const compiledFiltered = (sortStatus && sortStatus !== 'all')
-            ? filteredByEvent.filter((o) => getStatusKey(o.overallstatus) === sortStatus)
+            ? filteredByEvent.filter((o) => getStatusKey(o) === sortStatus)
             : filteredByEvent;
 
         // Filter by department if selected
@@ -834,7 +838,7 @@ const OfficesP = forwardRef(
                                                         user={aud}
                                                         size="h-6 w-6"
                                                         textSize="text-[9px] font-bold"
-                                                        ring="border-2 border-sky-300 shadow-2xs ring-1 ring-sky-100"
+                                                        ring="border border-white shadow-2xs"
                                                     />
                                                     <span 
                                                         className="text-[9px] text-sky-700 text-center truncate w-full mt-0.5 font-semibold leading-tight" 

@@ -11,7 +11,22 @@ export default function NotificationPopup({ onClose }) {
 	const [loading, setLoading] = useState(false);
 	const [currentUser, setCurrentUser] = useState(null);
 	const [notificationCounts, setNotificationCounts] = useState({ total: 0, unread: 0, read: 0 });
+	const [expandedIds, setExpandedIds] = useState(() => new Set());
 	const navigate = useNavigate();
+
+	const toggleExpanded = (e, notification) => {
+		e.stopPropagation();
+		const id = notification.notificationid;
+		setExpandedIds((prev) => {
+			const next = new Set(prev);
+			if (next.has(id)) next.delete(id);
+			else next.add(id);
+			return next;
+		});
+		if (!notification.isread) {
+			markAsRead(id);
+		}
+	};
 
 	useEffect(() => {
 		const token = localStorage.getItem('token');
@@ -321,6 +336,11 @@ export default function NotificationPopup({ onClose }) {
 						const adminFirst = notification.AdminFirstName || notification.adminfirstname || notification.adminFirstName || '';
 						const adminLast = notification.AdminLastName || notification.adminlastname || notification.adminLastName || '';
 						const notifTitle = notification.Title || notification.title || 'Notification';
+						const isExpanded = expandedIds.has(notification.notificationid);
+						const isTruncatable =
+							String(displayMessage || '').length > 80 ||
+							String(displayMessage || '').includes('\n') ||
+							String(notifTitle || '').length > 48;
 
 						return (
 							<div
@@ -380,26 +400,51 @@ export default function NotificationPopup({ onClose }) {
 										</div>
 
 										{/* Notification Title */}
-										<h4 className={`text-xs font-semibold mb-0.5 leading-snug line-clamp-1 ${
+										<h4 className={`text-xs font-semibold mb-0.5 leading-snug ${
+											isExpanded ? '' : 'line-clamp-1'
+										} ${
 											isUnread ? 'text-slate-900 font-bold' : 'text-slate-700'
 										}`}>
 											{notifTitle}
 										</h4>
 
 										{/* Detailed Message Text */}
-										<p className="text-[11px] text-slate-600 leading-relaxed line-clamp-2 mb-1.5">
+										<p className={`text-[11px] text-slate-600 leading-relaxed mb-1.5 ${
+											isExpanded ? 'whitespace-pre-line break-words' : 'line-clamp-2'
+										}`}>
 											{displayMessage}
 										</p>
 
 										{/* Action Link Footer */}
-										{hasLink && (
-											<div className="flex items-center justify-end">
-												<span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 group-hover:text-blue-700 transition group-hover:translate-x-0.5">
-													View Details
-													<svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-														<path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-													</svg>
-												</span>
+										{(isTruncatable || hasLink) && (
+											<div className="flex items-center justify-between gap-2 pt-0.5">
+												{isTruncatable ? (
+													<button
+														type="button"
+														onClick={(e) => toggleExpanded(e, notification)}
+														className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-slate-500 hover:text-slate-800 transition cursor-pointer"
+													>
+														<span>{isExpanded ? 'See less' : 'See more'}</span>
+														<svg
+															className={`w-3 h-3 transition-transform duration-150 ${isExpanded ? 'rotate-180' : ''}`}
+															fill="none"
+															viewBox="0 0 24 24"
+															stroke="currentColor"
+															strokeWidth={2}
+														>
+															<path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+														</svg>
+													</button>
+												) : <span />}
+
+												{hasLink && (
+													<span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 group-hover:text-blue-700 transition group-hover:translate-x-0.5">
+														View Details
+														<svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+															<path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+														</svg>
+													</span>
+												)}
 											</div>
 										)}
 									</div>

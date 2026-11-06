@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ShieldCheck, Lock, Eye, EyeOff, Loader2, CheckCircle2, AlertCircle, Mail, KeyRound, RefreshCw } from 'lucide-react';
 import { usersAPI } from '../../utils/api';
 
-export default function ChangePasswordCard({ user }) {
+export default function ChangePasswordCard({ user, embedded = false }) {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -164,11 +164,11 @@ export default function ChangePasswordCard({ user }) {
     !isSubmitting;
 
   return (
-    <article className="mt-6 rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden transition-all duration-200">
+    <article className={embedded ? "bg-white transition-all duration-200" : "mt-6 rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden transition-all duration-200"}>
       {/* Header Banner */}
-      <div className="flex flex-col gap-4 border-b border-slate-200 px-6 py-5 sm:flex-row sm:items-center sm:justify-between bg-white">
+      <div className="flex flex-col gap-4 border-b border-slate-100 px-6 py-5 sm:flex-row sm:items-center sm:justify-between bg-white">
         <div className="flex items-center gap-3.5">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-md shadow-blue-500/20 shrink-0">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-500/20 shrink-0">
             <KeyRound className="h-5 w-5" />
           </div>
           <div>

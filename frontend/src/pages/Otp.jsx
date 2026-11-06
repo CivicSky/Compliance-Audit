@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
-import bg from "../assets/images/bglogins.jpg";
 import logo from "../assets/images/lccb_logo.png";
 import auditrackLogo from "../assets/images/logo.png";
 import { API_BASE_URL } from '../utils/apiBase';
@@ -98,29 +97,14 @@ export default function Otp() {
     };
 
     return (
-        <div className="flex h-full overflow-hidden">
-            <div
-                className="w-1/2 flex items-center justify-center relative overflow-hidden bg-cover bg-center bg-no-repeat"
-                style={{ backgroundImage: `url(${bg})` }}
-            >
-                <div className="absolute inset-0 bg-blue-800 bg-opacity-60"></div>
-                <div className="relative z-10 text-center text-white max-w-md animate-fade-in-left">
-                    <img
-                        src={auditrackLogo}
-                        alt="Auditrack Logo"
-                        className="w-32 h-32 object-contain mx-auto mb-4 drop-shadow-2xl"
-                    />
-                    <h2 className="text-4xl font-bold mb-4 drop-shadow-lg">Auditrack</h2>
-                    <p className="text-white text-lg drop-shadow-md px-4">
-                        Verify your email before we create your account.
-                    </p>
-                </div>
-            </div>
-
-            <div className="w-1/2 flex items-center justify-center bg-white">
+        <div className="flex h-full overflow-hidden bg-white">
+            <div className="w-full flex items-center justify-center bg-white">
                 <div className="w-full max-w-md px-8 animate-fade-in-right">
                     <div className="text-center mb-8">
-                        <img src={logo} alt="App Logo" className="w-16 h-16 mx-auto mb-4" />
+                        <div className="inline-flex items-center justify-center gap-2.5 mb-3">
+                            <img src={auditrackLogo} alt="Auditrack Logo" className="w-11 h-11 object-contain" />
+                            <span className="text-2xl font-bold text-slate-900 tracking-tight">Auditrack</span>
+                        </div>
                         <h1 className="text-2xl font-bold text-gray-900 mb-2">Verify OTP</h1>
                         <p className="text-gray-600">
                             {email ? `Enter the code sent to ${email}` : "Please register first to receive a one-time PIN"}

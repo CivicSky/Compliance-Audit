@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, ChevronRight, Calendar, Plus, UserPlus } from 'lucide-react';
+import { ChevronDown, ChevronRight, Calendar, Plus, UserPlus, Lock, Unlock, BellRing, CalendarClock } from 'lucide-react';
 import AreaSection from './AreaSection';
 import CriteriaSection from './CriteriaSection';
 import RequirementsSection from './RequirementsSection';
@@ -10,7 +10,8 @@ import EditCriteriaModal from '../Criteria/EditCriteriaModal';
 import EditRequirementsModal from '../Requirement/EditRequirementsModal';
 import AssignPersonnelModal from './AssignPersonnelModal';
 import AssignPersonnelScopeModal from '../OfficeHead/AssignPersonnelScopeModal';
-import { usersAPI, officesAPI, personnelAssignmentsAPI } from '../../utils/api';
+import { usersAPI, officesAPI, personnelAssignmentsAPI, eventsAPI } from '../../utils/api';
+import { getDeadlineInfo } from '../../utils/deadlineHelpers';
 import { useModal } from "../UI/ModalProvider";
 import { useToast } from "../UI/Toast";
 
@@ -58,6 +59,32 @@ export default function EventPopup({
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedAreaIds, setSelectedAreaIds] = useState(new Set());
     const [selectedCriteriaIds, setSelectedCriteriaIds] = useState(new Set());
+    const [sendingReminder, setSendingReminder] = useState(false);
+
+    const deadlineInfo = useMemo(() => getDeadlineInfo(selectedEvent?.deadline), [selectedEvent?.deadline]);
+
+    const handleSendManualReminder = async () => {
+        if (!selectedEvent?.eventid || sendingReminder) return;
+        setSendingReminder(true);
+        try {
+            const res = await eventsAPI.sendReminder(selectedEvent.eventid);
+            if (res?.success) {
+                toast({
+                    title: 'Countdown Reminder Sent',
+                    description: res.message || `Notified ${res.recipientCount || 0} assigned personnel.`,
+                    variant: 'success'
+                });
+            }
+        } catch (err) {
+            toast({
+                title: 'Reminder Failed',
+                description: err?.response?.data?.message || 'Could not send deadline reminder.',
+                variant: 'error'
+            });
+        } finally {
+            setSendingReminder(false);
+        }
+    };
     const [selectedRequirementIds, setSelectedRequirementIds] = useState(new Set());
     const [isEditAreaOpen, setIsEditAreaOpen] = useState(false);
     const [editAreaData, setEditAreaData] = useState(null);
@@ -565,12 +592,30 @@ export default function EventPopup({
                                             {selectedEvent.accreditationlevel}
                                         </span>
                                     )}
+                                    {deadlineInfo.hasDeadline && (
+                                        <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-semibold ${deadlineInfo.badgeClasses}`}>
+                                            <CalendarClock className="h-3 w-3 shrink-0" />
+                                            {deadlineInfo.label}
+                                        </span>
+                                    )}
                                 </div>
                             </div>
                         </div>
 
                         {/* Right: actions + close */}
-                        <div className="flex shrink-0 items-center gap-2">
+                        <div className="flex shrink-0 flex-wrap items-center gap-2">
+                            {isAdmin && (
+                                <button
+                                    type="button"
+                                    disabled={sendingReminder}
+                                    onClick={handleSendManualReminder}
+                                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 text-xs font-semibold text-blue-700 shadow-2xs transition-all hover:bg-blue-100 active:scale-95 cursor-pointer disabled:opacity-50"
+                                    title="Send countdown reminder notification to all assigned personnel"
+                                >
+                                    <BellRing className="w-3.5 h-3.5 shrink-0" />
+                                    <span>{sendingReminder ? 'Sending...' : 'Send Reminder'}</span>
+                                </button>
+                            )}
                             {/* Primary Assign Personnel Button */}
                             {isAdmin && (
                                 <button

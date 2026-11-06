@@ -1,10 +1,63 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react';
+import axios from 'axios';
 import { Search, GraduationCap, Building2, User, UserCheck, X, ChevronDown, ChevronUp, Send, Upload, Download, Eye, Trash2, CheckCircle2, AlertCircle, FileText, Loader2 } from 'lucide-react';
 import StatusSlider from './StatusSlider';
 import { officesAPI, requirementsAPI } from '../../utils/api';
+import { API_BASE_URL } from '../../utils/apiBase';
 import { useModal } from '../UI/ModalProvider';
+import { useToast } from '../UI/Toast';
 import CustomSelect from '../UI/CustomSelect';
 import { isAcademicEntity } from '../../utils/entityHelpers';
+
+function InspectionReqDescription({ code, description, isExpanded, onToggle }) {
+  const textRef = useRef(null);
+  const [isOverflowing, setIsOverflowing] = useState(false);
+
+  useLayoutEffect(() => {
+    const el = textRef.current;
+    if (!el) return;
+    const checkOverflow = () => {
+      if (!isExpanded && textRef.current) {
+        setIsOverflowing(textRef.current.scrollHeight > textRef.current.clientHeight + 2);
+      }
+    };
+    checkOverflow();
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver(checkOverflow);
+      observer.observe(el);
+      return () => observer.disconnect();
+    }
+  }, [description, isExpanded]);
+
+  const showToggle = isOverflowing || isExpanded;
+
+  return (
+    <>
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-extrabold text-slate-900">
+          {code}
+        </span>
+        {showToggle && (
+          <button
+            type="button"
+            onClick={onToggle}
+            className="text-[11px] font-bold text-blue-600 hover:text-blue-800 inline-flex items-center gap-0.5 cursor-pointer leading-none"
+          >
+            <span>{isExpanded ? 'Show less' : 'Show more'}</span>
+            {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+          </button>
+        )}
+      </div>
+
+      <p
+        ref={textRef}
+        className={`text-xs text-slate-600 mt-1 leading-relaxed ${!isExpanded ? 'line-clamp-2' : ''}`}
+      >
+        {description}
+      </p>
+    </>
+  );
+}
 
 export default function OfficeInspectionModal({
   office,
@@ -13,7 +66,8 @@ export default function OfficeInspectionModal({
   currentUser,
   isAdmin = false
 }) {
-  const { showAlert } = useModal();
+  const { showAlert, showConfirm } = useModal();
+  const { toast } = useToast();
   const officeid = office?.officeid || office?.id;
 
   const [loading, setLoading] = useState(true);
@@ -23,9 +77,44 @@ export default function OfficeInspectionModal({
   const [expandedReqs, setExpandedReqs] = useState(new Set());
   const [commentsMap, setCommentsMap] = useState({});
   const [updatingReqId, setUpdatingReqId] = useState(null);
+  const [removingReqId, setRemovingReqId] = useState(null);
   const [proofDocument, setProofDocument] = useState(null);
   const [uploadingProof, setUploadingProof] = useState(false);
   const [currentLevel, setCurrentLevel] = useState(office?.accreditationlevel || 'None');
+
+  const handleRemoveRequirement = async (reqId, reqCode) => {
+    const confirmMsg = reqCode
+      ? `Remove standard "${reqCode}" from this office? This cannot be undone.`
+      : 'Remove this requirement from the office? This cannot be undone.';
+    const ok = await showConfirm(confirmMsg);
+    if (!ok) return;
+    try {
+      setRemovingReqId(reqId);
+      const token = localStorage.getItem('token');
+      await axios.delete(`${API_BASE_URL}/api/offices/${officeid}/requirements/${reqId}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      await fetchHierarchy();
+      toast?.({
+        title: 'Standard Removed',
+        description: reqCode
+          ? `Standard ${reqCode} was successfully removed from this office.`
+          : 'Standard removed from office successfully.',
+        variant: 'success',
+        duration: 3000
+      });
+    } catch (err) {
+      console.error('Failed to remove requirement from office', err);
+      toast?.({
+        title: 'Removal Failed',
+        description: err?.response?.data?.message || 'Failed to remove requirement from office',
+        variant: 'error',
+        duration: 3000
+      });
+    } finally {
+      setRemovingReqId(null);
+    }
+  };
 
   useEffect(() => {
     setCurrentLevel(office?.accreditationlevel || 'None');
@@ -203,17 +292,22 @@ export default function OfficeInspectionModal({
 
       const res = await officesAPI.uploadProofDocument(formData);
       if (res?.success) {
-        if (showAlert) {
-          showAlert({
-            title: 'Proof Document Uploaded',
-            message: 'Proof document attached successfully.',
-            type: 'success'
-          });
-        }
+        toast?.({
+          title: 'Upload Successful',
+          description: 'Proof document uploaded successfully.',
+          variant: 'success',
+          duration: 3000
+        });
         await fetchRequirements();
       }
     } catch (err) {
       console.error('Failed to upload proof document:', err);
+      toast?.({
+        title: 'Upload Failed',
+        description: err?.response?.data?.message || 'Failed to upload proof document.',
+        variant: 'error',
+        duration: 3000
+      });
     } finally {
       setUploadingProof(false);
     }
@@ -386,11 +480,11 @@ export default function OfficeInspectionModal({
           </div>
         </div>
 
-        {/* Requirements Toolbar */}
+        {/* Standards Toolbar */}
         <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-4">
           <div>
-            <h2 className="text-sm font-extrabold text-slate-900 uppercase tracking-wide">Requirements</h2>
-            <p className="text-xs text-slate-500">Browse areas, sub areas, and compliance items.</p>
+            <h2 className="text-sm font-extrabold text-slate-900 uppercase tracking-wide">Standards</h2>
+            <p className="text-xs text-slate-500">Browse areas, sub areas, and standards.</p>
           </div>
 
           <div className="flex items-center gap-3">
@@ -415,7 +509,7 @@ export default function OfficeInspectionModal({
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search requirements..."
+                placeholder="Search standards..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all outline-none shadow-2xs"
@@ -505,24 +599,12 @@ export default function OfficeInspectionModal({
 
                                 {/* Center: Description & Comments */}
                                 <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-xs font-extrabold text-slate-900">
-                                      {req.requirementcode || req.code || `Requirement #${reqId}`}
-                                    </span>
-                                  </div>
-
-                                  <p className={`text-xs text-slate-600 mt-1 leading-relaxed ${!isExpanded ? 'line-clamp-2' : ''}`}>
-                                    {req.Description || req.description || ''}
-                                  </p>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => toggleExpand(reqId)}
-                                    className="text-[11px] font-bold text-blue-600 hover:text-blue-800 mt-1 inline-flex items-center gap-1 cursor-pointer"
-                                  >
-                                    <span>{isExpanded ? 'Show less' : 'Show more'}</span>
-                                    {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                                  </button>
+                                  <InspectionReqDescription
+                                    code={req.requirementcode || req.code || `Requirement #${reqId}`}
+                                    description={req.Description || req.description || ''}
+                                    isExpanded={isExpanded}
+                                    onToggle={() => toggleExpand(reqId)}
+                                  />
 
                                   {/* Private Comment Box */}
                                   <div className="mt-3 flex items-center gap-2">
@@ -562,9 +644,11 @@ export default function OfficeInspectionModal({
 
                                   <button
                                     type="button"
-                                    className="px-2.5 py-1 rounded-md bg-rose-50 text-rose-600 hover:bg-rose-100 text-[10px] font-bold border border-rose-200 transition-colors"
+                                    disabled={removingReqId === reqId}
+                                    onClick={() => handleRemoveRequirement(reqId, req.requirementcode || req.code)}
+                                    className="px-2.5 py-1 rounded-md bg-rose-50 text-rose-600 hover:bg-rose-100 text-[10px] font-bold border border-rose-200 transition-colors cursor-pointer disabled:opacity-50"
                                   >
-                                    Remove
+                                    {removingReqId === reqId ? 'Removing...' : 'Remove'}
                                   </button>
                                 </div>
                               </div>
