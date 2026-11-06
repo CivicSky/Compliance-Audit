@@ -49,7 +49,7 @@ export default function ExternalAuditors() {
         setSelectedAuditorForDetails(auditor);
         setDetailsModalOpen(true);
     };
-    const itemsPerPage = 12;
+    const itemsPerPage = 30;
     const { showConfirm, showAlert } = useModal();
     const { toast } = useToast();
     const menuRef = useRef(null);
@@ -145,12 +145,9 @@ export default function ExternalAuditors() {
     // Pagination calculations
     const totalPages = Math.max(1, Math.ceil(filteredAuditors.length / itemsPerPage));
     const visibleAuditors = useMemo(() => {
-        if (viewMode === 'list') {
-            return filteredAuditors;
-        }
         const startIdx = (currentPage - 1) * itemsPerPage;
         return filteredAuditors.slice(startIdx, startIdx + itemsPerPage);
-    }, [filteredAuditors, currentPage, viewMode]);
+    }, [filteredAuditors, currentPage]);
 
     useEffect(() => {
         setCurrentPage(1);
@@ -456,7 +453,7 @@ export default function ExternalAuditors() {
                                 </div>
                             )}
 
-                            <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 grid-rows-3 gap-2 sm:gap-2.5 lg:gap-3 flex-1 min-h-0 h-full p-1 overflow-hidden' : 'space-y-2 pt-1 pb-3 min-w-[720px]'}>
+                            <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-2.5 lg:gap-3 flex-1 min-h-0 p-1 pb-14 overflow-y-auto' : 'space-y-2 pt-1 pb-14 min-w-[720px]'}>
                                 {visibleAuditors.map((auditor) => {
                                     const isAssigned = !!auditor.assignedArea;
                                     const isSelected = selectedIds.includes(auditor.userid);
@@ -875,14 +872,14 @@ export default function ExternalAuditors() {
                 </div>
             </div>
 
-            {/* Application Standard Fixed Bottom Pagination Bar (Grid mode only - removed in list mode per request) */}
-            {viewMode === 'grid' && !loading && filteredAuditors.length > 0 && (
+            {/* Application Standard Fixed Bottom Pagination Bar (Grid & List mode) */}
+            {!loading && filteredAuditors.length > 0 && (
                 <Pagination
                     currentPage={currentPage}
                     totalPages={totalPages}
                     onPageChange={(p) => setCurrentPage(p)}
                     fixed={true}
-                    showWhenSinglePage={false}
+                    showWhenSinglePage={true}
                 />
             )}
 

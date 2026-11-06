@@ -518,11 +518,11 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
         return false;
     };
 
-    const itemsPerPage = 12; // 12 for 4x3 grid
+    const itemsPerPage = 30; // 30 items per page
     const totalPages = Math.max(1, Math.ceil(filteredOfficeHeads.length / itemsPerPage));
     const startIdx = (currentPage - 1) * itemsPerPage;
     const paginatedOfficeHeads = filteredOfficeHeads.slice(startIdx, startIdx + itemsPerPage);
-    const visibleOfficeHeads = viewMode === 'list' ? filteredOfficeHeads : paginatedOfficeHeads;
+    const visibleOfficeHeads = paginatedOfficeHeads;
 
     useEffect(() => {
         if (currentPage > totalPages) {
@@ -601,7 +601,7 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                 </div>
             )}
 
-            <div className={viewMode === 'list' ? 'flex flex-col gap-2 pt-1 pb-1' : 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 grid-rows-3 gap-2 sm:gap-2.5 lg:gap-3 flex-1 min-h-0 h-full p-1 overflow-hidden'}>
+            <div className={viewMode === 'list' ? 'flex flex-col gap-2 pt-1 pb-14' : 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-2.5 lg:gap-3 flex-1 min-h-0 p-1 pb-14 overflow-y-auto'}>
                 {visibleOfficeHeads.map((person) => {
                     const fullName = `${person.firstname || ''}${person.middleinitial ? ' ' + person.middleinitial + '.' : ''} ${person.lastname || ''}`.trim() || 'Personnel';
                     const initials = `${(person.firstname || '').trim().charAt(0)}${(person.lastname || '').trim().charAt(0)}`.toUpperCase() || 'OP';
@@ -872,17 +872,15 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                 })}
             </div>
 
-            {viewMode !== 'list' && (
-                <div className="pt-1">
-                    <Pagination
-                        currentPage={currentPage}
-                        totalPages={totalPages}
-                        onPageChange={(p) => setCurrentPage(p)}
-                        fixed={true}
-                        showWhenSinglePage={true}
-                    />
-                </div>
-            )}
+            <div className="pt-1">
+                <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={(p) => setCurrentPage(p)}
+                    fixed={true}
+                    showWhenSinglePage={true}
+                />
+            </div>
 
             {/* Portal actions menu to avoid clipping inside list/card containers */}
             {isAdmin && actionMenuHeadId && actionMenuAnchorRect && typeof document !== 'undefined' && (() => {
