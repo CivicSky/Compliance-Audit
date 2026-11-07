@@ -1044,7 +1044,13 @@ export default function Home() {
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {activeEventProgress.map((eventItem) => {
-                            const dlInfo = getDeadlineInfo(eventItem.deadline, eventItem.completionPercent >= 100);
+                            const isEventCompleted = Boolean(
+                                eventItem.completionPercent >= 100 ||
+                                eventItem.iscompleted === true ||
+                                eventItem.isCompleted === true ||
+                                (eventItem.officeStatus && eventItem.officeStatus.compiled > 0 && eventItem.officeStatus.notCompiled === 0 && eventItem.officeStatus.partial === 0)
+                            );
+                            const dlInfo = getDeadlineInfo(eventItem.deadline, isEventCompleted);
                             const deadlineBusy = Boolean(busyEventAction[`deadline-${eventItem.id}`]);
                             const remindBusy = Boolean(busyEventAction[`remind-${eventItem.id}`]);
 
@@ -1060,12 +1066,10 @@ export default function Home() {
                                                     <span className="rounded bg-blue-100/80 px-2 py-0.5 text-xs font-bold text-blue-700 font-mono">
                                                         {eventItem.code && eventItem.code !== '-' ? eventItem.code : `EV-${eventItem.id}`}
                                                     </span>
-                                                    {dlInfo.hasDeadline && (
-                                                        <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${dlInfo.badgeClasses}`}>
-                                                            <CalendarClock className="w-2.5 h-2.5 shrink-0" />
-                                                            {dlInfo.label}
-                                                        </span>
-                                                    )}
+                                                    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${dlInfo.badgeClasses}`}>
+                                                        <CalendarClock className="w-2.5 h-2.5 shrink-0" />
+                                                        {dlInfo.label}
+                                                    </span>
                                                 </div>
                                                 <h3 className="truncate text-sm font-bold text-slate-900 mt-1.5">
                                                     {eventItem.name}
@@ -1282,18 +1286,36 @@ export default function Home() {
                         </div>
 
                         {activeEventProgress.length > 0 && (
-                            <CustomDropdown
-                                value={selectedAreaEventId || String(activeEventProgress[0]?.id || "")}
-                                onChange={(val) => setSelectedAreaEventId(String(val))}
-                                options={activeEventProgress.map((ev) => ({
-                                    value: String(ev.id),
-                                    label: ev.code && ev.code !== '-' ? ev.code : ev.name,
-                                    dot: "bg-blue-500",
-                                }))}
-                                minWidth="min-w-[160px]"
-                                size="sm"
-                                className="self-start sm:self-auto"
-                            />
+                            <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+                                <CustomDropdown
+                                    value={selectedAreaEventId || String(activeEventProgress[0]?.id || "")}
+                                    onChange={(val) => setSelectedAreaEventId(String(val))}
+                                    options={activeEventProgress.map((ev) => ({
+                                        value: String(ev.id),
+                                        label: ev.code && ev.code !== '-' ? ev.code : ev.name,
+                                        dot: "bg-blue-500",
+                                    }))}
+                                    minWidth="min-w-[160px]"
+                                    size="sm"
+                                />
+                                {(() => {
+                                    const selectedEv = activeEventProgress.find(ev => String(ev.id) === String(selectedAreaEventId || activeEventProgress[0]?.id));
+                                    if (!selectedEv) return null;
+                                    const isEvDone = Boolean(
+                                        selectedEv.completionPercent >= 100 ||
+                                        selectedEv.iscompleted === true ||
+                                        selectedEv.isCompleted === true ||
+                                        (selectedEv.officeStatus && selectedEv.officeStatus.compiled > 0 && selectedEv.officeStatus.notCompiled === 0 && selectedEv.officeStatus.partial === 0)
+                                    );
+                                    const dl = getDeadlineInfo(selectedEv.deadline, isEvDone);
+                                    return (
+                                        <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold ${dl.badgeClasses}`}>
+                                            <CalendarClock className="w-3 h-3 shrink-0" />
+                                            <span>{dl.label}</span>
+                                        </span>
+                                    );
+                                })()}
+                            </div>
                         )}
                     </div>
 

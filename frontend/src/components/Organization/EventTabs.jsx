@@ -142,9 +142,9 @@ export default function EventTabs({ selectedEventId, onChange }) {
                 ? 'text-rose-900'
                 : 'text-slate-700'
           }`}>
-            {dlInfo.hasDeadline ? dlInfo.formattedDate : 'No Deadline'}
+            {dlInfo.hasDeadline ? `Due ${dlInfo.formattedDate}` : (dlInfo.status === 'completed' ? 'Completed' : 'No Deadline')}
           </span>
-          {dlInfo.hasDeadline && (
+          {dlInfo.hasDeadline ? (
             <>
               <span className="text-slate-300 font-light">·</span>
               <span className={`font-medium ${
@@ -159,7 +159,12 @@ export default function EventTabs({ selectedEventId, onChange }) {
                 {dlInfo.shortLabel}
               </span>
             </>
-          )}
+          ) : dlInfo.status === 'completed' ? (
+            <>
+              <span className="text-slate-300 font-light">·</span>
+              <span className="text-emerald-700 font-bold">100% Complied</span>
+            </>
+          ) : null}
         </div>
       </div>
     </div>
