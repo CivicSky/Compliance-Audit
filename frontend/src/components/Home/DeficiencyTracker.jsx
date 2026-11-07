@@ -18,9 +18,11 @@ import {
     FileText,
     Layers,
     Filter,
+    CalendarClock,
 } from "lucide-react";
 import CustomDropdown from "../UI/CustomDropdown";
 import SmartUserAvatar from "../UI/SmartUserAvatar";
+import { getDeadlineInfo } from "../../utils/deadlineHelpers";
 
 const sortOptions = [
     { value: "lowest_compliance", label: "Lowest Compliance" },
@@ -577,8 +579,8 @@ export default function DeficiencyTracker({
                     </p>
                 </div>
 
-                {/* Right Actions: View Mode Switcher + Refresh */}
-                <div className="flex items-center gap-2 flex-wrap self-start lg:self-center">
+                {/* Right Actions: View Mode Switcher + Accreditation Dropdown + Deadline Badge */}
+                <div className="flex items-center gap-2.5 flex-wrap self-start lg:self-center">
                     <div className="inline-flex items-center rounded-lg bg-slate-100 p-0.5 border border-slate-200/80">
                         <button
                             type="button"
@@ -612,74 +614,67 @@ export default function DeficiencyTracker({
                         </button>
                     </div>
 
-                    {onRefresh && (
-                        <button
-                            type="button"
-                            onClick={onRefresh}
-                            title="Refresh data"
-                            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition cursor-pointer"
-                        >
-                            <RefreshCw size={13} />
-                            <span>Refresh</span>
-                        </button>
+                    {events.length > 0 && (
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <CustomDropdown
+                                value={selectedEventFilter || String(events[0]?.eventid || "")}
+                                onChange={(val) => handleEventFilterChange(String(val))}
+                                options={events.map((ev) => ({
+                                    value: String(ev.eventid),
+                                    label: ev.eventcode && ev.eventcode !== '-' ? ev.eventcode : ev.eventname,
+                                    dot: "bg-blue-500",
+                                }))}
+                                minWidth="min-w-[155px]"
+                                size="sm"
+                            />
+                            {(() => {
+                                const selectedEv = events.find(ev => String(ev.eventid) === String(selectedEventFilter || events[0]?.eventid));
+                                if (!selectedEv) return null;
+                                const isEvDone = Boolean(
+                                    selectedEv.completionPercent >= 100 ||
+                                    selectedEv.iscompleted === true ||
+                                    selectedEv.isCompleted === true ||
+                                    (selectedEv.officeStatus && selectedEv.officeStatus.compiled > 0 && selectedEv.officeStatus.notCompiled === 0 && selectedEv.officeStatus.partial === 0)
+                                );
+                                const dl = getDeadlineInfo(selectedEv.deadline, isEvDone);
+                                return (
+                                    <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold ${dl.badgeClasses}`}>
+                                        <CalendarClock className="w-3 h-3 shrink-0" />
+                                        <span>{dl.label}</span>
+                                    </span>
+                                );
+                            })()}
+                        </div>
                     )}
                 </div>
             </div>
 
-            {/* Unified Toolbar: Accreditation Event Pills + Search & Filter */}
-            <div className="mt-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-                {/* Accreditation Events Pill Tabs */}
-                {events.length > 0 ? (
-                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0 app-list-scroll">
-                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1">
-                            Accreditation:
-                        </span>
-                        {events.map((ev) => {
-                            const isSelected = String(ev.eventid) === String(selectedEventFilter);
-                            return (
-                                <button
-                                    key={ev.eventid}
-                                    type="button"
-                                    onClick={() => handleEventFilterChange(String(ev.eventid))}
-                                    className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-all cursor-pointer shrink-0 border ${
-                                        isSelected
-                                            ? "bg-blue-600 text-white border-blue-600 shadow-2xs"
-                                            : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300"
-                                    }`}
-                                >
-                                    <ShieldCheck size={13} className={isSelected ? "text-white" : "text-blue-600"} />
-                                    <span>{ev.eventcode || ev.eventname}</span>
-                                </button>
-                            );
-                        })}
-                    </div>
-                ) : <div />}
+            {/* Unified Toolbar: Search Input + Status / Sort Dropdown */}
+            <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="relative flex-1 max-w-md">
+                    <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                        type="text"
+                        placeholder={mainViewMode === "standards" ? "Search code, standard title, or office..." : "Search program, office, or personnel..."}
+                        value={searchTerm}
+                        onChange={(e) => {
+                            setSearchTerm(e.target.value);
+                            setCurrentPage(1);
+                        }}
+                        className="h-8.5 w-full rounded-xl border border-slate-200 bg-slate-50/60 pl-9 pr-8 text-xs text-slate-800 placeholder-slate-400 transition focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none hover:border-slate-300"
+                    />
+                    {searchTerm && (
+                        <button
+                            type="button"
+                            onClick={() => setSearchTerm("")}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                        >
+                            <X size={13} />
+                        </button>
+                    )}
+                </div>
 
-                {/* Right: Search Input + Status / Sort Dropdown */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                    <div className="relative flex-1 sm:w-72 md:w-80">
-                        <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <input
-                            type="text"
-                            placeholder={mainViewMode === "standards" ? "Search code, standard title, or office..." : "Search program, office, or personnel..."}
-                            value={searchTerm}
-                            onChange={(e) => {
-                                setSearchTerm(e.target.value);
-                                setCurrentPage(1);
-                            }}
-                            className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50/60 pl-9 pr-8 text-xs text-slate-800 placeholder-slate-400 transition focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none"
-                        />
-                        {searchTerm && (
-                            <button
-                                type="button"
-                                onClick={() => setSearchTerm("")}
-                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-                            >
-                                <X size={13} />
-                            </button>
-                        )}
-                    </div>
-
+                <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
                     {mainViewMode === "standards" ? (
                         <CustomDropdown
                             value={standardStatusFilter}
@@ -693,7 +688,7 @@ export default function DeficiencyTracker({
                                 { value: "partial", label: `Partially Complied (${standardKPIs.partial})`, dot: "bg-amber-500" },
                                 { value: "complied", label: `Fully Complied (${standardKPIs.complied})`, dot: "bg-emerald-500" },
                             ]}
-                            className="w-full sm:w-48"
+                            minWidth="min-w-[160px]"
                             size="sm"
                         />
                     ) : (
@@ -701,7 +696,7 @@ export default function DeficiencyTracker({
                             options={sortOptions}
                             value={sortBy}
                             onChange={(val) => setSortBy(val)}
-                            className="w-full sm:w-44 text-xs font-semibold"
+                            minWidth="min-w-[160px]"
                             size="sm"
                         />
                     )}
