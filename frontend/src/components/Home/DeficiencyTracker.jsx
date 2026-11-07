@@ -257,21 +257,13 @@ export default function DeficiencyTracker({
             }
         }
 
-        // 3. Unique requirement IDs under this event
+        // 3. Unique requirement IDs assigned to offices under this event
         const reqIdSet = new Set();
 
         for (const row of complianceData) {
             const officeid = String(row?.officeid ?? "");
             const reqId = String(row?.requirementid ?? "");
             if (reqId && eventOfficeIdSet.has(officeid)) {
-                reqIdSet.add(reqId);
-            }
-        }
-
-        for (const req of requirements) {
-            const reqId = String(req.requirementid ?? req.id ?? "");
-            const critId = String(req.criteriaid ?? "");
-            if (reqId && critId && eventCriteriaIds.has(critId)) {
                 reqIdSet.add(reqId);
             }
         }
@@ -320,11 +312,9 @@ export default function DeficiencyTracker({
                 }
             }
 
-            const evaluatedList = officesList.length > 0 ? officesList : eventOffices.map((office) => ({
-                office,
-                statusNum: 3,
-                comments: "",
-            }));
+            // Only evaluate offices that actually have this requirement assigned
+            if (officesList.length === 0) continue;
+            const evaluatedList = officesList;
 
             const totalUnits = evaluatedList.length;
             let compliedCount = 0;
