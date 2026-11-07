@@ -313,7 +313,7 @@ export default function AuditLogs() {
     };
 
     return (
-        <div className="w-full flex-1 flex flex-col min-w-0 bg-slate-50/50 overflow-hidden">
+        <div className="w-full h-[calc(100vh-3.5rem)] max-h-[calc(100vh-3.5rem)] flex flex-col min-w-0 bg-slate-50/50 overflow-hidden">
             {/* Top Header Card */}
             <div className="px-4 sm:px-6 pt-4 pb-3.5 shrink-0 border-b border-slate-200/70 bg-white shadow-2xs">
                 <div className="flex items-center gap-3">
@@ -331,7 +331,7 @@ export default function AuditLogs() {
                 </div>
             </div>
 
-            <div className="flex-1 min-h-0 px-4 sm:px-6 pt-3 pb-8 flex flex-col gap-3 overflow-hidden">
+            <div className="flex-1 min-h-0 px-4 sm:px-6 pt-3 pb-12 flex flex-col gap-3 overflow-hidden">
                 {/* Stat Cards Grid */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 shrink-0">
                         <div className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-2xs flex items-center justify-between hover:border-slate-300 transition">
@@ -447,7 +447,7 @@ export default function AuditLogs() {
                     </div>
 
                     {loading ? (
-                        <div className="flex-1 overflow-y-auto app-list-scroll">
+                        <div className="flex-1 min-h-0 overflow-y-auto app-list-scroll">
                             <AuditLogsSkeleton count={12} />
                         </div>
                     ) : serverError ? (
