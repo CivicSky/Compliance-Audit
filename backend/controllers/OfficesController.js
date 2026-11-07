@@ -1086,6 +1086,26 @@ const OfficesController = {
       const placeholders = ids.map(() => '?').join(',');
 
       try {
+        const { deleteFromSupabaseBucket } = require('../utils/supabaseStorage');
+        const [proofFiles] = await db.query(
+          `SELECT id, filepath FROM officeproofdocuments WHERE officeid IN (${placeholders})`,
+          ids
+        );
+        if (proofFiles && proofFiles.length > 0) {
+          for (const f of proofFiles) {
+            try {
+              if (f.filepath && (f.filepath.startsWith('http://') || f.filepath.startsWith('https://'))) {
+                await deleteFromSupabaseBucket(f.filepath, 'proof-documents');
+              } else {
+                const absPath = path.join(__dirname, '..', (f.filepath || '').replace(/^\//, ''));
+                if (fs.existsSync(absPath)) fs.unlinkSync(absPath);
+              }
+            } catch (delErr) {
+              console.warn('Failed to delete office proof file during bulk office deletion:', delErr);
+            }
+          }
+        }
+
         await db.query(`DELETE FROM requirement_user_uploads WHERE requirementid IN (SELECT requirementid FROM compliancestatusoffices WHERE officeid IN (${placeholders}))`, ids);
         await db.query(`DELETE FROM officeproofdocuments WHERE officeid IN (${placeholders})`, ids);
         await db.query(`DELETE FROM requirementuserassignments WHERE officeid IN (${placeholders})`, ids);
@@ -1574,14 +1594,19 @@ const OfficesController = {
         );
 
         if (files && files.length > 0) {
+          const { deleteFromSupabaseBucket } = require('../utils/supabaseStorage');
           for (const f of files) {
             try {
-              const absPath = path.join(__dirname, '..', (f.filepath || '').replace(/^\//, ''));
-              if (fs.existsSync(absPath)) {
-                fs.unlinkSync(absPath);
+              if (f.filepath && (f.filepath.startsWith('http://') || f.filepath.startsWith('https://'))) {
+                await deleteFromSupabaseBucket(f.filepath, 'proof-documents');
+              } else {
+                const absPath = path.join(__dirname, '..', (f.filepath || '').replace(/^\//, ''));
+                if (fs.existsSync(absPath)) {
+                  fs.unlinkSync(absPath);
+                }
               }
             } catch (fsErr) {
-              console.warn('Failed to delete requirement proof file from disk during removeOfficeRequirement:', fsErr);
+              console.warn('Failed to delete requirement proof file during removeOfficeRequirement:', fsErr);
             }
           }
 
