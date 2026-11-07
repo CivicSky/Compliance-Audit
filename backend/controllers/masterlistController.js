@@ -76,32 +76,37 @@ async function deleteLinkedOffices(masterListIds = [], itemNames = []) {
     if (requirementIds.length > 0) {
       const reqPlaceholders = requirementIds.map(() => '?').join(',');
 
-      // Delete requirement proof documents from disk and DB
+      // Delete requirement proof documents strictly belonging to these offices (disk + Supabase + DB)
       try {
+        const { deleteFromSupabaseBucket } = require('../utils/supabaseStorage');
         const [proofFiles] = await db.query(
-          `SELECT id, filepath FROM officeproofdocuments WHERE requirementid IN (${reqPlaceholders})`,
-          requirementIds
+          `SELECT id, filepath FROM officeproofdocuments WHERE officeid IN (${placeholders})`,
+          officeIds
         );
         if (proofFiles && proofFiles.length > 0) {
           for (const f of proofFiles) {
             try {
-              const absPath = path.join(__dirname, '..', (f.filepath || '').replace(/^\//, ''));
-              if (fs.existsSync(absPath)) fs.unlinkSync(absPath);
+              if (f.filepath && (f.filepath.startsWith('http://') || f.filepath.startsWith('https://'))) {
+                await deleteFromSupabaseBucket(f.filepath, 'proof-documents');
+              } else {
+                const absPath = path.join(__dirname, '..', (f.filepath || '').replace(/^\//, ''));
+                if (fs.existsSync(absPath)) fs.unlinkSync(absPath);
+              }
             } catch (fsErr) {
-              console.warn('Failed to delete proof file from disk:', fsErr);
+              console.warn('Failed to delete proof file:', fsErr);
             }
           }
-          await db.query(`DELETE FROM officeproofdocuments WHERE requirementid IN (${reqPlaceholders})`, requirementIds);
+          await db.query(`DELETE FROM officeproofdocuments WHERE officeid IN (${placeholders})`, officeIds);
         }
       } catch (e) {
         console.error('Error cleaning up proof documents during master list office delete:', e);
       }
 
-      // Delete user requirement uploads from disk and DB
+      // Delete user requirement uploads from disk and DB scoped to these offices
       try {
         const [userFiles] = await db.query(
-          `SELECT id, filepath FROM requirement_user_uploads WHERE requirementid IN (${reqPlaceholders})`,
-          requirementIds
+          `SELECT id, filepath FROM requirement_user_uploads WHERE requirementid IN (${reqPlaceholders}) AND officeid IN (${placeholders})`,
+          [...requirementIds, ...officeIds]
         );
         if (userFiles && userFiles.length > 0) {
           for (const uf of userFiles) {
@@ -112,7 +117,10 @@ async function deleteLinkedOffices(masterListIds = [], itemNames = []) {
               console.warn('Failed to delete user upload from disk:', fsErr);
             }
           }
-          await db.query(`DELETE FROM requirement_user_uploads WHERE requirementid IN (${reqPlaceholders})`, requirementIds);
+          await db.query(
+            `DELETE FROM requirement_user_uploads WHERE requirementid IN (${reqPlaceholders}) AND officeid IN (${placeholders})`,
+            [...requirementIds, ...officeIds]
+          );
         }
       } catch (e) {
         console.error('Error cleaning up user uploads during master list office delete:', e);

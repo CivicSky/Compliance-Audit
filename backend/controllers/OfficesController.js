@@ -975,41 +975,11 @@ const OfficesController = {
         if (requirementIds.length > 0) {
           const placeholders = requirementIds.map(() => '?').join(',');
 
-          // Delete any proof documents attached to these requirements (disk + DB)
-          try {
-            const [proofFiles] = await db.query(
-              `SELECT id, filepath FROM officeproofdocuments WHERE requirementid IN (${placeholders})`,
-              requirementIds
-            );
-            console.log('Office delete: found proofFiles for requirements:', (proofFiles || []).length);
-            if (proofFiles && proofFiles.length > 0) {
-              for (const f of proofFiles) {
-                try {
-                  const absPath = path.join(__dirname, '..', (f.filepath || '').replace(/^\//, ''));
-                  const exists = fs.existsSync(absPath);
-                  console.log('Attempting delete proof file:', absPath, 'exists=', exists);
-                  if (exists) {
-                    fs.unlinkSync(absPath);
-                    console.log('Deleted proof file:', absPath);
-                  } else {
-                    console.warn('Proof file not found on disk:', absPath);
-                  }
-                } catch (fsErr) {
-                  console.warn('Failed to delete office proof file during office deletion:', fsErr);
-                }
-              }
-              const [delRes] = await db.query(`DELETE FROM officeproofdocuments WHERE requirementid IN (${placeholders})`, requirementIds);
-              console.log('Deleted proof DB rows count:', delRes.affectedRows || 0);
-            }
-          } catch (e) {
-            console.error('Error cleaning up proof documents for requirements during office delete:', e);
-          }
-
-          // Delete any user-uploaded requirement files (disk + DB)
+          // Delete any user-uploaded requirement files scoped to this office (disk + DB)
           try {
             const [userFiles] = await db.query(
-              `SELECT id, filepath FROM requirement_user_uploads WHERE requirementid IN (${placeholders})`,
-              requirementIds
+              `SELECT id, filepath FROM requirement_user_uploads WHERE requirementid IN (${placeholders}) AND officeid = ?`,
+              [...requirementIds, id]
             );
             console.log('Office delete: found requirement_user_uploads count:', (userFiles || []).length);
             if (userFiles && userFiles.length > 0) {
@@ -1017,19 +987,17 @@ const OfficesController = {
                 try {
                   const absPath = path.join(__dirname, '..', (uf.filepath || '').replace(/^\//, ''));
                   const exists = fs.existsSync(absPath);
-                  console.log('Attempting delete user upload:', absPath, 'exists=', exists);
                   if (exists) {
                     fs.unlinkSync(absPath);
-                    console.log('Deleted user upload:', absPath);
-                  } else {
-                    console.warn('User upload file not found on disk:', absPath);
                   }
                 } catch (fsErr) {
                   console.warn('Failed to delete user requirement upload during office deletion:', fsErr);
                 }
               }
-              const [delUserRes] = await db.query(`DELETE FROM requirement_user_uploads WHERE requirementid IN (${placeholders})`, requirementIds);
-              console.log('Deleted requirement_user_uploads DB rows count:', delUserRes.affectedRows || 0);
+              await db.query(
+                `DELETE FROM requirement_user_uploads WHERE requirementid IN (${placeholders}) AND officeid = ?`,
+                [...requirementIds, id]
+              );
             }
           } catch (e) {
             console.error('Error cleaning up requirement_user_uploads during office delete:', e);
@@ -1046,22 +1014,27 @@ const OfficesController = {
           }
         }
 
-        // 2) Remove any office-level proof documents (requirementid IS NULL) for this office (disk + DB)
+        // 2) Remove any proof documents (both requirement and office-level) strictly for THIS office (disk + Supabase + DB)
         try {
-          const [officeProofs] = await db.query('SELECT id, filepath FROM officeproofdocuments WHERE officeid = ? AND requirementid IS NULL', [id]);
-          if (officeProofs && officeProofs.length > 0) {
-            for (const f of officeProofs) {
+          const { deleteFromSupabaseBucket } = require('../utils/supabaseStorage');
+          const [proofFiles] = await db.query('SELECT id, filepath FROM officeproofdocuments WHERE officeid = ?', [id]);
+          if (proofFiles && proofFiles.length > 0) {
+            for (const f of proofFiles) {
               try {
-                const absPath = path.join(__dirname, '..', (f.filepath || '').replace(/^\//, ''));
-                if (fs.existsSync(absPath)) fs.unlinkSync(absPath);
+                if (f.filepath && (f.filepath.startsWith('http://') || f.filepath.startsWith('https://'))) {
+                  await deleteFromSupabaseBucket(f.filepath, 'proof-documents');
+                } else {
+                  const absPath = path.join(__dirname, '..', (f.filepath || '').replace(/^\//, ''));
+                  if (fs.existsSync(absPath)) fs.unlinkSync(absPath);
+                }
               } catch (fsErr) {
-                console.warn('Failed to delete office-level proof file during office deletion:', fsErr);
+                console.warn('Failed to delete office proof file during office deletion:', fsErr);
               }
             }
-            await db.query('DELETE FROM officeproofdocuments WHERE officeid = ? AND requirementid IS NULL', [id]);
+            await db.query('DELETE FROM officeproofdocuments WHERE officeid = ?', [id]);
           }
         } catch (e) {
-          console.error('Error cleaning up office-level proof documents during office delete:', e);
+          console.error('Error cleaning up office proof documents during office delete:', e);
         }
       } catch (e) {
         console.error('Error during uploaded files cleanup before deleting office:', e);
