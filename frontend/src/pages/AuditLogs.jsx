@@ -36,7 +36,7 @@ export default function AuditLogs() {
     const [actionFilter, setActionFilter] = useState("all");
     const [currentPage, setCurrentPage] = useState(1);
     const [expandedLogId, setExpandedLogId] = useState(null);
-    const itemsPerPage = 9;
+    const itemsPerPage = 30;
 
     const preparedLogs = useMemo(() => {
         const lookups = { eventLookup, areaLookup, criteriaLookup, requirementLookup, officeLookup, userLookup };
@@ -447,8 +447,8 @@ export default function AuditLogs() {
                     </div>
 
                     {loading ? (
-                        <div className="flex-1 overflow-y-auto">
-                            <AuditLogsSkeleton count={itemsPerPage} />
+                        <div className="flex-1 overflow-y-auto app-list-scroll">
+                            <AuditLogsSkeleton count={12} />
                         </div>
                     ) : serverError ? (
                         <ServerOfflineState
@@ -479,7 +479,7 @@ export default function AuditLogs() {
                             )}
                         </div>
                     ) : (
-                        <div className="flex-1 overflow-y-auto divide-y divide-slate-100 min-h-0 [contain:content]">
+                        <div className="flex-1 overflow-y-auto divide-y divide-slate-100 min-h-0 [contain:content] app-list-scroll">
                             {visibleLogs.map((log) => {
                                 const action = log.normalizedAction;
                                 const style = actionStyles[action] || actionStyles.default;
