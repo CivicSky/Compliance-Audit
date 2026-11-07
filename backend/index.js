@@ -87,8 +87,11 @@ const serveProfilePic = (req, res, next) => {
     if (fs.existsSync(localPath)) {
         return res.sendFile(localPath);
     }
-    const supabaseUrl = process.env.SUPABASE_URL || 'https://ylluxulqxkjircffndxg.supabase.co';
-    return res.redirect(`${supabaseUrl}/storage/v1/object/public/profile-pics/${filename}`);
+    const supabaseUrl = (process.env.SUPABASE_URL || '').replace(/\/$/, '');
+    if (supabaseUrl) {
+        return res.redirect(`${supabaseUrl}/storage/v1/object/public/profile-pics/${filename}`);
+    }
+    return next();
 };
 
 app.get('/uploads/profile-pics/:filename', serveProfilePic);

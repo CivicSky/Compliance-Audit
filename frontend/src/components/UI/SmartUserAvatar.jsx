@@ -56,7 +56,7 @@ export function getInitials(firstname = '', lastname = '', fullName = '') {
     return 'U';
 }
 
-const SUPABASE_PROFILE_STORAGE = 'https://ylluxulqxkjircffndxg.supabase.co/storage/v1/object/public/profile-pics';
+const SUPABASE_PROFILE_STORAGE = (import.meta.env.VITE_SUPABASE_PROFILE_STORAGE || '').replace(/\/$/, '');
 
 export default function SmartUserAvatar({
     user,
@@ -96,7 +96,7 @@ export default function SmartUserAvatar({
         if (!rawPic || rawPic === '/default-avatar.png') return null;
         if (typeof rawPic !== 'string') return null;
 
-        if (triedSupabaseFallback) {
+        if (triedSupabaseFallback && SUPABASE_PROFILE_STORAGE) {
             const filename = rawPic.split('/').pop().split('?')[0];
             return `${SUPABASE_PROFILE_STORAGE}/${filename}`;
         }
@@ -106,19 +106,19 @@ export default function SmartUserAvatar({
         }
 
         const cleanName = rawPic.replace(/^\/?(api\/)?uploads\/profile-pics\//, '').replace(/^\//, '');
-        // If clean filename follows standard profile picture naming, prefer direct Supabase permanent storage
-        if (cleanName.toLowerCase().startsWith('profilepic-') || cleanName.toLowerCase().startsWith('profilepic')) {
+        // If clean filename follows standard profile picture naming, prefer direct Supabase permanent storage when configured
+        if (SUPABASE_PROFILE_STORAGE && (cleanName.toLowerCase().startsWith('profilepic-') || cleanName.toLowerCase().startsWith('profilepic'))) {
             return `${SUPABASE_PROFILE_STORAGE}/${cleanName}`;
         }
 
         if (rawPic.startsWith('/uploads')) {
             return `${API_BASE_URL}${rawPic}`;
         }
-        return `${API_BASE_URL}/uploads/profile-pics/${rawPic}`;
+        return `${API_BASE_URL}/uploads/profile-pics/${cleanName || rawPic}`;
     })();
 
     const handleImageError = () => {
-        if (!triedSupabaseFallback && typeof rawPic === 'string' && (rawPic.toLowerCase().includes('profilepic') || rawPic.includes('/uploads/profile-pics/'))) {
+        if (SUPABASE_PROFILE_STORAGE && !triedSupabaseFallback && typeof rawPic === 'string' && (rawPic.toLowerCase().includes('profilepic') || rawPic.includes('/uploads/profile-pics/'))) {
             setTriedSupabaseFallback(true);
         } else {
             setImgFailed(true);
