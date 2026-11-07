@@ -315,15 +315,15 @@ export default function AuditLogs() {
     return (
         <div className="w-full h-[calc(100vh-3.5rem)] max-h-[calc(100vh-3.5rem)] flex flex-col min-w-0 bg-slate-50/50 overflow-hidden">
             {/* Top Header Card */}
-            <div className="px-4 sm:px-6 pt-3 pb-2.5 shrink-0 border-b border-slate-200/70 bg-white shadow-2xs">
+            <div className="px-4 sm:px-6 pt-2 pb-1.5 shrink-0 border-b border-slate-200/70 bg-white shadow-2xs">
                 <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-500/20 shrink-0">
-                        <svg className="w-5 h-5 sm:w-5.5 sm:h-5.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-500/20 shrink-0">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
                     </div>
                     <div>
-                        <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">Audit Logs &amp; Security Trails</h1>
+                        <h1 className="text-base sm:text-lg font-bold tracking-tight text-slate-900">Audit Logs &amp; Security Trails</h1>
                         <p className="text-xs text-slate-500 mt-0.5">
                             Chronological immutable record of accreditation data modifications, file operations, and user logins.
                         </p>
@@ -331,45 +331,45 @@ export default function AuditLogs() {
                 </div>
             </div>
 
-            <div className="flex-1 min-h-0 px-4 sm:px-6 pt-2 pb-3 sm:pb-3.5 flex flex-col gap-2.5 overflow-hidden">
+            <div className="flex-1 min-h-0 px-4 sm:px-6 pt-1.5 pb-1 sm:pb-1.5 flex flex-col gap-2 overflow-hidden">
                 {/* Stat Cards Grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 shrink-0">
-                        <div className="rounded-xl border border-slate-200/90 bg-white p-2.5 sm:p-3 shadow-2xs flex items-center justify-between hover:border-slate-300 transition">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5 shrink-0">
+                        <div className="rounded-xl border border-slate-200/90 bg-white py-2 px-3 shadow-2xs flex items-center justify-between hover:border-slate-300 transition">
                             <div>
                                 <p className="text-[11px] font-semibold text-slate-500">Total Activities</p>
                                 <p className="text-xl font-bold text-slate-900 mt-0.5">{stats.total}</p>
                             </div>
-                            <div className="h-9 w-9 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-sm shadow-2xs">
+                            <div className="h-8.5 w-8.5 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-sm shadow-2xs">
                                 <Activity className="w-4 h-4 text-slate-700" />
                             </div>
                         </div>
 
-                        <div className="rounded-xl border border-emerald-200/70 bg-emerald-50/30 p-2.5 sm:p-3 shadow-2xs flex items-center justify-between hover:border-emerald-300 transition">
+                        <div className="rounded-xl border border-emerald-200/70 bg-emerald-50/30 py-2 px-3 shadow-2xs flex items-center justify-between hover:border-emerald-300 transition">
                             <div>
                                 <p className="text-[11px] font-semibold text-emerald-800">Created Records</p>
                                 <p className="text-xl font-bold text-emerald-700 mt-0.5">{stats.created}</p>
                             </div>
-                            <div className="h-9 w-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-sm shadow-2xs">
+                            <div className="h-8.5 w-8.5 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-sm shadow-2xs">
                                 <Plus className="w-4 h-4 text-emerald-700" />
                             </div>
                         </div>
 
-                        <div className="rounded-xl border border-indigo-200/70 bg-indigo-50/30 p-2.5 sm:p-3 shadow-2xs flex items-center justify-between hover:border-indigo-300 transition">
+                        <div className="rounded-xl border border-indigo-200/70 bg-indigo-50/30 py-2 px-3 shadow-2xs flex items-center justify-between hover:border-indigo-300 transition">
                             <div>
                                 <p className="text-[11px] font-semibold text-indigo-800">Updated Records</p>
                                 <p className="text-xl font-bold text-indigo-700 mt-0.5">{stats.updated}</p>
                             </div>
-                            <div className="h-9 w-9 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm shadow-2xs">
+                            <div className="h-8.5 w-8.5 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm shadow-2xs">
                                 <FileEdit className="w-4 h-4 text-indigo-700" />
                             </div>
                         </div>
 
-                        <div className="rounded-xl border border-rose-200/70 bg-rose-50/30 p-2.5 sm:p-3 shadow-2xs flex items-center justify-between hover:border-rose-300 transition">
+                        <div className="rounded-xl border border-rose-200/70 bg-rose-50/30 py-2 px-3 shadow-2xs flex items-center justify-between hover:border-rose-300 transition">
                             <div>
                                 <p className="text-[11px] font-semibold text-rose-800">Security & Deletions</p>
                                 <p className="text-xl font-bold text-rose-700 mt-0.5">{stats.deletedAndAuth}</p>
                             </div>
-                            <div className="h-9 w-9 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center font-bold text-sm shadow-2xs">
+                            <div className="h-8.5 w-8.5 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center font-bold text-sm shadow-2xs">
                                 <ShieldAlert className="w-4 h-4 text-rose-700" />
                             </div>
                         </div>
@@ -378,7 +378,7 @@ export default function AuditLogs() {
                     {/* Main Card Container */}
                     <div className="bg-white rounded-2xl shadow-xs border border-slate-200/90 flex flex-col overflow-hidden flex-1 min-h-0">
                     {/* Filter Toolbar */}
-                    <div className="px-4 py-2 border-b border-slate-200/90 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+                    <div className="px-4 py-1.5 border-b border-slate-200/90 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
                         <div className="flex items-center gap-2">
                             <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Activity History</h2>
                             <span className="rounded-full bg-slate-200/70 px-2 py-0.5 text-[11px] font-bold text-slate-700">
