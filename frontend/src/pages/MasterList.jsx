@@ -282,18 +282,18 @@ export default function MasterList() {
   ];
 
   return (
-    <div className="w-full flex-1 min-h-0 flex flex-col min-w-0 bg-slate-50/50 overflow-hidden">
+    <div className="w-full h-[calc(100vh-3.5rem)] max-h-[calc(100vh-3.5rem)] flex flex-col min-w-0 bg-slate-50/50 overflow-hidden">
       <NotificationToast title="Notice" message={notice} visible={isNoticeVisible} onDismiss={() => setNotice('')} />
 
       {/* Top Header Card */}
-      <div className="px-4 sm:px-6 pt-3 pb-2.5 shrink-0 border-b border-slate-200/70 bg-white shadow-2xs">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="px-4 sm:px-6 pt-2 pb-1.5 shrink-0 border-b border-slate-200/70 bg-white shadow-2xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-500/20 shrink-0">
-              <Layers className="w-5 h-5 sm:w-5.5 sm:h-5.5" />
+            <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-500/20 shrink-0">
+              <Layers className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">Master List</h1>
+              <h1 className="text-base sm:text-lg font-bold tracking-tight text-slate-900">Master List</h1>
               <p className="text-xs text-slate-500 mt-0.5">
                 {deleteMode ? 'Select items to delete from master list.' : 'Manage your reusable academic programs and non-academic offices.'}
               </p>
@@ -354,7 +354,7 @@ export default function MasterList() {
         </div>
 
         {/* Search, Filters & View Mode Toolbar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mt-2 pt-2 border-t border-slate-100">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mt-1.5 pt-1.5 border-t border-slate-100">
           <div className="relative w-full sm:w-72 md:w-80">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
@@ -397,7 +397,7 @@ export default function MasterList() {
         </div>
       </div>
 
-      <div className={`flex-1 px-4 sm:px-6 pt-1 ${viewMode === 'list' ? 'pb-3' : 'pb-8'} flex flex-col min-h-0 overflow-hidden`}>
+      <div className={`flex-1 px-4 sm:px-6 pt-1.5 ${viewMode === 'list' ? 'pb-1 sm:pb-1.5' : 'pb-8'} flex flex-col min-h-0 overflow-hidden`}>
 
         {/* Content Area */}
         <div 
@@ -448,9 +448,9 @@ export default function MasterList() {
               ) : null}
             </div>
           ) : viewMode === 'list' ? (
-            <div className="flex flex-col min-w-[760px] pb-14">
+            <div className="flex flex-col min-w-[760px] pb-12">
               {/* Sticky Header Row matching Programs & Offices */}
-              <div className="grid grid-cols-[minmax(220px,1fr)_160px_160px_120px_80px] gap-6 px-6 py-2 bg-white border border-slate-200 rounded-xl shadow-xs text-xs font-semibold text-slate-700 sticky top-0 z-20 mb-1.5">
+              <div className="grid grid-cols-[minmax(220px,1fr)_160px_160px_120px_80px] gap-6 px-6 py-1.5 bg-white border border-slate-200 rounded-xl shadow-xs text-xs font-semibold text-slate-700 sticky top-0 z-20 mb-1">
                 <div className="flex items-center">Office Name</div>
                 <div className="flex items-center">Office Type</div>
                 <div className="flex items-center">Department</div>
@@ -459,7 +459,7 @@ export default function MasterList() {
               </div>
 
               {/* Rows List */}
-              <div className="space-y-1.5">
+              <div className="space-y-1">
                 {visibleItems.map((item) => {
                   const isSelected = selectedIds.includes(item.id);
                   const isAcademic = isAcademicEntity(item);
@@ -476,7 +476,7 @@ export default function MasterList() {
                             : 'border border-slate-200/90 app-card-hover cursor-pointer'
                       }`}
                     >
-                      <div className="grid grid-cols-[minmax(220px,1fr)_160px_160px_120px_80px] items-center gap-6 px-6 py-2.5">
+                      <div className="grid grid-cols-[minmax(220px,1fr)_160px_160px_120px_80px] items-center gap-6 px-6 py-2">
                         {/* Office / Program Name & Detailed Metadata */}
                         <div className="flex items-center gap-3 min-w-0">
                           {deleteMode && (
@@ -711,15 +711,13 @@ export default function MasterList() {
 
         {/* Bottom Pagination (Grid and List mode) */}
         {!loadingItems && !serverError && filteredItems.length > 0 && (
-          <div className="mt-1 shrink-0">
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={(page) => setCurrentPage(page)}
-              fixed={true}
-              showWhenSinglePage={true}
-            />
-          </div>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={(page) => setCurrentPage(page)}
+            fixed={true}
+            showWhenSinglePage={true}
+          />
         )}
       </div>
 
