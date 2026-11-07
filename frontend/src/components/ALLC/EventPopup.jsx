@@ -16,6 +16,7 @@ import { useModal } from "../UI/ModalProvider";
 import { useToast } from "../UI/Toast";
 
 import { formatDateTime } from '../../utils/formatDateTime';
+import { API_BASE_URL } from '../../utils/apiBase';
 
 export default function EventPopup({
     selectedEvent,
@@ -303,7 +304,7 @@ export default function EventPopup({
         const fetchAssignments = async () => {
             try {
                 const token = localStorage.getItem('token');
-                const res = await fetch(`/api/areas/assignments/${currentUser.userid}`, {
+                const res = await fetch(`${API_BASE_URL}/api/areas/assignments/${currentUser.userid}`, {
                     headers: token ? { 'Authorization': `Bearer ${token}` } : {}
                 });
                 const data = await res.json();

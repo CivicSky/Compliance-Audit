@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { API_BASE_URL } from "../../utils/apiBase";
 export default function AuditLogs() {
 
     const [logs, setLogs] = useState([]);
@@ -345,7 +346,10 @@ export default function AuditLogs() {
     useEffect(() => {
         const fetchLogs = async () => {
             try {
-                const res = await fetch("/api/logs");
+                const token = localStorage.getItem("token");
+                const res = await fetch(`${API_BASE_URL}/api/logs`, {
+                    headers: token ? { Authorization: `Bearer ${token}` } : {}
+                });
                 const data = await res.json();
                 const logsArr = data.logs || [];
                 const sorted = [...logsArr].sort(
@@ -365,9 +369,9 @@ export default function AuditLogs() {
         const fetchLookups = async () => {
             try {
                 const [criteriaRes, eventsRes, usersRes] = await Promise.all([
-                    fetch("/api/criteria"),
-                    fetch("/api/events"),
-                    fetch("/api/user")
+                    fetch(`${API_BASE_URL}/api/criteria`),
+                    fetch(`${API_BASE_URL}/api/events`),
+                    fetch(`${API_BASE_URL}/api/user`)
                 ]);
 
                 if (criteriaRes.ok) {

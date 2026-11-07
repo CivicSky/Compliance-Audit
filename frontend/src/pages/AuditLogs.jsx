@@ -5,6 +5,7 @@ import Header from "../components/Header/header";
 import { AuditLogsSkeleton } from "../components/UI/Skeleton";
 import { useLiveRefresh } from "../utils/liveSync";
 import ServerOfflineState from "../components/UI/ServerOfflineState";
+import { API_BASE_URL } from "../utils/apiBase";
 import { Activity, Plus, FileEdit, ShieldAlert, X, FileText, Award } from "lucide-react";
 
 import {
@@ -127,7 +128,7 @@ export default function AuditLogs() {
             setServerError(null);
 
             const token = localStorage.getItem("token");
-            const res = await fetch(`/api/logs?page=${currentPage}&limit=${itemsPerPage}`, {
+            const res = await fetch(`${API_BASE_URL}/api/logs?page=${currentPage}&limit=${itemsPerPage}`, {
                 headers: token ? { Authorization: `Bearer ${token}` } : {}
             });
             if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to fetch logs`);
@@ -171,13 +172,15 @@ export default function AuditLogs() {
     useEffect(() => {
         const fetchLookups = async () => {
             try {
+                const token = localStorage.getItem("token");
+                const headers = token ? { Authorization: `Bearer ${token}` } : {};
                 const [eventsRes, areasRes, criteriaRes, reqsRes, officesRes, usersRes] = await Promise.all([
-                    fetch("/api/events").catch(() => null),
-                    fetch("/api/areas").catch(() => null),
-                    fetch("/api/criteria").catch(() => null),
-                    fetch("/api/requirements").catch(() => null),
-                    fetch("/api/offices").catch(() => null),
-                    fetch("/api/user").catch(() => null)
+                    fetch(`${API_BASE_URL}/api/events`, { headers }).catch(() => null),
+                    fetch(`${API_BASE_URL}/api/areas`, { headers }).catch(() => null),
+                    fetch(`${API_BASE_URL}/api/criteria`, { headers }).catch(() => null),
+                    fetch(`${API_BASE_URL}/api/requirements`, { headers }).catch(() => null),
+                    fetch(`${API_BASE_URL}/api/offices`, { headers }).catch(() => null),
+                    fetch(`${API_BASE_URL}/api/user`, { headers }).catch(() => null)
                 ]);
 
                 // 1. Events
