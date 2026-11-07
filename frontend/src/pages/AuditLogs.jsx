@@ -331,10 +331,10 @@ export default function AuditLogs() {
                 </div>
             </div>
 
-            <div className="flex-1 min-h-0 px-4 sm:px-6 pt-2.5 pb-10 flex flex-col gap-2.5 overflow-hidden">
+            <div className="flex-1 min-h-0 px-4 sm:px-6 pt-2 pb-3 sm:pb-3.5 flex flex-col gap-2.5 overflow-hidden">
                 {/* Stat Cards Grid */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 shrink-0">
-                        <div className="rounded-xl border border-slate-200/90 bg-white py-2 px-3 shadow-2xs flex items-center justify-between hover:border-slate-300 transition">
+                        <div className="rounded-xl border border-slate-200/90 bg-white p-2.5 sm:p-3 shadow-2xs flex items-center justify-between hover:border-slate-300 transition">
                             <div>
                                 <p className="text-[11px] font-semibold text-slate-500">Total Activities</p>
                                 <p className="text-xl font-bold text-slate-900 mt-0.5">{stats.total}</p>
@@ -344,7 +344,7 @@ export default function AuditLogs() {
                             </div>
                         </div>
 
-                        <div className="rounded-xl border border-emerald-200/70 bg-emerald-50/30 py-2 px-3 shadow-2xs flex items-center justify-between hover:border-emerald-300 transition">
+                        <div className="rounded-xl border border-emerald-200/70 bg-emerald-50/30 p-2.5 sm:p-3 shadow-2xs flex items-center justify-between hover:border-emerald-300 transition">
                             <div>
                                 <p className="text-[11px] font-semibold text-emerald-800">Created Records</p>
                                 <p className="text-xl font-bold text-emerald-700 mt-0.5">{stats.created}</p>
@@ -354,7 +354,7 @@ export default function AuditLogs() {
                             </div>
                         </div>
 
-                        <div className="rounded-xl border border-indigo-200/70 bg-indigo-50/30 py-2 px-3 shadow-2xs flex items-center justify-between hover:border-indigo-300 transition">
+                        <div className="rounded-xl border border-indigo-200/70 bg-indigo-50/30 p-2.5 sm:p-3 shadow-2xs flex items-center justify-between hover:border-indigo-300 transition">
                             <div>
                                 <p className="text-[11px] font-semibold text-indigo-800">Updated Records</p>
                                 <p className="text-xl font-bold text-indigo-700 mt-0.5">{stats.updated}</p>
@@ -364,7 +364,7 @@ export default function AuditLogs() {
                             </div>
                         </div>
 
-                        <div className="rounded-xl border border-rose-200/70 bg-rose-50/30 py-2 px-3 shadow-2xs flex items-center justify-between hover:border-rose-300 transition">
+                        <div className="rounded-xl border border-rose-200/70 bg-rose-50/30 p-2.5 sm:p-3 shadow-2xs flex items-center justify-between hover:border-rose-300 transition">
                             <div>
                                 <p className="text-[11px] font-semibold text-rose-800">Security & Deletions</p>
                                 <p className="text-xl font-bold text-rose-700 mt-0.5">{stats.deletedAndAuth}</p>
@@ -378,7 +378,7 @@ export default function AuditLogs() {
                     {/* Main Card Container */}
                     <div className="bg-white rounded-2xl shadow-xs border border-slate-200/90 flex flex-col overflow-hidden flex-1 min-h-0">
                     {/* Filter Toolbar */}
-                    <div className="px-4 py-2.5 border-b border-slate-200/90 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+                    <div className="px-4 py-2 border-b border-slate-200/90 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
                         <div className="flex items-center gap-2">
                             <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Activity History</h2>
                             <span className="rounded-full bg-slate-200/70 px-2 py-0.5 text-[11px] font-bold text-slate-700">
@@ -448,7 +448,7 @@ export default function AuditLogs() {
 
                     {loading ? (
                         <div className="flex-1 min-h-0 overflow-y-auto app-list-scroll">
-                            <AuditLogsSkeleton count={9} />
+                            <AuditLogsSkeleton count={12} />
                         </div>
                     ) : serverError ? (
                         <ServerOfflineState
@@ -479,7 +479,7 @@ export default function AuditLogs() {
                             )}
                         </div>
                     ) : (
-                        <div className="flex-1 overflow-y-auto divide-y divide-slate-100 min-h-0 [contain:content] app-list-scroll">
+                        <div className="flex-1 overflow-y-auto divide-y divide-slate-100 min-h-0 [contain:content] app-list-scroll pb-10">
                             {visibleLogs.map((log) => {
                                 const action = log.normalizedAction;
                                 const style = actionStyles[action] || actionStyles.default;
@@ -496,7 +496,7 @@ export default function AuditLogs() {
                                         className="group transition-colors hover:bg-slate-50/80"
                                     >
                                         <div
-                                            className="flex items-center justify-between px-4 py-1.5 text-xs cursor-pointer gap-3"
+                                            className="flex items-center justify-between px-4 py-2 text-xs cursor-pointer gap-3"
                                             onClick={() => setExpandedLogId(prev => prev === log.logid ? null : log.logid)}
                                         >
                                             {/* Left: Icon + Action Badge + Message */}
