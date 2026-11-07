@@ -409,6 +409,15 @@ exports.updateHead = async (req, res) => {
     const nextContactInfo = nextContactInfoRaw || null;
     const nextProfilePic = req.file ? req.file.filename : current.profilepic;
 
+    if (req.file) {
+      try {
+        const { uploadToSupabaseBucket } = require('../utils/supabaseStorage');
+        await uploadToSupabaseBucket(req.file.path, req.file.filename, req.file.mimetype, 'profile-pics');
+      } catch (sbErr) {
+        console.warn('Failed to upload head profile pic to Supabase:', sbErr.message);
+      }
+    }
+
     if (!nextFirstName || !nextLastName || !nextPosition) {
       return res.status(400).json({
         success: false,

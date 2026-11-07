@@ -79,6 +79,20 @@ app.use('/uploads', (req, res, next) => {
     }
     next();
 }, express.static('uploads'));
+
+// Profile picture serving with automatic Supabase Storage redirect fallback for cloud deployments (Render/Heroku ephemeral disks)
+const serveProfilePic = (req, res, next) => {
+    const filename = path.basename(req.path);
+    const localPath = path.join(__dirname, 'uploads', 'profile-pics', filename);
+    if (fs.existsSync(localPath)) {
+        return res.sendFile(localPath);
+    }
+    const supabaseUrl = process.env.SUPABASE_URL || 'https://ylluxulqxkjircffndxg.supabase.co';
+    return res.redirect(`${supabaseUrl}/storage/v1/object/public/profile-pics/${filename}`);
+};
+
+app.get('/uploads/profile-pics/:filename', serveProfilePic);
+app.get('/api/uploads/profile-pics/:filename', serveProfilePic);
 app.use('/uploads/profile-pics', express.static('uploads/profile-pics'));
 app.use('/api/uploads/profile-pics', express.static('uploads/profile-pics'));
 app.use('/api/uploads', express.static('uploads'));

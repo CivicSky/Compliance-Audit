@@ -56,6 +56,8 @@ export function getInitials(firstname = '', lastname = '', fullName = '') {
     return 'U';
 }
 
+const SUPABASE_PROFILE_STORAGE = 'https://ylluxulqxkjircffndxg.supabase.co/storage/v1/object/public/profile-pics';
+
 export default function SmartUserAvatar({
     user,
     src,
@@ -71,6 +73,7 @@ export default function SmartUserAvatar({
     onClick,
 }) {
     const [imgFailed, setImgFailed] = useState(false);
+    const [triedSupabaseFallback, setTriedSupabaseFallback] = useState(false);
 
     const firstname = user?.firstname || user?.firstname || '';
     const lastname = user?.lastname || user?.lastname || '';
@@ -86,19 +89,41 @@ export default function SmartUserAvatar({
     // Reset error when source changes
     useEffect(() => {
         setImgFailed(false);
+        setTriedSupabaseFallback(false);
     }, [rawPic]);
 
     const resolvedPicUrl = (() => {
         if (!rawPic || rawPic === '/default-avatar.png') return null;
         if (typeof rawPic !== 'string') return null;
+
+        if (triedSupabaseFallback) {
+            const filename = rawPic.split('/').pop().split('?')[0];
+            return `${SUPABASE_PROFILE_STORAGE}/${filename}`;
+        }
+
         if (rawPic.startsWith('http') || rawPic.startsWith('data:') || rawPic.startsWith('blob:')) {
             return rawPic;
         }
+
+        const cleanName = rawPic.replace(/^\/?(api\/)?uploads\/profile-pics\//, '').replace(/^\//, '');
+        // If clean filename follows standard profile picture naming, prefer direct Supabase permanent storage
+        if (cleanName.toLowerCase().startsWith('profilepic-') || cleanName.toLowerCase().startsWith('profilepic')) {
+            return `${SUPABASE_PROFILE_STORAGE}/${cleanName}`;
+        }
+
         if (rawPic.startsWith('/uploads')) {
             return `${API_BASE_URL}${rawPic}`;
         }
         return `${API_BASE_URL}/uploads/profile-pics/${rawPic}`;
     })();
+
+    const handleImageError = () => {
+        if (!triedSupabaseFallback && typeof rawPic === 'string' && (rawPic.toLowerCase().includes('profilepic') || rawPic.includes('/uploads/profile-pics/'))) {
+            setTriedSupabaseFallback(true);
+        } else {
+            setImgFailed(true);
+        }
+    };
 
     if (resolvedPicUrl && !imgFailed) {
         return (
@@ -108,7 +133,7 @@ export default function SmartUserAvatar({
                 title={tooltip}
                 onClick={onClick}
                 className={`${size} shrink-0 ${shape} object-cover shadow-2xs ${ring} ${className}`}
-                onError={() => setImgFailed(true)}
+                onError={handleImageError}
             />
         );
     }
