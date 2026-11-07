@@ -649,32 +649,41 @@ export default function DeficiencyTracker({
                 </div>
             </div>
 
-            {/* Unified Toolbar: Search Input + Status / Sort Dropdown */}
-            <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="relative flex-1 max-w-md">
-                    <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                        type="text"
-                        placeholder={mainViewMode === "standards" ? "Search code, standard title, or office..." : "Search program, office, or personnel..."}
-                        value={searchTerm}
-                        onChange={(e) => {
-                            setSearchTerm(e.target.value);
-                            setCurrentPage(1);
-                        }}
-                        className="h-8.5 w-full rounded-xl border border-slate-200 bg-slate-50/60 pl-9 pr-8 text-xs text-slate-800 placeholder-slate-400 transition focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none hover:border-slate-300"
-                    />
-                    {searchTerm && (
-                        <button
-                            type="button"
-                            onClick={() => setSearchTerm("")}
-                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-                        >
-                            <X size={13} />
-                        </button>
-                    )}
+            {/* Unified Toolbar: Section Badge + Search & Status/Sort Filter */}
+            <div className="mt-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                        {mainViewMode === "standards" ? "Standards List" : "Units & Programs"}
+                    </span>
+                    <span className="rounded-full bg-slate-100 border border-slate-200/80 px-2 py-0.5 text-[11px] font-bold text-slate-700">
+                        {mainViewMode === "standards" ? `${filteredStandardRows.length} standard(s)` : `${filteredAndSortedOffices.length} unit(s)`}
+                    </span>
                 </div>
 
-                <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 self-start sm:self-auto w-full sm:w-auto">
+                    <div className="relative w-full sm:w-72 md:w-80">
+                        <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                            type="text"
+                            placeholder={mainViewMode === "standards" ? "Search code, standard title, or office..." : "Search program, office, or personnel..."}
+                            value={searchTerm}
+                            onChange={(e) => {
+                                setSearchTerm(e.target.value);
+                                setCurrentPage(1);
+                            }}
+                            className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50/60 pl-9 pr-8 text-xs text-slate-800 placeholder-slate-400 transition focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none hover:border-slate-300 shadow-2xs"
+                        />
+                        {searchTerm && (
+                            <button
+                                type="button"
+                                onClick={() => setSearchTerm("")}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                            >
+                                <X size={13} />
+                            </button>
+                        )}
+                    </div>
+
                     {mainViewMode === "standards" ? (
                         <CustomDropdown
                             value={standardStatusFilter}
