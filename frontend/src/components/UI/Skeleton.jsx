@@ -236,3 +236,52 @@ export function StandardsSkeleton({ count = 4 }) {
   );
 }
 
+/**
+ * Skeleton loader matching the actual compact list layout of Audit Logs & Security Trails.
+ */
+export function AuditLogsSkeleton({ count = 9 }) {
+  return (
+    <div className="w-full divide-y divide-slate-100 animate-pulse">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="flex items-center justify-between px-4 py-2 gap-3">
+          {/* Left: Icon + Action Badge + Message Title + Subtitle */}
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            <div className="h-7 w-7 shrink-0 rounded-lg bg-slate-200" />
+            <div className="min-w-0 flex-1 space-y-1">
+              <div className="flex items-center gap-1.5">
+                <div className="h-4 w-12 bg-slate-200 rounded-full shrink-0" />
+                <div
+                  className={`h-3 bg-slate-200 rounded ${
+                    i % 4 === 0
+                      ? 'w-2/3'
+                      : i % 4 === 1
+                      ? 'w-1/2'
+                      : i % 4 === 2
+                      ? 'w-3/5'
+                      : 'w-4/5'
+                  }`}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="h-2.5 bg-slate-100 rounded w-28" />
+                <div className="h-2.5 bg-slate-100 rounded w-16" />
+                <div className="h-2.5 bg-slate-100 rounded w-36 hidden sm:block" />
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Timestamp & Chevron */}
+          <div className="flex items-center gap-2.5 shrink-0">
+            <div className="space-y-1 flex flex-col items-end">
+              <div className="h-3 w-16 bg-slate-200 rounded" />
+              <div className="h-2.5 w-14 bg-slate-100 rounded" />
+            </div>
+            <div className="w-3.5 h-3.5 rounded bg-slate-200/80 shrink-0" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+

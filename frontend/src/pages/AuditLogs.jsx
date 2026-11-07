@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import Pagination from "../components/Pagination/Pagination";
 import CustomDropdown from "../components/UI/CustomDropdown";
 import Header from "../components/Header/header";
-import { CardListSkeleton } from "../components/UI/Skeleton";
+import { AuditLogsSkeleton } from "../components/UI/Skeleton";
 import { useLiveRefresh } from "../utils/liveSync";
 import ServerOfflineState from "../components/UI/ServerOfflineState";
 import { Activity, Plus, FileEdit, ShieldAlert, X, FileText, Award } from "lucide-react";
@@ -448,7 +448,7 @@ export default function AuditLogs() {
 
                     {loading ? (
                         <div className="flex-1 overflow-y-auto">
-                            <CardListSkeleton count={9} />
+                            <AuditLogsSkeleton count={itemsPerPage} />
                         </div>
                     ) : serverError ? (
                         <ServerOfflineState
