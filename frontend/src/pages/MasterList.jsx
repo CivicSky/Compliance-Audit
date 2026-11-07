@@ -163,12 +163,12 @@ export default function MasterList() {
     return filtered.sort((a, b) => a.name.localeCompare(b.name));
   }, [items, departmentFilter, searchTerm, typeFilter]);
 
-  const itemsPerPage = 12; // 4x3 grid for card view
+  const itemsPerPage = viewMode === 'list' ? 30 : 12;
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / itemsPerPage));
   const safePage = Math.min(currentPage, totalPages);
   const startIndex = (safePage - 1) * itemsPerPage;
   const paginatedItems = filteredItems.slice(startIndex, startIndex + itemsPerPage);
-  const visibleItems = viewMode === 'list' ? filteredItems : paginatedItems;
+  const visibleItems = paginatedItems;
 
   const renderItemIcon = (itemOrType) => {
     const isAcademic = typeof itemOrType === 'object' && itemOrType !== null
@@ -397,12 +397,11 @@ export default function MasterList() {
         </div>
       </div>
 
-      <div className="flex-1 px-4 sm:px-6 pt-1 pb-3.5 flex flex-col">
+      <div className={`flex-1 px-4 sm:px-6 pt-1 ${viewMode === 'list' ? 'pb-3' : 'pb-8'} flex flex-col min-h-0 overflow-hidden`}>
 
         {/* Content Area */}
         <div 
-          className={`flex-1 ${viewMode === 'list' && !serverError && filteredItems.length > 0 ? 'app-list-scroll overflow-x-auto pr-1' : 'flex flex-col h-full overflow-hidden'}`}
-          style={viewMode === 'list' ? { height: '548px', minHeight: '548px', maxHeight: '548px' } : undefined}
+          className={`flex-1 min-h-0 ${viewMode === 'list' && !serverError && filteredItems.length > 0 ? 'app-list-scroll overflow-auto pr-1' : 'flex flex-col h-full overflow-hidden'}`}
         >
           {loadingItems ? (
             <MasterListSkeleton count={9} />
@@ -449,7 +448,7 @@ export default function MasterList() {
               ) : null}
             </div>
           ) : viewMode === 'list' ? (
-            <div className="flex flex-col min-w-[760px] pb-1">
+            <div className="flex flex-col min-w-[760px] pb-14">
               {/* Sticky Header Row matching Programs & Offices */}
               <div className="grid grid-cols-[minmax(220px,1fr)_160px_160px_120px_80px] gap-6 px-6 py-2 bg-white border border-slate-200 rounded-xl shadow-xs text-xs font-semibold text-slate-700 sticky top-0 z-20 mb-1.5">
                 <div className="flex items-center">Office Name</div>
@@ -710,8 +709,8 @@ export default function MasterList() {
           )}
         </div>
 
-        {/* Bottom Pagination (Grid/Card mode only - removed in list mode per request) */}
-        {viewMode === 'grid' && !loadingItems && !serverError && filteredItems.length > 0 && (
+        {/* Bottom Pagination (Grid and List mode) */}
+        {!loadingItems && !serverError && filteredItems.length > 0 && (
           <div className="mt-1 shrink-0">
             <Pagination
               currentPage={currentPage}
