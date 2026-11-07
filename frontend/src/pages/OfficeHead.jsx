@@ -329,7 +329,7 @@ export default function OfficeHead() {
             </div>
 
             {/* Content Container */}
-            <div className="flex-1 min-h-0 flex flex-col px-4 sm:px-6 pt-3 pb-3 overflow-hidden">
+            <div className={`flex-1 min-h-0 flex flex-col px-4 sm:px-6 pt-3 ${viewMode === 'list' ? 'pb-3' : 'pb-8'} overflow-hidden`}>
                 <div className={`relative z-10 flex-1 min-h-0 ${viewMode === 'list' ? 'app-list-scroll overflow-auto pr-1' : 'flex flex-col h-full overflow-hidden'}`}>
                     <div className={`${viewMode === 'list' ? 'flex flex-col gap-0 min-w-[720px] pb-14' : 'flex-1 min-h-0 h-full flex flex-col overflow-hidden'}`}>
                         <OfficeHeadP 

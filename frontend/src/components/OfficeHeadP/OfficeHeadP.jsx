@@ -518,7 +518,7 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
         return false;
     };
 
-    const itemsPerPage = 30; // 30 items per page
+    const itemsPerPage = viewMode === 'list' ? 30 : 12;
     const totalPages = Math.max(1, Math.ceil(filteredOfficeHeads.length / itemsPerPage));
     const startIdx = (currentPage - 1) * itemsPerPage;
     const paginatedOfficeHeads = filteredOfficeHeads.slice(startIdx, startIdx + itemsPerPage);
@@ -601,7 +601,7 @@ const OfficeHeadP = forwardRef(({ searchTerm = '', sortType = 'name', deleteMode
                 </div>
             )}
 
-            <div className={viewMode === 'list' ? 'flex flex-col gap-2 pt-1 pb-14' : 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-2.5 lg:gap-3 flex-1 min-h-0 p-1 pb-14 overflow-y-auto'}>
+            <div className={viewMode === 'list' ? 'flex flex-col gap-2 pt-1 pb-14' : 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 grid-rows-3 gap-2 sm:gap-2.5 lg:gap-3 flex-1 min-h-0 h-full p-1 overflow-hidden'}>
                 {visibleOfficeHeads.map((person) => {
                     const fullName = `${person.firstname || ''}${person.middleinitial ? ' ' + person.middleinitial + '.' : ''} ${person.lastname || ''}`.trim() || 'Personnel';
                     const initials = `${(person.firstname || '').trim().charAt(0)}${(person.lastname || '').trim().charAt(0)}`.toUpperCase() || 'OP';
