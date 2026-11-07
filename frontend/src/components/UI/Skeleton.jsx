@@ -243,7 +243,7 @@ export function AuditLogsSkeleton({ count = 9 }) {
   return (
     <div className="w-full divide-y divide-slate-100 animate-pulse">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="flex items-center justify-between px-4 py-2 gap-3">
+        <div key={i} className="flex items-center justify-between px-4 py-1.5 gap-3">
           {/* Left: Icon + Action Badge + Message Title + Subtitle */}
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
             <div className="h-7 w-7 shrink-0 rounded-lg bg-slate-200" />
