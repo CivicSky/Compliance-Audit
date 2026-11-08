@@ -1048,7 +1048,7 @@ export default function DeficiencyTracker({
                                             <div className="min-w-0 flex-1">
                                                 <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full mb-1 ${
                                                     unit.isAcademic
-                                                        ? "bg-purple-100 text-purple-800"
+                                                        ? "bg-blue-100 text-blue-800"
                                                         : "bg-teal-100 text-teal-800"
                                                 }`}>
                                                     {unit.categoryName}

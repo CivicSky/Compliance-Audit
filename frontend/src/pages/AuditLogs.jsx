@@ -587,8 +587,8 @@ export default function AuditLogs() {
                                                     )}
 
                                                     {ctx.critLabel && (
-                                                        <div className="rounded-xl border border-purple-200/80 bg-white p-3 shadow-2xs">
-                                                            <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 flex items-center gap-1">
+                                                        <div className="rounded-xl border border-cyan-200/80 bg-white p-3 shadow-2xs">
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-700 flex items-center gap-1">
                                                                 Sub Area
                                                             </span>
                                                             <span className="text-xs font-bold text-slate-900 mt-1 block">{ctx.critLabel}</span>

@@ -39,8 +39,8 @@ export const actionStyles = {
         )
     },
     Login: {
-        badge: "bg-violet-100/90 text-violet-800 border-violet-300/80",
-        iconBg: "bg-violet-500 text-white",
+        badge: "bg-blue-100/90 text-blue-800 border-blue-300/80",
+        iconBg: "bg-blue-600 text-white",
         icon: (
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l3 3m0 0l-3 3m3-3H2.25" />
