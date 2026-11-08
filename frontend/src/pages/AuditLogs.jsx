@@ -337,49 +337,49 @@ export default function AuditLogs() {
             <div className="flex-1 min-h-0 px-4 sm:px-6 pt-1.5 pb-1 sm:pb-1.5 flex flex-col gap-2 overflow-hidden">
                 {/* Stat Cards Grid */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5 shrink-0">
-                        <div className="rounded-xl border border-slate-200/90 bg-white py-2 px-3 shadow-2xs flex items-center justify-between hover:border-slate-300 transition">
-                            <div>
-                                <p className="text-[11px] font-semibold text-slate-500">Total Activities</p>
-                                <p className="text-xl font-bold text-slate-900 mt-0.5">{stats.total}</p>
-                            </div>
-                            <div className="h-8.5 w-8.5 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-sm shadow-2xs">
-                                <Activity className="w-4 h-4 text-slate-700" />
-                            </div>
+                    <div className="rounded-xl border border-slate-200/90 bg-white py-2 px-3 shadow-2xs flex items-center justify-between hover:border-slate-300 transition">
+                        <div>
+                            <p className="text-[11px] font-semibold text-slate-500">Total Activities</p>
+                            <p className="text-xl font-bold text-slate-900 mt-0.5">{stats.total}</p>
                         </div>
-
-                        <div className="rounded-xl border border-emerald-200/70 bg-emerald-50/30 py-2 px-3 shadow-2xs flex items-center justify-between hover:border-emerald-300 transition">
-                            <div>
-                                <p className="text-[11px] font-semibold text-emerald-800">Created Records</p>
-                                <p className="text-xl font-bold text-emerald-700 mt-0.5">{stats.created}</p>
-                            </div>
-                            <div className="h-8.5 w-8.5 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-sm shadow-2xs">
-                                <Plus className="w-4 h-4 text-emerald-700" />
-                            </div>
-                        </div>
-
-                        <div className="rounded-xl border border-indigo-200/70 bg-indigo-50/30 py-2 px-3 shadow-2xs flex items-center justify-between hover:border-indigo-300 transition">
-                            <div>
-                                <p className="text-[11px] font-semibold text-indigo-800">Updated Records</p>
-                                <p className="text-xl font-bold text-indigo-700 mt-0.5">{stats.updated}</p>
-                            </div>
-                            <div className="h-8.5 w-8.5 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm shadow-2xs">
-                                <FileEdit className="w-4 h-4 text-indigo-700" />
-                            </div>
-                        </div>
-
-                        <div className="rounded-xl border border-rose-200/70 bg-rose-50/30 py-2 px-3 shadow-2xs flex items-center justify-between hover:border-rose-300 transition">
-                            <div>
-                                <p className="text-[11px] font-semibold text-rose-800">Security & Deletions</p>
-                                <p className="text-xl font-bold text-rose-700 mt-0.5">{stats.deletedAndAuth}</p>
-                            </div>
-                            <div className="h-8.5 w-8.5 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center font-bold text-sm shadow-2xs">
-                                <ShieldAlert className="w-4 h-4 text-rose-700" />
-                            </div>
+                        <div className="h-8.5 w-8.5 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-sm shadow-2xs">
+                            <Activity className="w-4 h-4 text-slate-700" />
                         </div>
                     </div>
 
-                    {/* Main Card Container */}
-                    <div className="bg-white rounded-2xl shadow-xs border border-slate-200/90 flex flex-col overflow-hidden flex-1 min-h-0">
+                    <div className="rounded-xl border border-emerald-200/70 bg-emerald-50/30 py-2 px-3 shadow-2xs flex items-center justify-between hover:border-emerald-300 transition">
+                        <div>
+                            <p className="text-[11px] font-semibold text-emerald-800">Created Records</p>
+                            <p className="text-xl font-bold text-emerald-700 mt-0.5">{stats.created}</p>
+                        </div>
+                        <div className="h-8.5 w-8.5 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-sm shadow-2xs">
+                            <Plus className="w-4 h-4 text-emerald-700" />
+                        </div>
+                    </div>
+
+                    <div className="rounded-xl border border-indigo-200/70 bg-indigo-50/30 py-2 px-3 shadow-2xs flex items-center justify-between hover:border-indigo-300 transition">
+                        <div>
+                            <p className="text-[11px] font-semibold text-indigo-800">Updated Records</p>
+                            <p className="text-xl font-bold text-indigo-700 mt-0.5">{stats.updated}</p>
+                        </div>
+                        <div className="h-8.5 w-8.5 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm shadow-2xs">
+                            <FileEdit className="w-4 h-4 text-indigo-700" />
+                        </div>
+                    </div>
+
+                    <div className="rounded-xl border border-rose-200/70 bg-rose-50/30 py-2 px-3 shadow-2xs flex items-center justify-between hover:border-rose-300 transition">
+                        <div>
+                            <p className="text-[11px] font-semibold text-rose-800">Security & Deletions</p>
+                            <p className="text-xl font-bold text-rose-700 mt-0.5">{stats.deletedAndAuth}</p>
+                        </div>
+                        <div className="h-8.5 w-8.5 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center font-bold text-sm shadow-2xs">
+                            <ShieldAlert className="w-4 h-4 text-rose-700" />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Main Card Container */}
+                <div className="bg-white rounded-2xl shadow-xs border border-slate-200/90 flex flex-col overflow-hidden flex-1 min-h-0">
                     {/* Filter Toolbar */}
                     <div className="px-4 py-1.5 border-b border-slate-200/90 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
                         <div className="flex items-center gap-2">
@@ -458,8 +458,8 @@ export default function AuditLogs() {
                             onRetry={() => fetchLogs(true)}
                             isRetrying={isRetrying}
                             title={serverError === 'Server Offline' ? 'Backend Server Unavailable' : 'Unable to Load Logs'}
-                            message={serverError === 'Server Offline' 
-                                ? 'The backend server is unreachable or offline. If you stopped the backend server, please start it and click Retry Connection.' 
+                            message={serverError === 'Server Offline'
+                                ? 'The backend server is unreachable or offline. If you stopped the backend server, please start it and click Retry Connection.'
                                 : serverError}
                         />
                     ) : filteredLogs.length === 0 ? (
