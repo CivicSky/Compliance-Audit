@@ -1,16 +1,15 @@
 const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');
-
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '';
+const path = require('path');
 
 async function uploadToSupabaseBucket(fileSource, filename, mimeType, bucket = 'proof-documents') {
+  const currentUrl = process.env.SUPABASE_URL;
   const currentKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '';
-  if (!currentKey) {
+  if (!currentUrl || !currentKey) {
     throw new Error('Supabase Storage key missing in backend/.env! Please add SUPABASE_ANON_KEY or SUPABASE_SERVICE_ROLE_KEY.');
   }
 
-  const client = createClient(supabaseUrl, currentKey);
+  const client = createClient(currentUrl, currentKey);
 
   // 2. Read buffer
   let fileBuffer;
@@ -49,10 +48,16 @@ async function uploadToSupabaseBucket(fileSource, filename, mimeType, bucket = '
  * Deletes a file from Supabase Storage Bucket.
  */
 async function deleteFromSupabaseBucket(filepath, bucket = 'proof-documents') {
+  const currentUrl = process.env.SUPABASE_URL;
   const currentKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '';
-  if (!currentKey || !filepath) return;
-  const client = createClient(supabaseUrl, currentKey);
-  const cleanPath = filepath.replace(/^\//, '').replace(/^.*\/storage\/v1\/object\/public\/[^\/]+\//, '');
+  if (!currentUrl || !currentKey || !filepath) return;
+  const client = createClient(currentUrl, currentKey);
+  const cleanPath = String(filepath)
+    .split('?')[0]
+    .replace(/^\//, '')
+    .replace(/^.*\/storage\/v1\/object\/public\/[^\/]+\//, '')
+    .replace(/^uploads\/profile-pics\//, '');
+  if (!cleanPath) return;
   try {
     await client.storage.from(bucket).remove([cleanPath]);
   } catch (err) {
@@ -60,7 +65,29 @@ async function deleteFromSupabaseBucket(filepath, bucket = 'proof-documents') {
   }
 }
 
+/**
+ * Deletes an old profile picture from both local disk (uploads/profile-pics)
+ * and the Supabase 'profile-pics' storage bucket.
+ */
+async function deleteProfilePicFile(oldProfilePic) {
+  if (!oldProfilePic || typeof oldProfilePic !== 'string') return;
+  const cleanName = path.basename(oldProfilePic.split('?')[0].trim());
+  if (!cleanName || cleanName === 'null' || cleanName === 'undefined') return;
+
+  const localPath = path.join(__dirname, '..', 'uploads', 'profile-pics', cleanName);
+  try {
+    if (fs.existsSync(localPath)) {
+      fs.unlinkSync(localPath);
+    }
+  } catch (fsErr) {
+    console.warn('Local profile pic delete warning:', fsErr.message);
+  }
+
+  await deleteFromSupabaseBucket(cleanName, 'profile-pics');
+}
+
 module.exports = {
   uploadToSupabaseBucket,
-  deleteFromSupabaseBucket
+  deleteFromSupabaseBucket,
+  deleteProfilePicFile
 };

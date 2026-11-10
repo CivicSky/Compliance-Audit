@@ -110,6 +110,7 @@ export default function ViewReqPASSCUModal({
     const [removingReqId, setRemovingReqId] = useState(null);
     const [expandedReqs, setExpandedReqs] = useState([]);
     const [gridModalData, setGridModalData] = useState(null);
+    const pendingStatusUpdatesRef = useRef(new Map());
 
     const currentRoleId = Number(currentUser?.roleid || 0);
     const isAdmin = currentRoleId === 1;
@@ -391,7 +392,42 @@ export default function ViewReqPASSCUModal({
         }
     }, [isOpen, office]);
 
-    const fetchOfficeRequirements = async (isBackground = null) => {
+    const computeOfficeStatsFromReqs = (reqsList) => {
+        const total = Array.isArray(reqsList) ? reqsList.length : 0;
+        if (total === 0) {
+            return {
+                totalrequirements: 0,
+                compliedcount: 0,
+                partiallycompliedcount: 0,
+                notcompliedcount: 0,
+                compliancepercent: 0,
+                overallstatus: 'No Standards'
+            };
+        }
+        let complied = 0;
+        let partially = 0;
+        let notComplied = 0;
+        reqsList.forEach(r => {
+            const s = Number(r.ComplianceStatusID ?? r.compliancestatusid ?? 3);
+            if (s === 5) complied++;
+            else if (s === 4) partially++;
+            else notComplied++;
+        });
+        const compliancepercent = Number((((complied * 100) + (partially * 50)) / total).toFixed(2));
+        let overallstatus = 'Partially Complied';
+        if (complied === total) overallstatus = 'Complied';
+        else if (notComplied === total) overallstatus = 'Not Complied';
+        return {
+            totalrequirements: total,
+            compliedcount: complied,
+            partiallycompliedcount: partially,
+            notcompliedcount: notComplied,
+            compliancepercent,
+            overallstatus
+        };
+    };
+
+    const fetchOfficeRequirements = async (isBackground = null, options = {}) => {
         if (!office?.id) return;
         const shouldBeSilent = isBackground !== null 
             ? Boolean(isBackground) 
@@ -399,8 +435,11 @@ export default function ViewReqPASSCUModal({
         if (!shouldBeSilent) setLoading(true);
         try {
             const response = await api.get(`/api/offices/${office.id}/requirements`);
+            const now = Date.now();
             const reqs = (response.data.data || []).map((req) => {
-                const statusid = Number(
+                const rId = Number(req.requirementid);
+                const pending = pendingStatusUpdatesRef.current.get(rId);
+                let statusid = Number(
                     req.ComplianceStatusID ??
                     req.complianceStatusId ??
                     req.compliancestatusid ??
@@ -408,37 +447,54 @@ export default function ViewReqPASSCUModal({
                     req.status ??
                     3
                 );
+                statusid = [3, 4, 5].includes(statusid) ? statusid : 3;
+
+                if (pending) {
+                    if (pending.inFlight || (now - pending.timestamp < 4000)) {
+                        statusid = pending.statusId;
+                    } else {
+                        pendingStatusUpdatesRef.current.delete(rId);
+                    }
+                }
+
+                const statusName = statusid === 5 ? 'Complied' : statusid === 4 ? 'Partially Complied' : 'Not Complied';
 
                 return {
                     ...req,
-                    requirementid: req.requirementid ?? req.requirementid ?? req.requirementid,
-                    ComplianceStatusID: [3, 4, 5].includes(statusid) ? statusid : 3,
-                    ComplianceStatus: req.ComplianceStatus ?? req.complianceStatus ?? req.ComplianceStatusName ?? req.compliancestatusname,
+                    requirementid: req.requirementid,
+                    compliancestatusid: statusid,
+                    ComplianceStatusID: statusid,
+                    ComplianceStatus: pending ? statusName : (req.ComplianceStatus ?? req.complianceStatus ?? req.ComplianceStatusName ?? req.compliancestatusname ?? statusName),
                     comments: req.comments ?? req.Comments ?? '',
                 };
             });
             setRequirements(reqs);
 
-            const assignedMap = {};
-            await Promise.all(reqs.map(async (req) => {
-                try {
-                    const assignedRes = await requirementsAPI.getAssignedUsers(req.requirementid, office.id);
-                    assignedMap[req.requirementid] = assignedRes.users || assignedRes.data || [];
-                } catch (err) {
-                    console.error(`Error fetching assigned users for req ${req.requirementid}:`, err);
-                    assignedMap[req.requirementid] = [];
-                }
-            }));
-            setAssignedUsersMap(assignedMap);
+            let assignedMap = assignedUsersMap;
+            if (!options.skipAssignedUsers || !assignedUsersMap || Object.keys(assignedUsersMap).length === 0) {
+                assignedMap = {};
+                await Promise.all(reqs.map(async (req) => {
+                    try {
+                        const assignedRes = await requirementsAPI.getAssignedUsers(req.requirementid, office.id);
+                        assignedMap[req.requirementid] = assignedRes.users || assignedRes.data || [];
+                    } catch (err) {
+                        console.error(`Error fetching assigned users for req ${req.requirementid}:`, err);
+                        assignedMap[req.requirementid] = [];
+                    }
+                }));
+                setAssignedUsersMap(assignedMap);
+            }
             
             let updatedOfficeData = null;
             try {
                 const officeResponse = await api.get(`/api/offices/${office.id}`);
                 if (officeResponse.data) {
+                    const hasPending = pendingStatusUpdatesRef.current.size > 0;
+                    const localStats = hasPending ? computeOfficeStatsFromReqs(reqs) : null;
                     updatedOfficeData = {
-                        overallstatus: officeResponse.data.overallstatus,
-                        compliancepercent: officeResponse.data.compliancepercent,
-                        totalrequirements: officeResponse.data.totalrequirements,
+                        overallstatus: localStats ? localStats.overallstatus : officeResponse.data.overallstatus,
+                        compliancepercent: localStats ? localStats.compliancepercent : officeResponse.data.compliancepercent,
+                        totalrequirements: localStats ? localStats.totalrequirements : officeResponse.data.totalrequirements,
                         eventid: officeResponse.data.eventid || office.eventid || null,
                         eventname: officeResponse.data.eventname || office.eventname || null,
                         eventcode: officeResponse.data.eventcode || office.eventcode || null,
@@ -454,7 +510,7 @@ export default function ViewReqPASSCUModal({
 
             // Load personnel assignments for the event so Area and Sub-area personnel markers display
             const effectiveEventId = updatedOfficeData?.eventid || office.eventid || office.event_id || reqs?.[0]?.eventid;
-            if (effectiveEventId) {
+            if (effectiveEventId && (!options.skipAssignedUsers || personnelAssignments.length === 0)) {
                 try {
                     const paRes = await personnelAssignmentsAPI.getByEvent(effectiveEventId);
                     if (paRes?.success) {
@@ -483,6 +539,10 @@ export default function ViewReqPASSCUModal({
     // Real-time live synchronization while modal is open
     useLiveRefresh(async () => {
         if (!isOpen || !office?.id) return;
+        // Skip full refetch while an optimistic status update is actively in flight
+        for (const entry of pendingStatusUpdatesRef.current.values()) {
+            if (entry.inFlight) return;
+        }
         await fetchOfficeRequirements(true);
 
         // If UserFilesGridModal is open, silently refresh its files
@@ -602,9 +662,11 @@ export default function ViewReqPASSCUModal({
     };
 
     const handleStatusChange = async (reqId, newStatusId) => {
+        const numReqId = Number(reqId);
+        const nextStatusId = Number(newStatusId);
         const reqUsers = assignedUsersMap[reqId] || [];
-        const hasUserUploaded = reqUsers.some(u => u?.hasuploaded === 1 || u?.hasuploaded === true);
-        const currentReq = (requirements || []).find(r => r.requirementid === reqId);
+        const hasUserUploaded = reqUsers.some(u => u?.hasuploaded === 1 || u?.hasuploaded === true || Number(u?.totalfiles) > 0);
+        const currentReq = (requirements || []).find(r => Number(r.requirementid) === numReqId);
         const hasProofDoc = currentReq && Boolean(currentReq.documentproof || currentReq.ProofDocument || currentReq.hasProof || currentReq.has_proof || currentReq.file_url);
 
         if (!hasUserUploaded && !hasProofDoc) {
@@ -612,32 +674,85 @@ export default function ViewReqPASSCUModal({
             return;
         }
 
+        const prevStatusId = Number(currentReq?.ComplianceStatusID ?? currentReq?.compliancestatusid ?? 3);
+        const prevStatusName = currentReq?.ComplianceStatus || (prevStatusId === 5 ? 'Complied' : prevStatusId === 4 ? 'Partially Complied' : 'Not Complied');
+        const nextStatusName = nextStatusId === 5 ? 'Complied' : nextStatusId === 4 ? 'Partially Complied' : 'Not Complied';
+        const reqCode = currentReq?.requirementcode || currentReq?.code || '';
+
+        // Record pending optimistic update so background sync never reverts it
+        pendingStatusUpdatesRef.current.set(numReqId, {
+            statusId: nextStatusId,
+            statusName: nextStatusName,
+            inFlight: true,
+            timestamp: Date.now()
+        });
+
+        // Optimistically update requirements & office stats immediately (0ms delay)
+        const updatedReqs = (requirements || []).map(req =>
+            Number(req.requirementid) === numReqId
+                ? {
+                    ...req,
+                    compliancestatusid: nextStatusId,
+                    ComplianceStatusID: nextStatusId,
+                    ComplianceStatus: nextStatusName
+                  }
+                : req
+        );
+        setRequirements(updatedReqs);
+
+        const nextStats = computeOfficeStatsFromReqs(updatedReqs);
+        setOfficeData(prev => ({
+            ...prev,
+            ...nextStats
+        }));
+
+        toast?.({
+            title: 'Compliance Status Updated',
+            description: reqCode
+                ? `Standard ${reqCode} set to ${nextStatusName}.`
+                : `Compliance status set to ${nextStatusName}.`,
+            variant: nextStatusId === 5 ? 'success' : nextStatusId === 4 ? 'warning' : 'info',
+            duration: 2500
+        });
+
+        if (office?.id) {
+            const existingCache = dataCache.get(CacheKeys.officeReqs(office.id));
+            if (existingCache) {
+                dataCache.set(CacheKeys.officeReqs(office.id), {
+                    ...existingCache,
+                    reqs: updatedReqs,
+                    officeData: { ...(existingCache.officeData || office), ...nextStats }
+                });
+            }
+        }
+
         try {
             await api.put(`/api/offices/${office.id}/requirements/${reqId}/status`, {
-                statusid: newStatusId
+                statusid: nextStatusId
             });
-            setRequirements(prev => prev.map(req => 
-                req.requirementid === reqId 
-                    ? { 
-                        ...req, 
-                        ComplianceStatusID: newStatusId,
-                        ComplianceStatus: newStatusId === 5 ? 'Complied' : 
-                                         newStatusId === 4 ? 'Partially Complied' : 'Not Complied'
-                      }
-                    : req
-            ));
-            const officeResponse = await api.get(`/api/offices/${office.id}`);
-            if (officeResponse.data) {
-                setOfficeData(prev => ({
-                    ...prev,
-                    overallstatus: officeResponse.data.overallstatus,
-                    compliancepercent: officeResponse.data.compliancepercent,
-                    totalrequirements: officeResponse.data.totalrequirements,
-                    eventname: officeResponse.data.eventname || officeResponse.data.Event || prev.eventname || null
-                }));
-            }
+            pendingStatusUpdatesRef.current.set(numReqId, {
+                statusId: nextStatusId,
+                statusName: nextStatusName,
+                inFlight: false,
+                timestamp: Date.now()
+            });
         } catch (error) {
             console.error('Error updating status:', error);
+            pendingStatusUpdatesRef.current.delete(numReqId);
+            setRequirements(prev => {
+                const rolledBack = prev.map(req =>
+                    Number(req.requirementid) === numReqId
+                        ? {
+                            ...req,
+                            compliancestatusid: prevStatusId,
+                            ComplianceStatusID: prevStatusId,
+                            ComplianceStatus: prevStatusName
+                          }
+                        : req
+                );
+                setOfficeData(curr => ({ ...curr, ...computeOfficeStatsFromReqs(rolledBack) }));
+                return rolledBack;
+            });
             await showAlert(error.response?.data?.message || error.response?.data?.details || 'Failed to update compliance status');
         }
     };

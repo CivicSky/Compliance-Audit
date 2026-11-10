@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 
 const STATUS_OPTIONS = [
     { id: 3, label: 'Not Complied', shortLabel: 'Not', color: 'rose', dotClass: 'bg-rose-500', textClass: 'text-rose-600', fillClass: 'from-rose-500 to-rose-600' },
@@ -16,8 +16,14 @@ export default function StatusSlider({
     const trackRef = useRef(null);
     const [isDragging, setIsDragging] = useState(false);
     const [dragPercent, setDragPercent] = useState(null);
+    const [optimisticStatusId, setOptimisticStatusId] = useState(() => Number(currentStatusId) || 3);
 
-    const currentIndex = Math.max(0, STATUS_OPTIONS.findIndex(opt => opt.id === Number(currentStatusId)));
+    useEffect(() => {
+        setOptimisticStatusId(Number(currentStatusId) || 3);
+    }, [currentStatusId]);
+
+    const effectiveStatusId = optimisticStatusId;
+    const currentIndex = Math.max(0, STATUS_OPTIONS.findIndex(opt => opt.id === Number(effectiveStatusId)));
     const activeOption = STATUS_OPTIONS[currentIndex] || STATUS_OPTIONS[0];
 
     // Target fill percent based on current index or active drag
@@ -74,7 +80,8 @@ export default function StatusSlider({
                 Math.max(0, Math.round((dragPercent / 100) * (STATUS_OPTIONS.length - 1)))
             );
             const targetOption = STATUS_OPTIONS[nearestIndex];
-            if (targetOption && targetOption.id !== Number(currentStatusId)) {
+            if (targetOption && targetOption.id !== Number(effectiveStatusId)) {
+                setOptimisticStatusId(targetOption.id);
                 onChange?.(targetOption.id);
             }
         }
@@ -94,7 +101,8 @@ export default function StatusSlider({
             return;
         }
         const targetOption = STATUS_OPTIONS[index];
-        if (targetOption && targetOption.id !== Number(currentStatusId)) {
+        if (targetOption && targetOption.id !== Number(effectiveStatusId)) {
+            setOptimisticStatusId(targetOption.id);
             onChange?.(targetOption.id);
         }
     };

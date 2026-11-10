@@ -418,6 +418,16 @@ exports.updateHead = async (req, res) => {
       }
     }
 
+    // Delete old profile picture if it was replaced
+    if (current.profilepic && current.profilepic !== nextProfilePic) {
+      try {
+        const { deleteProfilePicFile } = require('../utils/supabaseStorage');
+        await deleteProfilePicFile(current.profilepic);
+      } catch (delErr) {
+        console.warn('Old head profile pic delete warning:', delErr.message);
+      }
+    }
+
     if (!nextFirstName || !nextLastName || !nextPosition) {
       return res.status(400).json({
         success: false,
@@ -551,7 +561,7 @@ exports.deleteHeads = async (req, res) => {
     // Collect names and user IDs before deletion for readable audit logs and cascading cleanup
     const placeholders = validIds.map(() => '?').join(',');
     const [headsToDelete] = await db.execute(
-      `SELECT h.headid, h.userid, u.firstname, u.lastname, u.Email
+      `SELECT h.headid, h.userid, u.firstname, u.lastname, u.Email, u.profilepic, u.roleid
        FROM headofoffice h
        LEFT JOIN users u ON h.userid = u.userid
        WHERE h.headid IN (${placeholders})`,
@@ -596,6 +606,17 @@ exports.deleteHeads = async (req, res) => {
 
     // 5. Delete corresponding non-admin user accounts from users table so they don't resurrect
     if (userIds.length > 0) {
+      try {
+        const { deleteProfilePicFile } = require('../utils/supabaseStorage');
+        for (const h of headsToDelete) {
+          if (Number(h.roleid) !== 1 && h.profilepic) {
+            await deleteProfilePicFile(h.profilepic).catch(() => {});
+          }
+        }
+      } catch (picErr) {
+        console.warn('Cleanup head profile pics warning:', picErr.message);
+      }
+
       const userPlaceholders = userIds.map(() => '?').join(',');
       try {
         await db.execute(`DELETE FROM users WHERE userid IN (${userPlaceholders}) AND roleid != 1`, userIds);

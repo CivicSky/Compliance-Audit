@@ -1334,8 +1334,9 @@ exports.updateUser = async (req, res) => {
   try {
     const userid = req.params.id;
     const tokenUserId = req.user.userid;
+    const isAdmin = Number(req.user?.roleid) === 1;
 
-    if (parseInt(userid) !== tokenUserId) {
+    if (parseInt(userid) !== tokenUserId && !isAdmin) {
       return res.status(403).json({ success: false, message: "Not authorized" });
     }
 
@@ -1362,6 +1363,16 @@ exports.updateUser = async (req, res) => {
         await uploadToSupabaseBucket(req.file.path, req.file.filename, req.file.mimetype, 'profile-pics');
       } catch (sErr) {
         console.warn('Profile pic cloud upload notice:', sErr.message);
+      }
+    }
+
+    // Delete old profile picture if it was replaced or cleared
+    if (current.profilepic && current.profilepic !== nextProfilePic) {
+      try {
+        const { deleteProfilePicFile } = require('../utils/supabaseStorage');
+        await deleteProfilePicFile(current.profilepic);
+      } catch (delErr) {
+        console.warn('Old profile pic delete warning:', delErr.message);
       }
     }
 
@@ -1415,6 +1426,10 @@ exports.updateApprovalStatus = async (req, res) => {
     // If the user was denied, remove their related records and delete the user
     if (approvalstatus === 'denied') {
       try {
+        if (rows[0]?.profilepic) {
+          const { deleteProfilePicFile } = require('../utils/supabaseStorage');
+          await deleteProfilePicFile(rows[0].profilepic).catch(() => {});
+        }
         // cleanup assignments and headofoffice entries
         await db.query('DELETE FROM requirementuserassignments WHERE userid = ?', [userid]);
         await db.query('DELETE FROM headofoffice WHERE userid = ?', [userid]);
@@ -1545,6 +1560,21 @@ exports.deleteUsers = async (req, res) => {
     }
 
     const placeholders = ids.map(() => '?').join(',');
+
+    // Delete profile pictures of users being deleted
+    try {
+      const [usersToDelete] = await db.query(`SELECT profilepic FROM users WHERE userid IN (${placeholders})`, ids);
+      if (Array.isArray(usersToDelete) && usersToDelete.length > 0) {
+        const { deleteProfilePicFile } = require('../utils/supabaseStorage');
+        for (const u of usersToDelete) {
+          if (u?.profilepic) {
+            await deleteProfilePicFile(u.profilepic).catch(() => {});
+          }
+        }
+      }
+    } catch (picErr) {
+      console.warn('Error deleting user profile pics during bulk delete:', picErr.message);
+    }
 
     // Remove assignments and related records referencing these users
     await db.query(`DELETE FROM requirementuserassignments WHERE userid IN (${placeholders})`, ids);

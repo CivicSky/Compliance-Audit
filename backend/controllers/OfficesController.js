@@ -1659,37 +1659,6 @@ const OfficesController = {
     }
 
     try {
-      // Check existing status to see if statusid is changing
-      const [existingStatusRows] = await db.query(
-        `SELECT status AS "Status" FROM compliancestatusoffices WHERE officeid = ? AND requirementid = ?`,
-        [officeid, requirementid]
-      );
-      const rawCurrentStatus = existingStatusRows[0]?.Status;
-      const currentStatus = rawCurrentStatus != null ? Number(rawCurrentStatus) : 3;
-
-      // If compliance status is actually being elevated to Partially Complied (4) or Complied (5), ensure evidence exists
-      if (nextStatusId !== 3 && nextStatusId !== currentStatus) {
-        const [userUploads] = await db.query(
-          `SELECT COUNT(*) as cnt FROM requirementuserassignments 
-           WHERE officeid = ? AND requirementid = ? AND hasuploaded = TRUE`,
-          [officeid, requirementid]
-        );
-        const [proofDocs] = await db.query(
-          `SELECT COUNT(*) as cnt FROM officeproofdocuments 
-           WHERE officeid = ? AND (requirementid = ? OR requirementid IS NULL)`,
-          [officeid, requirementid]
-        );
-
-        const hasEvidence = (userUploads[0]?.cnt > 0) || (proofDocs[0]?.cnt > 0);
-
-        if (!hasEvidence) {
-          return res.status(400).json({
-            success: false,
-            message: "Cannot set compliance status to Partially Complied or Complied: No evidence or proof document has been uploaded for this requirement yet."
-          });
-        }
-      }
-
       const hasCommentPayload = Object.prototype.hasOwnProperty.call(req.body, 'comments');
       if (hasCommentPayload) {
         let userRoleId = Number(req.user?.roleid || 0);
@@ -1701,6 +1670,43 @@ const OfficesController = {
           return res.status(403).json({
             success: false,
             message: "Forbidden: Only Administrators are permitted to add or edit comments on standards."
+          });
+        }
+      }
+
+      // Check existing status and evidence in parallel
+      const [[existingStatusRows], [userUploads], [proofDocs]] = await Promise.all([
+        db.query(
+          `SELECT status AS "Status" FROM compliancestatusoffices WHERE officeid = ? AND requirementid = ?`,
+          [officeid, requirementid]
+        ),
+        nextStatusId !== 3
+          ? db.query(
+              `SELECT COUNT(*) as cnt FROM requirementuserassignments 
+               WHERE officeid = ? AND requirementid = ? AND hasuploaded = TRUE`,
+              [officeid, requirementid]
+            )
+          : Promise.resolve([[{ cnt: 1 }]]),
+        nextStatusId !== 3
+          ? db.query(
+              `SELECT COUNT(*) as cnt FROM officeproofdocuments 
+               WHERE (officeid = ? AND (requirementid = ? OR requirementid IS NULL))
+                  OR (requirementid = ? AND officeid IS NULL)`,
+              [officeid, requirementid, requirementid]
+            )
+          : Promise.resolve([[{ cnt: 1 }]])
+      ]);
+
+      const rawCurrentStatus = existingStatusRows[0]?.Status ?? existingStatusRows[0]?.status;
+      const currentStatus = rawCurrentStatus != null ? Number(rawCurrentStatus) : 3;
+
+      // If compliance status is actually being elevated to Partially Complied (4) or Complied (5), ensure evidence exists
+      if (nextStatusId !== 3 && nextStatusId !== currentStatus) {
+        const hasEvidence = (Number(userUploads[0]?.cnt) > 0) || (Number(proofDocs[0]?.cnt) > 0);
+        if (!hasEvidence) {
+          return res.status(400).json({
+            success: false,
+            message: "Cannot set compliance status to Partially Complied or Complied: No evidence or proof document has been uploaded for this requirement yet."
           });
         }
       }
@@ -1731,98 +1737,99 @@ const OfficesController = {
       const actorId = req.user?.userid || req.user?.id;
       const statusName = nextStatusId === 5 ? 'Complied' : (nextStatusId === 4 ? 'Partially Complied' : 'Not Complied');
 
-      // Context info for log and notifications
-      try {
-        const [contextRows] = await db.query(`
-          SELECT r.requirementcode, r.description, o.officename, e.eventname
-          FROM requirements r
-          JOIN offices o ON o.officeid = ?
-          LEFT JOIN events e ON e.eventid = o.eventid
-          WHERE r.requirementid = ?
-        `, [officeid, requirementid]);
-
-        const reqCode = contextRows[0]?.requirementcode || `REQ-${requirementid}`;
-        const officeName = contextRows[0]?.officename || `Office #${officeid}`;
-        const eventName = contextRows[0]?.eventname || null;
-
-        // Record Audit Log
-        if (actorId) {
-          await recordLog(actorId, 'ComplianceStatusUpdated', {
-            officeid: Number(officeid),
-            officename: officeName,
-            eventname: eventName,
-            requirementid: Number(requirementid),
-            requirementcode: reqCode,
-            previousStatus: currentStatus ? Number(currentStatus) : null,
-            newStatus: nextStatusId,
-            statusName,
-            comments: hasCommentPayload ? comments : undefined
-          });
-        }
-
-        // Send notifications to assigned personnel and office heads
-        const [assignedUsers] = await db.query(
-          `SELECT userid FROM requirementuserassignments WHERE officeid = ? AND requirementid = ?`,
-          [officeid, requirementid]
-        );
-        const [headUsers] = await db.query(
-          `SELECT u.userid FROM users u
-           JOIN headofoffice h ON u.userid = h.userid
-           JOIN officeheadassignments oha ON h.headid = oha.headid
-           WHERE oha.officeid = ?`,
-          [officeid]
-        );
-
-        const recipientIds = [...new Set([
-          ...(assignedUsers || []).map(u => Number(u.userid)),
-          ...(headUsers || []).map(u => Number(u.userid))
-        ])].filter(id => id !== actorId && id > 0);
-
-        if (recipientIds.length > 0) {
-          const commentNote = hasCommentPayload && comments ? ` Comment: "${comments.slice(0, 80)}${comments.length > 80 ? '...' : ''}"` : '';
-          await createNotifications({
-            userIds: recipientIds,
-            adminid: actorId,
-            title: 'Compliance Status Updated',
-            message: `Compliance status for standard "${reqCode}" in "${officeName}" was updated to "${statusName}".${commentNote}`,
-            type: nextStatusId === 5 ? 'success' : (nextStatusId === 4 ? 'info' : 'warning'),
-            relatedtable: 'compliancestatusoffices',
-            relatedid: Number(officeid),
-            meta: {
-              officeid: Number(officeid),
-              requirementid: Number(requirementid),
-              openSubmission: true
-            }
-          });
-        }
-      } catch (logOrNotifErr) {
-        console.warn('Notice: Error in logging or notifying for status update:', logOrNotifErr.message);
-      }
-
-      try {
-        const { emitDataChange } = require('../socket');
-        emitDataChange('compliance', {
-          action: 'status_updated',
-          officeid: Number(officeid),
-          requirementid: Number(requirementid),
-          statusid: nextStatusId,
-          statusName,
-          comments: hasCommentPayload ? comments : undefined
-        });
-        emitDataChange('requirements', {
-          action: 'status_updated',
-          officeid: Number(officeid),
-          requirementid: Number(requirementid),
-          statusid: nextStatusId,
-          statusName,
-          comments: hasCommentPayload ? comments : undefined
-        });
-      } catch (sErr) {}
-
       res.json({
         success: true,
         message: "Compliance status and comment updated successfully"
       });
+
+      // Run audit log, notifications, and socket broadcast asynchronously without blocking response
+      (async () => {
+        try {
+          const [[contextRows], [assignedUsers], [headUsers]] = await Promise.all([
+            db.query(`
+              SELECT r.requirementcode, r.description, o.officename, e.eventname
+              FROM requirements r
+              JOIN offices o ON o.officeid = ?
+              LEFT JOIN events e ON e.eventid = o.eventid
+              WHERE r.requirementid = ?
+            `, [officeid, requirementid]),
+            db.query(
+              `SELECT userid FROM requirementuserassignments WHERE officeid = ? AND requirementid = ?`,
+              [officeid, requirementid]
+            ),
+            db.query(
+              `SELECT u.userid FROM users u
+               JOIN headofoffice h ON u.userid = h.userid
+               JOIN officeheadassignments oha ON h.headid = oha.headid
+               WHERE oha.officeid = ?`,
+              [officeid]
+            )
+          ]);
+
+          const reqCode = contextRows[0]?.requirementcode || `REQ-${requirementid}`;
+          const officeName = contextRows[0]?.officename || `Office #${officeid}`;
+          const eventName = contextRows[0]?.eventname || null;
+
+          if (actorId) {
+            await recordLog(actorId, 'ComplianceStatusUpdated', {
+              officeid: Number(officeid),
+              officename: officeName,
+              eventname: eventName,
+              requirementid: Number(requirementid),
+              requirementcode: reqCode,
+              previousStatus: currentStatus ? Number(currentStatus) : null,
+              newStatus: nextStatusId,
+              statusName,
+              comments: hasCommentPayload ? comments : undefined
+            });
+          }
+
+          const recipientIds = [...new Set([
+            ...(assignedUsers || []).map(u => Number(u.userid)),
+            ...(headUsers || []).map(u => Number(u.userid))
+          ])].filter(id => id !== actorId && id > 0);
+
+          if (recipientIds.length > 0) {
+            const commentNote = hasCommentPayload && comments ? ` Comment: "${comments.slice(0, 80)}${comments.length > 80 ? '...' : ''}"` : '';
+            await createNotifications({
+              userIds: recipientIds,
+              adminid: actorId,
+              title: 'Compliance Status Updated',
+              message: `Compliance status for standard "${reqCode}" in "${officeName}" was updated to "${statusName}".${commentNote}`,
+              type: nextStatusId === 5 ? 'success' : (nextStatusId === 4 ? 'info' : 'warning'),
+              relatedtable: 'compliancestatusoffices',
+              relatedid: Number(officeid),
+              meta: {
+                officeid: Number(officeid),
+                requirementid: Number(requirementid),
+                openSubmission: true
+              }
+            });
+          }
+        } catch (logOrNotifErr) {
+          console.warn('Notice: Error in logging or notifying for status update:', logOrNotifErr.message);
+        }
+
+        try {
+          const { emitDataChange } = require('../socket');
+          emitDataChange('compliance', {
+            action: 'status_updated',
+            officeid: Number(officeid),
+            requirementid: Number(requirementid),
+            statusid: nextStatusId,
+            statusName,
+            comments: hasCommentPayload ? comments : undefined
+          });
+          emitDataChange('requirements', {
+            action: 'status_updated',
+            officeid: Number(officeid),
+            requirementid: Number(requirementid),
+            statusid: nextStatusId,
+            statusName,
+            comments: hasCommentPayload ? comments : undefined
+          });
+        } catch (sErr) {}
+      })();
     } catch (err) {
       console.error("Error updating requirement status:", err);
       res.status(500).json({
