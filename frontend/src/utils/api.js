@@ -162,8 +162,14 @@ export const officeHeadsAPI = {
 // ========================
 // Users/Auth API
 // ========================
+let loggedInUserPromise = null;
+let loggedInUserCache = { token: null, data: null, timestamp: 0 };
+
 export const usersAPI = {
-  login: async (credentials) => (await api.post('/api/user/login', credentials)).data,
+  login: async (credentials) => {
+    loggedInUserCache = { token: null, data: null, timestamp: 0 };
+    return (await api.post('/api/user/login', credentials)).data;
+  },
   register: async (userData) => (await api.post('/user/register', userData)).data,
   loginStatus: async (email) => (await api.get(`/api/user/login-status?email=${encodeURIComponent(email)}`)).data,
   createRegistrationInvite: async (data = {}) => (await api.post('/api/user/registration-invite', data)).data,
@@ -172,7 +178,27 @@ export const usersAPI = {
   ).data,
   sendChangePasswordOtp: async (data = {}) => (await api.post('/api/user/change-password/send-otp', data)).data,
   verifyAndChangePassword: async (data) => (await api.post('/api/user/change-password/verify-and-change', data)).data,
-  getLoggedInUser: async () => (await api.get('/api/user/me')).data, // JWT required
+  getLoggedInUser: async () => {
+    const token = localStorage.getItem('token');
+    const now = Date.now();
+    if (token && loggedInUserCache.token === token && loggedInUserCache.data && (now - loggedInUserCache.timestamp < 15000)) {
+      return loggedInUserCache.data;
+    }
+    if (loggedInUserPromise) {
+      return loggedInUserPromise;
+    }
+    loggedInUserPromise = api.get('/api/user/me')
+      .then((res) => {
+        if (res.data?.success) {
+          loggedInUserCache = { token, data: res.data, timestamp: Date.now() };
+        }
+        return res.data;
+      })
+      .finally(() => {
+        loggedInUserPromise = null;
+      });
+    return loggedInUserPromise;
+  }, // JWT required
   getAllUsers: async () => (await api.get('/api/user')).data,
   getCurrentUser: async (email) => (await api.get(`/user/current/${email}`)).data,
   updateUser: async (userid, data) => {
@@ -189,6 +215,7 @@ export const usersAPI = {
       },
     });
 
+    loggedInUserCache = { token: null, data: null, timestamp: 0 };
     return response.data;
   },
   updateApprovalStatus: async (userid, approvalstatus) => {

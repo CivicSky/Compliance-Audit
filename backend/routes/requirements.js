@@ -8,13 +8,16 @@ const { auth, restrictAuditor } = require('../middleware/auth');
 const { recordLog } = require('../controllers/logsController');
 const { notifyUsers } = require('../utils/notify');
 
+let reviewColumnsEnsured = false;
 const ensureReviewColumns = async (db) => {
+    if (reviewColumnsEnsured) return;
     try {
         await db.query('ALTER TABLE officeproofdocuments ADD COLUMN IF NOT EXISTS reviewstatus VARCHAR(20) DEFAULT \'pending\'');
         await db.query('ALTER TABLE officeproofdocuments ADD COLUMN IF NOT EXISTS rejectionreason TEXT DEFAULT NULL');
         await db.query('ALTER TABLE officeproofdocuments ADD COLUMN IF NOT EXISTS reviewedby INT DEFAULT NULL');
         await db.query('ALTER TABLE officeproofdocuments ADD COLUMN IF NOT EXISTS reviewedat TIMESTAMP DEFAULT NULL');
         await db.query('ALTER TABLE officeproofdocuments ADD COLUMN IF NOT EXISTS sortorder INT DEFAULT 0');
+        reviewColumnsEnsured = true;
     } catch (e) {
         // Ignored if already exist
     }

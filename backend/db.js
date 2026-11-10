@@ -12,10 +12,12 @@ const isLocal = dbUrl.includes('localhost') || dbUrl.includes('127.0.0.1');
 
 const sql = postgres(dbUrl, {
   ssl: isLocal ? false : { rejectUnauthorized: false },
-  max: 5,
-  idle_timeout: 10,
+  max: 10,
+  idle_timeout: 60,
   connect_timeout: 30,
-  onnotice: () => {},
+  prepare: false,
+  fetch_types: false,
+  onnotice: () => { },
   types: {
     date: {
       to: 1114,

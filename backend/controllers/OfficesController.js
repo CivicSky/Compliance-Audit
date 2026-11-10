@@ -141,16 +141,21 @@ const getOfficeSnapshot = async (officeid) => {
   };
 };
 
+let officeEventColumnsEnsured = false;
+
 const OfficesController = {
   // ================================
   // GET ALL OFFICES (WITH JOINED DATA - SUPPORTS MULTIPLE HEADS)
   // ================================
   getAll: async (req, res) => {
     try {
-      try {
-        await db.query('ALTER TABLE Events ADD COLUMN IF NOT EXISTS islocked BOOLEAN DEFAULT FALSE');
-        await db.query('ALTER TABLE Events ADD COLUMN IF NOT EXISTS deadline TIMESTAMP DEFAULT NULL');
-      } catch (e) {}
+      if (!officeEventColumnsEnsured) {
+        try {
+          await db.query('ALTER TABLE Events ADD COLUMN IF NOT EXISTS islocked BOOLEAN DEFAULT FALSE');
+          await db.query('ALTER TABLE Events ADD COLUMN IF NOT EXISTS deadline TIMESTAMP DEFAULT NULL');
+          officeEventColumnsEnsured = true;
+        } catch (e) {}
+      }
       const roleid = Number(req.user?.roleid || 0);
       const userid = Number(req.user?.userid || 0);
       const isAuditor = roleid === 4;
@@ -177,112 +182,130 @@ const OfficesController = {
           )`
         : '';
 
+      const [[officeRows], [headRows], auditorRows] = await Promise.all([
+        // 1. Get all offices with basic info
+        db.query(`
+          SELECT 
+            o.officeid,
+            COALESCE(m.entityname, o.officename) AS officename,
+            o.masterlistid,
+            o.officetypeid,
+            o.eventid,
+            o.eventdepartmentid,
+            COALESCE(o.accreditationlevel, 'None') AS accreditationlevel,
+            COALESCE(m.entitytypeid, CASE WHEN ot.typename ILIKE '%non%' THEN 2 WHEN ot.typename ILIKE '%academic%' THEN 1 ELSE NULL END) AS entitytypeid,
+            m.departmentid,
+            COALESCE(o.createdat, m.createdat) AS createdat,
+            COALESCE(o.updatedat, m.updatedat, o.createdat, m.createdat) AS updatedat,
+            COALESCE(d.name, NULL) AS department_name,
+            CASE 
+              WHEN m.entitytypeid = 1 THEN 'Academic Program'
+              WHEN m.entitytypeid = 2 THEN 'Non-Academic Office'
+              WHEN ot.typename ILIKE '%non%' THEN 'Non-Academic Office'
+              WHEN ot.typename ILIKE '%academic%' THEN 'Academic Program'
+              ELSE 'Unknown'
+            END AS category_name,
+            e.eventname,
+            e.eventcode,
+            e.islocked AS event_islocked,
+            e.deadline AS event_deadline,
+            ot.typename,
+            os.overallstatus,
+            os.compliancepercent,
+            os.totalrequirements,
+            os.compliedcount,
+            os.partiallycompliedcount,
+            os.notcompliedcount
+          FROM offices o
+          LEFT JOIN masterlist m ON o.masterlistid = m.id
+          LEFT JOIN departments d ON m.departmentid = d.id
+          LEFT JOIN eventdepartments ed ON o.eventdepartmentid = ed.id
+          LEFT JOIN Events e ON o.eventid = e.eventid
+          LEFT JOIN officetypes ot ON o.officetypeid = ot.officetypeid
+          LEFT JOIN (
+            SELECT
+              cso.officeid,
+              COUNT(*) AS totalrequirements,
+              SUM(CASE WHEN cso.Status::text = '5' THEN 1 ELSE 0 END) AS compliedcount,
+              SUM(CASE WHEN cso.Status::text = '4' THEN 1 ELSE 0 END) AS partiallycompliedcount,
+              SUM(CASE WHEN cso.Status::text = '3' THEN 1 ELSE 0 END) AS notcompliedcount,
+              CASE
+                WHEN COUNT(*) = 0 THEN 0
+                ELSE ROUND(
+                  (((SUM(CASE WHEN cso.Status::text = '5' THEN 1.0 ELSE 0.0 END) * 100.0) +
+                  (SUM(CASE WHEN cso.Status::text = '4' THEN 1.0 ELSE 0.0 END) * 50.0)) /
+                  NULLIF(COUNT(*), 0))::numeric,
+                  2
+                )
+              END AS compliancepercent,
+              CASE
+                WHEN COUNT(*) = 0 THEN 'No Standards'
+                WHEN SUM(CASE WHEN cso.Status::text = '5' THEN 1 ELSE 0 END) = COUNT(*) THEN 'Complied'
+                WHEN SUM(CASE WHEN cso.Status::text = '3' THEN 1 ELSE 0 END) = COUNT(*) THEN 'Not Complied'
+                ELSE 'Partially Complied'
+              END AS overallstatus
+            FROM compliancestatusoffices cso
+            GROUP BY cso.officeid
+          ) os ON o.officeid = os.officeid
+          ${officeWhere}
+        `),
+        // 2. Get all heads/personnel assigned to offices
+        db.query(`
+          SELECT DISTINCT
+            assigned.officeid,
+            COALESCE(h.headid, u.userid) AS headid,
+            u.userid,
+            COALESCE(h.Position, 'Personnel') AS Position,
+            u.firstname,
+            u.middleinitial,
+            u.lastname,
+            u.profilepic
+          FROM (
+            SELECT officeid, h.userid
+            FROM officeheadassignments oha
+            INNER JOIN headofoffice h ON oha.headid = h.headid
+            WHERE oha.officeid IS NOT NULL
 
-      // First get all offices with basic info
-      const [officeRows] = await db.query(`
-        SELECT 
-          o.officeid,
-          COALESCE(m.entityname, o.officename) AS officename,
-          o.masterlistid,
-          o.officetypeid,
-          o.eventid,
-          o.eventdepartmentid,
-          COALESCE(o.accreditationlevel, 'None') AS accreditationlevel,
-          COALESCE(m.entitytypeid, CASE WHEN ot.typename ILIKE '%non%' THEN 2 WHEN ot.typename ILIKE '%academic%' THEN 1 ELSE NULL END) AS entitytypeid,
-          m.departmentid,
-          COALESCE(o.createdat, m.createdat) AS createdat,
-          COALESCE(o.updatedat, m.updatedat, o.createdat, m.createdat) AS updatedat,
-          COALESCE(d.name, NULL) AS department_name,
-          CASE 
-            WHEN m.entitytypeid = 1 THEN 'Academic Program'
-            WHEN m.entitytypeid = 2 THEN 'Non-Academic Office'
-            WHEN ot.typename ILIKE '%non%' THEN 'Non-Academic Office'
-            WHEN ot.typename ILIKE '%academic%' THEN 'Academic Program'
-            ELSE 'Unknown'
-          END AS category_name,
-          e.eventname,
-          e.eventcode,
-          e.islocked AS event_islocked,
-          e.deadline AS event_deadline,
-          ot.typename,
-          os.overallstatus,
-          os.compliancepercent,
-          os.totalrequirements,
-          os.compliedcount,
-          os.partiallycompliedcount,
-          os.notcompliedcount
-        FROM offices o
-        LEFT JOIN masterlist m ON o.masterlistid = m.id
-        LEFT JOIN departments d ON m.departmentid = d.id
-        LEFT JOIN eventdepartments ed ON o.eventdepartmentid = ed.id
-        LEFT JOIN Events e ON o.eventid = e.eventid
-        LEFT JOIN officetypes ot ON o.officetypeid = ot.officetypeid
-        LEFT JOIN (
-          SELECT
+            UNION
+
+            SELECT officeid, userid
+            FROM requirementuserassignments
+            WHERE officeid IS NOT NULL AND userid IS NOT NULL
+
+            UNION
+
+            SELECT cso.officeid, pa.userid
+            FROM personnelassignments pa
+            JOIN requirements r ON (
+              (pa.requirementid IS NOT NULL AND r.requirementid = pa.requirementid)
+              OR (pa.criteriaid IS NOT NULL AND r.criteriaid = pa.criteriaid)
+              OR (pa.areaid IS NOT NULL AND r.criteriaid IN (SELECT criteriaid FROM criteria WHERE areaid = pa.areaid))
+            )
+            JOIN compliancestatusoffices cso ON r.requirementid = cso.requirementid
+            WHERE pa.userid IS NOT NULL
+          ) assigned
+          INNER JOIN users u ON assigned.userid = u.userid
+          LEFT JOIN headofoffice h ON u.userid = h.userid
+        `),
+        // 3. Get all auditors assigned to offices
+        db.query(`
+          SELECT DISTINCT 
             cso.officeid,
-            COUNT(*) AS totalrequirements,
-            SUM(CASE WHEN cso.Status::text = '5' THEN 1 ELSE 0 END) AS compliedcount,
-            SUM(CASE WHEN cso.Status::text = '4' THEN 1 ELSE 0 END) AS partiallycompliedcount,
-            SUM(CASE WHEN cso.Status::text = '3' THEN 1 ELSE 0 END) AS notcompliedcount,
-            CASE
-              WHEN COUNT(*) = 0 THEN 0
-              ELSE ROUND(
-                (((SUM(CASE WHEN cso.Status::text = '5' THEN 1.0 ELSE 0.0 END) * 100.0) +
-                (SUM(CASE WHEN cso.Status::text = '4' THEN 1.0 ELSE 0.0 END) * 50.0)) /
-                NULLIF(COUNT(*), 0))::numeric,
-                2
-              )
-            END AS compliancepercent,
-            CASE
-              WHEN COUNT(*) = 0 THEN 'No Standards'
-              WHEN SUM(CASE WHEN cso.Status::text = '5' THEN 1 ELSE 0 END) = COUNT(*) THEN 'Complied'
-              WHEN SUM(CASE WHEN cso.Status::text = '3' THEN 1 ELSE 0 END) = COUNT(*) THEN 'Not Complied'
-              ELSE 'Partially Complied'
-            END AS overallstatus
-          FROM compliancestatusoffices cso
-          GROUP BY cso.officeid
-        ) os ON o.officeid = os.officeid
-        ${officeWhere}
-      `);
-
-      // Get all heads/personnel assigned to offices via officeheadassignments, requirementuserassignments, OR personnelassignments (area/subarea/standard)
-      const [headRows] = await db.query(`
-        SELECT DISTINCT
-          assigned.officeid,
-          COALESCE(h.headid, u.userid) AS headid,
-          u.userid,
-          COALESCE(h.Position, 'Personnel') AS Position,
-          u.firstname,
-          u.middleinitial,
-          u.lastname,
-          u.profilepic
-        FROM (
-          SELECT officeid, h.userid
-          FROM officeheadassignments oha
-          INNER JOIN headofoffice h ON oha.headid = h.headid
-          WHERE oha.officeid IS NOT NULL
-
-          UNION
-
-          SELECT officeid, userid
-          FROM requirementuserassignments
-          WHERE officeid IS NOT NULL AND userid IS NOT NULL
-
-          UNION
-
-          SELECT cso.officeid, pa.userid
-          FROM personnelassignments pa
-          JOIN requirements r ON (
-            (pa.requirementid IS NOT NULL AND r.requirementid = pa.requirementid)
-            OR (pa.criteriaid IS NOT NULL AND r.criteriaid = pa.criteriaid)
-            OR (pa.areaid IS NOT NULL AND r.criteriaid IN (SELECT criteriaid FROM criteria WHERE areaid = pa.areaid))
-          )
+            u.userid,
+            u.firstname,
+            u.middleinitial,
+            u.lastname,
+            u.profilepic,
+            ar.areacode,
+            ar.areaname
+          FROM auditorareaassignments aaa
+          JOIN users u ON aaa.auditoruserid = u.userid
+          JOIN areas ar ON aaa.areaid = ar.areaid
+          JOIN criteria c ON ar.areaid = c.areaid
+          JOIN requirements r ON c.criteriaid = r.criteriaid
           JOIN compliancestatusoffices cso ON r.requirementid = cso.requirementid
-          WHERE pa.userid IS NOT NULL
-        ) assigned
-        INNER JOIN users u ON assigned.userid = u.userid
-        LEFT JOIN headofoffice h ON u.userid = h.userid
-      `);
+        `).then(([auds]) => auds).catch(() => [])
+      ]);
 
       // Group heads by officeid
       const headsByOffice = {};
@@ -310,31 +333,6 @@ const OfficesController = {
           full_name: head.firstname ? `${head.firstname} ${head.middleinitial ? head.middleinitial + '.' : ''} ${head.lastname}`.trim() : 'Unknown'
         });
       });
-
-      // Get all auditors assigned to offices via auditorareaassignments junction
-      let auditorRows = [];
-      try {
-        const [auds] = await db.query(`
-          SELECT DISTINCT 
-            cso.officeid,
-            u.userid,
-            u.firstname,
-            u.middleinitial,
-            u.lastname,
-            u.profilepic,
-            ar.areacode,
-            ar.areaname
-          FROM auditorareaassignments aaa
-          JOIN users u ON aaa.auditoruserid = u.userid
-          JOIN areas ar ON aaa.areaid = ar.areaid
-          JOIN criteria c ON ar.areaid = c.areaid
-          JOIN requirements r ON c.criteriaid = r.criteriaid
-          JOIN compliancestatusoffices cso ON r.requirementid = cso.requirementid
-        `);
-        auditorRows = auds;
-      } catch (audErr) {
-        // auditorareaassignments may not exist or be empty
-      }
 
       const auditorsByOffice = {};
       const seenAuditorsByOffice = {};
@@ -402,7 +400,6 @@ const OfficesController = {
 
       });
 
-      console.log('Formatted offices with multiple heads:', formatted);
       res.json({ success: true, data: formatted });
     } catch (err) {
       console.error("Error fetching offices:", err);
