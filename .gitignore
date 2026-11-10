@@ -33,6 +33,7 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Local Self-Hosted Supabase Docker & volumes
-supabase-project/
-
+# Gemini
+GEMINI.md
+gemini.md
+.gemini/
