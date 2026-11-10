@@ -35,7 +35,11 @@ async function uploadToSupabaseBucket(fileSource, filename, mimeType, bucket = '
 
   // 4. Get public URL
   const { data: urlData } = client.storage.from(bucket).getPublicUrl(cleanPath);
-  const publicUrl = urlData.publicUrl;
+  const publicBaseUrl = (process.env.SUPABASE_PUBLIC_URL || currentUrl || '').replace(/\/$/, '');
+  const internalBaseUrl = (currentUrl || '').replace(/\/$/, '');
+  const publicUrl = (publicBaseUrl && internalBaseUrl && urlData.publicUrl)
+    ? urlData.publicUrl.replace(internalBaseUrl, publicBaseUrl)
+    : urlData.publicUrl;
 
   return {
     success: true,

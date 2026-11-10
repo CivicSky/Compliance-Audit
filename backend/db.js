@@ -8,7 +8,13 @@ if (!dbUrl) {
   throw new Error('DATABASE_URL is not defined in environment variables. Please check your .env file.');
 }
 
-const isLocal = dbUrl.includes('localhost') || dbUrl.includes('127.0.0.1');
+const isLocal =
+  dbUrl.includes('localhost') ||
+  dbUrl.includes('127.0.0.1') ||
+  dbUrl.includes('@db:') ||
+  dbUrl.includes('@supavisor:') ||
+  dbUrl.includes('@supabase-db:') ||
+  process.env.DB_SSL === 'false';
 
 const sql = postgres(dbUrl, {
   ssl: isLocal ? false : { rejectUnauthorized: false },

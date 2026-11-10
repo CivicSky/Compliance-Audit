@@ -87,7 +87,7 @@ const serveProfilePic = (req, res, next) => {
     if (fs.existsSync(localPath)) {
         return res.sendFile(localPath);
     }
-    const supabaseUrl = (process.env.SUPABASE_URL || '').replace(/\/$/, '');
+    const supabaseUrl = (process.env.SUPABASE_PUBLIC_URL || process.env.SUPABASE_URL || '').replace(/\/$/, '');
     if (supabaseUrl) {
         return res.redirect(`${supabaseUrl}/storage/v1/object/public/profile-pics/${filename}`);
     }
