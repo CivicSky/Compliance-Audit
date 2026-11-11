@@ -69,8 +69,27 @@ function emitDataChange(entityType = 'all', payload = null) {
   }
 }
 
+/**
+ * Notify connected clients that a user's active session was replaced by a new login
+ * @param {number|string} userid
+ * @param {string} newSid
+ */
+function emitSessionReplaced(userid, newSid) {
+  if (!io) return;
+  try {
+    io.emit('session_replaced', {
+      userid: Number(userid),
+      newSid,
+      timestamp: Date.now(),
+    });
+  } catch (err) {
+    console.error('[Socket.io] emitSessionReplaced error:', err);
+  }
+}
+
 module.exports = {
   initSocket,
   getIO,
   emitDataChange,
+  emitSessionReplaced,
 };

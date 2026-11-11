@@ -70,7 +70,12 @@ export default function Navbar({ isMobileMenuOpen: propIsMobileMenuOpen, setIsMo
 
     // Unified logout function
     const handleLogout = () => {
+        try {
+            usersAPI.logout?.().catch(() => {});
+        } catch {}
         localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        localStorage.removeItem("sessionId");
         delete axios.defaults.headers.common["Authorization"];
         navigate("/login");
     };

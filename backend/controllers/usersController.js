@@ -1081,11 +1081,18 @@ exports.loginUser = async (req, res) => {
       });
     }
 
+    const { createSession, clearSession } = require('../utils/sessionStore');
+    const { emitSessionReplaced } = require('../socket');
+    const sid = await createSession(user.userid);
+
     const token = jwt.sign(
-      { userid: user.userid, roleid: user.roleid },
+      { userid: user.userid, roleid: user.roleid, sid },
       "MY_SECRET_KEY",
       { expiresIn: "8h" }
     );
+
+    // Notify any previously open browsers/devices for this user so they log out immediately
+    emitSessionReplaced(user.userid, sid);
 
     if (user && user.userid) {
       try { recordLog(user.userid, 'Login', `User ${user.Email} logged in`); } catch (e) {}
@@ -1097,6 +1104,7 @@ exports.loginUser = async (req, res) => {
       success: true,
       message: "Login successful.",
       token,
+      sessionId: sid,
       user,
     });
   } catch (error) {
@@ -1112,6 +1120,8 @@ exports.logoutUser = async (req, res) => {
   try {
     const userid = req.user?.userid || null;
     if (userid) {
+      const { clearSession } = require('../utils/sessionStore');
+      await clearSession(userid, req.user?.sid);
       try { recordLog(userid, 'Logout', `User ${userid} logged out`); } catch (e) {}
     }
     res.json({ success: true, message: 'Logout successful' });

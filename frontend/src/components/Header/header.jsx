@@ -92,9 +92,13 @@ export default function Header({ onToggleMobileMenu, isAdmin: propIsAdmin }) {
 
   const handleLogout = () => {
     setShowProfileMenu(false);
+    try {
+      usersAPI.logout?.().catch(() => {});
+    } catch {}
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('name');
+    localStorage.removeItem('sessionId');
     delete axios.defaults.headers.common['Authorization'];
     navigate('/login');
   };

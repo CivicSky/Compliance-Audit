@@ -39,15 +39,24 @@ api.interceptors.response.use(
   },
   (error) => {
     const originalRequest = error.config;
-    // Only redirect if not a login or register request
+    // Redirect on 401 Unauthorized (expired or replaced session) if not a login or register request
     if (
-      (error.response?.status === 401 || error.response?.status === 403) &&
+      error.response?.status === 401 &&
       originalRequest &&
       !originalRequest.url.includes('/login') &&
       !originalRequest.url.includes('/register')
     ) {
+      const code = error.response?.data?.code;
+      const msg = error.response?.data?.message;
+      if (code === 'SESSION_REPLACED' && typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem(
+          'sessionReplacedMessage',
+          msg || 'Your session has ended because your account was signed in on another browser or device.'
+        );
+      }
       localStorage.removeItem('token');
       localStorage.removeItem('user');
+      localStorage.removeItem('sessionId');
       if (window.location.pathname !== '/login') {
         window.location.href = '/login';
       }
@@ -169,6 +178,10 @@ export const usersAPI = {
   login: async (credentials) => {
     loggedInUserCache = { token: null, data: null, timestamp: 0 };
     return (await api.post('/api/user/login', credentials)).data;
+  },
+  logout: async () => {
+    loggedInUserCache = { token: null, data: null, timestamp: 0 };
+    return (await api.post('/api/user/logout')).data;
   },
   register: async (userData) => (await api.post('/user/register', userData)).data,
   loginStatus: async (email) => (await api.get(`/api/user/login-status?email=${encodeURIComponent(email)}`)).data,
